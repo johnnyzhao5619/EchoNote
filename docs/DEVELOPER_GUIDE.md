@@ -53,38 +53,38 @@ EchoNote is a cross-platform desktop application for intelligent voice transcrip
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                         UI Layer (PyQt6)                     │
-│  ┌──────────┬──────────┬──────────┬──────────┬──────────┐  │
-│  │ Sidebar  │  Batch   │ Realtime │ Calendar │ Timeline │  │
-│  │          │Transcribe│  Record  │   Hub    │   View   │  │
-│  └──────────┴──────────┴──────────┴──────────┴──────────┘  │
+│                         UI Layer (PyQt6)                    │
+│  ┌──────────┬──────────┬──────────┬──────────┬──────────┐   │
+│  │ Sidebar  │  Batch   │ Realtime │ Calendar │ Timeline │   │
+│  │          │Transcribe│  Record  │   Hub    │   View   │   │
+│  └──────────┴──────────┴──────────┴──────────┴──────────┘   │
 └─────────────────────────────────────────────────────────────┘
-```
+
 
                               │
 
 ┌─────────────────────────────────────────────────────────────┐
-│ Core Business Logic │
-│ ┌──────────────┬──────────────┬──────────────────────────┐ │
-│ │ Transcription│ Calendar │ Timeline │ Settings │ │
-│ │ Manager │ Manager │ Manager │ Manager │ │
-│ └──────────────┴──────────────┴──────────────────────────┘ │
+│ Core Business Logic                                         │
+│ ┌──────────────┬──────────────┬──────────┬───────────────┐  │
+│ │ Transcription│ Calendar     │ Timeline │ Setting       │  │
+│ │ Manager      │ Manager      │ Manager  │ Manager       │  │
+│ └──────────────┴──────────────┴──────────┴───────────────┘  │
 └─────────────────────────────────────────────────────────────┘
 │
 ┌─────────────────────────────────────────────────────────────┐
-│ Engine Layer │
-│ ┌──────────────┬──────────────┬──────────────────────────┐ │
-│ │ Speech │ Translation │ Audio │ Calendar │ │
-│ │ Engines │ Engines │ Capture │ Sync │ │
-│ └──────────────┴──────────────┴──────────────────────────┘ │
+│ Engine Layer                                                │
+│ ┌──────────────┬──────────────┬──────────┬───────────────┐  │
+│ │ Speech       │ Translation  │ Audio    │ Calendar      │  │
+│ │ Engines      │ Engines      │ Capture  │ Sync          │  │
+│ └──────────────┴──────────────┴──────────┴───────────────┘  │
 └─────────────────────────────────────────────────────────────┘
 │
 ┌─────────────────────────────────────────────────────────────┐
-│ Data Layer │
-│ ┌──────────────┬──────────────┬──────────────────────────┐ │
-│ │ Database │ File System │ Config │ Security │ │
-│ │ (SQLite) │ Storage │ Manager │ Manager │ │
-│ └──────────────┴──────────────┴──────────────────────────┘ │
+│ Data Layer                                                  │
+│ ┌──────────────┬──────────────┬──────────┬───────────────┐  │
+│ │ Database     │ File System  │ Config   │ Security      │  │
+│ │ (SQLite)     │ Storage      │ Manager  │ Manager       │  │
+│ └──────────────┴──────────────┴──────────┴───────────────┘  │
 └─────────────────────────────────────────────────────────────┘
 
 ````
@@ -175,7 +175,7 @@ sudo apt install libxcb-xinerama0
 1. **Clone the Repository**
 
 ```bash
-git clone https://github.com/yourusername/echonote.git
+git clone https://github.com/johnnyzhao5619/echonote.git
 cd echonote
 ```
 
