@@ -212,7 +212,6 @@ We are continuously working to improve accessibility:
 
 For accessibility-related questions or feedback:
 
-- Email: accessibility@echonote.app
 - GitHub Issues: [EchoNote Issues](https://github.com/echonote/echonote/issues)
 
 ---
