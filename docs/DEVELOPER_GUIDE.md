@@ -1,7 +1,7 @@
 # EchoNote Developer Guide
 
 **Version**: 1.0.0  
-**Last Updated**: May 2024
+**Last Updated**: Oct 2025
 
 ---
 
