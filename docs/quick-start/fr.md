@@ -1,70 +1,23 @@
 # Démarrage rapide EchoNote
 
-Ce guide vous accompagne du premier lancement à votre première transcription en cinq minutes.
+Cette page sert de plan pour accéder rapidement aux sections pertinentes du [guide utilisateur](../user-guide/fr.md) sans dupliquer le contenu.
 
-## 1. Premier lancement (≈2 minutes)
-1. Double-cliquez sur l'icône EchoNote.
-2. Suivez l'assistant :
-   - Choisissez la langue d'interface (chinois, anglais ou français).
-   - Sélectionnez un thème (clair, sombre ou suivre le système).
-   - Téléchargez le modèle recommandé `base` (~145 Mo) via **Télécharger maintenant**.
-3. Patientez pendant l'initialisation (5 à 10 secondes lors du premier démarrage).
+## 1. Lancement & assistant (≈2 minutes)
+- Suivez la [liste de vérification de première configuration](../user-guide/fr.md#first-time-setup) pour la langue, le thème et le téléchargement du modèle.
+- La sous-section [Premier lancement](../user-guide/fr.md#first-launch) décrit les contrôles de dépendances et le temps d'initialisation attendu.
 
 ## 2. Première transcription (≈3 minutes)
-1. Importez un fichier audio/vidéo :
-   ```text
-   Transcription par lots → Importer un fichier → choisir le média
-   ```
-2. Une fois dans la file, cliquez sur **Démarrer** ou laissez EchoNote lancer la tâche automatiquement.
-3. À la fin, sélectionnez **Afficher** ou **Exporter** pour générer des fichiers TXT, SRT ou Markdown.
+- Préparez le traitement via [Lancer votre première transcription](../user-guide/fr.md#first-transcription).
+- Utilisez le raccourci présenté dans [Transcription par lots](../user-guide/fr.md#workflow-batch) pour importer, démarrer et exporter au même endroit.
 
-## Fiches mémo
-### Transcription par lots
-```text
-Transcription par lots → Importer fichier/dossier → Choisir un modèle → Attendre → Afficher/Exporter
-```
+## 3. Accès rapide aux fonctionnalités
+- **Enregistrement temps réel** : suivez le chemin indiqué dans [Enregistrement temps réel](../user-guide/fr.md#workflow-realtime).
+- **Synchronisation calendrier** : configurez les comptes via [Centre calendrier](../user-guide/fr.md#workflow-calendar).
+- **Téléchargement de modèles** : gérez-les depuis [Panneau Paramètres → Gestion des modèles](../user-guide/fr.md#workflow-models).
 
-### Enregistrement en temps réel
-```text
-Enregistrement temps réel → Choisir micro → Choisir un modèle → Démarrer → Arrêter → Exporter le texte
-```
-
-### Connecter Google Agenda
-```text
-Paramètres → Calendrier → Ajouter un compte Google → Autoriser dans le navigateur → Synchronisation automatique
-```
-
-### Télécharger d'autres modèles
-```text
-Paramètres → Gestion des modèles → Modèles disponibles → Télécharger → Attendre la fin
-```
-
-## Réglages recommandés
-- **Usage quotidien** : modèle `base`, concurrence 2, périphérique Auto.
-- **Haute qualité** : modèle `medium`/`large`, concurrence 1, périphérique CUDA (si disponible), type de calcul `float16`.
-- **Rapidité** : modèle `tiny`, concurrence 3–5, type de calcul `int8`.
-
-## Résolution rapide
-- **Échec de transcription** : vérifier le format du fichier, la présence du modèle et l'espace disque → Paramètres → Gestion des modèles → Vérifier le modèle.
-- **Transcription lente** : Paramètres → Paramètres de transcription → choisir un modèle plus petit.
-- **Impossible d'enregistrer** : confirmer micro, permissions système et source audio.
-- **Calendrier non synchronisé** : Paramètres → Calendrier → Supprimer le compte → Le reconnecter.
-
-## Raccourcis clavier
-| Fonction              | Raccourci       |
-| --------------------- | --------------- |
-| Transcription par lots| Ctrl+1 (⌘+1)    |
-| Enregistrement direct | Ctrl+2 (⌘+2)    |
-| Centre calendrier     | Ctrl+3 (⌘+3)    |
-| Timeline              | Ctrl+4 (⌘+4)    |
-| Paramètres            | Ctrl+, (⌘+,)    |
-
-## Emplacements des données
-```text
-Base de données : ~/.echonote/data.db
-Enregistrements : ~/Documents/EchoNote/Recordings/
-Transcriptions : ~/Documents/EchoNote/Transcripts/
-Journaux : ~/.echonote/logs/echonote.log
-```
-
-Pour plus d'informations, consultez `../user-guide/fr.md`.
+## 4. Réglages & assistance
+- Optimisez les performances avec les [Paramètres recommandés](../user-guide/fr.md#recommended-settings).
+- Résolvez les problèmes via la [section Dépannage](../user-guide/fr.md#troubleshooting).
+- Retenez les [Raccourcis clavier](../user-guide/fr.md#keyboard-shortcuts).
+- Vérifiez les chemins de stockage dans [Emplacements des données](../user-guide/fr.md#data-locations).
+- Besoin d'aide supplémentaire ? Consultez la rubrique [Support](../user-guide/fr.md#support).
