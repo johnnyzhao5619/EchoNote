@@ -1,5 +1,7 @@
 # Présentation du projet EchoNote
 
+> Consultez la référence principale en anglais dans [`README.md`](README.md) pour la version la plus à jour.
+
 ## 1. Objectifs de conception
 - Offrir une expérience hors ligne pour la transcription et la gestion d'agenda.
 - Garder les moteurs modulaires afin de faire évoluer indépendamment reconnaissance, traduction et synchronisation calendrier.

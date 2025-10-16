@@ -58,7 +58,7 @@ Ce manuel décrit les flux quotidiens, la navigation dans l'interface et les sol
 
 ## 6. Support
 - Consultez `~/.echonote/logs/echonote.log` pour diagnostics et traces.
-- Lisez `docs/PROJECT_OVERVIEW.fr.md` pour comprendre l'architecture et les flux de données.
+- Lisez `../project-overview/fr.md` pour comprendre l'architecture et les flux de données.
 - Lors d'une demande d'assistance, incluez l'OS, la version Python, le modèle utilisé et la présence de FFmpeg/PyAudio.
 
 Bonne organisation de vos conversations !

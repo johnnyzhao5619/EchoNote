@@ -50,9 +50,9 @@ python main.py
 运行测试前请确保安装开发依赖 `pip install -r requirements-dev.txt`，并在必要时准备音频输入或日历凭据。
 
 ## 文档
-- 使用手册：`docs/USER_GUIDE.zh-CN.md`
-- 快速入门：`docs/QUICK_START.zh-CN.md`
-- 项目说明：`docs/PROJECT_OVERVIEW.zh-CN.md`
+- 使用手册：`docs/user-guide/zh-CN.md`
+- 快速入门：`docs/quick-start/zh-CN.md`
+- 项目说明：`docs/project-overview/zh-CN.md`
 - 开发者参考：`docs/DEVELOPER_GUIDE.md`, `docs/API_REFERENCE.md`
 
 更多文档导航请参见 `docs/README.md`。

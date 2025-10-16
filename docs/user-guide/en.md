@@ -58,7 +58,7 @@ This guide covers the day-to-day workflows, UI navigation, and troubleshooting t
 
 ## 6. Getting Support
 - Review `~/.echonote/logs/echonote.log` for stack traces and diagnostics.
-- Read `docs/PROJECT_OVERVIEW.en.md` for architectural context and data flow diagrams.
+- Read `../project-overview/README.md` for architectural context and data flow diagrams.
 - When filing issues, include OS, Python version, model choice, and whether FFmpeg/PyAudio are installed.
 
 Enjoy capturing and organizing your conversations!
