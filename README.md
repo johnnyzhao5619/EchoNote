@@ -21,7 +21,7 @@ The project runs from source on Python 3.10+.
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/echonote.git
+git clone https://github.com/johnnyzhao5619/echonote.git
 cd EchoNote
 
 # Create and activate a virtual environment
@@ -41,6 +41,7 @@ Useful developer scripts and fixtures live under the `tests/` directory. Integra
 
 ## Documentation Map
 Comprehensive documentation in Chinese and English lives inside the `docs/` directory:
+
 
 - User Guides (`docs/USER_GUIDE.*.md`)
 - Quick Start handbooks (`docs/QUICK_START.*.md`)
