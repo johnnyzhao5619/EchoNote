@@ -1,9 +1,9 @@
 # EchoNote Documentation Index
 
 ## User Documentation
-- **User Guides**: [Index](user-guide/README.md) · [English](user-guide/en.md) · [中文](user-guide/zh-CN.md) · [Français](user-guide/fr.md)
-- **Quick Start**: [Index](quick-start/README.md) · [English](quick-start/en.md) · [中文](quick-start/zh-CN.md) · [Français](quick-start/fr.md)
-- **Project Overview**: [English](project-overview/README.md) · [中文](project-overview/zh-CN.md) · [Français](project-overview/fr.md)
+- **User Guide** (multi-language): [docs/user-guide/README.md](user-guide/README.md)
+- **Quick Start** (multi-language navigator): [docs/quick-start/README.md](quick-start/README.md)
+- **Project Overview** (architecture & translations): [docs/project-overview/README.md](project-overview/README.md)
 
 ## Developer & Reference
 - [Developer Guide](DEVELOPER_GUIDE.md)
