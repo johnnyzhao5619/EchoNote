@@ -1,1130 +1,316 @@
 # EchoNote Developer Guide
 
 **Version**: 1.0.0  
-**Last Updated**: October 2025
+**Last Updated**: May 2024
 
 ---
 
 ## Table of Contents
-
-1. [Introduction](#introduction)
-2. [Architecture Overview](#architecture-overview)
-3. [Development Environment Setup](#development-environment-setup)
-4. [Project Structure](#project-structure)
-5. [Core Components](#core-components)
-6. [API Reference](#api-reference)
-7. [Contributing Guidelines](#contributing-guidelines)
-8. [Code Standards](#code-standards)
-9. [Testing](#testing)
-10. [Build and Deployment](#build-and-deployment)
-
----
-
-## Introduction
-
-Welcome to the EchoNote developer documentation! This guide provides comprehensive information for developers who want to contribute to, extend, or understand the EchoNote codebase.
-
-### What is EchoNote?
-
-EchoNote is a cross-platform desktop application for intelligent voice transcription, translation, and calendar management. Built with Python and PyQt6, it follows a local-first philosophy while offering optional cloud service integration.
-
-### Key Technologies
-
-- **UI Framework**: PyQt6
-- **Speech Recognition**: faster-whisper (default), OpenAI/Google/Azure (optional)
-- **Database**: SQLite with application-level encryption
-- **Audio Processing**: PyAudio, soundfile, librosa
-- **HTTP Client**: httpx
-- **Task Scheduling**: APScheduler
-
-### Design Philosophy
-
-1. **Local-First**: Core functionality works offline
-2. **Modular Architecture**: Clear separation of concerns
-3. **Pluggable Engines**: Easy to add new speech/translation engines
-4. **Security**: Encrypted storage for sensitive data
-5. **Performance**: Optimized for resource efficiency
+1. [Introduction](#1-introduction)
+2. [Architecture at a Glance](#2-architecture-at-a-glance)
+3. [Local Environment Setup](#3-local-environment-setup)
+4. [Configuration & Secrets](#4-configuration--secrets)
+5. [Project Map](#5-project-map)
+6. [Domain Deep-Dives](#6-domain-deep-dives)
+    1. [Application Bootstrap](#61-application-bootstrap)
+    2. [Core Services](#62-core-services)
+    3. [Engine Layer](#63-engine-layer)
+    4. [UI Layer](#64-ui-layer)
+    5. [Utilities](#65-utilities)
+7. [Data Persistence & Migrations](#7-data-persistence--migrations)
+8. [Quality Toolkit](#8-quality-toolkit)
+9. [Runbook & Troubleshooting](#9-runbook--troubleshooting)
+10. [Contribution Workflow](#10-contribution-workflow)
+11. [Reference Resources](#11-reference-resources)
 
 ---
 
-## Architecture Overview
+## 1. Introduction
+EchoNote is a local-first desktop application that combines batch and real-time transcription, calendar coordination, and an interactive timeline. The goal of this guide is to give contributors a cohesive mental model of the system, clarify day-to-day development tasks, and highlight the practices that keep the codebase maintainable.
 
-### High-Level Architecture
+### Design Principles
+- **Local-first privacy** – the application runs without a cloud dependency; encrypted persistence and secrets management protect user data.
+- **Composable modules** – each feature has a focused manager inside `core/` with clear boundaries to UI widgets and engine adapters.
+- **Pluggable engines** – speech, translation, audio capture, and calendar sync adapters live in `engines/` and expose consistent interfaces so that alternatives can be added without ripple effects.
+- **Operational empathy** – diagnostic tools, dependency checks, and resource monitors are built into the startup sequence to make field issues debuggable.
+
+---
+
+## 2. Architecture at a Glance
+The project follows a layered architecture where UI widgets orchestrate feature managers, which in turn talk to engine adapters and the data layer.
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                         UI Layer (PyQt6)                    │
-│  ┌──────────┬──────────┬──────────┬──────────┬──────────┐   │
-│  │ Sidebar  │  Batch   │ Realtime │ Calendar │ Timeline │   │
-│  │          │Transcribe│  Record  │   Hub    │   View   │   │
-│  └──────────┴──────────┴──────────┴──────────┴──────────┘   │
-└─────────────────────────────────────────────────────────────┘
-                              │
-┌─────────────────────────────────────────────────────────────┐
-│ Core Business Logic                                         │
-│ ┌──────────────┬──────────────┬──────────┬───────────────┐  │
-│ │ Transcription│ Calendar     │ Timeline │ Setting       │  │
-│ │ Manager      │ Manager      │ Manager  │ Manager       │  │
-│ └──────────────┴──────────────┴──────────┴───────────────┘  │
-└─────────────────────────────────────────────────────────────┘
-                              │
-┌─────────────────────────────────────────────────────────────┐
-│ Engine Layer                                                │
-│ ┌──────────────┬──────────────┬──────────┬───────────────┐  │
-│ │ Speech       │ Translation  │ Audio    │ Calendar      │  │
-│ │ Engines      │ Engines      │ Capture  │ Sync          │  │
-│ └──────────────┴──────────────┴──────────┴───────────────┘  │
-└─────────────────────────────────────────────────────────────┘
-                              │
-┌─────────────────────────────────────────────────────────────┐
-│ Data Layer                                                  │
-│ ┌──────────────┬──────────────┬──────────┬───────────────┐  │
-│ │ Database     │ File System  │ Config   │ Security      │  │
-│ │ (SQLite)     │ Storage      │ Manager  │ Manager       │  │
-│ └──────────────┴──────────────┴──────────┴───────────────┘  │
-└─────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────┐
+│                UI Layer (`ui/`)            │
+│  Qt widgets, dialogs, navigation shell     │
+└───────────────────────┬────────────────────┘
+                        │ signals/slots
+┌───────────────────────┴────────────────────┐
+│          Core Services (`core/`)           │
+│  Domain managers, schedulers, task queues  │
+└───────────────────────┬────────────────────┘
+                        │ contracts
+┌───────────────────────┴────────────────────┐
+│           Engine Layer (`engines/`)        │
+│  Speech, audio, translation, calendar APIs │
+└───────────────────────┬────────────────────┘
+                        │ persistence
+┌───────────────────────┴────────────────────┐
+│            Data Layer (`data/`)            │
+│  SQLite access, storage, secrets, crypto   │
+└────────────────────────────────────────────┘
+```
 
-````
-
-### Layer Responsibilities
-
-#### UI Layer (`ui/`)
-- PyQt6-based user interface components
-- Event handling and user interactions
-- Theme and language switching
-- No direct database access (uses managers)
-
-#### Core Layer (`core/`)
-- Business logic independent of UI
-- Manager classes for each feature domain
-- Task queue and scheduling
-- Coordinates between UI and engines
-
-#### Engine Layer (`engines/`)
-- Pluggable speech recognition implementations
-- Translation service adapters
-- Audio capture and processing
-- Calendar sync adapters
-
-#### Data Layer (`data/`)
-- Database connection and ORM models
-- File system operations
-- Configuration management
-- Security and encryption
+Supporting modules under `utils/` provide logging, diagnostics, async helpers, and environment checks that are reused across layers.
 
 ---
 
-## Development Environment Setup
-
+## 3. Local Environment Setup
 ### Prerequisites
+- Python **3.10+** (3.11 recommended)
+- Git
+- pip / venv tooling
+- Optional runtime dependencies: FFmpeg (media support), PortAudio (microphone capture), CUDA drivers (GPU acceleration)
 
-- **Python**: 3.8 or higher
-- **pip**: Latest version
-- **Git**: For version control
-- **FFmpeg**: For audio/video processing (optional but recommended)
+Follow the platform-specific instructions in `docs/quick-start/README.md` if you need package manager commands.
 
-### Platform-Specific Requirements
-
-#### macOS
+### Step-by-step setup
 ```bash
-# Install Homebrew (if not installed)
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-# Install Python
-brew install python@3.11
-
-# Install FFmpeg
-brew install ffmpeg
-
-# Install PortAudio (for PyAudio)
-brew install portaudio
-````
-
-#### Windows
-
-```bash
-# Install Python from python.org
-# Download and install FFmpeg from ffmpeg.org
-
-# Install Visual C++ Build Tools (for some dependencies)
-# Download from: https://visualstudio.microsoft.com/visual-cpp-build-tools/
-```
-
-#### Linux (Ubuntu/Debian)
-
-```bash
-# Install Python and dependencies
-sudo apt update
-sudo apt install python3.11 python3.11-venv python3-pip
-
-# Install FFmpeg
-sudo apt install ffmpeg
-
-# Install PortAudio
-sudo apt install portaudio19-dev
-
-# Install Qt dependencies
-sudo apt install libxcb-xinerama0
-```
-
-### Setting Up the Development Environment
-
-1. **Clone the Repository**
-
-```bash
+# 1. Clone the repository
 git clone https://github.com/johnnyzhao5619/echonote.git
-cd echonote
-```
+cd EchoNote
 
-2. **Create Virtual Environment**
+# 2. Create an isolated environment
+python -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
 
-```bash
-python -m venv venv
-
-# Activate on macOS/Linux
-source venv/bin/activate
-
-# Activate on Windows
-venv\Scripts\activate
-```
-
-3. **Install Dependencies**
-
-```bash
-# Install production dependencies
+# 3. Install runtime dependencies
+pip install --upgrade pip
 pip install -r requirements.txt
 
-# Install development dependencies
+# 4. Install development extras (linters, type-checkers, tests)
 pip install -r requirements-dev.txt
-```
 
-4. **Configure the Application**
+# 5. Install pre-commit hooks (runs Black, isort, flake8, mypy, bandit, interrogate)
+pre-commit install
 
-```bash
-# Copy default configuration
-cp config/default_config.json ~/.echonote/config.json
-
-# Edit configuration as needed
-# (API keys, paths, etc.)
-```
-
-5. **Run the Application**
-
-```bash
+# 6. Launch the app
 python main.py
 ```
-
-### IDE Setup
-
-#### VS Code (Recommended)
-
-```json
-// .vscode/settings.json
-{
-  "python.defaultInterpreterPath": "${workspaceFolder}/venv/bin/python",
-  "python.linting.enabled": true,
-  "python.linting.pylintEnabled": true,
-  "python.formatting.provider": "black",
-  "editor.formatOnSave": true,
-  "python.testing.pytestEnabled": true
-}
-```
-
-#### PyCharm
-
-1. Open project in PyCharm
-2. Configure Python interpreter: Settings → Project → Python Interpreter
-3. Select the virtual environment: `<project>/venv`
-4. Enable pytest: Settings → Tools → Python Integrated Tools → Testing
+The first launch triggers `utils.first_run_setup.FirstRunSetup` which creates the application directories under `~/.echonote`, initializes the SQLite schema, and writes default configuration files.
 
 ---
 
-## Project Structure
+## 4. Configuration & Secrets
+Configuration is managed by `config/app_config.py`.
 
-### Directory Layout
+- **Defaults** live in `config/default_config.json` (version, paths, scheduler cadence, engine defaults).
+- **User overrides** are persisted to `~/.echonote/app_config.json`.
+- Secrets such as OAuth credentials and encryption keys are stored via `data/security/secrets_manager.py` and encrypted when possible.
+- Engine API keys should be set via the settings UI, which delegates to the `SettingsManager` to persist encrypted values.
 
+When adding new settings:
+1. Extend the schema in `config/default_config.json`.
+2. Update `ConfigManager` getters/setters.
+3. Surface changes through `core/settings/manager.py` and the relevant UI component.
+4. Provide migration defaults in `utils/first_run_setup.py` so existing users receive sane values.
+
+---
+
+## 5. Project Map
 ```
-echonote/
-├── main.py                          # Application entry point
-├── requirements.txt                 # Production dependencies
-├── requirements-dev.txt             # Development dependencies
+EchoNote/
+├── main.py                     # Application bootstrap & dependency wiring
 ├── config/
 │   ├── __init__.py
-│   ├── default_config.json         # Default configuration
-│   └── app_config.py               # Configuration loader
-├── ui/                              # UI Layer
-│   ├── __init__.py
-│   ├── main_window.py              # Main application window
-│   ├── sidebar.py                  # Navigation sidebar
-│   ├── batch_transcribe/           # Batch transcription UI
-│   ├── realtime_record/            # Real-time recording UI
-│   ├── calendar_hub/               # Calendar hub UI
-│   ├── timeline/                   # Timeline view UI
-│   ├── settings/                   # Settings UI
-│   ├── common/                     # Shared UI components
-│   └── dialogs/                    # Dialog windows
-├── core/                            # Core Business Logic
-│   ├── __init__.py
-│   ├── transcription/              # Transcription management
-│   │   ├── __init__.py
-│   │   ├── manager.py
-│   │   ├── task_queue.py
-│   │   └── format_converter.py
-│   ├── realtime/                   # Real-time recording
-│   │   ├── __init__.py
-│   │   ├── recorder.py
-│   │   └── audio_buffer.py
-│   ├── calendar/                   # Calendar management
-│   │   ├── __init__.py
-│   │   ├── manager.py
-│   │   └── sync_scheduler.py
-│   ├── timeline/                   # Timeline management
-│   │   ├── __init__.py
-│   │   ├── manager.py
-│   │   └── auto_task_scheduler.py
-│   ├── settings/                   # Settings management
-│   │   ├── __init__.py
-│   │   └── manager.py
-│   └── models/                     # Model management
-│       ├── __init__.py
-│       ├── manager.py
-│       ├── downloader.py
-│       ├── registry.py
-│       └── validator.py
+│   ├── app_config.py          # ConfigManager implementation
+│   └── default_config.json    # Baseline configuration
+├── core/
+│   ├── transcription/         # Batch transcription managers and task queue
+│   ├── realtime/              # Live recording pipeline
+│   ├── calendar/              # Calendar CRUD + sync scheduler
+│   ├── timeline/              # Timeline aggregation & automation
+│   └── settings/              # User preference management
+├── data/
+│   ├── database/              # SQLite access, schema, models
+│   ├── security/              # Encryption, secrets, OAuth helpers
+│   └── storage/               # File lifecycle helpers
+├── engines/
+│   ├── speech/                # Speech recognition adapters
+│   ├── audio/                 # Microphone capture & VAD
+│   ├── translation/           # Translation engines
+│   └── calendar_sync/         # Google & Outlook sync adapters
+├── resources/                 # Icons, QSS themes, translations
+├── ui/                        # PyQt6 widgets, dialogs, navigation shell
+├── utils/                     # Logging, diagnostics, async helpers
+└── tests/                     # Unit, integration, and E2E scaffolding
 ```
-
-├── engines/ # Engine Layer
-│ ├── **init**.py
-│ ├── speech/ # Speech recognition engines
-│ │ ├── **init**.py
-│ │ ├── base.py # Abstract base class
-│ │ ├── faster_whisper_engine.py
-│ │ ├── openai_engine.py
-│ │ ├── google_engine.py
-│ │ ├── azure_engine.py
-│ │ ├── usage_tracker.py
-│ │ └── api_validator.py
-│ ├── translation/ # Translation engines
-│ │ ├── **init**.py
-│ │ ├── base.py
-│ │ └── google_translate.py
-│ ├── audio/ # Audio processing
-│ │ ├── **init**.py
-│ │ ├── capture.py
-│ │ └── vad.py
-│ └── calendar_sync/ # Calendar sync adapters
-│ ├── **init**.py
-│ ├── base.py
-│ ├── google_calendar.py
-│ └── outlook_calendar.py
-├── data/ # Data Layer
-│ ├── **init**.py
-│ ├── database/ # Database operations
-│ │ ├── **init**.py
-│ │ ├── connection.py
-│ │ ├── models.py
-│ │ ├── schema.sql
-│ │ ├── encryption_helper.py
-│ │ └── migrations/
-│ ├── storage/ # File system operations
-│ │ ├── **init**.py
-│ │ └── file_manager.py
-│ └── security/ # Security and encryption
-│ ├── **init**.py
-│ ├── encryption.py
-│ ├── oauth_manager.py
-│ └── secrets_manager.py
-├── utils/ # Utilities
-│ ├── **init**.py
-│ ├── i18n.py # Internationalization
-│ ├── logger.py # Logging
-│ ├── validators.py # Input validation
-│ ├── error_handler.py # Error handling
-│ ├── ffmpeg_checker.py # FFmpeg detection
-│ ├── gpu_detector.py # GPU detection
-│ ├── resource_monitor.py # Resource monitoring
-│ ├── startup_optimizer.py # Startup optimization
-│ ├── first_run_setup.py # First run setup
-│ ├── http_client.py # HTTP client utilities
-│ ├── network_error_handler.py # Network error handling
-│ ├── qt_async.py # Qt async utilities
-│ ├── user_feedback.py # User feedback
-│ └── data_cleanup.py # Data cleanup
-├── resources/ # Static Resources
-│ ├── icons/
-│ ├── themes/
-│ │ ├── light.qss
-│ │ └── dark.qss
-│ └── translations/
-│ ├── en_US.json
-│ ├── zh_CN.json
-│ └── fr_FR.json
-├── docs/ # Documentation
-│ ├── README.md
-│ ├── USER_GUIDE.md
-│ ├── QUICK_START.md
-│ ├── DEVELOPER_GUIDE.md # This file
-│ ├── API_REFERENCE.md
-│ ├── CONTRIBUTING.md
-│ └── CODE_STANDARDS.md
-└── tests/ # Tests
-├── **init**.py
-├── unit/
-├── integration/
-└── fixtures/
-
-````
-
-### Key Files
-
-- **`main.py`**: Application entry point, initializes all managers and starts the Qt event loop
-- **`config/app_config.py`**: Configuration management system
-- **`data/database/models.py`**: ORM models for all database entities
-- **`ui/main_window.py`**: Main application window with sidebar navigation
-- **`core/*/manager.py`**: Manager classes for each feature domain
+Supplementary documentation lives under `docs/` (see [Reference Resources](#11-reference-resources)).
 
 ---
 
-## Core Components
-
-### 1. Transcription System
-
-#### TranscriptionManager (`core/transcription/manager.py`)
-
-Manages batch transcription tasks with queue management and progress tracking.
-
-**Key Methods:**
-```python
-async def add_task(file_path: str, options: dict) -> str
-async def start_processing()
-async def process_task(task_id: str)
-def get_task_status(task_id: str) -> dict
-def cancel_task(task_id: str)
-def pause_processing()
-def resume_processing()
-````
-
-**Usage Example:**
-
-```python
-from core.transcription.manager import TranscriptionManager
-
-# Initialize
-manager = TranscriptionManager(db, speech_engine, config)
-
-# Add task
-task_id = await manager.add_task(
-    file_path="/path/to/audio.mp3",
-    options={
-        "language": "zh",
-        "output_format": "txt"
-    }
-)
-
-# Start processing
-await manager.start_processing()
-
-# Check status
-status = manager.get_task_status(task_id)
-print(f"Progress: {status['progress']}%")
-```
-
-#### TaskQueue (`core/transcription/task_queue.py`)
-
-Asynchronous task queue with concurrency control.
-
-**Features:**
-
-- Concurrent task execution with semaphore
-- Priority queue support
-- Retry mechanism with exponential backoff
-- Progress callbacks
-
-#### FormatConverter (`core/transcription/format_converter.py`)
-
-Converts transcription results to various output formats.
-
-**Supported Formats:**
-
-- **TXT**: Plain text
-- **SRT**: SubRip subtitle format
-- **MD**: Markdown with timestamps
-
-### 2. Real-time Recording System
-
-#### RealtimeRecorder (`core/realtime/recorder.py`)
-
-Manages real-time audio recording, transcription, and translation.
-
-**Key Methods:**
-
-```python
-async def start_recording(input_source: str, options: dict)
-async def stop_recording() -> dict
-def get_transcription_stream() -> AsyncIterator[str]
-def get_translation_stream() -> AsyncIterator[str]
-```
-
-**Usage Example:**
-
-```python
-from core.realtime.recorder import RealtimeRecorder
-
-# Initialize
-recorder = RealtimeRecorder(
-    audio_capture=audio_capture,
-    speech_engine=speech_engine,
-    translation_engine=translation_engine,
-    db_connection=db,
-    file_manager=file_manager
-)
-
-# Start recording
-await recorder.start_recording(
-    input_source="default",
-    options={
-        "language": "zh",
-        "enable_translation": True,
-        "target_language": "en"
-    }
-)
-
-# Get transcription stream
-async for text in recorder.get_transcription_stream():
-    print(f"Transcription: {text}")
-
-# Stop recording
-result = await recorder.stop_recording()
-print(f"Recording saved to: {result['recording_path']}")
-```
-
-#### AudioBuffer (`core/realtime/audio_buffer.py`)
-
-Circular buffer for real-time audio data with sliding window support.
-
-**Features:**
-
-- Fixed-size circular buffer
-- Sliding window access
-- Memory-efficient
-- Thread-safe
-
-### 3. Calendar System
-
-#### CalendarManager (`core/calendar/manager.py`)
-
-Manages local and external calendar events.
-
-**Key Methods:**
-
-```python
-async def create_event(event_data: dict, sync_to: list = None) -> str
-async def update_event(event_id: str, event_data: dict)
-async def delete_event(event_id: str)
-def get_events(start_date, end_date, filters: dict = None) -> list
-async def sync_external_calendar(provider: str)
-```
-
-**Usage Example:**
-
-```python
-from core.calendar.manager import CalendarManager
-
-# Initialize
-manager = CalendarManager(db, sync_adapters)
-
-# Create event
-event_id = await manager.create_event(
-    event_data={
-        "title": "Team Meeting",
-        "event_type": "Event",
-        "start_time": datetime(2025, 10, 15, 10, 0),
-        "end_time": datetime(2025, 10, 15, 11, 0),
-        "location": "Conference Room A"
-    },
-    sync_to=["google"]  # Optional: sync to Google Calendar
-)
-
-# Get events
-events = manager.get_events(
-    start_date=datetime(2025, 10, 1),
-    end_date=datetime(2025, 10, 31)
-)
-```
-
-#### SyncScheduler (`core/calendar/sync_scheduler.py`)
-
-Periodically syncs external calendars in the background.
-
-**Features:**
-
-- Automatic periodic sync (default: 15 minutes)
-- Incremental sync using sync tokens
-- Error handling and retry logic
-- Manual sync trigger
-
-### 4. Timeline System
-
-#### TimelineManager (`core/timeline/manager.py`)
-
-Provides timeline view data with past and future events.
-
-**Key Methods:**
-
-```python
-def get_timeline_events(center_time, past_days, future_days, page, page_size) -> dict
-async def set_auto_task(event_id: str, task_config: dict)
-def search_events(query: str, filters: dict) -> list
-def get_event_artifacts(event_id: str) -> dict
-```
-
-#### AutoTaskScheduler (`core/timeline/auto_task_scheduler.py`)
-
-Automatically starts recording/transcription for scheduled events.
-
-**Features:**
-
-- Monitors upcoming events
-- Sends reminder notifications (5 minutes before)
-- Auto-starts configured tasks
-- Saves artifacts to event attachments
-
-### 5. Speech Engine System
-
-#### SpeechEngine Base Class (`engines/speech/base.py`)
-
-Abstract base class for all speech recognition engines.
-
-**Interface:**
-
-```python
-class SpeechEngine(ABC):
-    @abstractmethod
-    def get_name(self) -> str:
-        """Engine name"""
-
-    @abstractmethod
-    def get_supported_languages(self) -> list:
-        """Supported language codes"""
-
-    @abstractmethod
-    async def transcribe_file(self, audio_path: str, language: str = None) -> dict:
-        """Transcribe audio file"""
-
-    @abstractmethod
-    async def transcribe_stream(self, audio_chunk: np.ndarray, language: str = None) -> str:
-        """Transcribe audio stream"""
-
-    @abstractmethod
-    def get_config_schema(self) -> dict:
-        """Configuration schema"""
-```
-
-#### FasterWhisperEngine (`engines/speech/faster_whisper_engine.py`)
-
-Default local speech recognition engine using faster-whisper.
-
-**Features:**
-
-- Multiple model sizes (tiny, base, small, medium, large)
-- GPU acceleration (CUDA, CoreML)
-- VAD integration
-- Batch and streaming modes
-
-**Usage Example:**
-
-```python
-from engines.speech.faster_whisper_engine import FasterWhisperEngine
-
-# Initialize
-engine = FasterWhisperEngine(
-    model_size="base",
-    device="auto",  # auto-detect GPU
-    compute_type="int8"
-)
-
-# Transcribe file
-result = await engine.transcribe_file(
-    audio_path="/path/to/audio.mp3",
-    language="zh"
-)
-
-# Result format
-{
-    "segments": [
-        {"start": 0.0, "end": 2.5, "text": "Hello world"},
-        {"start": 2.5, "end": 5.0, "text": "This is a test"}
-    ],
-    "language": "zh"
-}
-```
-
-### 6. Database System
-
-#### DatabaseConnection (`data/database/connection.py`)
-
-SQLite database connection with encryption support.
-
-**Features:**
-
-- Connection pooling
-- Transaction management
-- Application-level encryption for sensitive fields
-- Migration system
-
-**Usage Example:**
-
-```python
-from data.database.connection import DatabaseConnection
-
-# Initialize with encryption
-db = DatabaseConnection(
-    db_path="~/.echonote/data.db",
-    encryption_key="your-encryption-key"
-)
-
-# Execute query
-results = db.execute(
-    "SELECT * FROM transcription_tasks WHERE status = ?",
-    ("completed",)
-)
-
-# Transaction
-with db.transaction():
-    db.execute("INSERT INTO ...", (...))
-    db.execute("UPDATE ...", (...))
-```
-
-#### ORM Models (`data/database/models.py`)
-
-Object-relational mapping for database entities.
-
-**Key Models:**
-
-- `TranscriptionTask`: Batch transcription tasks
-- `CalendarEvent`: Calendar events
-- `EventAttachment`: Event attachments (recordings, transcripts)
-- `AutoTaskConfig`: Auto-task configurations
-- `CalendarSyncStatus`: External calendar sync status
-- `APIUsage`: API usage tracking
-- `ModelUsageStats`: Model usage statistics
+## 6. Domain Deep-Dives
+### 6.1 Application Bootstrap
+`main.py` orchestrates startup:
+1. Configure logging via `utils/logger.py`.
+2. Install a global exception hook that surfaces crashes with `ui/common/error_dialog.py`.
+3. Initialize the Qt application, splash screen, and first-run setup.
+4. Load configuration (`ConfigManager`), ensure FFmpeg availability (`utils/ffmpeg_checker.py`), and open the encrypted database (`data/database/connection.py`).
+5. Instantiate managers: transcription, realtime, calendar, timeline, and settings; wire engine adapters from `engines/`.
+6. Initialize background services (`core/calendar/sync_scheduler.py`, `core/timeline/auto_task_scheduler.py`).
+7. Construct the main window (`ui/main_window.py`) and hand control to the Qt event loop.
+
+### 6.2 Core Services
+Each subpackage inside `core/` houses a manager that encapsulates domain logic and exposes a thin API to the UI.
+
+- **Transcription (`core/transcription/`)**
+  - `TranscriptionManager` handles task creation (`add_task`, `add_tasks_from_folder`), background processing (`start_processing`, `pause_processing`, `resume_processing`, `stop_all_tasks`), and progress callbacks.
+  - `TaskQueue` provides coroutine scheduling with retry logic (`start`, `add_task`, `pause`, `resume`, `stop`).
+  - `FormatConverter` exports transcripts to TXT/SRT/Markdown and attaches metadata.
+
+- **Real-time recording (`core/realtime/`)**
+  - `RealtimeRecorder` streams audio frames from `engines/audio/capture.py`, applies voice-activity detection, and dispatches transcripts to listeners.
+  - `audio_buffer.py` maintains rolling buffers for low-latency playback or streaming transcripts.
+
+- **Calendar (`core/calendar/`)**
+  - `CalendarManager` exposes CRUD methods (`create_event`, `update_event`, `delete_event`, `get_event`, `get_events`) and synchronization entrypoints (`sync_external_calendar`).
+  - `SyncScheduler` polls external providers on an interval, tracks sync tokens, and reconciles conflicts.
+
+- **Timeline (`core/timeline/`)**
+  - `TimelineManager` aggregates events and artifacts (`get_timeline_events`, `search_events`, `get_event_artifacts`).
+  - `AutoTaskScheduler` observes upcoming events and can trigger `RealtimeRecorder` or transcription tasks automatically.
+
+- **Settings (`core/settings/manager.py`)**
+  - Centralizes user preferences, theme toggles, language selection, API credentials, and persists values through `ConfigManager` and the secrets store.
+
+### 6.3 Engine Layer
+Engine adapters isolate third-party APIs and hardware concerns.
+
+- **Speech (`engines/speech/`)**
+  - `SpeechEngine` defines the contract (`get_name`, `get_supported_languages`, `transcribe_file`, `transcribe_stream`, `get_config_schema`).
+  - `faster_whisper_engine.py` provides the default local transcription implementation with GPU detection.
+  - `openai_engine.py`, `google_engine.py`, and `azure_engine.py` integrate cloud services and reuse `api_validator.py` and `usage_tracker.py` for quota management.
+
+- **Audio (`engines/audio/`)**
+  - `capture.py` wraps PyAudio streams and exposes async iteration for live capture.
+  - `vad.py` provides voice-activity detection utilities consumed by both realtime and batch flows.
+
+- **Translation (`engines/translation/`)**
+  - `base.py` defines the translator interface; `google_translate.py` implements it through Google Translate APIs.
+
+- **Calendar sync (`engines/calendar_sync/`)**
+  - `base.py` standardizes methods such as `fetch_events`, `create_event`, `update_event`, `delete_event`.
+  - `google_calendar.py` and `outlook_calendar.py` translate between provider APIs and local models, relying on credentials issued via the settings UI.
+
+### 6.4 UI Layer
+UI code under `ui/` follows Qt best practices:
+- `main_window.py` wires the sidebar, central stacked widgets, and orchestrates manager interactions.
+- Feature-specific packages (`batch_transcribe`, `realtime_record`, `calendar_hub`, `timeline`, `settings`) contain views, dialogs, and presenters dedicated to each domain.
+- Shared components and dialogs live in `ui/common/` and `ui/dialogs/` (e.g., splash screen, notifications, error handling).
+- Qt styles reside in `resources/themes/`, translations in `resources/translations/`, and icons in `resources/icons/`.
+
+### 6.5 Utilities
+Reusable helpers live under `utils/`:
+- `logger.py` sets up structured logging across modules.
+- `ffmpeg_checker.py`, `gpu_detector.py`, and `resource_monitor.py` collect system diagnostics.
+- `first_run_setup.py` provisions configuration, database schema, and sample folders.
+- `qt_async.py` bridges asyncio tasks with Qt's event loop.
+- `error_handler.py` and `network_error_handler.py` normalize error reporting for UI dialogs.
+- `http_client.py` wraps shared HTTP session settings, including retries and timeouts.
 
 ---
 
-## API Reference
+## 7. Data Persistence & Migrations
+The data layer is anchored by `data/database`:
+- `connection.py` offers a thread-local connection pool with optional SQLCipher encryption (`initialize_schema` applies `schema.sql`).
+- `models.py` contains dataclass-backed models (`TranscriptionTask`, `CalendarEvent`, `EventAttachment`, `AutoTaskConfig`, `CalendarSyncStatus`, etc.) with helpers to persist and query records.
+- `schema.sql` is the authoritative schema. Update it when adding tables or columns and bump the schema migration logic in `utils/first_run_setup.py` accordingly.
 
-For detailed API documentation, see [API_REFERENCE.md](API_REFERENCE.md).
+Additional support modules:
+- `data/security/encryption.py` and `secrets_manager.py` manage symmetric keys and secure storage.
+- `data/storage/file_manager.py` handles transcript/export paths, cleanup, and disk quotas.
+- `data/test_data_layer.py` contains fixtures to validate schema changes; extend it with regression tests when altering database structure.
 
-### Quick Reference
-
-#### Manager Classes
-
-| Class                  | Location                        | Purpose             |
-| ---------------------- | ------------------------------- | ------------------- |
-| `TranscriptionManager` | `core/transcription/manager.py` | Batch transcription |
-| `RealtimeRecorder`     | `core/realtime/recorder.py`     | Real-time recording |
-| `CalendarManager`      | `core/calendar/manager.py`      | Calendar management |
-| `TimelineManager`      | `core/timeline/manager.py`      | Timeline view       |
-| `SettingsManager`      | `core/settings/manager.py`      | Settings management |
-| `ModelManager`         | `core/models/manager.py`        | Model management    |
-
-#### Engine Classes
-
-| Class                   | Location                                   | Purpose                  |
-| ----------------------- | ------------------------------------------ | ------------------------ |
-| `FasterWhisperEngine`   | `engines/speech/faster_whisper_engine.py`  | Local speech recognition |
-| `OpenAIEngine`          | `engines/speech/openai_engine.py`          | OpenAI Whisper API       |
-| `GoogleTranslateEngine` | `engines/translation/google_translate.py`  | Google Translate         |
-| `AudioCapture`          | `engines/audio/capture.py`                 | Audio capture            |
-| `GoogleCalendarAdapter` | `engines/calendar_sync/google_calendar.py` | Google Calendar sync     |
-
-#### Utility Classes
-
-| Class             | Location                         | Purpose                |
-| ----------------- | -------------------------------- | ---------------------- |
-| `I18nQtManager`   | `utils/i18n.py`                  | Internationalization   |
-| `SecurityManager` | `data/security/encryption.py`    | Encryption             |
-| `OAuthManager`    | `data/security/oauth_manager.py` | OAuth token management |
-| `FileManager`     | `data/storage/file_manager.py`   | File operations        |
-| `ResourceMonitor` | `utils/resource_monitor.py`      | Resource monitoring    |
+When evolving the schema:
+1. Update `schema.sql`.
+2. Extend models in `models.py` (fields, serialization helpers).
+3. Provide backfill logic inside `FirstRunSetup` (e.g., default values, migrations).
+4. Add unit tests that exercise new fields or relationships.
 
 ---
 
-## Contributing Guidelines
-
-For detailed contribution guidelines, see [CONTRIBUTING.md](CONTRIBUTING.md).
-
-### Quick Start for Contributors
-
-1. **Fork the Repository**
-2. **Create a Feature Branch**
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
-3. **Make Your Changes**
-4. **Write Tests**
-5. **Run Tests**
-   ```bash
-   pytest tests/
-   ```
-6. **Commit Your Changes**
-   ```bash
-   git commit -m "Add: your feature description"
-   ```
-7. **Push to Your Fork**
-   ```bash
-   git push origin feature/your-feature-name
-   ```
-8. **Create a Pull Request**
-
-### Commit Message Convention
-
-Use conventional commit format:
-
-```
-<type>(<scope>): <subject>
-
-<body>
-
-<footer>
-```
-
-**Types:**
-
-- `feat`: New feature
-- `fix`: Bug fix
-- `docs`: Documentation changes
-- `style`: Code style changes (formatting, etc.)
-- `refactor`: Code refactoring
-- `test`: Adding or updating tests
-- `chore`: Maintenance tasks
-
-**Example:**
-
-```
-feat(transcription): add support for MP4 video files
-
-- Add MP4 to supported formats list
-- Update file validation logic
-- Add tests for MP4 transcription
-
-Closes #123
-```
-
----
-
-## Code Standards
-
-For detailed code standards, see [CODE_STANDARDS.md](CODE_STANDARDS.md).
-
-### Python Style Guide
-
-We follow [PEP 8](https://pep8.org/) with some modifications:
-
-- **Line Length**: 100 characters (not 79)
-- **Indentation**: 4 spaces
-- **Quotes**: Double quotes for strings
-- **Imports**: Grouped and sorted (stdlib, third-party, local)
-
-### Code Formatting
-
-Use `black` for automatic formatting:
-
-```bash
-black echonote/
-```
-
-### Linting
-
-Use `pylint` for code quality checks:
-
-```bash
-pylint echonote/
-```
-
-### Type Hints
-
-Use type hints for function signatures:
-
-```python
-def process_audio(file_path: str, language: str = "en") -> dict:
-    """Process audio file and return transcription."""
-    pass
-```
-
-### Docstrings
-
-Use Google-style docstrings:
-
-```python
-def transcribe_file(audio_path: str, language: str = None) -> dict:
-    """
-    Transcribe an audio file.
-
-    Args:
-        audio_path: Path to the audio file
-        language: Language code (e.g., 'en', 'zh'). If None, auto-detect.
-
-    Returns:
-        Dictionary containing transcription segments and metadata.
-
-    Raises:
-        FileNotFoundError: If audio file doesn't exist
-        ValueError: If audio format is not supported
-
-    Example:
-        >>> result = transcribe_file("/path/to/audio.mp3", "en")
-        >>> print(result["segments"])
-    """
-    pass
-```
-
-### Error Handling
-
-Always use specific exception types:
-
-```python
-# Good
-try:
-    result = process_file(path)
-except FileNotFoundError:
-    logger.error(f"File not found: {path}")
-except ValueError as e:
-    logger.error(f"Invalid file format: {e}")
-
-# Bad
-try:
-    result = process_file(path)
-except Exception as e:
-    logger.error(f"Error: {e}")
-```
-
-### Logging
-
-Use the application logger:
-
-```python
-import logging
-
-logger = logging.getLogger(__name__)
-
-logger.debug("Debug message")
-logger.info("Info message")
-logger.warning("Warning message")
-logger.error("Error message")
-logger.critical("Critical message")
-```
-
----
-
-## Testing
-
-### Running Tests
-
+## 8. Quality Toolkit
+### Tests
 ```bash
 # Run all tests
-pytest tests/
+pytest tests
 
-# Run specific test file
-pytest tests/unit/test_transcription_manager.py
+# Run unit tests only
+pytest tests/unit
 
-# Run with coverage
-pytest --cov=echonote tests/
+# Run integration scaffolding (requires configured services)
+pytest tests/integration
 
-# Run with verbose output
-pytest -v tests/
+# Execute the end-to-end/performance harness
+pytest tests/e2e_performance_test.py
 ```
+Add new tests under `tests/unit/` or `tests/integration/` alongside fixtures in `tests/fixtures/`. Prefer deterministic inputs; rely on the existing secrets abstraction rather than hard-coding credentials.
 
-### Writing Tests
-
-#### Unit Tests
-
-```python
-import pytest
-from core.transcription.manager import TranscriptionManager
-
-class TestTranscriptionManager:
-    @pytest.fixture
-    def manager(self, mock_db, mock_engine, mock_config):
-        return TranscriptionManager(mock_db, mock_engine, mock_config)
-
-    def test_add_task(self, manager):
-        """Test adding a transcription task."""
-        task_id = manager.add_task("/path/to/audio.mp3", {})
-        assert task_id is not None
-        assert len(task_id) == 36  # UUID length
-
-    def test_invalid_file_format(self, manager):
-        """Test handling of invalid file format."""
-        with pytest.raises(ValueError):
-            manager.add_task("/path/to/file.xyz", {})
-```
-
-#### Integration Tests
-
-```python
-import pytest
-from data.database.connection import DatabaseConnection
-from core.transcription.manager import TranscriptionManager
-
-class TestTranscriptionIntegration:
-    @pytest.fixture
-    def db(self, tmp_path):
-        db_path = tmp_path / "test.db"
-        db = DatabaseConnection(str(db_path))
-        db.initialize_schema()
-        yield db
-        db.close_all()
-
-    def test_full_transcription_workflow(self, db, speech_engine, config):
-        """Test complete transcription workflow."""
-        manager = TranscriptionManager(db, speech_engine, config)
-
-        # Add task
-        task_id = manager.add_task("/path/to/audio.mp3", {})
-
-        # Process task
-        await manager.process_task(task_id)
-
-        # Verify result
-        status = manager.get_task_status(task_id)
-        assert status["status"] == "completed"
-        assert status["progress"] == 100
-```
-
-### Test Coverage
-
-Aim for at least 80% code coverage:
-
+### Linters & Formatters
 ```bash
-pytest --cov=echonote --cov-report=html tests/
+# Run the full pre-commit suite on staged changes
+pre-commit run --all-files
+
+# Or invoke individual tools
+black .
+isort .
+flake8
+mypy
+bandit -c pyproject.toml
+interrogate
 ```
+CI runs the same hooks, so keeping a clean `pre-commit` state locally avoids surprises.
 
-View coverage report:
-
+### Coverage
 ```bash
-open htmlcov/index.html
+pytest --cov=core --cov=engines --cov=data --cov=utils --cov=ui --cov-report=term-missing
 ```
+Aim for ≥80% coverage on core logic. Investigate any newly introduced gaps.
 
 ---
 
-## Build and Deployment
+## 9. Runbook & Troubleshooting
+| Symptom | Likely Cause | Mitigation |
+| --- | --- | --- |
+| Application launches without media support | FFmpeg missing | Run `utils.ffmpeg_checker.get_ffmpeg_checker().get_installation_instructions()` or install FFmpeg via your package manager. |
+| Microphone input unavailable | PortAudio backend missing or busy | Install PortAudio (`brew install portaudio`, `apt install portaudio19-dev`) and ensure no other application has exclusive access. |
+| GPU acceleration disabled | No compatible CUDA/CoreML device detected | Check `utils/gpu_detector.py` logs; adjust `config['transcription']['faster_whisper']['device']` or install appropriate drivers. |
+| Calendar sync silently stops | Expired OAuth tokens | Refresh credentials through the settings UI; `CalendarSyncStatus` rows will update once a new token is stored. |
+| Schema mismatch errors | Local database predates schema change | Delete/backup `~/.echonote/data.db` and rerun `DatabaseConnection.initialize_schema()` via `FirstRunSetup.setup()` or start the app to trigger automatic migration. |
 
-### Building for Distribution
-
-#### Windows (.exe)
-
-```bash
-# Install PyInstaller
-pip install pyinstaller
-
-# Build
-pyinstaller --name EchoNote \
-    --windowed \
-    --icon=resources/icons/app.ico \
-    --add-data "resources:resources" \
-    --add-data "config:config" \
-    main.py
-
-# Output: dist/EchoNote.exe
-```
-
-#### macOS (.app)
-
-```bash
-# Install py2app
-pip install py2app
-
-# Create setup.py
-python setup.py py2app
-
-# Output: dist/EchoNote.app
-```
-
-#### Linux (AppImage)
-
-```bash
-# Use PyInstaller
-pyinstaller echonote.spec
-
-# Create AppImage
-# (requires appimagetool)
-```
-
-### Code Signing
-
-#### Windows
-
-```bash
-signtool sign /f certificate.pfx /p password /t http://timestamp.digicert.com dist/EchoNote.exe
-```
-
-#### macOS
-
-```bash
-codesign --deep --force --verify --verbose --sign "Developer ID Application: Your Name" dist/EchoNote.app
-```
-
-### Release Process
-
-1. **Update Version**
-
-   - Update version in `config/default_config.json`
-   - Update version in `README.md`
-   - Update `CHANGELOG.md`
-
-2. **Run Tests**
-
-   ```bash
-   pytest tests/
-   ```
-
-3. **Build Packages**
-
-   ```bash
-   ./scripts/build_all.sh
-   ```
-
-4. **Create Release**
-   - Tag the release: `git tag v1.0.0`
-   - Push tag: `git push origin v1.0.0`
-   - Create GitHub release
-   - Upload build artifacts
+Enable debug logging (set `ECHO_NOTE_LOG_LEVEL=DEBUG` before launch) to get verbose traces from managers and engine adapters.
 
 ---
 
-## Additional Resources
-
-### Documentation
-
-- [User Guide](USER_GUIDE.md) - End-user documentation
-- [Quick Start](QUICK_START.md) - Getting started guide
-- [API Reference](API_REFERENCE.md) - Detailed API documentation
-- [FAQ](FAQ.md) - Frequently asked questions
-- [Troubleshooting](TROUBLESHOOTING.md) - Common issues and solutions
-
-### External Resources
-
-- [PyQt6 Documentation](https://www.riverbankcomputing.com/static/Docs/PyQt6/)
-- [faster-whisper GitHub](https://github.com/SYSTRAN/faster-whisper)
-- [OpenAI Whisper](https://github.com/openai/whisper)
-- [SQLite Documentation](https://www.sqlite.org/docs.html)
-
-### Community
-
-- **GitHub Issues**: Report bugs and request features
-- **GitHub Discussions**: Ask questions and share ideas
-- **Discord**: Join our community (link TBD)
+## 10. Contribution Workflow
+1. **Review open issues** and existing documentation (`docs/project-overview/README.md`) before making structural changes.
+2. **Create a topic branch** from `main`: `git checkout -b feature/<concise-summary>`.
+3. **Keep changes focused** – avoid unrelated refactors in the same pull request.
+4. **Follow code standards** defined in `docs/CODE_STANDARDS.md` (naming, docstrings, error handling).
+5. **Run `pre-commit run --all-files` and the relevant `pytest` suites** before opening a PR.
+6. **Write clear commit messages** describing intent and scope; reference issue IDs when applicable.
+7. **Update documentation** (including this guide) whenever you introduce new modules, settings, or workflows.
 
 ---
 
-## License
+## 11. Reference Resources
+- `docs/README.md` – documentation index
+- `docs/project-overview/README.md` – product vision and personas
+- `docs/user-guide/README.md` – end-user guide
+- `docs/quick-start/README.md` – environment and installation specifics
+- `docs/API_REFERENCE.md` – module-by-module API details
+- `docs/CODE_STANDARDS.md` – formatting, logging, error-handling expectations
+- `docs/ACCESSIBILITY.md` – accessibility checklist for UI changes
+- `docs/GOOGLE_OAUTH_SETUP.md` – configuring Google API credentials
 
-EchoNote is licensed under the MIT License. See [LICENSE](../LICENSE) for details.
-
----
-
-**Last Updated**: October 2025  
-**Maintainers**: EchoNote Development Team
-
-For questions or support, please open an issue on GitHub.
+For unresolved questions, open a GitHub issue or start a discussion thread so decisions remain discoverable.
