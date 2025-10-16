@@ -22,7 +22,7 @@ The project runs from source on Python 3.10+.
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/echonote.git
+git clone https://github.com/johnnyzhao5619/echonote.git
 cd EchoNote
 
 # Create and activate a virtual environment
