@@ -22,7 +22,7 @@
 
 **Location**: `core/transcription/manager.py`
 
-Manages batch transcription tasks with queue management and progress tracking.
+Manages batch transcription tasks with queue orchestration, export handling, and progress callbacks.
 
 #### Constructor
 
@@ -34,25 +34,22 @@ TranscriptionManager(db_connection, speech_engine, config)
 
 - `db_connection` (DatabaseConnection): Database connection instance
 - `speech_engine` (SpeechEngine): Speech recognition engine
-- `config` (ConfigManager): Application configuration
+- `config` (dict): Namespaced configuration for transcription behaviour
 
 #### Methods
 
 ##### add_task
 
 ```python
-async def add_task(file_path: str, options: dict = None) -> str
+def add_task(file_path: str, options: dict | None = None) -> str
 ```
 
-Add a transcription task to the queue.
+Register a single file for transcription. The task record is persisted immediately and queued when processing is running.
 
 **Parameters:**
 
 - `file_path` (str): Path to audio/video file
-- `options` (dict, optional): Task options
-  - `language` (str): Language code (e.g., 'en', 'zh')
-  - `output_format` (str): Output format ('txt', 'srt', 'md')
-  - `output_path` (str): Custom output path
+- `options` (dict, optional): Overrides such as `language`, `output_format`, and `output_path`
 
 **Returns:**
 
@@ -60,84 +57,69 @@ Add a transcription task to the queue.
 
 **Raises:**
 
-- `FileNotFoundError`: If file doesn't exist
-- `ValueError`: If file format is not supported
+- `FileNotFoundError`: File missing
+- `ValueError`: Unsupported extension
 
-**Example:**
-
-```python
-task_id = await manager.add_task(
-    file_path="/path/to/audio.mp3",
-    options={"language": "zh", "output_format": "txt"}
-)
-```
-
-##### start_processing
+##### add_tasks_from_folder
 
 ```python
-async def start_processing()
+def add_tasks_from_folder(folder_path: str, options: dict | None = None) -> list[str]
 ```
 
-Start processing tasks in the queue.
+Recursively discover supported media files in a folder and enqueue each one.
 
-##### process_task
+##### start_processing / stop_processing
 
 ```python
-async def process_task(task_id: str)
+def start_processing() -> None
+def stop_processing() -> None
 ```
 
-Process a specific task.
+Spin up (or tear down) the background worker loop that drains the task queue.
 
-**Parameters:**
+##### pause_processing / resume_processing
 
-- `task_id` (str): Task ID
+```python
+def pause_processing() -> None
+def resume_processing() -> None
+```
+
+Temporarily suspend queue intake without dropping tasks. `is_paused()` reports the current state.
 
 ##### get_task_status
 
 ```python
-def get_task_status(task_id: str) -> dict
+def get_task_status(task_id: str) -> dict | None
 ```
 
-Get task status and progress.
+Fetch the latest status row from the database for UI updates.
 
-**Parameters:**
-
-- `task_id` (str): Task ID
-
-**Returns:**
-
-- `dict`: Task status information
-  - `id` (str): Task ID
-  - `status` (str): 'pending', 'processing', 'completed', 'failed'
-  - `progress` (float): Progress percentage (0-100)
-  - `file_name` (str): File name
-  - `error_message` (str, optional): Error message if failed
-
-##### cancel_task
+##### cancel_task / retry_task / delete_task
 
 ```python
-def cancel_task(task_id: str)
+def cancel_task(task_id: str) -> bool
+def retry_task(task_id: str) -> bool
+def delete_task(task_id: str) -> bool
 ```
 
-Cancel a pending or processing task.
+Cancel pending work, clone a failed task for another attempt, or remove a completed record.
 
-##### pause_processing
+##### export_result
 
 ```python
-def pause_processing()
+def export_result(task_id: str, output_dir: str | None = None, fmt: str | None = None) -> dict
 ```
 
-Pause task processing (e.g., due to low resources).
+Convert the internal transcript into the requested format (`txt`, `srt`, or `md`) and return filesystem paths.
 
-##### resume_processing
+##### register_progress_callback / unregister_progress_callback
 
 ```python
-def resume_processing()
+def register_progress_callback(task_id: str, callback: Callable[[float, str], None]) -> None
+def unregister_progress_callback(task_id: str) -> None
 ```
 
-Resume task processing.
-
----
+Subscribe UI handlers to receive granular progress updates as the speech engine reports them.
 
 ### RealtimeRecorder
 
@@ -241,121 +223,78 @@ Get real-time translation text stream.
 
 **Location**: `core/calendar/manager.py`
 
-Manages local and external calendar events.
+Handles local calendar CRUD and coordinates optional sync adapters (Google, Outlook, etc.).
 
 #### Constructor
 
 ```python
-CalendarManager(db_connection, sync_adapters: dict)
+CalendarManager(db_connection, sync_adapters: dict | None = None)
 ```
 
 **Parameters:**
 
 - `db_connection` (DatabaseConnection): Database connection
-- `sync_adapters` (dict): Dictionary of sync adapters
-  - Key: Provider name ('google', 'outlook')
-  - Value: CalendarSyncAdapter instance
+- `sync_adapters` (dict, optional): Mapping of provider name → sync adapter implementing push/pull operations
 
 #### Methods
 
 ##### create_event
 
 ```python
-async def create_event(event_data: dict, sync_to: list = None) -> str
+def create_event(event_data: dict, sync_to: list[str] | None = None) -> str
 ```
 
-Create a calendar event.
-
-**Parameters:**
-
-- `event_data` (dict): Event data
-  - `title` (str): Event title
-  - `event_type` (str): 'Event', 'Task', or 'Appointment'
-  - `start_time` (datetime): Start time
-  - `end_time` (datetime): End time
-  - `location` (str, optional): Location
-  - `attendees` (list, optional): List of attendee emails
-  - `description` (str, optional): Description
-  - `reminder_minutes` (int, optional): Reminder time in minutes
-  - `recurrence_rule` (str, optional): iCalendar RRULE
-- `sync_to` (list, optional): List of providers to sync to
-
-**Returns:**
-
-- `str`: Event ID
-
-**Example:**
-
-```python
-event_id = await manager.create_event(
-    event_data={
-        "title": "Team Meeting",
-        "event_type": "Event",
-        "start_time": datetime(2025, 10, 15, 10, 0),
-        "end_time": datetime(2025, 10, 15, 11, 0),
-        "location": "Conference Room A",
-        "attendees": ["user1@example.com", "user2@example.com"]
-    },
-    sync_to=["google"]
-)
-```
+Create and persist a local event, optionally pushing to configured providers. Returns the new event ID.
 
 ##### update_event
 
 ```python
-async def update_event(event_id: str, event_data: dict)
+def update_event(event_id: str, event_data: dict) -> None
 ```
 
-Update an existing event.
+Modify mutable fields on a local event. Readonly (synced) events raise an error.
 
 ##### delete_event
 
 ```python
-async def delete_event(event_id: str)
+def delete_event(event_id: str) -> None
 ```
 
-Delete an event.
+Remove a local event. Readonly events cannot be deleted.
+
+##### get_event
+
+```python
+def get_event(event_id: str) -> CalendarEvent | None
+```
+
+Retrieve a single event by ID.
 
 ##### get_events
 
 ```python
-def get_events(start_date: datetime, end_date: datetime, filters: dict = None) -> list
+def get_events(
+    start_date: str,
+    end_date: str,
+    filters: dict | None = None
+) -> list[CalendarEvent]
 ```
 
-Get events within a date range.
-
-**Parameters:**
-
-- `start_date` (datetime): Start date
-- `end_date` (datetime): End date
-- `filters` (dict, optional): Filter options
-  - `source` (str): Filter by source ('local', 'google', 'outlook')
-  - `event_type` (str): Filter by type
-  - `search` (str): Search in title/description
-
-**Returns:**
-
-- `list`: List of CalendarEvent objects
+List events in a time window with optional filters (`source`, `event_type`, text search).
 
 ##### sync_external_calendar
 
 ```python
-async def sync_external_calendar(provider: str)
+def sync_external_calendar(provider: str) -> None
 ```
 
-Sync with external calendar.
-
-**Parameters:**
-
-- `provider` (str): Provider name ('google', 'outlook')
-
----
+Delegate a pull operation to the registered adapter and persist results locally.
 
 ### TimelineManager
 
 **Location**: `core/timeline/manager.py`
 
-Provides timeline view data with past and future events.
+Provides timeline data, auto-task configuration, and artifact lookups for past recordings.
 
 #### Constructor
 
@@ -377,57 +316,24 @@ def get_timeline_events(
 ) -> dict
 ```
 
-Get timeline events around a center time.
+Return paginated past/future events surrounding the supplied timestamp. Past entries include attachments; future entries include auto-task defaults.
 
-**Parameters:**
-
-- `center_time` (datetime): Center time (usually current time)
-- `past_days` (int): Number of days to look back
-- `future_days` (int): Number of days to look ahead
-- `page` (int): Page number for pagination
-- `page_size` (int): Number of events per page
-
-**Returns:**
-
-- `dict`: Timeline data
-  - `current_time` (str): Current time ISO format
-  - `past_events` (list): List of past events with artifacts
-  - `future_events` (list): List of future events with auto-tasks
-
-##### set_auto_task
+##### set_auto_task / get_auto_task
 
 ```python
-async def set_auto_task(event_id: str, task_config: dict)
+def set_auto_task(event_id: str, task_config: dict) -> None
+def get_auto_task(event_id: str) -> dict | None
 ```
 
-Configure auto-task for an event.
-
-**Parameters:**
-
-- `event_id` (str): Event ID
-- `task_config` (dict): Task configuration
-  - `enable_transcription` (bool)
-  - `enable_recording` (bool)
-  - `transcription_language` (str)
-  - `enable_translation` (bool)
-  - `translation_target_language` (str)
+Persist user preferences for auto-recording/transcription and retrieve them when rendering the timeline.
 
 ##### search_events
 
 ```python
-def search_events(query: str, filters: dict = None) -> list
+def search_events(query: str, filters: dict | None = None) -> list[dict]
 ```
 
-Search events and transcripts.
-
-**Parameters:**
-
-- `query` (str): Search query
-- `filters` (dict, optional): Additional filters
-
-**Returns:**
-
-- `list`: Matching events
+Search titles, descriptions, attendee lists, and transcript contents for the supplied keyword. Optional filters include `start_date`, `end_date`, `attendees`, `event_type`, and `source`.
 
 ##### get_event_artifacts
 
@@ -435,16 +341,7 @@ Search events and transcripts.
 def get_event_artifacts(event_id: str) -> dict
 ```
 
-Get artifacts (recordings, transcripts) for an event.
-
-**Returns:**
-
-- `dict`: Artifact paths
-  - `recording` (str, optional): Recording file path
-  - `transcript` (str, optional): Transcript file path
-  - `translation` (str, optional): Translation file path
-
----
+Collect recordings and transcript attachments related to a specific event.
 
 ### SettingsManager
 

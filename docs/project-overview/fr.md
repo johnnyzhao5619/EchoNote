@@ -1,63 +1,66 @@
 # Présentation du projet EchoNote
 
-> Consultez la référence principale en anglais dans [`README.md`](README.md) pour la version la plus à jour.
+> Pour les informations les plus récentes, consultez la version anglaise [`README.md`](README.md).
 
 ## 1. Objectifs de conception
-- Offrir une expérience hors ligne pour la transcription et la gestion d'agenda.
-- Garder les moteurs modulaires afin de faire évoluer indépendamment reconnaissance, traduction et synchronisation calendrier.
-- Garantir sécurité, maintenabilité et performance stables sur desktop.
+- Offrir une expérience hors-ligne pour la transcription et la gestion d’agenda.
+- Garder des moteurs interchangeables afin de faire évoluer parole, traduction et calendriers indépendamment.
+- Maintenir un niveau de sécurité, de maintenabilité et de performance adapté au poste de travail.
 
-## 2. Architecture
+## 2. Vue d’architecture
 ```
 ┌───────────┐      ┌──────────┐      ┌───────────┐
-│   Interface│ ───▶ │  Noyau  │ ───▶ │  Moteurs  │
+│    UI     │ ───▶ │   Core   │ ───▶ │  Engines  │
 └───────────┘      └──────────┘      └───────────┘
         │                 │                   │
         ▼                 ▼                   ▼
-    utils/ outils    couche data/       Services externes
+     utils/          data/ layer        Services externes
 ```
-- **Interface** (`ui/`) : widgets PyQt6, dialogues, notifications et ressources de localisation.
-- **Noyau** (`core/`) : gestionnaires métiers orchestrant base de données, moteurs et événements UI.
-- **Moteurs** (`engines/`) : implémentations pour capture audio, reconnaissance vocale, traduction et synchronisation calendrier.
-- **Données** (`data/`) : modèles SQLite, stockage, chiffrement et accès système de fichiers.
-- **Outils** (`utils/`) : journalisation, gestion d'erreurs, surveillance ressources, optimisation du démarrage, i18n.
+- **Couche UI** (`ui/`) : widgets PyQt6, dialogues, notifications et textes localisés.
+- **Couche Core** (`core/`) : gestionnaires métier coordonnant base de données, moteurs et UI.
+- **Couche Engines** (`engines/`) : implémentations pour capture audio, reconnaissance vocale, traduction et synchronisation calendrier.
+- **Couche Données** (`data/`) : schéma SQLite, modèles, chiffrement, stockage et gestion des secrets.
+- **Utilitaires** (`utils/`) : journalisation, gestion d’erreurs, surveillance des ressources, optimisation du démarrage, i18n.
 
 ## 3. Modules clés
-| Module | Chemin | Rôle |
-| ------ | ------ | ---- |
-| Gestionnaire de configuration | `config/app_config.py` | Charger les valeurs par défaut, valider le schéma, persister les préférences |
-| Connexion base | `data/database/connection.py` | Accès SQLite chiffré, initialisation du schéma, gestion de version |
-| Gestionnaire de modèles | `core/models/manager.py` | Télécharger, vérifier et valider les modèles de voix |
-| Gestionnaire de transcription | `core/transcription/manager.py` | Maintenir la file de tâches, piloter le moteur vocal, générer les sorties |
-| Enregistreur temps réel | `core/realtime/recorder.py` | Orchestrer capture audio, moteur vocal et traduction |
-| Synchronisation calendrier | `core/calendar/manager.py` & `engines/calendar_sync/*` | CRUD local + intégration fournisseurs externes |
-| Planificateur auto | `core/timeline/auto_task_scheduler.py` | Programmer en arrière-plan enregistrements/transcriptions selon les événements |
+| Module | Emplacement | Rôle |
+| ------ | ----------- | ---- |
+| Gestionnaire de config | `config/app_config.py` | Charger les valeurs par défaut, valider le schéma, persister les préférences |
+| Connexion base | `data/database/connection.py` | Accès SQLite thread-safe, initialisation du schéma, clé SQLCipher optionnelle |
+| Modèles de données | `data/database/models.py` | CRUD pour tâches, événements, pièces jointes, auto-tâches, statut de synchronisation |
+| Chiffrement & tokens | `data/security/` | Outils AES-GCM, coffre OAuth, gestionnaire de secrets |
+| Gestionnaire transcription | `core/transcription/manager.py` | Orchestration de file, coordination moteur, conversion de formats |
+| File de tâches | `core/transcription/task_queue.py` | Pool asynchrone avec retry/backoff et prise en charge pause/reprise |
+| Enregistreur temps réel | `core/realtime/recorder.py` | Capture micro, transcription en continu, traduction, persistance des fichiers |
+| Gestionnaire calendrier | `core/calendar/manager.py` | CRUD local, planification des synchronisations, politique de couleurs, suivi des comptes |
+| Gestionnaire timeline | `core/timeline/manager.py` | Requêtes chronologiques, pagination, association des pièces jointes |
+| Planificateur auto-tâches | `core/timeline/auto_task_scheduler.py` | Préparer/déclencher enregistrements et transcriptions selon les règles calendrier |
 
 ## 4. Données & sécurité
-- **Base** : `~/.echonote/data.db` chiffrée par défaut ; clés gérées dans `data/security`.
-- **Stockage** : enregistrements et transcriptions dans `~/Documents/EchoNote/`.
-- **Secrets** : identifiants OAuth protégés par le gestionnaire de secrets.
-- **Logs** : toutes les sous-systèmes écrivent dans `~/.echonote/logs/echonote.log`.
+- **Base** : `~/.echonote/data.db`, chiffrée si SQLCipher disponible ; clés gérées par `data/security`.
+- **Fichiers** : enregistrements et transcriptions stockés dans `~/Documents/EchoNote/` sauf configuration contraire.
+- **Secrets** : identifiants OAuth conservés via le gestionnaire sécurisé afin d’éviter toute exposition en clair.
+- **Logs** : chaque sous-système écrit dans `~/.echonote/logs/echonote.log` pour un diagnostic unifié.
 
 ## 5. Gestion des dépendances
-- Dépendances runtime : `requirements.txt` ; développement : `requirements-dev.txt`.
-- Vérifications FFmpeg et ressources système : `utils/ffmpeg_checker`, `utils/resource_monitor`.
-- Les répertoires de cache modèle sont configurables via le gestionnaire de configuration.
+- Dépendances runtime dans `requirements.txt`, dépendances de développement dans `requirements-dev.txt`.
+- Vérifications FFmpeg et surveillance des ressources implémentées dans `utils/ffmpeg_checker` et `utils/resource_monitor`.
+- Les chemins de cache des modèles sont configurables via le gestionnaire de configuration.
 
-## 6. Tests
-- **Unitaires** : configuration, modèles base, utilitaires.
-- **Intégration** : pipeline de transcription, synchronisation calendrier, planificateurs.
-- **Performance** : `tests/e2e_performance_test.py` pour mesurer le débit de transcription.
+## 6. Stratégie de tests
+- **Unitaires** : configuration, modèles de données, utilitaires.
+- **Intégration** : pipelines de transcription, synchronisation calendrier, planificateurs.
+- **Performance** : `tests/e2e_performance_test.py` mesure le débit pour le suivi des régressions.
 
-## 7. Recommandations de maintenance
-- Suivre `docs/CODE_STANDARDS.md` pour la structure et les conventions.
-- Préserver les interfaces lors de l'ajout de nouveaux moteurs afin d'éviter les régressions côté noyau.
-- Nettoyer régulièrement les ressources inutilisées et réduire le bruit des journaux.
-- Planifier la rotation des clés de chiffrement et vérifier le schéma avant publication.
+## 7. Bonnes pratiques de maintenance
+- Suivre les règles de `docs/CODE_STANDARDS.md` pour la structure et la nomenclature.
+- Préserver les interfaces existantes lors de l’ajout de nouveaux moteurs afin de stabiliser la couche core.
+- Nettoyer les ressources inutilisées et les logs verbeux pour conserver un démarrage rapide et des traces lisibles.
+- Faire tourner régulièrement les clés de chiffrement et vérifier la version du schéma avant publication.
 
-## 8. Pistes futures
-- Ajouter des adaptateurs de traduction supplémentaires avec détection de capacités.
-- Étendre les scripts de packaging multi-plateformes pour des releases officielles.
-- Concevoir un tableau de bord analytique pour visualiser l'usage et la performance des modèles.
+## 8. Pistes d’évolution
+- Ajouter de nouveaux adaptateurs de traduction avec détection de capacités homogène.
+- Étendre les scripts de packaging multiplateforme pour les releases officielles.
+- Fournir des tableaux de bord d’analyse afin de visualiser l’usage et les performances des modèles.
 
-Merci de contribuer au maintien d'une architecture claire et durable.
+Le document sera tenu à jour au fil de l’évolution des modules. Les contributions sont les bienvenues.
