@@ -62,20 +62,20 @@ Before you begin, ensure you have:
 
 1. **Fork the Repository**
 
-   - Visit https://github.com/yourusername/echonote
+   - Visit https://github.com/johnnyzhao5619/echonote
    - Click the "Fork" button in the top right
 
 2. **Clone Your Fork**
 
    ```bash
-   git clone https://github.com/YOUR-USERNAME/echonote.git
+   git clone https://github.com/johnnyzhao5619/echonote.git
    cd echonote
    ```
 
 3. **Add Upstream Remote**
 
    ```bash
-   git remote add upstream https://github.com/yourusername/echonote.git
+   git remote add upstream https://github.com/johnnyzhao5619/echonote.git
    ```
 
 4. **Create Virtual Environment**
@@ -693,8 +693,8 @@ Any other context or screenshots.
 If you need help:
 
 1. Check the [User Guide](USER_GUIDE.md)
-2. Search existing [GitHub Issues](https://github.com/yourusername/echonote/issues)
-3. Ask in [GitHub Discussions](https://github.com/yourusername/echonote/discussions)
+2. Search existing [GitHub Issues](https://github.com/johnnyzhao5619/echonote/issues)
+3. Ask in [GitHub Discussions](https://github.com/johnnyzhao5619/echonote/discussions)
 4. Join our Discord community
 
 ### Recognition
