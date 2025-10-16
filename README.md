@@ -5,7 +5,6 @@
 ## 🌐 Language Navigation
 - [中文说明 / Chinese Guide](README.zh-CN.md)
 - [English Guide](README.en.md)
-- [Guide en Français](README.fr.md)
 
 ## Overview
 EchoNote is a PyQt6 desktop application that combines local-first speech transcription, calendar integration, and timeline automation. The codebase is structured around modular managers (`core/`), reusable engines (`engines/`), and a Qt-based interface (`ui/`). Fast initialization, background schedulers, and defensive error handling are built directly into `main.py`.
@@ -41,7 +40,8 @@ python main.py
 Useful developer scripts and fixtures live under the `tests/` directory. Integration, end-to-end, and performance tests are available but may require PyAudio-compatible hardware and calendar credentials.
 
 ## Documentation Map
-Comprehensive documentation, translated into Chinese, English, and French, lives inside the `docs/` directory:
+Comprehensive documentation in Chinese and English lives inside the `docs/` directory:
+
 
 - User Guides (`docs/USER_GUIDE.*.md`)
 - Quick Start handbooks (`docs/QUICK_START.*.md`)
