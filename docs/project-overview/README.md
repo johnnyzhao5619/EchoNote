@@ -20,25 +20,28 @@ Review this overview before modifying core modules to understand dependency boun
         ▼                 ▼                   ▼
      utils/          data/ layer        External services
 ```
-- **UI layer** (`ui/`): PyQt6 widgets, dialogs, notifications, and localization assets.
+- **UI layer** (`ui/`): PyQt6 widgets, dialogs, notifications, and localisation assets.
 - **Core layer** (`core/`): domain managers coordinating database, engines, and UI interactions.
 - **Engines layer** (`engines/`): concrete implementations for audio capture, speech recognition, translation, and calendar sync.
-- **Data layer** (`data/`): SQLite models, storage helpers, encryption, and filesystem management.
-- **Utilities** (`utils/`): logging, error handling, resource monitoring, startup optimization, and i18n.
+- **Data layer** (`data/`): SQLite schema, models, encryption, storage utilities, and secrets management.
+- **Utilities** (`utils/`): logging, error handling, resource monitoring, startup optimisation, and i18n.
 
 ## 3. Key Modules
 | Module | Path | Responsibility |
 | ------ | ---- | -------------- |
 | Config Manager | `config/app_config.py` | Load defaults, validate schema, persist user overrides |
-| Database Connection | `data/database/connection.py` | Encrypted SQLite access, schema bootstrapping, versioning |
-| Model Manager | `core/models/manager.py` | Download, verify, and validate speech models asynchronously |
-| Transcription Manager | `core/transcription/manager.py` | Maintain job queue, coordinate speech engine, emit outputs |
-| Realtime Recorder | `core/realtime/recorder.py` | Orchestrate audio capture, speech engine, and translation engine |
-| Calendar Sync | `core/calendar/manager.py` & `engines/calendar_sync/*` | CRUD local events and integrate external providers |
-| Auto Task Scheduler | `core/timeline/auto_task_scheduler.py` | Create background jobs for recording/transcription based on events |
+| Database Connection | `data/database/connection.py` | Thread-safe SQLite access, schema initialisation, optional SQLCipher key |
+| Database Models | `data/database/models.py` | CRUD helpers for tasks, calendar events, attachments, auto-task configs, sync status |
+| Encryption & Tokens | `data/security/` | AES-GCM utilities, OAuth token vault, secrets helper |
+| Transcription Manager | `core/transcription/manager.py` | Queue orchestration, engine coordination, format conversion |
+| Task Queue | `core/transcription/task_queue.py` | Async worker pool with retry/backoff and pause/resume support |
+| Realtime Recorder | `core/realtime/recorder.py` | Microphone capture, streaming transcription, translation dispatch, file persistence |
+| Calendar Manager | `core/calendar/manager.py` | Local CRUD, sync scheduling, colour policies, provider state tracking |
+| Timeline Manager | `core/timeline/manager.py` | Timeline queries, pagination, linking attachments to events |
+| Auto Task Scheduler | `core/timeline/auto_task_scheduler.py` | Prepare and trigger meeting recordings/transcriptions based on calendar rules |
 
 ## 4. Data & Security
-- **Database**: `~/.echonote/data.db` encrypted by default; keys managed under `data/security`.
+- **Database**: `~/.echonote/data.db` encrypted when SQLCipher is available; keys managed under `data/security`.
 - **File storage**: recordings and transcripts live in `~/Documents/EchoNote/` unless reconfigured.
 - **Secrets**: OAuth credentials stored via the secrets manager to avoid plaintext exposure.
 - **Logging**: every subsystem writes to `~/.echonote/logs/echonote.log` for unified diagnostics.
@@ -62,6 +65,6 @@ Review this overview before modifying core modules to understand dependency boun
 ## 8. Future Enhancements
 - Introduce more translation adapters with consistent capability detection.
 - Expand cross-platform packaging scripts for official releases.
-- Provide analytic dashboards to visualize usage patterns and model performance.
+- Provide analytic dashboards to visualise usage patterns and model performance.
 
 Contributions that keep the architecture cohesive and secure are always welcome.

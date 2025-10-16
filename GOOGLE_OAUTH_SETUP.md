@@ -107,19 +107,20 @@
 
 ### 步骤 6: 验证配置
 
-运行诊断工具：
-
-```bash
-python diagnose_oauth.py
-```
-
-你应该看到：
-
-```
-Google 配置:
-  client_id: 已配置
-  client_secret: 已配置
-```
+1. 确认配置文件包含非空凭据。示例命令：
+   ```bash
+   python - <<'PY'
+   import json, pathlib
+   cfg = pathlib.Path('~/.echonote/config.json').expanduser()
+   data = json.load(cfg.open()) if cfg.exists() else json.load(open('config/default_config.json'))
+   google = data['calendar']['oauth']['google']
+   print('client_id:', bool(google.get('client_id')))
+   print('client_secret:', bool(google.get('client_secret')))
+   PY
+   ```
+   输出 `True` 表示字段已填入。
+2. 重启 EchoNote，打开 **设置 → 日历**。界面若不再提示“未配置”即说明凭据被正确加载。
+3. 如仍显示未配置，请检查 JSON 格式、文件权限（建议 `600`）或路径是否写错。
 
 ### 步骤 7: 测试 OAuth 连接
 
@@ -181,7 +182,7 @@ A: 有两种方式：
 
 如果遇到问题，请：
 
-1. 运行 `python diagnose_oauth.py` 检查配置
-2. 查看 `OAUTH_TROUBLESHOOTING.md` 排查指南
-3. 检查应用日志中的错误信息
-4. 提交 issue 并附上日志和错误截图
+1. 检查 `~/.echonote/logs/echonote.log` 中是否有 OAuth 相关错误信息。
+2. 确认配置文件 JSON 格式正确且凭据未留空。
+3. 重新启动 EchoNote 并再次尝试连接，必要时删除旧的 `~/.echonote/oauth_tokens.json` 以强制重新授权。
+4. 若问题仍在，请提交 issue 并附上日志与错误截图。
