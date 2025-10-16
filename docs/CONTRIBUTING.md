@@ -512,8 +512,8 @@ open htmlcov/index.html
 
 When adding new features, update:
 
-- `docs/USER_GUIDE.md` - User-facing documentation
-- `docs/QUICK_START.md` - Quick start guide (if applicable)
+- `docs/user-guide/` - User-facing documentation
+- `docs/quick-start/` - Quick start guides (if applicable)
 - `docs/FAQ.md` - Frequently asked questions (if applicable)
 
 ### Developer Documentation

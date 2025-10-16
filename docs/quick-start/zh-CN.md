@@ -67,4 +67,4 @@
 日志：~/.echonote/logs/echonote.log
 ```
 
-更多细节请参考 `docs/USER_GUIDE.zh-CN.md`。
+更多细节请参考 `../user-guide/zh-CN.md`。

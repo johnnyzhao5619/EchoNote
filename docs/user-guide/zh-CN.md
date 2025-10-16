@@ -58,7 +58,7 @@
 
 ## 6. 获取帮助
 - 查看 `~/.echonote/logs/echonote.log` 获取详细堆栈。
-- 参考 `docs/PROJECT_OVERVIEW.zh-CN.md` 了解架构与数据流。
+- 参考 `../project-overview/zh-CN.md` 了解架构与数据流。
 - 如需提问，请附上系统信息（操作系统、Python 版本、模型配置）。
 
 祝您使用顺利！

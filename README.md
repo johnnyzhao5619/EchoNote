@@ -40,12 +40,11 @@ python main.py
 Useful developer scripts and fixtures live under the `tests/` directory. Integration, end-to-end, and performance tests are available but may require PyAudio-compatible hardware and calendar credentials.
 
 ## Documentation Map
-Comprehensive documentation in Chinese and English lives inside the `docs/` directory:
+Comprehensive documentation in Chinese, English, and French lives inside the `docs/` directory:
 
-
-- User Guides (`docs/USER_GUIDE.*.md`)
-- Quick Start handbooks (`docs/QUICK_START.*.md`)
-- Project Overview and architecture (`docs/PROJECT_OVERVIEW.*.md`)
+- User Guides (`docs/user-guide/`)
+- Quick Start handbooks (`docs/quick-start/`)
+- Project Overview and architecture (`docs/project-overview/`)
 - Developer and API references (`docs/DEVELOPER_GUIDE.md`, `docs/API_REFERENCE.md`)
 
 Refer to `docs/README.md` for a curated index across all materials.

@@ -67,4 +67,4 @@ Transcripts: ~/Documents/EchoNote/Transcripts/
 Logs: ~/.echonote/logs/echonote.log
 ```
 
-See `docs/USER_GUIDE.en.md` for full details.
+See `../user-guide/en.md` for full details.

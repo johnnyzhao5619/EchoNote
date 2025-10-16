@@ -1,5 +1,11 @@
 # EchoNote Project Overview
 
+Review this overview before modifying core modules to understand dependency boundaries.
+
+## Translation Index
+- [中文 / Chinese](zh-CN.md)
+- [Français](fr.md)
+
 ## 1. Design Goals
 - Deliver an offline-first experience for transcription and calendar management.
 - Keep engines pluggable so speech, translation, and calendar providers can evolve independently.
@@ -18,7 +24,7 @@
 - **Core layer** (`core/`): domain managers coordinating database, engines, and UI interactions.
 - **Engines layer** (`engines/`): concrete implementations for audio capture, speech recognition, translation, and calendar sync.
 - **Data layer** (`data/`): SQLite models, storage helpers, encryption, and filesystem management.
-- **Utilities** (`utils/`): logging, error handling, resource monitoring, startup optimization, i18n.
+- **Utilities** (`utils/`): logging, error handling, resource monitoring, startup optimization, and i18n.
 
 ## 3. Key Modules
 | Module | Path | Responsibility |

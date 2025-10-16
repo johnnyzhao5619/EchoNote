@@ -50,9 +50,9 @@ Default configuration values ship with `config/default_config.json`. User overri
 Install development extras via `pip install -r requirements-dev.txt` and prepare microphone/calendar credentials before executing integration scenarios.
 
 ## Documentation
-- User Handbook: `docs/USER_GUIDE.en.md`
-- Quick Start: `docs/QUICK_START.en.md`
-- Project Overview: `docs/PROJECT_OVERVIEW.en.md`
+- User Handbook: `docs/user-guide/en.md`
+- Quick Start: `docs/quick-start/en.md`
+- Project Overview: `docs/project-overview/README.md`
 - Developer resources: `docs/DEVELOPER_GUIDE.md`, `docs/API_REFERENCE.md`
 
 `docs/README.md` collects every manual and reference.

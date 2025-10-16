@@ -50,9 +50,9 @@ Les valeurs par défaut résident dans `config/default_config.json` et les perso
 Installez les dépendances de développement via `pip install -r requirements-dev.txt` et préparez périphériques audio ou identifiants calendriers avant d'exécuter les scénarios d'intégration.
 
 ## Documentation
-- Guide utilisateur : `docs/USER_GUIDE.fr.md`
-- Démarrage rapide : `docs/QUICK_START.fr.md`
-- Présentation du projet : `docs/PROJECT_OVERVIEW.fr.md`
+- Guide utilisateur : `docs/user-guide/fr.md`
+- Démarrage rapide : `docs/quick-start/fr.md`
+- Présentation du projet : `docs/project-overview/fr.md`
 - Références développeur : `docs/DEVELOPER_GUIDE.md`, `docs/API_REFERENCE.md`
 
 Consultez `docs/README.md` pour l'index complet.
