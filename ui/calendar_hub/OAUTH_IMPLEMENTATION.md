@@ -1,0 +1,242 @@
+# OAuth Implementation for Calendar Hub
+
+## Overview
+
+The OAuth implementation for EchoNote's Calendar Hub provides secure authentication and authorization for external calendar services (Google Calendar and Outlook Calendar).
+
+## Components
+
+### 1. OAuthDialog (`oauth_dialog.py`)
+
+A PyQt6 dialog that handles the OAuth 2.0 authorization flow:
+
+- **Features**:
+
+  - Opens system browser for user authorization
+  - Runs local HTTP server on port 8080 to receive OAuth callback
+  - Displays authorization status and progress
+  - Handles authorization success and failure
+  - Non-blocking UI using QThread for HTTP server
+
+- **Signals**:
+
+  - `authorization_complete(str)`: Emitted with authorization code on success
+  - `authorization_failed(str)`: Emitted with error message on failure
+
+- **Usage**:
+
+  ```python
+  dialog = OAuthDialog(
+      provider='google',
+      authorization_url=auth_url,
+      i18n=i18n_manager,
+      parent=parent_widget
+  )
+
+  dialog.authorization_complete.connect(handle_success)
+  dialog.authorization_failed.connect(handle_error)
+
+  dialog.exec()
+  ```
+
+### 2. CalendarHubWidget Integration
+
+The Calendar Hub widget integrates OAuth functionality:
+
+- **OAuth Flow**:
+
+  1. User clicks "Add Account" button
+  2. Selects provider (Google/Outlook)
+  3. OAuthDialog opens with authorization URL
+  4. User authorizes in browser
+  5. Callback received with authorization code
+  6. Code exchanged for access/refresh tokens
+  7. Tokens stored securely using OAuthManager
+  8. CalendarSyncStatus record created
+  9. Initial calendar sync triggered
+  10. Account badge displayed
+
+- **Account Management**:
+  - Display connected accounts with provider badges
+  - Disconnect button on each badge
+  - Disconnect removes tokens, sync status, and synced events
+
+### 3. OAuthManager (`data/security/oauth_manager.py`)
+
+Manages secure storage and retrieval of OAuth tokens:
+
+- **Features**:
+
+  - Encrypted token storage using AES-256
+  - Token expiration detection
+  - Automatic token refresh support
+  - Multiple provider support
+
+- **Storage Location**: `~/.echonote/oauth_tokens.enc`
+
+### 4. Calendar Sync Adapters
+
+#### GoogleCalendarAdapter (`engines/calendar_sync/google_calendar.py`)
+
+- **OAuth Endpoints**:
+
+  - Authorization: `https://accounts.google.com/o/oauth2/v2/auth`
+  - Token Exchange: `https://oauth2.googleapis.com/token`
+  - Revoke: `https://oauth2.googleapis.com/revoke`
+
+- **Scopes**:
+  - `https://www.googleapis.com/auth/calendar.readonly`
+  - `https://www.googleapis.com/auth/calendar.events`
+
+#### OutlookCalendarAdapter (`engines/calendar_sync/outlook_calendar.py`)
+
+- **OAuth Endpoints**:
+
+  - Authorization: `https://login.microsoftonline.com/common/oauth2/v2.0/authorize`
+  - Token Exchange: `https://login.microsoftonline.com/common/oauth2/v2.0/token`
+
+- **Scopes**:
+  - `Calendars.Read`
+  - `Calendars.ReadWrite`
+
+## Configuration
+
+OAuth credentials are configured in `config/default_config.json`:
+
+```json
+{
+  "calendar": {
+    "oauth": {
+      "redirect_uri": "http://localhost:8080/callback",
+      "callback_port": 8080,
+      "google": {
+        "client_id": "YOUR_GOOGLE_CLIENT_ID",
+        "client_secret": "YOUR_GOOGLE_CLIENT_SECRET"
+      },
+      "outlook": {
+        "client_id": "YOUR_OUTLOOK_CLIENT_ID",
+        "client_secret": "YOUR_OUTLOOK_CLIENT_SECRET"
+      }
+    }
+  }
+}
+```
+
+### Obtaining OAuth Credentials
+
+#### Google Calendar
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select existing
+3. Enable Google Calendar API
+4. Create OAuth 2.0 credentials (Desktop app)
+5. Add `http://localhost:8080/callback` as authorized redirect URI
+6. Copy client ID and secret to config
+
+#### Outlook Calendar
+
+1. Go to [Azure Portal](https://portal.azure.com/)
+2. Register a new application in Azure AD
+3. Add `http://localhost:8080/callback` as redirect URI
+4. Grant Calendar permissions (Calendars.Read, Calendars.ReadWrite)
+5. Create client secret
+6. Copy application (client) ID and secret to config
+
+## Security Considerations
+
+1. **Token Storage**: All OAuth tokens are encrypted using AES-256 before storage
+2. **File Permissions**: Token file has 0600 permissions (owner read/write only)
+3. **No Password Storage**: Only OAuth tokens are stored, never user passwords
+4. **HTTPS Only**: All API communication uses HTTPS
+5. **Token Expiration**: Tokens are checked for expiration before use
+6. **Revocation**: Tokens can be revoked when disconnecting accounts
+
+## Database Schema
+
+### CalendarSyncStatus Table
+
+Stores synchronization status for each connected provider:
+
+```sql
+CREATE TABLE calendar_sync_status (
+    id TEXT PRIMARY KEY,
+    provider TEXT NOT NULL,           -- google/outlook
+    user_email TEXT,
+    last_sync_time TIMESTAMP,
+    sync_token TEXT,                  -- For incremental sync
+    is_active BOOLEAN DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+## Error Handling
+
+The implementation handles various error scenarios:
+
+1. **Network Errors**: Displayed to user with retry option
+2. **User Denial**: Gracefully handled, user can retry
+3. **Invalid Credentials**: Clear error message displayed
+4. **Token Expiration**: Automatic refresh attempted
+5. **Server Errors**: Logged and displayed to user
+
+## Testing
+
+A test script is provided: `test_oauth_dialog.py`
+
+```bash
+python test_oauth_dialog.py
+```
+
+This opens a test window with buttons to test Google and Outlook OAuth flows.
+
+## Limitations
+
+1. **Local Callback Server**: Requires port 8080 to be available
+2. **Browser Required**: System must have a default browser configured
+3. **Manual Configuration**: OAuth credentials must be manually configured
+4. **Single Account**: Only one account per provider supported
+
+## Future Enhancements
+
+1. **Multiple Accounts**: Support multiple accounts per provider
+2. **Automatic Token Refresh**: Background token refresh before expiration
+3. **OAuth Configuration UI**: In-app OAuth credential configuration
+4. **Alternative Callback Methods**: Support for other callback mechanisms
+5. **Sync Conflict Resolution**: Better handling of sync conflicts
+
+## Troubleshooting
+
+### Port 8080 Already in Use
+
+If port 8080 is already in use, you can change it in the configuration:
+
+```json
+{
+  "calendar": {
+    "oauth": {
+      "callback_port": 8081,
+      "redirect_uri": "http://localhost:8081/callback"
+    }
+  }
+}
+```
+
+Remember to update the redirect URI in your OAuth app configuration.
+
+### Browser Doesn't Open
+
+Ensure your system has a default browser configured. The implementation uses Python's `webbrowser` module which relies on system defaults.
+
+### Authorization Fails
+
+1. Check that OAuth credentials are correctly configured
+2. Verify redirect URI matches in both config and OAuth app settings
+3. Check that required API scopes are enabled
+4. Review logs for detailed error messages
+
+## References
+
+- [Google Calendar API Documentation](https://developers.google.com/calendar/api)
+- [Microsoft Graph Calendar API](https://docs.microsoft.com/en-us/graph/api/resources/calendar)
+- [OAuth 2.0 Specification](https://oauth.net/2/)

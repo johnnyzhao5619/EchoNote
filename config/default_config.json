@@ -1,0 +1,63 @@
+{
+  "version": "1.0.0",
+  "database": {
+    "path": "~/.echonote/data.db",
+    "encryption_enabled": true
+  },
+  "transcription": {
+    "default_engine": "faster-whisper",
+    "default_output_format": "txt",
+    "default_save_path": "~/Documents/EchoNote/Transcripts",
+    "max_concurrent_tasks": 2,
+    "faster_whisper": {
+      "model_size": "base",
+      "device": "auto",
+      "compute_type": "int8",
+      "model_dir": "~/.echonote/models",
+      "auto_download_recommended": false,
+      "default_model": "base"
+    }
+  },
+  "realtime": {
+    "default_input_source": "default",
+    "default_gain": 1.0,
+    "recording_format": "wav",
+    "recording_save_path": "~/Documents/EchoNote/Recordings",
+    "vad_threshold": 0.5,
+    "silence_duration_ms": 2000
+  },
+  "calendar": {
+    "default_view": "week",
+    "sync_interval_minutes": 15,
+    "colors": {
+      "local": "#2196F3",
+      "google": "#EA4335",
+      "outlook": "#FF6F00"
+    },
+    "oauth": {
+      "redirect_uri": "http://localhost:8080/callback",
+      "callback_port": 8080,
+      "google": {
+        "client_id": "",
+        "client_secret": ""
+      },
+      "outlook": {
+        "client_id": "",
+        "client_secret": ""
+      }
+    }
+  },
+  "timeline": {
+    "past_days": 30,
+    "future_days": 30,
+    "reminder_minutes": 5,
+    "page_size": 50
+  },
+  "ui": {
+    "theme": "light",
+    "language": "zh_CN"
+  },
+  "security": {
+    "encryption_algorithm": "AES-256-GCM"
+  }
+}

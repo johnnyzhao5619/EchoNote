@@ -1,0 +1,1 @@
+"""Transcription management logic."""

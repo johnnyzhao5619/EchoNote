@@ -1,0 +1,1158 @@
+# EchoNote API Reference
+
+**Version**: 1.0.0  
+**Last Updated**: October 2025
+
+---
+
+## Table of Contents
+
+1. [Core Managers](#core-managers)
+2. [Speech Engines](#speech-engines)
+3. [Translation Engines](#translation-engines)
+4. [Calendar System](#calendar-system)
+5. [Database Models](#database-models)
+6. [Utilities](#utilities)
+
+---
+
+## Core Managers
+
+### TranscriptionManager
+
+**Location**: `core/transcription/manager.py`
+
+Manages batch transcription tasks with queue management and progress tracking.
+
+#### Constructor
+
+```python
+TranscriptionManager(db_connection, speech_engine, config)
+```
+
+**Parameters:**
+
+- `db_connection` (DatabaseConnection): Database connection instance
+- `speech_engine` (SpeechEngine): Speech recognition engine
+- `config` (ConfigManager): Application configuration
+
+#### Methods
+
+##### add_task
+
+```python
+async def add_task(file_path: str, options: dict = None) -> str
+```
+
+Add a transcription task to the queue.
+
+**Parameters:**
+
+- `file_path` (str): Path to audio/video file
+- `options` (dict, optional): Task options
+  - `language` (str): Language code (e.g., 'en', 'zh')
+  - `output_format` (str): Output format ('txt', 'srt', 'md')
+  - `output_path` (str): Custom output path
+
+**Returns:**
+
+- `str`: Task ID (UUID)
+
+**Raises:**
+
+- `FileNotFoundError`: If file doesn't exist
+- `ValueError`: If file format is not supported
+
+**Example:**
+
+```python
+task_id = await manager.add_task(
+    file_path="/path/to/audio.mp3",
+    options={"language": "zh", "output_format": "txt"}
+)
+```
+
+##### start_processing
+
+```python
+async def start_processing()
+```
+
+Start processing tasks in the queue.
+
+##### process_task
+
+```python
+async def process_task(task_id: str)
+```
+
+Process a specific task.
+
+**Parameters:**
+
+- `task_id` (str): Task ID
+
+##### get_task_status
+
+```python
+def get_task_status(task_id: str) -> dict
+```
+
+Get task status and progress.
+
+**Parameters:**
+
+- `task_id` (str): Task ID
+
+**Returns:**
+
+- `dict`: Task status information
+  - `id` (str): Task ID
+  - `status` (str): 'pending', 'processing', 'completed', 'failed'
+  - `progress` (float): Progress percentage (0-100)
+  - `file_name` (str): File name
+  - `error_message` (str, optional): Error message if failed
+
+##### cancel_task
+
+```python
+def cancel_task(task_id: str)
+```
+
+Cancel a pending or processing task.
+
+##### pause_processing
+
+```python
+def pause_processing()
+```
+
+Pause task processing (e.g., due to low resources).
+
+##### resume_processing
+
+```python
+def resume_processing()
+```
+
+Resume task processing.
+
+---
+
+### RealtimeRecorder
+
+**Location**: `core/realtime/recorder.py`
+
+Manages real-time audio recording, transcription, and translation.
+
+#### Constructor
+
+```python
+RealtimeRecorder(audio_capture, speech_engine, translation_engine, db_connection, file_manager)
+```
+
+**Parameters:**
+
+- `audio_capture` (AudioCapture): Audio capture instance
+- `speech_engine` (SpeechEngine): Speech recognition engine
+- `translation_engine` (TranslationEngine, optional): Translation engine
+- `db_connection` (DatabaseConnection): Database connection
+- `file_manager` (FileManager): File manager instance
+
+#### Methods
+
+##### start_recording
+
+```python
+async def start_recording(input_source: str, options: dict)
+```
+
+Start real-time recording and transcription.
+
+**Parameters:**
+
+- `input_source` (str): Audio input source name
+- `options` (dict): Recording options
+  - `language` (str): Source language code
+  - `enable_translation` (bool): Enable translation
+  - `target_language` (str): Target language for translation
+  - `recording_format` (str): 'wav' or 'mp3'
+
+**Example:**
+
+```python
+await recorder.start_recording(
+    input_source="default",
+    options={
+        "language": "zh",
+        "enable_translation": True,
+        "target_language": "en",
+        "recording_format": "wav"
+    }
+)
+```
+
+##### stop_recording
+
+```python
+async def stop_recording() -> dict
+```
+
+Stop recording and save files.
+
+**Returns:**
+
+- `dict`: Recording result
+  - `recording_path` (str): Path to saved recording
+  - `transcript_path` (str): Path to transcript file
+  - `translation_path` (str, optional): Path to translation file
+  - `event_id` (str, optional): Created calendar event ID
+
+##### get_transcription_stream
+
+```python
+def get_transcription_stream() -> AsyncIterator[str]
+```
+
+Get real-time transcription text stream.
+
+**Returns:**
+
+- `AsyncIterator[str]`: Stream of transcription text
+
+**Example:**
+
+```python
+async for text in recorder.get_transcription_stream():
+    print(f"Transcription: {text}")
+```
+
+##### get_translation_stream
+
+```python
+def get_translation_stream() -> AsyncIterator[str]
+```
+
+Get real-time translation text stream.
+
+---
+
+### CalendarManager
+
+**Location**: `core/calendar/manager.py`
+
+Manages local and external calendar events.
+
+#### Constructor
+
+```python
+CalendarManager(db_connection, sync_adapters: dict)
+```
+
+**Parameters:**
+
+- `db_connection` (DatabaseConnection): Database connection
+- `sync_adapters` (dict): Dictionary of sync adapters
+  - Key: Provider name ('google', 'outlook')
+  - Value: CalendarSyncAdapter instance
+
+#### Methods
+
+##### create_event
+
+```python
+async def create_event(event_data: dict, sync_to: list = None) -> str
+```
+
+Create a calendar event.
+
+**Parameters:**
+
+- `event_data` (dict): Event data
+  - `title` (str): Event title
+  - `event_type` (str): 'Event', 'Task', or 'Appointment'
+  - `start_time` (datetime): Start time
+  - `end_time` (datetime): End time
+  - `location` (str, optional): Location
+  - `attendees` (list, optional): List of attendee emails
+  - `description` (str, optional): Description
+  - `reminder_minutes` (int, optional): Reminder time in minutes
+  - `recurrence_rule` (str, optional): iCalendar RRULE
+- `sync_to` (list, optional): List of providers to sync to
+
+**Returns:**
+
+- `str`: Event ID
+
+**Example:**
+
+```python
+event_id = await manager.create_event(
+    event_data={
+        "title": "Team Meeting",
+        "event_type": "Event",
+        "start_time": datetime(2025, 10, 15, 10, 0),
+        "end_time": datetime(2025, 10, 15, 11, 0),
+        "location": "Conference Room A",
+        "attendees": ["user1@example.com", "user2@example.com"]
+    },
+    sync_to=["google"]
+)
+```
+
+##### update_event
+
+```python
+async def update_event(event_id: str, event_data: dict)
+```
+
+Update an existing event.
+
+##### delete_event
+
+```python
+async def delete_event(event_id: str)
+```
+
+Delete an event.
+
+##### get_events
+
+```python
+def get_events(start_date: datetime, end_date: datetime, filters: dict = None) -> list
+```
+
+Get events within a date range.
+
+**Parameters:**
+
+- `start_date` (datetime): Start date
+- `end_date` (datetime): End date
+- `filters` (dict, optional): Filter options
+  - `source` (str): Filter by source ('local', 'google', 'outlook')
+  - `event_type` (str): Filter by type
+  - `search` (str): Search in title/description
+
+**Returns:**
+
+- `list`: List of CalendarEvent objects
+
+##### sync_external_calendar
+
+```python
+async def sync_external_calendar(provider: str)
+```
+
+Sync with external calendar.
+
+**Parameters:**
+
+- `provider` (str): Provider name ('google', 'outlook')
+
+---
+
+### TimelineManager
+
+**Location**: `core/timeline/manager.py`
+
+Provides timeline view data with past and future events.
+
+#### Constructor
+
+```python
+TimelineManager(calendar_manager, db_connection)
+```
+
+#### Methods
+
+##### get_timeline_events
+
+```python
+def get_timeline_events(
+    center_time: datetime,
+    past_days: int,
+    future_days: int,
+    page: int = 0,
+    page_size: int = 50
+) -> dict
+```
+
+Get timeline events around a center time.
+
+**Parameters:**
+
+- `center_time` (datetime): Center time (usually current time)
+- `past_days` (int): Number of days to look back
+- `future_days` (int): Number of days to look ahead
+- `page` (int): Page number for pagination
+- `page_size` (int): Number of events per page
+
+**Returns:**
+
+- `dict`: Timeline data
+  - `current_time` (str): Current time ISO format
+  - `past_events` (list): List of past events with artifacts
+  - `future_events` (list): List of future events with auto-tasks
+
+##### set_auto_task
+
+```python
+async def set_auto_task(event_id: str, task_config: dict)
+```
+
+Configure auto-task for an event.
+
+**Parameters:**
+
+- `event_id` (str): Event ID
+- `task_config` (dict): Task configuration
+  - `enable_transcription` (bool)
+  - `enable_recording` (bool)
+  - `transcription_language` (str)
+  - `enable_translation` (bool)
+  - `translation_target_language` (str)
+
+##### search_events
+
+```python
+def search_events(query: str, filters: dict = None) -> list
+```
+
+Search events and transcripts.
+
+**Parameters:**
+
+- `query` (str): Search query
+- `filters` (dict, optional): Additional filters
+
+**Returns:**
+
+- `list`: Matching events
+
+##### get_event_artifacts
+
+```python
+def get_event_artifacts(event_id: str) -> dict
+```
+
+Get artifacts (recordings, transcripts) for an event.
+
+**Returns:**
+
+- `dict`: Artifact paths
+  - `recording` (str, optional): Recording file path
+  - `transcript` (str, optional): Transcript file path
+  - `translation` (str, optional): Translation file path
+
+---
+
+### SettingsManager
+
+**Location**: `core/settings/manager.py`
+
+Manages application settings.
+
+#### Constructor
+
+```python
+SettingsManager(config_manager)
+```
+
+#### Methods
+
+##### get
+
+```python
+def get(key: str, default=None)
+```
+
+Get a setting value.
+
+##### set
+
+```python
+def set(key: str, value)
+```
+
+Set a setting value.
+
+##### save
+
+```python
+def save()
+```
+
+Save settings to disk.
+
+##### validate
+
+```python
+def validate(key: str, value) -> bool
+```
+
+Validate a setting value.
+
+---
+
+## Speech Engines
+
+### SpeechEngine (Base Class)
+
+**Location**: `engines/speech/base.py`
+
+Abstract base class for all speech recognition engines.
+
+#### Methods
+
+##### get_name
+
+```python
+@abstractmethod
+def get_name(self) -> str
+```
+
+Get engine name.
+
+##### get_supported_languages
+
+```python
+@abstractmethod
+def get_supported_languages(self) -> list
+```
+
+Get list of supported language codes.
+
+##### transcribe_file
+
+```python
+@abstractmethod
+async def transcribe_file(audio_path: str, language: str = None) -> dict
+```
+
+Transcribe an audio file.
+
+**Parameters:**
+
+- `audio_path` (str): Path to audio file
+- `language` (str, optional): Language code
+
+**Returns:**
+
+- `dict`: Transcription result
+  - `segments` (list): List of segments
+    - `start` (float): Start time in seconds
+    - `end` (float): End time in seconds
+    - `text` (str): Transcribed text
+  - `language` (str): Detected/used language
+
+##### transcribe_stream
+
+```python
+@abstractmethod
+async def transcribe_stream(audio_chunk: np.ndarray, language: str = None) -> str
+```
+
+Transcribe audio stream chunk.
+
+**Parameters:**
+
+- `audio_chunk` (np.ndarray): Audio data (16kHz, mono)
+- `language` (str, optional): Language code
+
+**Returns:**
+
+- `str`: Transcribed text
+
+##### get_config_schema
+
+```python
+@abstractmethod
+def get_config_schema(self) -> dict
+```
+
+Get configuration schema (JSON Schema format).
+
+---
+
+### FasterWhisperEngine
+
+**Location**: `engines/speech/faster_whisper_engine.py`
+
+Local speech recognition using faster-whisper.
+
+#### Constructor
+
+```python
+FasterWhisperEngine(
+    model_size: str = "base",
+    device: str = "auto",
+    compute_type: str = "int8",
+    model_manager = None
+)
+```
+
+**Parameters:**
+
+- `model_size` (str): Model size ('tiny', 'base', 'small', 'medium', 'large')
+- `device` (str): Device ('cpu', 'cuda', 'auto')
+- `compute_type` (str): Compute type ('int8', 'float16', 'float32')
+- `model_manager` (ModelManager, optional): Model manager instance
+
+#### Additional Methods
+
+##### is_model_available
+
+```python
+def is_model_available(self) -> bool
+```
+
+Check if model is downloaded and available.
+
+##### get_model_info
+
+```python
+def get_model_info(self) -> dict
+```
+
+Get model information.
+
+**Returns:**
+
+- `dict`: Model info
+  - `size` (str): Model size
+  - `device` (str): Device
+  - `compute_type` (str): Compute type
+  - `available` (bool): Whether model is available
+
+---
+
+### OpenAIEngine
+
+**Location**: `engines/speech/openai_engine.py`
+
+OpenAI Whisper API integration.
+
+#### Constructor
+
+```python
+OpenAIEngine(api_key: str)
+```
+
+**Parameters:**
+
+- `api_key` (str): OpenAI API key
+
+---
+
+## Translation Engines
+
+### TranslationEngine (Base Class)
+
+**Location**: `engines/translation/base.py`
+
+Abstract base class for translation engines.
+
+#### Methods
+
+##### translate
+
+```python
+@abstractmethod
+async def translate(text: str, source_lang: str, target_lang: str) -> str
+```
+
+Translate text.
+
+**Parameters:**
+
+- `text` (str): Text to translate
+- `source_lang` (str): Source language code
+- `target_lang` (str): Target language code
+
+**Returns:**
+
+- `str`: Translated text
+
+##### get_supported_languages
+
+```python
+@abstractmethod
+def get_supported_languages(self) -> list
+```
+
+Get supported language codes.
+
+---
+
+### GoogleTranslateEngine
+
+**Location**: `engines/translation/google_translate.py`
+
+Google Cloud Translation API integration.
+
+#### Constructor
+
+```python
+GoogleTranslateEngine(api_key: str)
+```
+
+---
+
+## Calendar System
+
+### CalendarSyncAdapter (Base Class)
+
+**Location**: `engines/calendar_sync/base.py`
+
+Abstract base class for calendar sync adapters.
+
+#### Methods
+
+##### authenticate
+
+```python
+@abstractmethod
+async def authenticate(credentials: dict) -> dict
+```
+
+Perform OAuth authentication.
+
+**Returns:**
+
+- `dict`: OAuth tokens
+  - `access_token` (str)
+  - `refresh_token` (str)
+  - `expires_at` (datetime)
+
+##### fetch_events
+
+```python
+@abstractmethod
+async def fetch_events(
+    start_date: datetime,
+    end_date: datetime,
+    last_sync_token: str = None
+) -> dict
+```
+
+Fetch events from external calendar.
+
+**Returns:**
+
+- `dict`: Fetch result
+  - `events` (list): List of events
+  - `sync_token` (str): Token for incremental sync
+
+##### push_event
+
+```python
+@abstractmethod
+async def push_event(event: CalendarEvent) -> str
+```
+
+Push event to external calendar.
+
+**Returns:**
+
+- `str`: External event ID
+
+##### revoke_access
+
+```python
+@abstractmethod
+async def revoke_access()
+```
+
+Revoke OAuth access.
+
+---
+
+## Database Models
+
+### TranscriptionTask
+
+**Location**: `data/database/models.py`
+
+Represents a batch transcription task.
+
+#### Attributes
+
+- `id` (str): Task ID (UUID)
+- `file_path` (str): Audio file path
+- `file_name` (str): File name
+- `file_size` (int): File size in bytes
+- `audio_duration` (float): Duration in seconds
+- `status` (str): 'pending', 'processing', 'completed', 'failed'
+- `progress` (float): Progress (0-100)
+- `language` (str): Language code
+- `engine` (str): Engine name
+- `output_format` (str): Output format
+- `output_path` (str): Output file path
+- `error_message` (str): Error message if failed
+- `created_at` (datetime): Creation time
+- `started_at` (datetime): Start time
+- `completed_at` (datetime): Completion time
+
+#### Methods
+
+##### save
+
+```python
+def save(db_connection)
+```
+
+Save to database.
+
+##### delete
+
+```python
+def delete(db_connection)
+```
+
+Delete from database.
+
+##### from_db_row
+
+```python
+@classmethod
+def from_db_row(cls, row: dict) -> TranscriptionTask
+```
+
+Create instance from database row.
+
+---
+
+### CalendarEvent
+
+**Location**: `data/database/models.py`
+
+Represents a calendar event.
+
+#### Attributes
+
+- `id` (str): Event ID (UUID)
+- `title` (str): Event title
+- `event_type` (str): 'Event', 'Task', 'Appointment'
+- `start_time` (datetime): Start time
+- `end_time` (datetime): End time
+- `location` (str): Location
+- `attendees` (list): List of attendee emails
+- `description` (str): Description
+- `reminder_minutes` (int): Reminder time
+- `recurrence_rule` (str): iCalendar RRULE
+- `source` (str): 'local', 'google', 'outlook'
+- `external_id` (str): External calendar event ID
+- `is_readonly` (bool): Whether event is read-only
+- `created_at` (datetime): Creation time
+- `updated_at` (datetime): Last update time
+
+---
+
+## Utilities
+
+### I18nQtManager
+
+**Location**: `utils/i18n.py`
+
+Internationalization manager for Qt applications.
+
+#### Constructor
+
+```python
+I18nQtManager(default_language: str = "en_US")
+```
+
+#### Methods
+
+##### t
+
+```python
+def t(key: str, **kwargs) -> str
+```
+
+Translate a key.
+
+**Parameters:**
+
+- `key` (str): Translation key (dot notation)
+- `**kwargs`: Variables for interpolation
+
+**Returns:**
+
+- `str`: Translated text
+
+**Example:**
+
+```python
+text = i18n.t("notification.low_memory.message", memory="500MB")
+```
+
+##### set_language
+
+```python
+def set_language(language: str)
+```
+
+Change current language.
+
+---
+
+### SecurityManager
+
+**Location**: `data/security/encryption.py`
+
+Manages encryption and security.
+
+#### Methods
+
+##### encrypt
+
+```python
+def encrypt(data: str) -> str
+```
+
+Encrypt data.
+
+##### decrypt
+
+```python
+def decrypt(encrypted_data: str) -> str
+```
+
+Decrypt data.
+
+---
+
+### FileManager
+
+**Location**: `data/storage/file_manager.py`
+
+Manages file operations.
+
+#### Methods
+
+##### save_file
+
+```python
+def save_file(data: bytes, filename: str, subdirectory: str = None) -> str
+```
+
+Save file to storage.
+
+**Returns:**
+
+- `str`: File path
+
+##### delete_file
+
+```python
+def delete_file(file_path: str)
+```
+
+Delete file.
+
+##### get_file_path
+
+```python
+def get_file_path(filename: str, subdirectory: str = None) -> str
+```
+
+Get full file path.
+
+---
+
+## Error Handling
+
+### ErrorHandler
+
+**Location**: `utils/error_handler.py`
+
+Centralized error handling.
+
+#### Methods
+
+##### handle_error
+
+```python
+@staticmethod
+def handle_error(exception: Exception) -> dict
+```
+
+Handle an exception and return error info.
+
+**Returns:**
+
+- `dict`: Error information
+  - `user_message` (str): User-friendly message
+  - `technical_details` (str): Technical details
+  - `suggestions` (list): Suggested actions
+
+---
+
+## Signals and Events
+
+### Qt Signals
+
+EchoNote uses Qt signals for event communication:
+
+#### TranscriptionManager Signals
+
+- `task_added(task_id: str)`: Task added to queue
+- `task_started(task_id: str)`: Task processing started
+- `task_progress(task_id: str, progress: float)`: Progress updated
+- `task_completed(task_id: str)`: Task completed
+- `task_failed(task_id: str, error: str)`: Task failed
+
+#### RealtimeRecorder Signals
+
+- `recording_started()`: Recording started
+- `recording_stopped()`: Recording stopped
+- `transcription_updated(text: str)`: New transcription text
+- `translation_updated(text: str)`: New translation text
+
+#### ResourceMonitor Signals
+
+- `low_memory_warning(available_mb: float)`: Low memory detected
+- `high_cpu_warning(usage_percent: float)`: High CPU usage
+- `resources_recovered()`: Resources recovered
+
+---
+
+## Configuration
+
+### Configuration Keys
+
+Configuration is stored in JSON format. Key paths use dot notation.
+
+#### Transcription
+
+- `transcription.default_engine`: Default speech engine
+- `transcription.default_output_format`: Default output format
+- `transcription.max_concurrent_tasks`: Max concurrent tasks
+- `transcription.faster_whisper.model_size`: Model size
+- `transcription.faster_whisper.device`: Device
+- `transcription.faster_whisper.compute_type`: Compute type
+
+#### Real-time
+
+- `realtime.default_input_source`: Default audio input
+- `realtime.recording_format`: Recording format
+- `realtime.vad_threshold`: VAD threshold
+- `realtime.silence_duration_ms`: Silence duration
+
+#### Calendar
+
+- `calendar.default_view`: Default view ('month', 'week', 'day')
+- `calendar.sync_interval_minutes`: Sync interval
+- `calendar.colors.local`: Local event color
+- `calendar.colors.google`: Google event color
+- `calendar.colors.outlook`: Outlook event color
+
+#### Timeline
+
+- `timeline.past_days`: Days to show in past
+- `timeline.future_days`: Days to show in future
+- `timeline.reminder_minutes`: Reminder time
+- `timeline.page_size`: Events per page
+
+#### UI
+
+- `ui.theme`: Theme ('light', 'dark', 'system')
+- `ui.language`: Language ('zh_CN', 'en_US', 'fr_FR')
+
+---
+
+## Examples
+
+### Complete Transcription Workflow
+
+```python
+from core.transcription.manager import TranscriptionManager
+from engines.speech.faster_whisper_engine import FasterWhisperEngine
+from data.database.connection import DatabaseConnection
+from config.app_config import ConfigManager
+
+# Initialize
+config = ConfigManager()
+db = DatabaseConnection("~/.echonote/data.db")
+engine = FasterWhisperEngine(model_size="base")
+manager = TranscriptionManager(db, engine, config)
+
+# Add task
+task_id = await manager.add_task(
+    file_path="/path/to/audio.mp3",
+    options={"language": "zh", "output_format": "txt"}
+)
+
+# Start processing
+await manager.start_processing()
+
+# Monitor progress
+while True:
+    status = manager.get_task_status(task_id)
+    print(f"Progress: {status['progress']}%")
+
+    if status['status'] in ['completed', 'failed']:
+        break
+
+    await asyncio.sleep(1)
+
+# Get result
+if status['status'] == 'completed':
+    print(f"Output: {status['output_path']}")
+```
+
+### Real-time Recording with Translation
+
+```python
+from core.realtime.recorder import RealtimeRecorder
+from engines.audio.capture import AudioCapture
+from engines.speech.faster_whisper_engine import FasterWhisperEngine
+from engines.translation.google_translate import GoogleTranslateEngine
+
+# Initialize
+audio_capture = AudioCapture()
+speech_engine = FasterWhisperEngine()
+translation_engine = GoogleTranslateEngine(api_key="your-key")
+recorder = RealtimeRecorder(
+    audio_capture, speech_engine, translation_engine, db, file_manager
+)
+
+# Start recording
+await recorder.start_recording(
+    input_source="default",
+    options={
+        "language": "zh",
+        "enable_translation": True,
+        "target_language": "en"
+    }
+)
+
+# Get streams
+async def display_transcription():
+    async for text in recorder.get_transcription_stream():
+        print(f"Transcription: {text}")
+
+async def display_translation():
+    async for text in recorder.get_translation_stream():
+        print(f"Translation: {text}")
+
+# Run both streams concurrently
+await asyncio.gather(
+    display_transcription(),
+    display_translation()
+)
+
+# Stop recording
+result = await recorder.stop_recording()
+print(f"Saved to: {result['recording_path']}")
+```
+
+---
+
+**For more examples, see the [Developer Guide](DEVELOPER_GUIDE.md).**
+
+---
+
+**Last Updated**: October 2025  
+**Version**: 1.0.0

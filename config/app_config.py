@@ -1,0 +1,268 @@
+"""
+Configuration management for EchoNote application.
+
+Handles loading, validation, and saving of application configuration.
+"""
+
+import json
+import logging
+from pathlib import Path
+from typing import Any, Dict
+
+
+logger = logging.getLogger(__name__)
+
+
+class ConfigManager:
+    """Manages application configuration with validation and persistence."""
+
+    def __init__(self):
+        """Initialize the configuration manager."""
+        self.default_config_path = (
+            Path(__file__).parent / "default_config.json"
+        )
+        self.user_config_dir = Path.home() / ".echonote"
+        self.user_config_path = self.user_config_dir / "app_config.json"
+        self._config: Dict[str, Any] = {}
+        self._load_config()
+    
+    def _load_config(self) -> None:
+        """Load configuration from user config or default config."""
+        try:
+            # Try to load user configuration first
+            if self.user_config_path.exists():
+                logger.info(
+                    f"Loading user configuration from "
+                    f"{self.user_config_path}"
+                )
+                with open(self.user_config_path, 'r',
+                          encoding='utf-8') as f:
+                    self._config = json.load(f)
+            else:
+                # Fall back to default configuration
+                logger.info(
+                    f"Loading default configuration from "
+                    f"{self.default_config_path}"
+                )
+                with open(self.default_config_path, 'r',
+                          encoding='utf-8') as f:
+                    self._config = json.load(f)
+
+            # Validate the loaded configuration
+            self._validate_config()
+            logger.info("Configuration loaded and validated successfully")
+
+        except FileNotFoundError as e:
+            logger.error(f"Configuration file not found: {e}")
+            raise
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid JSON in configuration file: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"Error loading configuration: {e}")
+            raise
+    
+    def _validate_config(self) -> None:
+        """Validate required configuration fields and types."""
+        required_fields = {
+            "version": str,
+            "database": dict,
+            "transcription": dict,
+            "realtime": dict,
+            "calendar": dict,
+            "timeline": dict,
+            "ui": dict,
+            "security": dict
+        }
+
+        for field, expected_type in required_fields.items():
+            if field not in self._config:
+                raise ValueError(
+                    f"Missing required configuration field: {field}"
+                )
+            if not isinstance(self._config[field], expected_type):
+                raise TypeError(
+                    f"Configuration field '{field}' must be of type "
+                    f"{expected_type.__name__}, got "
+                    f"{type(self._config[field]).__name__}"
+                )
+
+        # Validate nested required fields
+        self._validate_database_config()
+        self._validate_transcription_config()
+        self._validate_ui_config()
+    
+    def _validate_database_config(self) -> None:
+        """Validate database configuration."""
+        db_config = self._config["database"]
+        if "path" not in db_config:
+            raise ValueError("Missing required field: database.path")
+        if "encryption_enabled" not in db_config:
+            raise ValueError("Missing required field: database.encryption_enabled")
+    
+    def _validate_transcription_config(self) -> None:
+        """Validate transcription configuration."""
+        trans_config = self._config["transcription"]
+        required = [
+            "default_engine",
+            "default_output_format",
+            "max_concurrent_tasks"
+        ]
+        for field in required:
+            if field not in trans_config:
+                raise ValueError(
+                    f"Missing required field: transcription.{field}"
+                )
+
+        # Validate max_concurrent_tasks range
+        max_concurrent = trans_config["max_concurrent_tasks"]
+        if (not isinstance(max_concurrent, int) or
+                not (1 <= max_concurrent <= 5)):
+            raise ValueError(
+                "transcription.max_concurrent_tasks must be an "
+                "integer between 1 and 5"
+            )
+        
+        # Validate faster_whisper configuration
+        if "faster_whisper" in trans_config:
+            fw_config = trans_config["faster_whisper"]
+            
+            # Validate model_dir
+            if "model_dir" in fw_config:
+                if not isinstance(fw_config["model_dir"], str):
+                    raise TypeError(
+                        "transcription.faster_whisper.model_dir must be a string"
+                    )
+            
+            # Validate auto_download_recommended
+            if "auto_download_recommended" in fw_config:
+                if not isinstance(fw_config["auto_download_recommended"], bool):
+                    raise TypeError(
+                        "transcription.faster_whisper.auto_download_recommended "
+                        "must be a boolean"
+                    )
+            
+            # Validate default_model
+            if "default_model" in fw_config:
+                if not isinstance(fw_config["default_model"], str):
+                    raise TypeError(
+                        "transcription.faster_whisper.default_model must be a string"
+                    )
+                
+                # Validate model name is in supported list
+                valid_models = [
+                    "tiny", "tiny.en", "base", "base.en",
+                    "small", "small.en", "medium", "medium.en",
+                    "large-v1", "large-v2", "large-v3"
+                ]
+                if fw_config["default_model"] not in valid_models:
+                    raise ValueError(
+                        f"transcription.faster_whisper.default_model must be "
+                        f"one of {valid_models}"
+                    )
+    
+    def _validate_ui_config(self) -> None:
+        """Validate UI configuration."""
+        ui_config = self._config["ui"]
+        if "theme" not in ui_config:
+            raise ValueError("Missing required field: ui.theme")
+        if "language" not in ui_config:
+            raise ValueError("Missing required field: ui.language")
+
+        # Validate theme value
+        valid_themes = ["light", "dark", "system"]
+        if ui_config["theme"] not in valid_themes:
+            raise ValueError(f"ui.theme must be one of {valid_themes}")
+
+        # Validate language value
+        valid_languages = ["zh_CN", "en_US", "fr_FR"]
+        if ui_config["language"] not in valid_languages:
+            raise ValueError(
+                f"ui.language must be one of {valid_languages}"
+            )
+    
+    def get(self, key: str, default: Any = None) -> Any:
+        """
+        Get a configuration value by key.
+
+        Supports nested keys using dot notation (e.g., "database.path").
+
+        Args:
+            key: Configuration key (supports dot notation)
+            default: Default value if key is not found
+
+        Returns:
+            Configuration value or default
+        """
+        keys = key.split('.')
+        value = self._config
+
+        for k in keys:
+            if isinstance(value, dict) and k in value:
+                value = value[k]
+            else:
+                return default
+
+        return value
+    
+    def set(self, key: str, value: Any) -> None:
+        """
+        Set a configuration value by key.
+
+        Supports nested keys using dot notation (e.g., "database.path").
+
+        Args:
+            key: Configuration key (supports dot notation)
+            value: Value to set
+        """
+        keys = key.split('.')
+        config = self._config
+
+        # Navigate to the parent of the target key
+        for k in keys[:-1]:
+            if k not in config:
+                config[k] = {}
+            config = config[k]
+
+        # Set the value
+        config[keys[-1]] = value
+    
+    def save(self) -> None:
+        """Save the current configuration to the user config file."""
+        try:
+            # Ensure the user config directory exists
+            self.user_config_dir.mkdir(parents=True, exist_ok=True)
+
+            # Validate before saving
+            self._validate_config()
+
+            # Write configuration to file
+            with open(self.user_config_path, 'w', encoding='utf-8') as f:
+                json.dump(self._config, f, indent=2, ensure_ascii=False)
+            
+            # Set secure file permissions (owner read/write only)
+            import os
+            try:
+                os.chmod(self.user_config_path, 0o600)
+                logger.debug(f"Set secure permissions for config file")
+            except Exception as e:
+                logger.warning(f"Could not set file permissions: {e}")
+
+            logger.info(f"Configuration saved to {self.user_config_path}")
+
+        except Exception as e:
+            logger.error(f"Error saving configuration: {e}")
+            raise
+    
+    def get_all(self) -> Dict[str, Any]:
+        """
+        Get the entire configuration dictionary.
+
+        Returns:
+            Complete configuration dictionary
+        """
+        return self._config.copy()
+    
+    def reload(self) -> None:
+        """Reload configuration from disk."""
+        self._load_config()
