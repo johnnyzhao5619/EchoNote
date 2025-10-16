@@ -13,4 +13,4 @@
 - [Contributing Guide](CONTRIBUTING.md)
 
 ## Operational Guides
-- [Google OAuth Setup](../GOOGLE_OAUTH_SETUP.md)
+- [Google OAuth Setup](GOOGLE_OAUTH_SETUP.md)
