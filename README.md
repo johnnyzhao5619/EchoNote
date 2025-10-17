@@ -1,3 +1,13 @@
+<p align="center">
+  <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%' stop-color='%236C63FF'/><stop offset='100%' stop-color='%2300C9A7'/></linearGradient></defs><rect width='120' height='120' rx='24' fill='url(%23g)'/><g fill='white'><path d='M38 34h44v10H48v14h30v10H48v18h34v10H38z'/><path d='M74 44a6 6 0 0 1 12 0v24a12 12 0 1 1-24 0V50h8v18a4 4 0 1 0 8 0z' opacity='0.7'/></g><path d='M60 92c14 0 26-7 26-24' stroke='white' stroke-width='6' stroke-linecap='round' opacity='0.6'/><path d='M34 58h10' stroke='white' stroke-width='6' stroke-linecap='round' opacity='0.4'/><path d='M76 58h10' stroke='white' stroke-width='6' stroke-linecap='round' opacity='0.4'/></svg>" width="120" height="120" alt="EchoNote icon" />
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License" /></a>
+  <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB.svg" alt="Python 3.10+" />
+  <img src="https://img.shields.io/badge/PyQt-6-41CD52.svg" alt="PyQt6" />
+</p>
+
 # EchoNote
 
 > Local-first transcription, calendar orchestration, and timeline insights for desktop knowledge workers.
@@ -7,6 +17,60 @@
 - [中文](#中文)
 - [Français](#français)
 
+## 📚 Global Index
+- [System Architecture Overview](#system-architecture-overview)
+- [Core Capabilities Matrix](#core-capabilities-matrix)
+- [Documentation Library](#documentation-library)
+- [Developer Toolchain](#developer-toolchain)
+- [License](#license)
+
+### System Architecture Overview
+```
+EchoNote/
+├── main.py                # PyQt6 bootstrap, dependency wiring, runtime orchestration
+├── config/                # Default configuration and runtime config manager
+├── core/                  # Feature domains: calendar, realtime, timeline, transcription, settings
+├── engines/               # Integrations: audio capture, speech, translation, calendar sync
+├── data/                  # Database schema/models, encrypted storage, file lifecycle helpers
+├── ui/                    # Desktop UI components, dialogs, feature modules
+├── utils/                 # Logging, diagnostics, i18n, startup & resource utilities
+└── tests/                 # Unit, integration, and scenario harnesses
+```
+
+### Core Capabilities Matrix
+| Domain | Purpose | Key Modules |
+| --- | --- | --- |
+| Batch & realtime transcription | Task queueing, model orchestration, export formats | `core/transcription`, `engines/speech/`, `ui/batch_transcribe`, `ui/realtime_record` |
+| Calendar orchestration | Local persistence, Google/Outlook sync, OAuth lifecycle | `core/calendar`, `engines/calendar_sync`, `data/security/oauth_manager.py`, `ui/calendar_hub` |
+| Timeline intelligence | Event correlation, automation rules, reminders | `core/timeline`, `ui/timeline` |
+| Settings & preferences | Config surfaces, model downloads, appearance | `core/settings`, `ui/settings`, `core/models` |
+| Platform services | Logging, error handling, startup health, resource safety | `utils/`, `data/security`, `engines/audio` |
+
+### Documentation Library
+| Audience | Focus | Location |
+| --- | --- | --- |
+| New users | Guided onboarding & workflows | `docs/quick-start/README.md`, `docs/user-guide/README.md` |
+| Product overview | Value proposition & personas | `docs/project-overview/README.md` |
+| API & architecture | Core services, data flow diagrams | `docs/DEVELOPER_GUIDE.md`, `docs/API_REFERENCE.md` |
+| Accessibility & UX | Accessibility checklist, UI rationale | `docs/ACCESSIBILITY.md`, `ui/*/README.md` |
+| Contribution | Coding standards, contribution process | `docs/CODE_STANDARDS.md`, `docs/CONTRIBUTING.md` |
+| Cloud engines | External speech engine requirements | `engines/speech/CLOUD_ENGINES_IMPLEMENTATION.md` |
+
+### Developer Toolchain
+- Python 3.10+
+- Optional accelerants: PyAudio (capture), FFmpeg (media), CUDA GPU (Faster-Whisper)
+- Environment setup (`python -m venv .venv && source .venv/bin/activate`)
+- Install dependencies with `pip install -r requirements.txt`
+- Launch the desktop client via `python main.py`
+- Extended tooling: `pip install -r requirements-dev.txt`
+- Testing guardrails:
+  - Unit tests – `pytest tests/unit`
+  - Integration tests – `pytest tests/integration`
+  - Performance/E2E harness – `pytest tests/e2e_performance_test.py`
+
+### License
+Released under the [MIT License](LICENSE).
+
 ---
 
 ### English
@@ -14,6 +78,12 @@
 - **Framework**: PyQt6 entry point in `main.py`
 - **Core Domains**: batch/real-time transcription, calendar sync, task automation, settings management
 - **Operating Principles**: privacy-first, encrypted persistence, proactive resource checks
+
+#### Quick Start Checklist
+1. Create and activate a virtual environment.
+2. `pip install -r requirements.txt`
+3. Run `python main.py`
+4. On first launch complete the guided setup (storage paths, FFmpeg check, model download recommendation).
 
 #### Feature Highlights
 1. **Batch Transcription** – `core/transcription` coordinates Faster-Whisper engines, resumable queues, and export formatting.
@@ -23,52 +93,35 @@
 5. **Secure Storage** – `data/database`, `data/security`, and `data/storage` deliver encrypted SQLite, token vaults, and file lifecycle helpers.
 6. **System Health** – `utils/` centralises logging, diagnostics, resource monitoring, and FFmpeg checks.
 
-#### Repository Layout
-```
-EchoNote/
-├── main.py                # Application bootstrap & dependency wiring
-├── config/                # Default configuration and runtime manager
-├── core/                  # Feature managers (calendar, realtime, timeline, transcription, settings)
-├── engines/               # Pluggable engines (audio capture, speech, translation, calendar sync)
-├── data/                  # Database schema/models, encrypted storage, file management
-├── ui/                    # Qt widgets, dialogs, and navigation shell
-├── utils/                 # Logging, i18n, diagnostics, resource monitoring
-└── tests/                 # Unit and integration suites
-```
-
 #### Environment Requirements
 - Python 3.10 or newer
 - Optional: PyAudio (microphone capture), FFmpeg (media formats), CUDA GPU (acceleration)
 - First launch writes encrypted SQLite data, logs, and settings to `~/.echonote`
-
-#### Run from Source
-```bash
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\\Scripts\\activate
-pip install -r requirements.txt
-python main.py
-```
 
 #### Configuration Notes
 - Defaults live in `config/default_config.json`; user overrides persist to `~/.echonote/app_config.json`.
 - Recordings and transcripts are stored under `~/Documents/EchoNote/` by default.
 - Provide OAuth credentials in the settings UI before enabling Google or Outlook sync.
 
+#### Operational Index
+- **Runtime orchestration**: `main.py`, `utils/startup_optimizer.py`
+- **Audio services**: `engines/audio/`, `core/realtime/`
+- **Transcription pipeline**: `core/transcription/`, `core/models/`
+- **Calendar sync**: `core/calendar/`, `engines/calendar_sync/`
+- **UI modules**: `ui/main_window.py`, `ui/sidebar.py`, feature widgets under `ui/*`
+- **Security**: `data/security/`, `utils/error_handler.py`
+- **Testing suites**: `tests/core/test_model_manager.py`, placeholders under `tests/unit`, `tests/integration`
+
 #### Quality & Testing
 - `pytest tests/unit` – core logic and utilities
 - `pytest tests/integration` – database, engines, and schedulers (requires local dependencies)
 - Optional E2E and performance baselines reside in `tests/`
 
-Install development extras with `pip install -r requirements-dev.txt` when running broader suites.
-
-#### Documentation
+#### Documentation References
 - User handbook: `docs/user-guide/README.md`
 - Quick start: `docs/quick-start/README.md`
 - Project overview: `docs/project-overview/README.md`
 - Developer resources: `docs/DEVELOPER_GUIDE.md`, `docs/API_REFERENCE.md`
-
-#### License
-Released under the [MIT License](LICENSE).
 
 ---
 
@@ -78,6 +131,12 @@ Released under the [MIT License](LICENSE).
 - **核心领域**：批量/实时转录、日历同步、自动任务、设置管理
 - **运行原则**：隐私优先、加密持久化、主动的资源诊断
 
+#### 快速启动清单
+1. 创建并激活虚拟环境。
+2. 执行 `pip install -r requirements.txt` 安装依赖。
+3. 运行 `python main.py` 启动桌面客户端。
+4. 首次启动按向导完成存储路径、FFmpeg 检测、模型下载建议等设置。
+
 #### 核心特性
 1. **批量转录** —— `core/transcription` 调度 Faster-Whisper 引擎、支持任务重试与多格式导出。
 2. **实时录制** —— `core/realtime` 与 `engines/audio` 提供音频捕获、增益控制、语音活动检测与可选翻译。
@@ -86,52 +145,36 @@ Released under the [MIT License](LICENSE).
 5. **安全存储** —— `data/database`、`data/security`、`data/storage` 提供加密 SQLite、令牌保管与文件生命周期管理。
 6. **系统健康** —— `utils/` 集中处理日志、诊断、资源监控与 FFmpeg 检测。
 
-#### 目录结构
-```
-EchoNote/
-├── main.py                # 应用启动与依赖装配
-├── config/                # 默认配置与运行时管理器
-├── core/                  # 功能管理器（calendar、realtime、timeline、transcription、settings）
-├── engines/               # 可插拔引擎（音频捕获、语音、翻译、日历同步）
-├── data/                  # 数据库 schema/模型、加密存储、文件管理
-├── ui/                    # Qt 组件、对话框与导航框架
-├── utils/                 # 日志、国际化、诊断、资源监控
-└── tests/                 # 单元与集成测试
-```
-
 #### 环境要求
 - Python 3.10 及以上
 - 可选依赖：PyAudio（麦克风采集）、FFmpeg（媒体格式）、CUDA GPU（加速）
 - 首次启动会在 `~/.echonote` 下写入加密数据库、日志与配置
 
-#### 运行项目
-```bash
-python -m venv .venv
-source .venv/bin/activate   # Windows 使用 .venv\\Scripts\\activate
-pip install -r requirements.txt
-python main.py
-```
+#### 配置索引
+- 默认配置：`config/default_config.json`
+- 用户配置：`~/.echonote/app_config.json`
+- 录音/转录目录：`~/Documents/EchoNote/`
+- OAuth 管理：`data/security/oauth_manager.py`
 
-#### 配置说明
-- 默认配置位于 `config/default_config.json`，用户修改会保存到 `~/.echonote/app_config.json`。
-- 录音与转录文件默认存放在 `~/Documents/EchoNote/`。
-- 启用 Google 或 Outlook 同步前，请先在设置界面填入 OAuth 凭据。
+#### 模块索引
+- **运行调度**：`main.py`、`utils/startup_optimizer.py`
+- **音频链路**：`engines/audio/`、`core/realtime/`
+- **转录与模型**：`core/transcription/`、`core/models/`
+- **日历同步**：`core/calendar/`、`engines/calendar_sync/`
+- **桌面界面**：`ui/main_window.py`、`ui/sidebar.py` 及功能子模块
+- **安全机制**：`data/security/`、`utils/error_handler.py`
+- **测试样例**：`tests/core/test_model_manager.py`、`tests/` 下的占位目录
 
 #### 质量与测试
 - `pytest tests/unit` —— 核心逻辑与工具单元测试
 - `pytest tests/integration` —— 数据库、引擎与调度器集成测试（需本地依赖）
 - 其他端到端与性能场景位于 `tests/`
 
-如需运行更多测试，请先执行 `pip install -r requirements-dev.txt` 安装开发依赖。
-
-#### 文档
+#### 文档索引
 - 使用手册：`docs/user-guide/README.md`
 - 快速入门：`docs/quick-start/README.md`
 - 项目说明：`docs/project-overview/README.md`
 - 开发者参考：`docs/DEVELOPER_GUIDE.md`、`docs/API_REFERENCE.md`
-
-#### 许可证
-项目遵循 [MIT License](LICENSE)。
 
 ---
 
@@ -141,6 +184,12 @@ python main.py
 - **Domaines clés** : transcription batch/temps réel, synchronisation calendrier, automatisation des tâches, gestion des paramètres
 - **Principes opérationnels** : confidentialité par défaut, persistance chiffrée, surveillance proactive des ressources
 
+#### Démarrage rapide
+1. Créez et activez un environnement virtuel.
+2. Installez les dépendances avec `pip install -r requirements.txt`.
+3. Lancez `python main.py` pour ouvrir le client.
+4. Suivez l’assistant initial (chemins de stockage, vérification FFmpeg, recommandation de modèle).
+
 #### Fonctionnalités principales
 1. **Transcription par lots** – `core/transcription` orchestre les moteurs Faster-Whisper, gère les files avec reprise et l’export multi-formats.
 2. **Enregistrement en temps réel** – `core/realtime` et `engines/audio` gèrent la capture, le gain, la détection d’activité vocale et la traduction optionnelle.
@@ -149,49 +198,33 @@ python main.py
 5. **Stockage sécurisé** – `data/database`, `data/security` et `data/storage` fournissent SQLite chiffré, coffre à jetons et gestion du cycle de vie des fichiers.
 6. **Santé du système** – `utils/` centralise journalisation, diagnostics, surveillance des ressources et contrôles FFmpeg.
 
-#### Structure du dépôt
-```
-EchoNote/
-├── main.py                # Initialisation de l’application et injection des dépendances
-├── config/                # Configuration par défaut et gestionnaire d’exécution
-├── core/                  # Gestionnaires métiers (calendar, realtime, timeline, transcription, settings)
-├── engines/               # Moteurs interchangeables (capture audio, reconnaissance, traduction, synchronisation calendrier)
-├── data/                  # Schéma/modèles SQLite, stockage chiffré, gestion des fichiers
-├── ui/                    # Widgets Qt, boîtes de dialogue, shell de navigation
-├── utils/                 # Journalisation, i18n, diagnostics, surveillance des ressources
-└── tests/                 # Tests unitaires et d’intégration
-```
-
 #### Prérequis
 - Python 3.10 ou supérieur
 - Optionnel : PyAudio (capture micro), FFmpeg (formats média), GPU CUDA (accélération)
 - Le premier lancement crée la base SQLite chiffrée, les journaux et la configuration dans `~/.echonote`
 
-#### Exécution
-```bash
-python -m venv .venv
-source .venv/bin/activate   # Windows : .venv\\Scripts\\activate
-pip install -r requirements.txt
-python main.py
-```
+#### Index de configuration
+- Configuration par défaut : `config/default_config.json`
+- Surcharges utilisateur : `~/.echonote/app_config.json`
+- Stockage des enregistrements : `~/Documents/EchoNote/`
+- Gestion OAuth : `data/security/oauth_manager.py`
 
-#### Configuration
-- Les valeurs par défaut résident dans `config/default_config.json`; les substitutions utilisateur sont stockées dans `~/.echonote/app_config.json`.
-- Les enregistrements et transcriptions sont sauvegardés dans `~/Documents/EchoNote/`.
-- Ajoutez les identifiants OAuth dans l’UI des paramètres avant d’activer la synchronisation Google ou Outlook.
+#### Index fonctionnel
+- **Orchestration runtime** : `main.py`, `utils/startup_optimizer.py`
+- **Chaîne audio** : `engines/audio/`, `core/realtime/`
+- **Pipeline de transcription** : `core/transcription/`, `core/models/`
+- **Synchronisation calendrier** : `core/calendar/`, `engines/calendar_sync/`
+- **Interface utilisateur** : `ui/main_window.py`, `ui/sidebar.py`, modules `ui/*`
+- **Sécurité & résilience** : `data/security/`, `utils/error_handler.py`
+- **Tests** : `tests/core/test_model_manager.py`, suites `tests/`
 
 #### Qualité & tests
 - `pytest tests/unit` – logique cœur et utilitaires
 - `pytest tests/integration` – base de données, moteurs et ordonnanceurs (dépendances locales requises)
-- Les scénarios E2E et performance supplémentaires se trouvent dans `tests/`
-
-Installez les dépendances de développement avec `pip install -r requirements-dev.txt` pour une couverture élargie.
+- Scénarios E2E et performance supplémentaires dans `tests/`
 
 #### Documentation
 - Guide utilisateur : `docs/user-guide/README.md`
 - Démarrage rapide : `docs/quick-start/README.md`
 - Présentation du projet : `docs/project-overview/README.md`
 - Ressources développeur : `docs/DEVELOPER_GUIDE.md`, `docs/API_REFERENCE.md`
-
-#### Licence
-Projet distribué sous [Licence MIT](LICENSE).
