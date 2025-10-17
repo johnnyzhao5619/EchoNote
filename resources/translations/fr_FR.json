@@ -79,12 +79,16 @@
     "export_transcription": "Exporter la Transcription",
     "export_translation": "Exporter la Traduction",
     "save_recording": "Enregistrer l'Audio",
+    "no_input_devices": "Aucun périphérique d'entrée détecté",
     "no_models_available": "Veuillez d'abord télécharger un modèle",
     "no_models_message": "Aucun modèle disponible. Veuillez télécharger au moins un modèle pour utiliser l'enregistrement en temps réel.",
     "go_to_download": "Aller au Téléchargement de Modèles",
     "no_model_selected": "Veuillez sélectionner un modèle",
     "model_not_downloaded": "Le modèle sélectionné n'est pas téléchargé",
-    "translation_not_available": "Traduction non disponible. Veuillez configurer la clé API Google Translate dans Paramètres > Transcription."
+    "translation_not_available": "Traduction non disponible. Veuillez configurer la clé API Google Translate dans Paramètres > Transcription.",
+    "audio_unavailable_short": "Capture micro indisponible",
+    "audio_unavailable_message": "L'enregistrement en temps réel nécessite PyAudio. Installez-le avec : {command}",
+    "audio_unavailable_tooltip": "Installez PyAudio (pip install pyaudio) pour activer l'enregistrement en temps réel."
   },
   "calendar_hub": {
     "title": "Centre de Calendrier",

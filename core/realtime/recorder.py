@@ -36,6 +36,11 @@ class RealtimeRecorder:
         self.db = db_connection
         self.file_manager = file_manager
 
+        if self.audio_capture is None:
+            logger.warning(
+                "Audio capture not available. Real-time recording features will remain disabled."
+            )
+
         # 录制状态
         self.is_recording = False
         self.recording_start_time = None
@@ -66,6 +71,10 @@ class RealtimeRecorder:
         self._event_loop = None
 
         logger.info("RealtimeRecorder initialized")
+
+    def audio_input_available(self) -> bool:
+        """实时录音输入是否可用。"""
+        return self.audio_capture is not None
 
     def set_callbacks(
         self,
@@ -111,6 +120,11 @@ class RealtimeRecorder:
         if self.is_recording:
             logger.warning("Recording is already in progress")
             return
+
+        if self.audio_capture is None:
+            raise RuntimeError(
+                "Audio capture is not available. Install PyAudio to enable real-time recording."
+            )
 
         # 保存事件循环引用（用于线程安全的队列操作）
         if event_loop is not None:
@@ -415,7 +429,8 @@ class RealtimeRecorder:
         self.is_recording = False
 
         # 停止音频捕获
-        self.audio_capture.stop_capture()
+        if self.audio_capture is not None:
+            self.audio_capture.stop_capture()
 
         # 等待处理任务完成
         if self.processing_task:

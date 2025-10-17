@@ -79,12 +79,16 @@
     "export_transcription": "导出转录",
     "export_translation": "导出翻译",
     "save_recording": "保存录音",
+    "no_input_devices": "未检测到输入设备",
     "no_models_available": "请先下载模型",
     "no_models_message": "没有可用的模型。请先下载至少一个模型才能使用实时录制功能。",
     "go_to_download": "前往下载模型",
     "no_model_selected": "请选择一个模型",
     "model_not_downloaded": "所选模型未下载",
-    "translation_not_available": "翻译功能不可用。请在 设置 > 转录 中配置 Google Translate API 密钥。"
+    "translation_not_available": "翻译功能不可用。请在 设置 > 转录 中配置 Google Translate API 密钥。",
+    "audio_unavailable_short": "无法使用麦克风录制",
+    "audio_unavailable_message": "实时录制需要安装 PyAudio。请执行：{command}",
+    "audio_unavailable_tooltip": "安装 PyAudio（pip install pyaudio）后可启用实时录制。"
   },
   "calendar_hub": {
     "title": "日历中心",

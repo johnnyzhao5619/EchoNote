@@ -407,10 +407,26 @@ def main():
         # Initialize audio capture
         logger.info("Initializing audio capture...")
         from engines.audio.capture import AudioCapture
-        
-        audio_capture = AudioCapture()
+
+        audio_capture = None
+        try:
+            audio_capture = AudioCapture()
+            logger.info("Audio capture initialized")
+        except ImportError as exc:
+            logger.warning(
+                "PyAudio not available; real-time recording disabled until installation. %s",
+                exc,
+            )
+            logger.warning(
+                "Install PyAudio with 'pip install pyaudio' to enable microphone capture."
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Audio capture unavailable due to runtime error. Real-time recording will be disabled."
+            )
+            logger.warning("Audio capture initialization error: %s", exc, exc_info=True)
+
         managers['audio_capture'] = audio_capture
-        logger.info("Audio capture initialized")
         
         # Initialize translation engine (optional) with lazy loading
         logger.info("Setting up translation engine (lazy loading)...")

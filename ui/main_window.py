@@ -180,8 +180,7 @@ class MainWindow(QMainWindow):
                                        'Transcription manager not available')
         
         # Create realtime record widget
-        if (self.managers.get('realtime_recorder') is not None and 
-            self.managers.get('audio_capture') is not None):
+        if self.managers.get('realtime_recorder') is not None:
             try:
                 realtime_widget = RealtimeRecordWidget(
                     self.managers['realtime_recorder'],

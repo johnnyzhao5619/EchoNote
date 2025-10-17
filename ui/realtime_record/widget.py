@@ -61,6 +61,7 @@ class RealtimeRecordWidget(QWidget):
         super().__init__(parent)
         self.recorder = recorder
         self.audio_capture = audio_capture
+        self._audio_available = audio_capture is not None
         self.i18n = i18n_manager
         self.model_manager = model_manager
 
@@ -190,6 +191,7 @@ class RealtimeRecordWidget(QWidget):
 
         # 更新 UI 文本
         self._update_ui_text()
+        self._update_audio_availability()
 
     def _create_audio_input_group(self) -> QGroupBox:
         """创建音频输入设置组"""
@@ -253,6 +255,12 @@ class RealtimeRecordWidget(QWidget):
             Qt.ConnectionType.QueuedConnection
         )
         layout.addWidget(self.audio_visualizer)
+
+        self.audio_unavailable_label = QLabel()
+        self.audio_unavailable_label.setObjectName("audio_unavailable_label")
+        self.audio_unavailable_label.setWordWrap(True)
+        self.audio_unavailable_label.setVisible(False)
+        layout.addWidget(self.audio_unavailable_label)
 
         group.setLayout(layout)
         return group
@@ -469,13 +477,24 @@ class RealtimeRecordWidget(QWidget):
 
     def _populate_input_devices(self):
         """填充音频输入设备列表"""
+        if self.audio_capture is None:
+            self.input_combo.clear()
+            self.input_combo.addItem(
+                self.i18n.t("realtime_record.audio_unavailable_short"),
+                None
+            )
+            return
+
         try:
             devices = self.audio_capture.get_input_devices()
 
             self.input_combo.clear()
 
             if not devices:
-                self.input_combo.addItem("No input devices found", None)
+                self.input_combo.addItem(
+                    self.i18n.t("realtime_record.no_input_devices"),
+                    None
+                )
                 return
 
             for device in devices:
@@ -489,6 +508,56 @@ class RealtimeRecordWidget(QWidget):
         except Exception as e:
             logger.error(f"Failed to populate input devices: {e}")
             self.input_combo.addItem("Error loading devices", None)
+
+    def _update_audio_availability(self):
+        """根据音频捕获可用性调整 UI 状态"""
+        if hasattr(self.recorder, 'audio_capture'):
+            self.audio_capture = self.recorder.audio_capture
+
+        previous_state = getattr(self, '_audio_available', False)
+
+        available = False
+        if hasattr(self.recorder, 'audio_input_available'):
+            try:
+                available = bool(self.recorder.audio_input_available())
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Failed to check audio availability: %s", exc)
+        elif self.audio_capture is not None:
+            available = True
+
+        self._audio_available = available
+
+        tooltip = self.i18n.t("realtime_record.audio_unavailable_tooltip")
+        guide_text = self.i18n.t(
+            "realtime_record.audio_unavailable_message",
+            command="pip install pyaudio"
+        )
+        short_text = self.i18n.t("realtime_record.audio_unavailable_short")
+
+        record_button = getattr(self, 'record_button', None)
+        if record_button:
+            record_button.setEnabled(self._audio_available)
+            record_button.setToolTip('' if self._audio_available else tooltip)
+
+        for widget_name in ('input_combo', 'gain_slider', 'gain_value_label', 'audio_visualizer'):
+            widget = getattr(self, widget_name, None)
+            if widget:
+                widget.setEnabled(self._audio_available)
+
+        if hasattr(self, 'audio_unavailable_label'):
+            if self._audio_available:
+                self.audio_unavailable_label.setVisible(False)
+                self.audio_unavailable_label.clear()
+            else:
+                self.audio_unavailable_label.setText(guide_text)
+                self.audio_unavailable_label.setVisible(True)
+
+        if not self._audio_available and hasattr(self, 'input_combo'):
+            self.input_combo.clear()
+            self.input_combo.addItem(short_text, None)
+        elif self._audio_available and not previous_state:
+            # 仅在状态从不可用切换到可用时刷新设备列表
+            self._populate_input_devices()
 
     def _update_model_list(self):
         """Update model combo box with downloaded models."""
@@ -724,6 +793,9 @@ class RealtimeRecordWidget(QWidget):
                 self.i18n.t("realtime_record.save_recording")
             )
 
+        # 更新音频可用性提示
+        self._update_audio_availability()
+
     # Callback methods (called from recorder thread)
     def _on_transcription(self, text: str):
         """转录更新回调（线程安全）"""
@@ -846,7 +918,8 @@ class RealtimeRecordWidget(QWidget):
         """增益滑块变化处理"""
         gain = value / 100.0
         self.gain_value_label.setText(f"{gain:.1f}x")
-        self.audio_capture.set_gain(gain)
+        if self.audio_capture is not None:
+            self.audio_capture.set_gain(gain)
         logger.debug(f"Gain changed to {gain}")
 
     def _on_translation_toggled(self, state: int):
@@ -863,6 +936,12 @@ class RealtimeRecordWidget(QWidget):
 
     def _toggle_recording(self):
         """切换录制状态"""
+        if not self._audio_available:
+            warning = self.i18n.t("realtime_record.audio_unavailable_tooltip")
+            logger.warning("Realtime recording unavailable: %s", warning)
+            self.signals.error_occurred.emit(warning)
+            return
+
         if not self.recorder.is_recording:
             # 开始录制
             self._run_async_task(self._start_recording())

@@ -1,9 +1,8 @@
-"""
-音频捕获模块
+"""音频捕获模块
 
-使用 PyAudio 实现音频输入源枚举和实时音频捕获
-"""
+使用 PyAudio 实现音频输入源枚举和实时音频捕获"""
 
+import importlib
 import logging
 from typing import List, Dict, Optional, Callable
 import numpy as np
@@ -16,11 +15,13 @@ logger = logging.getLogger(__name__)
 class AudioCapture:
     """音频捕获器"""
 
-    def __init__(self, sample_rate: int = 16000, channels: int = 1, 
+    def __init__(self, sample_rate: int = 16000, channels: int = 1,
                  chunk_size: int = 512, gain: float = 1.0):
-        """
-        初始化音频捕获器
-        
+        """初始化音频捕获器。
+
+        PyAudio 模块仅在需要时导入和初始化，避免在应用启动时
+        强制加载可选依赖。
+
         Args:
             sample_rate: 采样率（Hz），默认 16000（Whisper 标准）
             channels: 声道数，默认 1（单声道）
@@ -31,31 +32,62 @@ class AudioCapture:
         self.channels = channels
         self.chunk_size = chunk_size
         self.gain = gain
-        
+
         self.pyaudio = None
         self.stream = None
         self.is_capturing = False
         self.capture_thread = None
         self.audio_queue = queue.Queue()
-        
-        self._initialize_pyaudio()
-        
-        logger.info(f"Audio capture initialized: sample_rate={sample_rate}, channels={channels}, chunk_size={chunk_size}")
 
-    def _initialize_pyaudio(self):
-        """初始化 PyAudio"""
+        self._pyaudio_module = None
+        self._pyaudio_error: Optional[Exception] = None
+
+        # 验证依赖是否存在（不创建实例，避免提前加载底层库）
+        self._ensure_module_available()
+
+        logger.info(
+            "Audio capture configured: sample_rate=%s, channels=%s, chunk_size=%s. "
+            "PyAudio instance will be created on first use.",
+            sample_rate,
+            channels,
+            chunk_size,
+        )
+
+    def _ensure_module_available(self):
+        """确保可以导入 PyAudio 模块。"""
+        if self._pyaudio_module is not None:
+            return self._pyaudio_module
+
         try:
-            import pyaudio
-            self.pyaudio = pyaudio.PyAudio()
-            logger.info("PyAudio initialized successfully")
-        except ImportError:
-            raise ImportError(
-                "PyAudio is not installed. "
-                "Please install it with: pip install pyaudio"
+            self._pyaudio_module = importlib.import_module("pyaudio")
+            return self._pyaudio_module
+        except ImportError as exc:
+            self._pyaudio_error = exc
+            logger.warning(
+                "PyAudio module not found; microphone capture is disabled until installation."
             )
-        except Exception as e:
-            logger.error(f"Failed to initialize PyAudio: {e}")
+            raise ImportError(
+                "PyAudio is not installed. Please install it with: pip install pyaudio"
+            ) from exc
+
+    def _ensure_pyaudio_instance(self):
+        """按需初始化 PyAudio 实例。"""
+        if self.pyaudio is not None:
+            return self.pyaudio
+
+        if self._pyaudio_error is not None:
+            raise self._pyaudio_error
+
+        try:
+            pyaudio_module = self._ensure_module_available()
+            self.pyaudio = pyaudio_module.PyAudio()
+            logger.info("PyAudio initialized successfully")
+        except Exception as exc:  # noqa: BLE001
+            self._pyaudio_error = exc
+            logger.error("Failed to initialize PyAudio: %s", exc)
             raise
+
+        return self.pyaudio
 
     def get_input_devices(self) -> List[Dict]:
         """
@@ -73,15 +105,21 @@ class AudioCapture:
                 ...
             ]
         """
-        if self.pyaudio is None:
+        try:
+            pyaudio_instance = self._ensure_pyaudio_instance()
+        except ImportError:
+            logger.warning("PyAudio not installed; audio input listing unavailable")
             return []
-        
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Failed to access audio input devices: %s", exc)
+            return []
+
         devices = []
-        device_count = self.pyaudio.get_device_count()
-        
+        device_count = pyaudio_instance.get_device_count()
+
         for i in range(device_count):
             try:
-                device_info = self.pyaudio.get_device_info_by_index(i)
+                device_info = pyaudio_instance.get_device_info_by_index(i)
                 
                 # 只返回输入设备
                 if device_info.get('maxInputChannels', 0) > 0:
@@ -113,11 +151,9 @@ class AudioCapture:
         Returns:
             Optional[Dict]: 默认输入设备信息，如果没有则返回 None
         """
-        if self.pyaudio is None:
-            return None
-        
         try:
-            device_info = self.pyaudio.get_default_input_device_info()
+            pyaudio_instance = self._ensure_pyaudio_instance()
+            device_info = pyaudio_instance.get_default_input_device_info()
             return {
                 "index": device_info.get('index', 0),
                 "name": device_info.get('name', 'Unknown'),
@@ -141,15 +177,13 @@ class AudioCapture:
             logger.warning("Audio capture is already running")
             return
         
-        if self.pyaudio is None:
-            raise RuntimeError("PyAudio is not initialized")
-        
+        pyaudio_instance = self._ensure_pyaudio_instance()
+        pyaudio_module = self._ensure_module_available()
+
         try:
-            import pyaudio
-            
             # 打开音频流
-            self.stream = self.pyaudio.open(
-                format=pyaudio.paInt16,
+            self.stream = pyaudio_instance.open(
+                format=pyaudio_module.paInt16,
                 channels=self.channels,
                 rate=self.sample_rate,
                 input=True,
@@ -302,7 +336,7 @@ class AudioCapture:
         if self.pyaudio:
             self.pyaudio.terminate()
             self.pyaudio = None
-        
+
         logger.info("Audio capture closed")
 
     def __enter__(self):
