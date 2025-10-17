@@ -56,6 +56,7 @@ class OutlookCalendarAdapter(CalendarSyncAdapter):
         self.access_token = None
         self.refresh_token = None
         self.expires_at: Optional[str] = None
+        self.token_type: Optional[str] = None
         logger.info("OutlookCalendarAdapter initialized")
 
     def get_authorization_url(self) -> str:
@@ -108,9 +109,12 @@ class OutlookCalendarAdapter(CalendarSyncAdapter):
             token_data = response.json()
             self.access_token = token_data['access_token']
             self.refresh_token = token_data.get('refresh_token')
+            token_type = token_data.get('token_type', 'Bearer')
+            self.token_type = token_type
 
             # Calculate expiration time
-            expires_in = token_data.get('expires_in', 3600)
+            raw_expires_in = token_data.get('expires_in')
+            expires_in = raw_expires_in if raw_expires_in is not None else 3600
             expires_at = datetime.now().timestamp() + expires_in
             self.expires_at = datetime.fromtimestamp(expires_at).isoformat()
 
@@ -119,8 +123,9 @@ class OutlookCalendarAdapter(CalendarSyncAdapter):
             return {
                 'access_token': self.access_token,
                 'refresh_token': self.refresh_token,
-                'expires_in': expires_in,
-                'expires_at': self.expires_at
+                'expires_in': raw_expires_in if raw_expires_in is not None else expires_in,
+                'expires_at': self.expires_at,
+                'token_type': token_type
             }
 
         except Exception as e:
@@ -178,8 +183,15 @@ class OutlookCalendarAdapter(CalendarSyncAdapter):
 
             token_data = response.json()
             self.access_token = token_data['access_token']
+            token_type = token_data.get('token_type', 'Bearer')
+            self.token_type = token_type
 
-            expires_in = token_data.get('expires_in', 3600)
+            new_refresh_token = token_data.get('refresh_token')
+            if new_refresh_token:
+                self.refresh_token = new_refresh_token
+
+            raw_expires_in = token_data.get('expires_in')
+            expires_in = raw_expires_in if raw_expires_in is not None else 3600
             expires_at = datetime.now().timestamp() + expires_in
             self.expires_at = datetime.fromtimestamp(expires_at).isoformat()
 
@@ -188,8 +200,9 @@ class OutlookCalendarAdapter(CalendarSyncAdapter):
             return {
                 'access_token': self.access_token,
                 'refresh_token': self.refresh_token,
-                'expires_in': expires_in,
-                'expires_at': self.expires_at
+                'expires_in': raw_expires_in if raw_expires_in is not None else expires_in,
+                'expires_at': self.expires_at,
+                'token_type': token_type
             }
 
         except Exception as e:

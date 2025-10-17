@@ -293,22 +293,66 @@ class CalendarManager:
                     try:
                         token_before_refresh = self.oauth_manager.get_token(provider)
 
+                        def _resolve_expires_in(data: Dict[str, Any], context: str) -> Optional[int]:
+                            expires_in_value = data.get('expires_in')
+                            if expires_in_value is not None:
+                                return expires_in_value
+
+                            expires_at_value = data.get('expires_at')
+                            if not expires_at_value:
+                                return None
+
+                            try:
+                                expires_at_dt = datetime.fromisoformat(expires_at_value)
+                                resolved = max(
+                                    int((expires_at_dt - datetime.now()).total_seconds()),
+                                    0
+                                )
+                                logger.debug(
+                                    "Derived expires_in=%s from expires_at during %s for %s",
+                                    resolved,
+                                    context,
+                                    provider
+                                )
+                                return resolved
+                            except ValueError:
+                                logger.warning(
+                                    "Unable to parse expires_at during %s for %s: %s",
+                                    context,
+                                    provider,
+                                    expires_at_value
+                                )
+                                return None
+
                         def refresh_callback(refresh_token: str):
                             adapter.refresh_token = refresh_token
                             refreshed = adapter.refresh_access_token()
 
-                            if refreshed.get('refresh_token'):
-                                adapter.refresh_token = refreshed['refresh_token']
+                            new_refresh_token = refreshed.get('refresh_token')
+                            if new_refresh_token:
+                                adapter.refresh_token = new_refresh_token
 
                             adapter.access_token = refreshed.get('access_token')
                             adapter.expires_at = refreshed.get('expires_at')
+                            if refreshed.get('token_type'):
+                                setattr(adapter, 'token_type', refreshed.get('token_type'))
+
+                            resolved_expires_in = _resolve_expires_in(
+                                refreshed,
+                                'refresh callback'
+                            )
 
                             refresh_result.clear()
                             refresh_result.update(refreshed)
+                            if resolved_expires_in is not None:
+                                refresh_result['expires_in'] = resolved_expires_in
 
                             return {
                                 'access_token': refreshed.get('access_token'),
-                                'expires_in': refreshed.get('expires_in')
+                                'expires_in': resolved_expires_in,
+                                'token_type': refreshed.get('token_type'),
+                                'refresh_token': refreshed.get('refresh_token'),
+                                'expires_at': refreshed.get('expires_at')
                             }
 
                         token_data = self.oauth_manager.refresh_token_if_needed(
@@ -317,10 +361,17 @@ class CalendarManager:
                         )
 
                         if refresh_result and refresh_result.get('access_token'):
+                            expires_in_for_update = _resolve_expires_in(
+                                refresh_result,
+                                'post-refresh update'
+                            )
                             self.oauth_manager.update_access_token(
                                 provider,
                                 refresh_result.get('access_token'),
-                                refresh_result.get('expires_in')
+                                expires_in_for_update,
+                                token_type=refresh_result.get('token_type'),
+                                refresh_token=refresh_result.get('refresh_token'),
+                                expires_at=refresh_result.get('expires_at')
                             )
 
                         if token_data:

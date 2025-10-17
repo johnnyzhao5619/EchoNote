@@ -126,15 +126,22 @@ class OAuthManager:
             'refresh_token': refresh_token,
             'token_type': token_type,
             'expires_at': expires_at,
+            'expires_in': expires_in,
             'scope': scope,
             'stored_at': datetime.now().isoformat(),
             **extra_data
         }
-        
+
         self._tokens_cache[provider] = token_data
         self._save_tokens()
-        
+
         logger.info(f"Stored OAuth token for provider: {provider}")
+        logger.debug(
+            "Provider %s token persisted with expires_in=%s (expires_at=%s)",
+            provider,
+            expires_in,
+            expires_at
+        )
     
     def get_token(self, provider: str) -> Optional[Dict[str, Any]]:
         """
@@ -223,7 +230,11 @@ class OAuthManager:
         self,
         provider: str,
         access_token: str,
-        expires_in: Optional[int] = None
+        expires_in: Optional[int] = None,
+        *,
+        token_type: Optional[str] = None,
+        refresh_token: Optional[str] = None,
+        expires_at: Optional[str] = None
     ):
         """
         Update only the access token (e.g., after refresh).
@@ -243,17 +254,34 @@ class OAuthManager:
         token_data['access_token'] = access_token
         
         # Update expiration time
-        if expires_in:
-            expires_at = (datetime.now() + timedelta(seconds=expires_in)).isoformat()
+        if expires_in is not None:
+            computed_expires_at = (
+                datetime.now() + timedelta(seconds=expires_in)
+            ).isoformat()
+            token_data['expires_at'] = computed_expires_at
+            token_data['expires_in'] = expires_in
+        elif expires_at is not None:
             token_data['expires_at'] = expires_at
-        
+
+        if token_type:
+            token_data['token_type'] = token_type
+
+        if refresh_token:
+            token_data['refresh_token'] = refresh_token
+
         # Update stored_at timestamp
         token_data['stored_at'] = datetime.now().isoformat()
-        
+
         self._tokens_cache[provider] = token_data
         self._save_tokens()
-        
+
         logger.info(f"Updated access token for provider: {provider}")
+        logger.debug(
+            "Provider %s token updated with expires_in=%s (expires_at=%s)",
+            provider,
+            token_data.get('expires_in'),
+            token_data.get('expires_at')
+        )
     
     def delete_token(self, provider: str):
         """
@@ -316,7 +344,8 @@ class OAuthManager:
             provider: Provider name
             refresh_callback: Function to call for token refresh.
                             Should accept refresh_token and return dict with
-                            'access_token' and optionally 'expires_in'
+                            'access_token' and optionally 'expires_in',
+                            'token_type', 'refresh_token', or 'expires_at'
             buffer_seconds: Consider token expired if it expires within
                           this many seconds (default: 5 minutes)
 
@@ -368,7 +397,10 @@ class OAuthManager:
             self.update_access_token(
                 provider,
                 new_token_data['access_token'],
-                new_token_data.get('expires_in')
+                new_token_data.get('expires_in'),
+                token_type=new_token_data.get('token_type'),
+                refresh_token=new_token_data.get('refresh_token'),
+                expires_at=new_token_data.get('expires_at')
             )
             
             logger.info(f"Successfully refreshed token for {provider}")
