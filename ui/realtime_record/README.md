@@ -4,6 +4,12 @@
 
 This module provides UI components for real-time audio recording, transcription, and translation.
 
+> **Note**
+> PyAudio is an optional dependency. When it is not installed, `AudioCapture`
+> creation will raise an `ImportError`, the application will continue running,
+> and the real-time recording UI automatically disables microphone features
+> while showing installation guidance.
+
 ## Components
 
 ### RealtimeRecordWidget

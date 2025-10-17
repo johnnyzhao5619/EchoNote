@@ -135,7 +135,9 @@ RealtimeRecorder(audio_capture, speech_engine, translation_engine, db_connection
 
 **Parameters:**
 
-- `audio_capture` (AudioCapture): Audio capture instance
+- `audio_capture` (Optional[AudioCapture]): Audio capture instance. Pass `None`
+  when PyAudio is unavailable; real-time recording UI will remain disabled but
+  the rest of the application continues to work.
 - `speech_engine` (SpeechEngine): Speech recognition engine
 - `translation_engine` (TranslationEngine, optional): Translation engine
 - `db_connection` (DatabaseConnection): Database connection
@@ -1008,7 +1010,10 @@ from engines.speech.faster_whisper_engine import FasterWhisperEngine
 from engines.translation.google_translate import GoogleTranslateEngine
 
 # Initialize
-audio_capture = AudioCapture()
+try:
+    audio_capture = AudioCapture()
+except ImportError:
+    audio_capture = None  # PyAudio missing; realtime recording will be disabled
 speech_engine = FasterWhisperEngine()
 translation_engine = GoogleTranslateEngine(api_key="your-key")
 recorder = RealtimeRecorder(

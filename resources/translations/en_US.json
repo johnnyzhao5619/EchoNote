@@ -79,12 +79,16 @@
     "export_transcription": "Export Transcription",
     "export_translation": "Export Translation",
     "save_recording": "Save Recording",
+    "no_input_devices": "No input devices found",
     "no_models_available": "Please download a model first",
     "no_models_message": "No models available. Please download at least one model to use real-time recording.",
     "go_to_download": "Go to Download Models",
     "no_model_selected": "Please select a model",
     "model_not_downloaded": "Selected model is not downloaded",
-    "translation_not_available": "Translation not available. Please configure Google Translate API key in Settings > Transcription."
+    "translation_not_available": "Translation not available. Please configure Google Translate API key in Settings > Transcription.",
+    "audio_unavailable_short": "Microphone capture not available",
+    "audio_unavailable_message": "Real-time recording requires PyAudio. Install it with: {command}",
+    "audio_unavailable_tooltip": "Install PyAudio (pip install pyaudio) to enable real-time recording."
   },
   "calendar_hub": {
     "title": "Calendar Hub",
