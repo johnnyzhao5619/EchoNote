@@ -9,8 +9,9 @@ import asyncio
 import json
 import logging
 import os
+import threading
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Callable, Dict, List, Optional, Any, Tuple
 from datetime import datetime
 
 from data.database.connection import DatabaseConnection
@@ -71,17 +72,99 @@ class TranscriptionManager:
         
         # Progress callbacks (task_id -> callback function)
         self.progress_callbacks: Dict[str, callable] = {}
-        
+
         # Background thread and event loop for async operations
         self._loop = None
         self._thread = None
         self._running = False
+
+        # Queue scheduling buffer for tasks added before loop starts
+        self._queue_buffer_lock = threading.Lock()
+        self._pending_queue_entries: Dict[str, Tuple[Callable, tuple, dict]] = {}
         
         logger.info(
             f"Transcription manager initialized with engine: "
             f"{speech_engine.get_name()}"
         )
-    
+
+    def _store_task_for_later(
+        self,
+        task_id: str,
+        task_func,
+        *args,
+        **kwargs
+    ) -> None:
+        """Cache tasks until the background event loop is ready."""
+        with self._queue_buffer_lock:
+            self._pending_queue_entries[task_id] = (task_func, args, kwargs)
+
+        logger.debug(f"Cached task {task_id} for later scheduling")
+
+        # If the loop is already running, schedule a flush
+        self._schedule_buffer_flush_if_running()
+
+    def _pop_buffered_tasks(self) -> List[Tuple[str, Tuple[Callable, tuple, dict]]]:
+        """Retrieve and clear buffered tasks."""
+        with self._queue_buffer_lock:
+            buffered = list(self._pending_queue_entries.items())
+            self._pending_queue_entries.clear()
+        return buffered
+
+    def _schedule_buffer_flush_if_running(self) -> None:
+        """Schedule buffered tasks to be enqueued if the loop is active."""
+        if not self._loop or not self._loop.is_running():
+            return
+
+        import asyncio
+
+        asyncio.run_coroutine_threadsafe(
+            self._drain_buffered_tasks(),
+            self._loop
+        )
+
+    def _queue_or_buffer_task(self, task_id: str) -> bool:
+        """Queue the task immediately if possible, otherwise cache it."""
+        if self._loop and self._loop.is_running():
+            import asyncio
+
+            try:
+                asyncio.run_coroutine_threadsafe(
+                    self.task_queue.add_task(
+                        task_id,
+                        self._process_task_async,
+                        task_id
+                    ),
+                    self._loop
+                )
+                return True
+            except RuntimeError as exc:
+                logger.warning(
+                    f"Event loop not ready for task {task_id}: {exc}. Caching for later"
+                )
+
+        self._store_task_for_later(
+            task_id,
+            self._process_task_async,
+            task_id
+        )
+        return False
+
+    async def _drain_buffered_tasks(self) -> None:
+        """Add all buffered tasks to the async queue."""
+        buffered_tasks = self._pop_buffered_tasks()
+        if not buffered_tasks:
+            return
+
+        for task_id, (task_func, args, kwargs) in buffered_tasks:
+            try:
+                await self.task_queue.add_task(task_id, task_func, *args, **kwargs)
+                logger.info(f"Task {task_id} scheduled from buffer")
+            except Exception as exc:
+                logger.error(
+                    f"Failed to schedule buffered task {task_id}: {exc}",
+                    exc_info=True
+                )
+
     def add_task(
         self,
         file_path: str,
@@ -137,21 +220,11 @@ class TranscriptionManager:
         task.save(self.db)
         
         # Add to task queue (schedule in background event loop)
-        if self._loop and self._running:
-            import asyncio
-            asyncio.run_coroutine_threadsafe(
-                self.task_queue.add_task(
-                    task.id,
-                    self._process_task_async,
-                    task.id
-                ),
-                self._loop
+        if not self._queue_or_buffer_task(task.id):
+            logger.info(
+                f"Task queue not ready, task {task.id} cached until processing starts"
             )
-        else:
-            logger.warning(
-                f"Task queue not running, task {task.id} added to database but not queued"
-            )
-        
+
         logger.info(f"Added transcription task: {task.id} for file {file_path.name}")
         return task.id
     
@@ -198,9 +271,51 @@ class TranscriptionManager:
         if self._running:
             logger.warning("Transcription processing already running")
             return
-        
-        import threading
-        
+
+        # Requeue tasks persisted in the database before starting the loop
+        try:
+            rows = self.db.execute(
+                "SELECT id, status FROM transcription_tasks "
+                "WHERE status IN ('pending', 'processing') "
+                "ORDER BY created_at ASC"
+            )
+        except Exception as exc:
+            logger.error(f"Failed to load tasks for restart: {exc}", exc_info=True)
+            rows = []
+
+        if rows:
+            processing_ids = [row['id'] for row in rows if row['status'] == 'processing']
+
+            if processing_ids:
+                try:
+                    self.db.execute_many(
+                        "UPDATE transcription_tasks "
+                        "SET status = 'pending', progress = 0, started_at = NULL "
+                        "WHERE id = ?",
+                        [(task_id,) for task_id in processing_ids]
+                    )
+                    logger.info(
+                        f"Reset {len(processing_ids)} tasks stuck in processing state"
+                    )
+                except Exception as exc:
+                    logger.error(
+                        f"Failed to reset processing tasks before restart: {exc}",
+                        exc_info=True
+                    )
+
+            for row in rows:
+                # Ensure any stale queue state is removed before re-adding
+                self.task_queue.tasks.pop(row['id'], None)
+                self._store_task_for_later(
+                    row['id'],
+                    self._process_task_async,
+                    row['id']
+                )
+
+            logger.info(
+                f"Queued {len(rows)} persisted tasks for background processing"
+            )
+
         def run_event_loop():
             """Run event loop in background thread."""
             import asyncio
@@ -212,10 +327,13 @@ class TranscriptionManager:
             try:
                 # Start task queue
                 self._loop.run_until_complete(self.task_queue.start())
-                
+
+                # Schedule buffered tasks gathered before the loop started
+                self._loop.create_task(self._drain_buffered_tasks())
+
                 # Keep loop running
                 self._loop.run_forever()
-                
+
             except Exception as e:
                 logger.error(f"Error in transcription event loop: {e}")
             finally:
@@ -225,13 +343,15 @@ class TranscriptionManager:
                 except Exception:
                     pass
                 self._loop.close()
+                self._loop = None
+                self._running = False
                 logger.info("Transcription event loop closed")
-        
+
         # Start background thread
+        self._running = True
         self._thread = threading.Thread(target=run_event_loop, daemon=True)
         self._thread.start()
-        self._running = True
-        
+
         logger.info("Started transcription task processing in background thread")
     
     def stop_processing(self):
@@ -248,7 +368,9 @@ class TranscriptionManager:
         if self._thread:
             # Wait for thread to finish (with timeout)
             self._thread.join(timeout=5.0)
-        
+            if not self._thread.is_alive():
+                self._thread = None
+
         logger.info("Stopped transcription task processing")
 
     def pause_processing(self):
