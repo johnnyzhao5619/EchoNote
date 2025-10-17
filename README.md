@@ -1,13 +1,3 @@
-<p align="center">
-  <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%' stop-color='%236C63FF'/><stop offset='100%' stop-color='%2300C9A7'/></linearGradient></defs><rect width='120' height='120' rx='24' fill='url(%23g)'/><g fill='white'><path d='M38 34h44v10H48v14h30v10H48v18h34v10H38z'/><path d='M74 44a6 6 0 0 1 12 0v24a12 12 0 1 1-24 0V50h8v18a4 4 0 1 0 8 0z' opacity='0.7'/></g><path d='M60 92c14 0 26-7 26-24' stroke='white' stroke-width='6' stroke-linecap='round' opacity='0.6'/><path d='M34 58h10' stroke='white' stroke-width='6' stroke-linecap='round' opacity='0.4'/><path d='M76 58h10' stroke='white' stroke-width='6' stroke-linecap='round' opacity='0.4'/></svg>" width="120" height="120" alt="EchoNote icon" />
-</p>
-
-<p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License" /></a>
-  <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB.svg" alt="Python 3.10+" />
-  <img src="https://img.shields.io/badge/PyQt-6-41CD52.svg" alt="PyQt6" />
-</p>
-
 # EchoNote
 
 <p align="center">
