@@ -17,6 +17,7 @@ Test Categories:
 
 import sys
 import time
+import types
 import unittest
 from unittest.mock import Mock, patch, MagicMock
 from pathlib import Path
@@ -24,6 +25,104 @@ from pathlib import Path
 # Add project root to path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
+
+try:
+    import psutil  # noqa: F401
+except ModuleNotFoundError:  # pragma: no cover - test stub setup
+    # Provide a lightweight psutil stub for testing environments without psutil.
+    def _stub_virtual_memory():
+        class _MemoryInfo:
+            available = 8 * 1024 * 1024 * 1024
+            total = 16 * 1024 * 1024 * 1024
+            percent = 50.0
+
+        return _MemoryInfo()
+
+    psutil_stub = types.SimpleNamespace(
+        virtual_memory=_stub_virtual_memory,
+        cpu_percent=lambda interval=None: 5.0,
+        cpu_count=lambda: 4
+    )
+
+    sys.modules['psutil'] = psutil_stub
+
+if 'PyQt6' not in sys.modules:  # pragma: no cover - test stub setup
+    qt_module = types.ModuleType('PyQt6')
+    qt_core = types.ModuleType('PyQt6.QtCore')
+    qt_widgets = types.ModuleType('PyQt6.QtWidgets')
+
+    class _SignalInstance:
+        def __init__(self):
+            self._subscribers = []
+
+        def connect(self, callback):
+            self._subscribers.append(callback)
+
+        def emit(self, *args, **kwargs):
+            for callback in list(self._subscribers):
+                callback(*args, **kwargs)
+
+    class _SignalDescriptor:
+        def __set_name__(self, owner, name):
+            self.name = name
+
+        def __get__(self, instance, owner):
+            if instance is None:
+                return self
+            signal = instance.__dict__.get(self.name)
+            if signal is None:
+                signal = _SignalInstance()
+                instance.__dict__[self.name] = signal
+            return signal
+
+    def _pyqt_signal(*args, **kwargs):
+        return _SignalDescriptor()
+
+    class QObject:
+        def __init__(self, parent=None):
+            self._parent = parent
+
+    class QTimer(QObject):
+        def __init__(self, parent=None):
+            super().__init__(parent)
+            self._active = False
+            self._interval = 0
+            self.timeout = _SignalInstance()
+
+        def start(self, interval):
+            self._interval = interval
+            self._active = True
+
+        def stop(self):
+            self._active = False
+
+        def isActive(self):
+            return self._active
+
+    class QApplication:
+        _instance = None
+
+        def __init__(self, argv=None):
+            QApplication._instance = self
+
+        @classmethod
+        def instance(cls):
+            return cls._instance
+
+        def processEvents(self):
+            pass
+
+    qt_core.QObject = QObject
+    qt_core.QTimer = QTimer
+    qt_core.pyqtSignal = _pyqt_signal
+    qt_widgets.QApplication = QApplication
+
+    qt_module.QtCore = qt_core
+    qt_module.QtWidgets = qt_widgets
+
+    sys.modules['PyQt6'] = qt_module
+    sys.modules['PyQt6.QtCore'] = qt_core
+    sys.modules['PyQt6.QtWidgets'] = qt_widgets
 
 
 class StartupTests(unittest.TestCase):
@@ -334,6 +433,52 @@ class ResourceMonitoringTests(unittest.TestCase):
         # Should emit signal
         self.assertEqual(len(signal_emitted), 1)
         self.assertLess(signal_emitted[0], 500)
+
+    @patch('utils.resource_monitor.psutil.virtual_memory')
+    def test_resource_monitor_sampling_non_blocking(self, mock_memory):
+        """ResourceMonitor sampling should avoid blocking the UI thread."""
+        from utils.resource_monitor import ResourceMonitor
+        from PyQt6.QtWidgets import QApplication
+
+        app = QApplication.instance()
+        if app is None:
+            app = QApplication(sys.argv)
+
+        mock_memory.return_value = Mock(
+            available=1 * 1024 * 1024 * 1024,
+            total=16 * 1024 * 1024 * 1024,
+            percent=35.0
+        )
+
+        call_history = []
+
+        def cpu_percent_mock(interval=None):
+            call_history.append(interval)
+            if interval not in (None, 0):
+                time.sleep(0.2)
+            return 95.0 if len(call_history) >= 3 else 10.0
+
+        with patch('utils.resource_monitor.psutil.cpu_percent', side_effect=cpu_percent_mock):
+            monitor = ResourceMonitor(check_interval_ms=10)
+            cpu_events = []
+
+            def on_high_cpu(value):
+                cpu_events.append(value)
+
+            monitor.high_cpu_warning.connect(on_high_cpu)
+
+            start = time.perf_counter()
+            monitor._check_resources()
+            monitor._check_resources()
+            duration = time.perf_counter() - start
+
+            app.processEvents()
+
+        self.assertGreaterEqual(len(call_history), 3)
+        self.assertTrue(all(interval is None for interval in call_history))
+        self.assertLess(duration, 0.15)
+        self.assertEqual(len(cpu_events), 1)
+        self.assertGreaterEqual(cpu_events[0], ResourceMonitor.HIGH_CPU_THRESHOLD_PERCENT)
 
 
 class PerformanceTests(unittest.TestCase):

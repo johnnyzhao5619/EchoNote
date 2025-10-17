@@ -51,6 +51,10 @@ class ResourceMonitor(QObject):
         self._high_cpu_warned = False
         self._last_memory_mb = 0
         self._last_cpu_percent = 0
+        self._is_checking = False
+        self._cpu_percent_initialized = False
+
+        self._prime_cpu_percent()
 
         logger.info(
             f"ResourceMonitor initialized with "
@@ -77,14 +81,19 @@ class ResourceMonitor(QObject):
 
     def _check_resources(self):
         """Check system resources and emit warnings if needed."""
+        if self._is_checking:
+            logger.debug("Resource check already in progress; skipping this cycle")
+            return
+
+        self._is_checking = True
+
         try:
             # Get memory info
             memory = psutil.virtual_memory()
             available_mb = memory.available / (1024 * 1024)
             self._last_memory_mb = available_mb
 
-            # Get CPU usage (averaged over 1 second)
-            cpu_percent = psutil.cpu_percent(interval=1)
+            cpu_percent = self._get_cpu_percent()
             self._last_cpu_percent = cpu_percent
 
             logger.debug(
@@ -126,6 +135,8 @@ class ResourceMonitor(QObject):
 
         except Exception as e:
             logger.error(f"Error checking resources: {e}")
+        finally:
+            self._is_checking = False
 
     def get_current_stats(self) -> Dict[str, float]:
         """
@@ -143,7 +154,7 @@ class ResourceMonitor(QObject):
         """
         try:
             memory = psutil.virtual_memory()
-            cpu_percent = psutil.cpu_percent(interval=0.1)
+            cpu_percent = self._get_cpu_percent()
 
             return {
                 'memory_available_mb': memory.available / (1024 * 1024),
@@ -197,6 +208,29 @@ class ResourceMonitor(QObject):
             return f"{size_mb / 1024:.1f} GB"
         else:
             return f"{size_mb:.0f} MB"
+
+    def _prime_cpu_percent(self) -> None:
+        """Prime psutil CPU sampling to enable non-blocking reads."""
+        try:
+            psutil.cpu_percent(interval=None)
+        except Exception as exc:
+            logger.debug(f"Unable to prime CPU percent sampling: {exc}")
+            self._cpu_percent_initialized = False
+        else:
+            self._cpu_percent_initialized = True
+
+    def _get_cpu_percent(self) -> float:
+        """Retrieve CPU usage using non-blocking sampling."""
+        if not self._cpu_percent_initialized:
+            self._prime_cpu_percent()
+
+        try:
+            cpu_percent = psutil.cpu_percent(interval=None)
+        except Exception as exc:
+            logger.error(f"Error getting CPU percent: {exc}")
+            return self._last_cpu_percent
+
+        return cpu_percent
 
 
 # Singleton instance
