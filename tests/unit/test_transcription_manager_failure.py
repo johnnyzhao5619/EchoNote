@@ -205,3 +205,38 @@ def test_process_task_failure_when_lookup_raises(manager, initialized_db, monkey
         (task_id,),
     )
     assert rows == []
+
+
+def test_task_queue_configuration_overrides(initialized_db):
+    engine = StubSpeechEngine()
+    config = {
+        'task_queue': {
+            'max_concurrent_tasks': 4,
+            'max_retries': 5,
+            'retry_delay': 2.5,
+        }
+    }
+
+    manager = TranscriptionManager(initialized_db, engine, config=config)
+
+    assert manager.task_queue.max_concurrent == 4
+    assert manager.task_queue.max_retries == 5
+    assert manager.task_queue.retry_delay == pytest.approx(2.5)
+
+
+def test_default_output_format_override(initialized_db, tmp_path):
+    engine = StubSpeechEngine()
+    config = {
+        'default_output_format': 'md'
+    }
+
+    manager = TranscriptionManager(initialized_db, engine, config=config)
+
+    audio_file = tmp_path / "sample.wav"
+    audio_file.write_bytes(b"RIFF")
+
+    task_id = manager.add_task(str(audio_file))
+    task = TranscriptionTask.get_by_id(initialized_db, task_id)
+
+    assert task is not None
+    assert task.output_format == 'md'

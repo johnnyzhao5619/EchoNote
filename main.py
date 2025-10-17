@@ -337,8 +337,12 @@ def main():
         
         logger.info("Initializing transcription manager...")
         from core.transcription.manager import TranscriptionManager
-        
-        transcription_manager = TranscriptionManager(db, managers['speech_engine'], config)
+
+        transcription_manager = TranscriptionManager(
+            db,
+            managers['speech_engine'],
+            config.get('transcription', {})
+        )
         managers['transcription_manager'] = transcription_manager
         logger.info("Transcription manager initialized")
         
