@@ -6,6 +6,7 @@ and account management.
 """
 
 import logging
+from datetime import datetime
 from typing import Optional, Dict, Any
 
 from PyQt6.QtWidgets import (
@@ -576,13 +577,35 @@ class CalendarHubWidget(QWidget):
             # Exchange code for token
             token_data = adapter.exchange_code_for_token(code)
             
+            expires_in = token_data.get('expires_in')
+            if expires_in is None and token_data.get('expires_at'):
+                try:
+                    expires_at_dt = datetime.fromisoformat(token_data['expires_at'])
+                    expires_delta = int((expires_at_dt - datetime.now()).total_seconds())
+                    expires_in = max(expires_delta, 0)
+                    logger.debug(
+                        "Computed expires_in=%s from expires_at for %s", expires_in, provider
+                    )
+                except ValueError:
+                    logger.warning(
+                        "Invalid expires_at format received for %s: %s", provider, token_data['expires_at']
+                    )
+            token_type = token_data.get('token_type', 'Bearer')
+
+            logger.debug(
+                "Storing %s OAuth token with expires_in=%s (expires_at=%s)",
+                provider,
+                expires_in,
+                token_data.get('expires_at')
+            )
+
             # Store token using OAuthManager
             self.oauth_manager.store_token(
                 provider=provider,
                 access_token=token_data['access_token'],
                 refresh_token=token_data.get('refresh_token'),
-                expires_in=token_data.get('expires_in'),
-                token_type=token_data.get('token_type', 'Bearer')
+                expires_in=expires_in,
+                token_type=token_type
             )
             
             # Update adapter with stored token
