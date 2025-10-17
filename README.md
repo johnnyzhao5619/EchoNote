@@ -10,6 +10,16 @@
 
 # EchoNote
 
+<p align="center">
+  <img src="data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20128%20128%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22grad%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%22100%25%22%3E%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%234f46e5%22/%3E%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%230ea5e9%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%22128%22%20height%3D%22128%22%20rx%3D%2224%22%20fill%3D%22url%28%23grad%29%22/%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%23f8fafc%22%20stroke-width%3D%226%22%20stroke-linecap%3D%22round%22%3E%3Cpath%20d%3D%22M32%2064h8l6-20%2010%2040%2012-48%2010%2028%206-16h12%22/%3E%3C/g%3E%3Ccircle%20cx%3D%2296%22%20cy%3D%2232%22%20r%3D%2210%22%20fill%3D%22%2322d3ee%22%20opacity%3D%220.9%22/%3E%3C/svg%3E" alt="EchoNote Icon" width="120" height="120" />
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" /></a>
+  <img src="https://img.shields.io/badge/Desktop-PyQt6-9cf.svg" alt="Desktop: PyQt6" />
+  <img src="https://img.shields.io/badge/Local--first-Privacy%20Focused-22c55e.svg" alt="Local-first privacy focused" />
+</p>
+
 > Local-first transcription, calendar orchestration, and timeline insights for desktop knowledge workers.
 
 ## 🌐 Language Overview
