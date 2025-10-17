@@ -12,7 +12,7 @@ from typing import Dict, List, Optional
 import psutil
 from PyQt6.QtCore import QObject, QCoreApplication, QTimer, pyqtSignal
 
-from config.app_config import ConfigManager
+from config.app_config import ConfigManager, get_app_dir
 from core.models.downloader import DownloadCancelled, ModelDownloader
 from core.models.registry import ModelInfo, ModelRegistry
 from data.database.connection import DatabaseConnection
@@ -43,7 +43,7 @@ class ModelManager(QObject):
         self._models_dir = Path(
             self._config.get(
                 "transcription.faster_whisper.model_dir",
-                "~/.echonote/models",
+                str(get_app_dir() / "models"),
             )
         ).expanduser()
         self._models_dir.mkdir(parents=True, exist_ok=True)

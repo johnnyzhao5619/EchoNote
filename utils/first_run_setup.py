@@ -11,6 +11,8 @@ import shutil
 from pathlib import Path
 from typing import Optional
 
+from config.app_config import get_app_dir
+
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +28,7 @@ class FirstRunSetup:
         Returns:
             True if this is the first run, False otherwise
         """
-        config_dir = Path.home() / '.echonote'
+        config_dir = get_app_dir()
         return not config_dir.exists()
 
     @staticmethod
@@ -42,7 +44,7 @@ class FirstRunSetup:
             model_manager: Optional ModelManager instance for model
                           recommendation (used after UI is initialized)
         """
-        config_dir = Path.home() / '.echonote'
+        config_dir = get_app_dir()
 
         try:
             logger.info("Starting first-run setup...")

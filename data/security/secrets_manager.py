@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Dict, Optional, Any
 
 from data.security.encryption import SecurityManager
+from config.app_config import get_app_dir
 
 
 logger = logging.getLogger('echonote.security.secrets')
@@ -31,7 +32,7 @@ class SecretsManager:
                        Defaults to ~/.echonote
         """
         if config_dir is None:
-            self.config_dir = Path.home() / ".echonote"
+            self.config_dir = get_app_dir()
         else:
             self.config_dir = Path(config_dir).expanduser()
         

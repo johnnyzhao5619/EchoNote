@@ -15,6 +15,7 @@ from typing import Optional
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from config.app_config import get_app_dir
 
 
 logger = logging.getLogger('echonote.security')
@@ -37,7 +38,7 @@ class SecurityManager:
                        Defaults to ~/.echonote
         """
         if config_dir is None:
-            self.config_dir = Path.home() / ".echonote"
+            self.config_dir = get_app_dir()
         else:
             self.config_dir = Path(config_dir).expanduser()
         

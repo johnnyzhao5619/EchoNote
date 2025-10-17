@@ -12,6 +12,7 @@ import numpy as np
 from pathlib import Path
 
 from engines.speech.base import SpeechEngine
+from config.app_config import get_app_dir
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +81,7 @@ class FasterWhisperEngine(SpeechEngine):
                 self.download_root = None
         else:
             # 向后兼容：使用传统的 download_root 参数
-            self.download_root = download_root or os.path.expanduser('~/.echonote/models')
+            self.download_root = download_root or str(get_app_dir() / "models")
             # 确保模型目录存在
             Path(self.download_root).mkdir(parents=True, exist_ok=True)
             self._model_available = True  # 假设模型可用（向后兼容）

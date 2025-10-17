@@ -10,6 +10,8 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 import sys
 
+from config.app_config import get_app_dir
+
 
 # 日志级别映射
 LOG_LEVELS = {
@@ -106,7 +108,7 @@ def setup_logging(
     """
     # 确定日志目录
     if log_dir is None:
-        log_dir = Path.home() / ".echonote" / "logs"
+        log_dir = get_app_dir() / "logs"
     else:
         log_dir = Path(log_dir)
     
@@ -224,7 +226,7 @@ def get_log_file_path() -> Path:
             return Path(handler.baseFilename)
     
     # 如果没有找到文件处理器，返回默认路径
-    return Path.home() / ".echonote" / "logs" / "echonote.log"
+    return get_app_dir() / "logs" / "echonote.log"
 
 
 def get_recent_logs(lines: int = 100) -> list:

@@ -19,6 +19,7 @@ from data.database.models import TranscriptionTask
 from engines.speech.base import SpeechEngine
 from core.transcription.task_queue import TaskQueue
 from core.transcription.format_converter import FormatConverter
+from config.app_config import get_app_dir
 
 
 logger = logging.getLogger('echonote.transcription.manager')
@@ -919,7 +920,7 @@ class TranscriptionManager:
         Returns:
             Path to internal format file
         """
-        data_dir = Path.home() / ".echonote" / "transcripts"
+        data_dir = get_app_dir() / "transcripts"
         data_dir.mkdir(parents=True, exist_ok=True)
         return str(data_dir / f"{task_id}.json")
     
