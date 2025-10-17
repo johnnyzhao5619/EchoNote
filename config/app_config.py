@@ -130,6 +130,51 @@ class ConfigManager:
                 "transcription.max_concurrent_tasks must be an "
                 "integer between 1 and 5"
             )
+
+        if "max_retries" in trans_config:
+            max_retries = trans_config["max_retries"]
+            if not isinstance(max_retries, int) or max_retries < 0:
+                raise ValueError(
+                    "transcription.max_retries must be a non-negative integer"
+                )
+
+        if "retry_delay" in trans_config:
+            retry_delay = trans_config["retry_delay"]
+            if not isinstance(retry_delay, (int, float)) or retry_delay < 0:
+                raise ValueError(
+                    "transcription.retry_delay must be a non-negative number"
+                )
+
+        if "task_queue" in trans_config:
+            task_queue_config = trans_config["task_queue"]
+            if not isinstance(task_queue_config, dict):
+                raise TypeError("transcription.task_queue must be a dictionary")
+
+            if "max_concurrent_tasks" in task_queue_config:
+                tq_concurrent = task_queue_config["max_concurrent_tasks"]
+                if (not isinstance(tq_concurrent, int) or
+                        not (1 <= tq_concurrent <= 5)):
+                    raise ValueError(
+                        "transcription.task_queue.max_concurrent_tasks must be "
+                        "an integer between 1 and 5"
+                    )
+
+            if "max_retries" in task_queue_config:
+                tq_retries = task_queue_config["max_retries"]
+                if not isinstance(tq_retries, int) or tq_retries < 0:
+                    raise ValueError(
+                        "transcription.task_queue.max_retries must be a "
+                        "non-negative integer"
+                    )
+
+            if "retry_delay" in task_queue_config:
+                tq_retry_delay = task_queue_config["retry_delay"]
+                if (not isinstance(tq_retry_delay, (int, float)) or
+                        tq_retry_delay < 0):
+                    raise ValueError(
+                        "transcription.task_queue.retry_delay must be a "
+                        "non-negative number"
+                    )
         
         # Validate faster_whisper configuration
         if "faster_whisper" in trans_config:

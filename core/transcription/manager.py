@@ -44,7 +44,7 @@ class TranscriptionManager:
         self,
         db_connection: DatabaseConnection,
         speech_engine: SpeechEngine,
-        config: Dict[str, Any]
+        config: Optional[Dict[str, Any]] = None
     ):
         """
         Initialize transcription manager.
@@ -52,21 +52,34 @@ class TranscriptionManager:
         Args:
             db_connection: Database connection instance
             speech_engine: Speech recognition engine instance
-            config: Configuration dictionary
+            config: Transcription configuration dictionary
         """
         self.db = db_connection
         self.speech_engine = speech_engine
-        self.config = config
-        
+        self.config = config or {}
+
+        task_queue_config = self.config.get('task_queue', {})
+        if not isinstance(task_queue_config, dict):
+            task_queue_config = {}
+
+        def _resolve_queue_setting(key: str, fallback: Any) -> Any:
+            if key in task_queue_config:
+                return task_queue_config[key]
+            if key in self.config:
+                return self.config[key]
+            return fallback
+
         # Initialize task queue
-        max_concurrent = config.get('max_concurrent_tasks', 2)
-        max_retries = config.get('max_retries', 3)
-        retry_delay = config.get('retry_delay', 1.0)
+        max_concurrent = _resolve_queue_setting('max_concurrent_tasks', 2)
+        max_retries = _resolve_queue_setting('max_retries', 3)
+        retry_delay = _resolve_queue_setting('retry_delay', 1.0)
         self.task_queue = TaskQueue(
             max_concurrent=max_concurrent,
             max_retries=max_retries,
             retry_delay=retry_delay
         )
+
+        self._default_output_format = self.config.get('default_output_format', 'txt')
         
         # Initialize format converter
         self.format_converter = FormatConverter()
@@ -212,7 +225,7 @@ class TranscriptionManager:
             engine=self.speech_engine.get_name(),
             output_format=options.get(
                 'output_format',
-                self.config.get('default_output_format', 'txt')
+                self._default_output_format
             ),
             output_path=options.get('output_path')
         )
