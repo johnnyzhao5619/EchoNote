@@ -6,6 +6,8 @@ with Google Calendar API v3.
 """
 
 import logging
+from urllib.parse import urlencode
+
 import httpx
 from typing import Dict, Any, Optional
 from datetime import datetime
@@ -76,12 +78,10 @@ class GoogleCalendarAdapter(CalendarSyncAdapter):
             'prompt': 'consent'
         }
 
-        query_string = '&'.join(
-            [f"{k}={v}" for k, v in params.items()]
-        )
+        query_string = urlencode(params, doseq=True)
         auth_url = f"{self.AUTH_URL}?{query_string}"
 
-        logger.info("Generated authorization URL")
+        logger.info("Generated Google authorization URL: %s", auth_url)
         return auth_url
 
     def exchange_code_for_token(self, code: str) -> dict:
