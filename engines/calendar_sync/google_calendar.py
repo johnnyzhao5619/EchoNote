@@ -56,6 +56,7 @@ class GoogleCalendarAdapter(CalendarSyncAdapter):
         self.redirect_uri = redirect_uri
         self.access_token = None
         self.refresh_token = None
+        self.expires_at: Optional[str] = None
         logger.info("GoogleCalendarAdapter initialized")
 
     def get_authorization_url(self) -> str:
@@ -113,15 +114,15 @@ class GoogleCalendarAdapter(CalendarSyncAdapter):
             # Calculate expiration time
             expires_in = token_data.get('expires_in', 3600)
             expires_at = datetime.now().timestamp() + expires_in
+            self.expires_at = datetime.fromtimestamp(expires_at).isoformat()
 
             logger.info("Successfully exchanged code for token")
 
             return {
                 'access_token': self.access_token,
                 'refresh_token': self.refresh_token,
-                'expires_at': datetime.fromtimestamp(
-                    expires_at
-                ).isoformat()
+                'expires_in': expires_in,
+                'expires_at': self.expires_at
             }
 
         except Exception as e:
@@ -182,15 +183,15 @@ class GoogleCalendarAdapter(CalendarSyncAdapter):
 
             expires_in = token_data.get('expires_in', 3600)
             expires_at = datetime.now().timestamp() + expires_in
+            self.expires_at = datetime.fromtimestamp(expires_at).isoformat()
 
             logger.info("Successfully refreshed access token")
 
             return {
                 'access_token': self.access_token,
                 'refresh_token': self.refresh_token,
-                'expires_at': datetime.fromtimestamp(
-                    expires_at
-                ).isoformat()
+                'expires_in': expires_in,
+                'expires_at': self.expires_at
             }
 
         except Exception as e:

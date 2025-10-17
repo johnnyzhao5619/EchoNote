@@ -475,39 +475,66 @@ def main():
         oauth_config = config.get('calendar', {}).get('oauth', {})
         redirect_uri = oauth_config.get('redirect_uri', 'http://localhost:8080/callback')
         
+        def inject_cached_tokens(provider_key: str, adapter):
+            token_data = oauth_manager.get_token(provider_key)
+            if not token_data:
+                logger.info(
+                    "No cached OAuth token found for %s calendar adapter", provider_key
+                )
+                return
+
+            adapter.access_token = token_data.get('access_token')
+            adapter.refresh_token = token_data.get('refresh_token')
+            adapter.expires_at = token_data.get('expires_at')
+
+            if adapter.refresh_token:
+                logger.info(
+                    "Restored OAuth token for %s calendar adapter (expires_at=%s)",
+                    provider_key,
+                    adapter.expires_at
+                )
+            else:
+                logger.warning(
+                    "Cached OAuth token for %s adapter lacks refresh_token; refresh disabled",
+                    provider_key
+                )
+                return
+
         try:
             from engines.calendar_sync.google_calendar import GoogleCalendarAdapter
-            
+
             google_config = oauth_config.get('google', {})
             google_client_id = google_config.get('client_id', '')
             google_client_secret = google_config.get('client_secret', '')
-            
+
             if google_client_id and google_client_secret:
                 google_adapter = GoogleCalendarAdapter(
                     client_id=google_client_id,
                     client_secret=google_client_secret,
                     redirect_uri=redirect_uri
                 )
+                inject_cached_tokens('google', google_adapter)
                 sync_adapters['google'] = google_adapter
                 logger.info("Google Calendar adapter initialized")
             else:
                 logger.warning("Google Calendar OAuth credentials not configured")
         except Exception as e:
             logger.warning(f"Could not initialize Google Calendar adapter: {e}")
-        
+
         try:
             from engines.calendar_sync.outlook_calendar import OutlookCalendarAdapter
-            
+
             outlook_config = oauth_config.get('outlook', {})
             outlook_client_id = outlook_config.get('client_id', '')
             outlook_client_secret = outlook_config.get('client_secret', '')
-            
+
             if outlook_client_id and outlook_client_secret:
                 outlook_adapter = OutlookCalendarAdapter(
                     client_id=outlook_client_id,
                     client_secret=outlook_client_secret,
                     redirect_uri=redirect_uri
                 )
+                inject_cached_tokens('outlook', outlook_adapter)
                 sync_adapters['outlook'] = outlook_adapter
                 logger.info("Outlook Calendar adapter initialized")
             else:
@@ -524,7 +551,7 @@ def main():
         logger.info("Initializing calendar manager...")
         from core.calendar.manager import CalendarManager
         
-        calendar_manager = CalendarManager(db, sync_adapters)
+        calendar_manager = CalendarManager(db, sync_adapters, oauth_manager=oauth_manager)
         managers['calendar_manager'] = calendar_manager
         logger.info("Calendar manager initialized")
         
