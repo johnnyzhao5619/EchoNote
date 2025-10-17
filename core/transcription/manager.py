@@ -363,6 +363,7 @@ class TranscriptionManager:
         Args:
             task_id: Task identifier
         """
+        task: Optional[TranscriptionTask] = None
         try:
             # Load task from database
             task = TranscriptionTask.get_by_id(self.db, task_id)
@@ -494,24 +495,51 @@ class TranscriptionManager:
             
         except Exception as e:
             logger.error(f"Task {task_id} failed: {e}", exc_info=True)
-            
-            # Update task status to failed
-            task = TranscriptionTask.get_by_id(self.db, task_id)
-            if task:
-                task.status = "failed"
-                task.error_message = str(e)
-                task.completed_at = datetime.now().isoformat()
-                task.save(self.db)
-            
+
+            refreshed_task: Optional[TranscriptionTask] = None
+            try:
+                refreshed_task = TranscriptionTask.get_by_id(self.db, task_id)
+            except Exception as fetch_error:
+                logger.error(
+                    f"Failed to reload task {task_id} during error handling: {fetch_error}",
+                    exc_info=True
+                )
+
+            task_for_update = refreshed_task or task
+            progress_value = (
+                task_for_update.progress
+                if task_for_update and task_for_update.progress is not None
+                else 0.0
+            )
+            file_name = (
+                task_for_update.file_name
+                if task_for_update and task_for_update.file_name
+                else task_id
+            )
+
+            if task_for_update:
+                task_for_update.status = "failed"
+                task_for_update.error_message = str(e)
+                task_for_update.completed_at = datetime.now().isoformat()
+                if task_for_update.progress is None:
+                    task_for_update.progress = progress_value
+                try:
+                    task_for_update.save(self.db)
+                except Exception as save_error:
+                    logger.error(
+                        f"Failed to record failure for task {task_id}: {save_error}",
+                        exc_info=True
+                    )
+
             # Notify progress: failed
-            self._update_progress(task_id, task.progress, f"Failed: {str(e)}")
-            
+            self._update_progress(task_id, progress_value, f"Failed: {str(e)}")
+
             # Send failure notification
             self._send_notification(
-                f"Transcription failed: {task.file_name}",
+                f"Transcription failed: {file_name}",
                 "error"
             )
-    
+
     def get_task_status(self, task_id: str) -> Optional[Dict[str, Any]]:
         """
         Get detailed status of a task.
