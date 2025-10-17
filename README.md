@@ -6,8 +6,6 @@
   <img src="https://img.shields.io/badge/Desktop-Local%20First-0EA5E9.svg" alt="Desktop local-first badge">
 </p>
 
-> Local-first transcription, calendar orchestration, and timeline insights for desktop knowledge workers.
-
 ## 🌐 Language Overview
 - [English](#english)
 - [中文](#中文)
