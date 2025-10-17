@@ -194,9 +194,13 @@ def main():
         from data.database.connection import DatabaseConnection
         from data.security.encryption import SecurityManager
         from data.security.secrets_manager import SecretsManager
-        
+
         security_manager = SecurityManager()
-        secrets_manager = SecretsManager()
+
+        from data.database.encryption_helper import initialize_encryption_helper
+
+        initialize_encryption_helper(security_manager)
+        secrets_manager = SecretsManager(security_manager=security_manager)
         
         db_path = config.get('database.path')
         encryption_enabled = config.get('database.encryption_enabled', True)

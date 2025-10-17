@@ -23,7 +23,11 @@ class SecretsManager:
     Stores secrets in ~/.echonote/secrets.enc as encrypted JSON.
     """
     
-    def __init__(self, config_dir: Optional[str] = None):
+    def __init__(
+        self,
+        config_dir: Optional[str] = None,
+        security_manager: Optional[SecurityManager] = None
+    ):
         """
         Initialize secrets manager.
         
@@ -32,7 +36,10 @@ class SecretsManager:
                        Defaults to ~/.echonote
         """
         if config_dir is None:
-            self.config_dir = get_app_dir()
+            if security_manager is not None:
+                self.config_dir = Path(security_manager.config_dir)
+            else:
+                self.config_dir = get_app_dir()
         else:
             self.config_dir = Path(config_dir).expanduser()
         
@@ -42,7 +49,10 @@ class SecretsManager:
         self.secrets_file = self.config_dir / "secrets.enc"
         
         # Initialize security manager for encryption
-        self.security_manager = SecurityManager(config_dir)
+        if security_manager is not None:
+            self.security_manager = security_manager
+        else:
+            self.security_manager = SecurityManager(str(self.config_dir))
         
         # Load secrets
         self._secrets = self._load_secrets()
