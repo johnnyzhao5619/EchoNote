@@ -6,13 +6,17 @@ synchronization.
 """
 
 import logging
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, TYPE_CHECKING
 from datetime import datetime
 
 from data.database.models import CalendarEvent, CalendarSyncStatus
 
 
 logger = logging.getLogger('echonote.calendar.manager')
+
+
+if TYPE_CHECKING:
+    from data.security.oauth_manager import OAuthManager
 
 
 class CalendarManager:
@@ -28,7 +32,8 @@ class CalendarManager:
     def __init__(
         self,
         db_connection,
-        sync_adapters: Optional[Dict[str, Any]] = None
+        sync_adapters: Optional[Dict[str, Any]] = None,
+        oauth_manager: Optional['OAuthManager'] = None
     ):
         """
         Initialize the calendar manager.
@@ -37,9 +42,11 @@ class CalendarManager:
             db_connection: Database connection instance
             sync_adapters: Dictionary of sync adapters
                           {provider: adapter_instance}
+            oauth_manager: OAuth token manager for external providers
         """
         self.db = db_connection
         self.sync_adapters = sync_adapters or {}
+        self.oauth_manager = oauth_manager
         logger.info("CalendarManager initialized")
 
     def create_event(
@@ -272,6 +279,76 @@ class CalendarManager:
                 )
 
             adapter = self.sync_adapters[provider]
+
+            token_before_refresh: Optional[Dict[str, Any]] = None
+            refresh_result: Dict[str, Any] = {}
+
+            if self.oauth_manager and hasattr(adapter, 'refresh_access_token'):
+                if not getattr(adapter, 'refresh_token', None):
+                    logger.warning(
+                        "Adapter %s has no refresh_token; skipping token refresh",
+                        provider
+                    )
+                else:
+                    try:
+                        token_before_refresh = self.oauth_manager.get_token(provider)
+
+                        def refresh_callback(refresh_token: str):
+                            adapter.refresh_token = refresh_token
+                            refreshed = adapter.refresh_access_token()
+
+                            if refreshed.get('refresh_token'):
+                                adapter.refresh_token = refreshed['refresh_token']
+
+                            adapter.access_token = refreshed.get('access_token')
+                            adapter.expires_at = refreshed.get('expires_at')
+
+                            refresh_result.clear()
+                            refresh_result.update(refreshed)
+
+                            return {
+                                'access_token': refreshed.get('access_token'),
+                                'expires_in': refreshed.get('expires_in')
+                            }
+
+                        token_data = self.oauth_manager.refresh_token_if_needed(
+                            provider,
+                            refresh_callback
+                        )
+
+                        if refresh_result and refresh_result.get('access_token'):
+                            self.oauth_manager.update_access_token(
+                                provider,
+                                refresh_result.get('access_token'),
+                                refresh_result.get('expires_in')
+                            )
+
+                        if token_data:
+                            adapter.access_token = token_data.get('access_token')
+                            adapter.expires_at = token_data.get('expires_at')
+
+                            refreshed_token = token_data.get('refresh_token')
+                            if refreshed_token:
+                                adapter.refresh_token = refreshed_token
+
+                        if (
+                            token_before_refresh
+                            and token_data
+                            and token_data.get('access_token')
+                            != token_before_refresh.get('access_token')
+                        ):
+                            logger.info(
+                                "Access token for %s refreshed successfully", provider
+                            )
+
+                    except ValueError as token_error:
+                        logger.warning(
+                            "Skipping token refresh for %s: %s", provider, token_error
+                        )
+                    except Exception as token_error:
+                        logger.error(
+                            "Token refresh failed for %s: %s", provider, token_error
+                        )
 
             # Get sync status
             sync_status = CalendarSyncStatus.get_by_provider(
