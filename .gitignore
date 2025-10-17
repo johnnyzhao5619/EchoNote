@@ -134,6 +134,7 @@ dmypy.json
 
 # Downloaded models (large files)
 models/
+!core/models/
 *.bin
 *.pt
 *.pth
