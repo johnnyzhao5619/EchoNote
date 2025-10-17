@@ -10,6 +10,14 @@ from pathlib import Path
 from typing import Any, Dict
 
 
+APP_DIR_NAME = ".echonote"
+
+
+def get_app_dir() -> Path:
+    """Return the root directory for EchoNote user data."""
+    return Path.home() / APP_DIR_NAME
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -21,7 +29,7 @@ class ConfigManager:
         self.default_config_path = (
             Path(__file__).parent / "default_config.json"
         )
-        self.user_config_dir = Path.home() / ".echonote"
+        self.user_config_dir = get_app_dir()
         self.user_config_path = self.user_config_dir / "app_config.json"
         self._config: Dict[str, Any] = {}
         self._load_config()

@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 
 from data.security.encryption import SecurityManager
+from config.app_config import get_app_dir
 
 
 logger = logging.getLogger('echonote.security.oauth')
@@ -36,7 +37,7 @@ class OAuthManager:
         self.security_manager = security_manager
         
         if config_dir is None:
-            self.config_dir = Path.home() / ".echonote"
+            self.config_dir = get_app_dir()
         else:
             self.config_dir = Path(config_dir).expanduser()
         

@@ -11,6 +11,7 @@ from pathlib import Path
 import json
 
 from ui.common.notification import get_notification_manager
+from config.app_config import get_app_dir
 
 
 logger = logging.getLogger(__name__)
@@ -31,7 +32,7 @@ class OperationLogger:
             log_file: 日志文件路径，默认为 ~/.echonote/operation.log
         """
         if log_file is None:
-            log_dir = Path.home() / '.echonote'
+            log_dir = get_app_dir()
             log_dir.mkdir(exist_ok=True)
             log_file = log_dir / 'operation.log'
         

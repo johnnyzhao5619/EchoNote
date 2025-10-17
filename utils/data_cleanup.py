@@ -9,6 +9,8 @@ import shutil
 from pathlib import Path
 from typing import List, Optional
 
+from config.app_config import get_app_dir
+
 
 logger = logging.getLogger('echonote.cleanup')
 
@@ -30,7 +32,7 @@ class DataCleanup:
             data_dir: Data directory (default: ~/Documents/EchoNote)
         """
         if config_dir is None:
-            self.config_dir = Path.home() / ".echonote"
+            self.config_dir = get_app_dir()
         else:
             self.config_dir = Path(config_dir).expanduser()
         
