@@ -1,6 +1,5 @@
 <p align="center">
   <svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="echonoteIconTitle">
-    <title id="echonoteIconTitle">EchoNote Application Icon</title>
     <defs>
       <linearGradient id="pageGradient" x1="0%" y1="0%" x2="100%" y2="100%">
         <stop offset="0%" stop-color="#4F46E5" />
