@@ -25,6 +25,7 @@ Main widget for real-time recording interface.
 - Real-time translation display (optional)
 - Audio waveform visualization
 - Export functionality
+- Marker capture button with timestamp list
 
 **Usage:**
 
@@ -132,6 +133,7 @@ The widget uses Qt Signals for thread-safe communication between the recorder (w
 - `error_occurred(str)`: Emitted when an error occurs
 - `status_changed(bool, float)`: Emitted when recording status changes
 - `audio_data_available(object)`: Emitted when audio data is available for visualization
+- `marker_added(object)`: Emitted when a new marker is created
 
 ### Callbacks
 
@@ -142,7 +144,8 @@ recorder.set_callbacks(
     on_transcription=lambda text: signals.transcription_updated.emit(text),
     on_translation=lambda text: signals.translation_updated.emit(text),
     on_error=lambda error: signals.error_occurred.emit(error),
-    on_audio_data=lambda audio: signals.audio_data_available.emit(audio)
+    on_audio_data=lambda audio: signals.audio_data_available.emit(audio),
+    on_marker=lambda marker: signals.marker_added.emit(marker)
 )
 ```
 
@@ -152,6 +155,7 @@ recorder.set_callbacks(
 - `on_translation`: Called when new translation text is available
 - `on_error`: Called when an error occurs
 - `on_audio_data`: Called with raw audio data for visualization or processing
+- `on_marker`: Called when a new marker is recorded (dict with index/offset/label)
 
 ## Async/Await Support
 
@@ -192,6 +196,13 @@ Translation keys used:
 - `realtime_record.export_transcription`
 - `realtime_record.export_translation`
 - `realtime_record.save_recording`
+- `realtime_record.add_marker`
+- `realtime_record.markers`
+- `realtime_record.markers_placeholder`
+- `realtime_record.marker_unavailable`
+- `realtime_record.marker_failed`
+- `realtime_record.marker_item`
+- `realtime_record.marker_item_with_label`
 
 ## File Export
 

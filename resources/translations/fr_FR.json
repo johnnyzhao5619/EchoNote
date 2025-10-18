@@ -88,7 +88,14 @@
     "translation_not_available": "Traduction non disponible. Veuillez configurer la clé API Google Translate dans Paramètres > Transcription.",
     "audio_unavailable_short": "Capture micro indisponible",
     "audio_unavailable_message": "L'enregistrement en temps réel nécessite PyAudio. Installez-le avec : {command}",
-    "audio_unavailable_tooltip": "Installez PyAudio (pip install pyaudio) pour activer l'enregistrement en temps réel."
+    "audio_unavailable_tooltip": "Installez PyAudio (pip install pyaudio) pour activer l'enregistrement en temps réel.",
+    "add_marker": "Ajouter un marqueur",
+    "markers": "Marqueurs",
+    "markers_placeholder": "Aucun marqueur. Cliquez sur « Ajouter un marqueur » pendant l’enregistrement.",
+    "marker_unavailable": "Démarrez l’enregistrement avant d’ajouter un marqueur.",
+    "marker_failed": "Impossible d’enregistrer le marqueur. Réessayez.",
+    "marker_item": "Marqueur {number} • {timestamp}",
+    "marker_item_with_label": "Marqueur {number} • {timestamp} – {label}"
   },
   "calendar_hub": {
     "title": "Centre de Calendrier",

@@ -1,7 +1,9 @@
 import asyncio
+import json
 import sys
 import tempfile
 import types
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -313,3 +315,104 @@ def test_custom_sample_rate_propagates(monkeypatch, tmp_path):
 
     assert recorded_rates
     assert recorded_rates[-1] == sample_rate
+
+
+def test_add_marker_requires_active_recording():
+    from core.realtime.recorder import RealtimeRecorder
+
+    recorder = RealtimeRecorder(
+        audio_capture=None,
+        speech_engine=DummySpeechEngine(),
+        translation_engine=None,
+        db_connection=None,
+        file_manager=DummyFileManager(),
+    )
+
+    assert recorder.add_marker() is None
+    assert recorder.get_markers() == []
+
+
+def test_markers_persist_and_save(monkeypatch, tmp_path):
+    if not HAS_NUMPY:
+        pytest.skip("numpy is required for marker persistence tests")
+
+    from core.realtime.recorder import RealtimeRecorder
+
+    class _DummyVAD:
+        def __init__(self, *args, **kwargs):  # noqa: D401, ARG002
+            """Stub VAD that treats all audio as speech."""
+
+        def detect_speech(self, audio, sample_rate):  # noqa: ARG002
+            if len(audio) == 0:
+                return []
+            return [{'start': 0.0, 'end': len(audio) / sample_rate}]
+
+        def extract_speech(self, audio, timestamps, sample_rate=16000):  # noqa: ARG002
+            return audio
+
+    monkeypatch.setattr("engines.audio.vad.VADDetector", _DummyVAD)
+
+    audio_capture = DummyAudioCapture(sample_rate=16000)
+    speech_engine = DummyStreamingSpeechEngine()
+    file_manager = DummyFileManager(base_dir=tmp_path)
+
+    recorded_callbacks = []
+
+    recorder = RealtimeRecorder(
+        audio_capture=audio_capture,
+        speech_engine=speech_engine,
+        translation_engine=None,
+        db_connection=None,
+        file_manager=file_manager,
+    )
+
+    recorder.set_callbacks(on_marker=recorded_callbacks.append)
+
+    options = {
+        'save_recording': False,
+        'save_transcript': False,
+        'create_calendar_event': False,
+        'enable_translation': False,
+    }
+
+    async def _run_marker_flow():
+        loop = asyncio.get_running_loop()
+        await recorder.start_recording(options=options, event_loop=loop)
+
+        recorder.recording_start_time -= timedelta(seconds=5)
+
+        marker = recorder.add_marker()
+        assert marker is not None
+        assert marker['index'] == 1
+        assert marker['offset'] == pytest.approx(5, abs=0.2)
+
+        await asyncio.sleep(0.02)
+        second_marker = recorder.add_marker()
+        assert second_marker is not None
+        assert second_marker['index'] == 2
+        assert second_marker['offset'] >= marker['offset']
+
+        result = await recorder.stop_recording()
+        return marker, second_marker, result
+
+    marker, second_marker, result = asyncio.run(_run_marker_flow())
+
+    assert recorded_callbacks
+    assert len(recorded_callbacks) == 2
+
+    assert 'markers' in result
+    assert len(result['markers']) == 2
+    assert result['markers'][0]['index'] == 1
+    assert result['markers'][1]['index'] == 2
+
+    assert 'markers_path' in result
+    saved_path = Path(result['markers_path'])
+    assert saved_path.exists()
+
+    with saved_path.open('r', encoding='utf-8') as handle:
+        payload = json.load(handle)
+
+    assert payload['markers'][0]['index'] == 1
+    assert payload['markers'][1]['index'] == 2
+    assert payload['markers'][0]['offset'] == pytest.approx(marker['offset'], abs=0.2)
+    assert payload['markers'][1]['offset'] == pytest.approx(second_marker['offset'], abs=0.2)

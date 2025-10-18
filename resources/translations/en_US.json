@@ -88,7 +88,14 @@
     "translation_not_available": "Translation not available. Please configure Google Translate API key in Settings > Transcription.",
     "audio_unavailable_short": "Microphone capture not available",
     "audio_unavailable_message": "Real-time recording requires PyAudio. Install it with: {command}",
-    "audio_unavailable_tooltip": "Install PyAudio (pip install pyaudio) to enable real-time recording."
+    "audio_unavailable_tooltip": "Install PyAudio (pip install pyaudio) to enable real-time recording.",
+    "add_marker": "Add Marker",
+    "markers": "Markers",
+    "markers_placeholder": "No markers yet. Click Add Marker during recording.",
+    "marker_unavailable": "Start recording before adding markers.",
+    "marker_failed": "Unable to capture the marker. Please try again.",
+    "marker_item": "#{number} • {timestamp}",
+    "marker_item_with_label": "#{number} • {timestamp} – {label}"
   },
   "calendar_hub": {
     "title": "Calendar Hub",

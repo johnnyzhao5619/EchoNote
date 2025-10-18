@@ -8,7 +8,7 @@
 import logging
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
-    QSlider, QCheckBox, QPushButton, QPlainTextEdit, QGroupBox
+    QSlider, QCheckBox, QPushButton, QPlainTextEdit, QGroupBox, QListWidget
 )
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QObject
 import threading
@@ -40,6 +40,9 @@ class RealtimeRecorderSignals(QObject):
     # Signal emitted when recording stops (for UI update)
     recording_stopped = pyqtSignal()
 
+    # Signal emitted when a marker is added
+    marker_added = pyqtSignal(object)
+
     def __init__(self):
         super().__init__()
 
@@ -67,7 +70,8 @@ class RealtimeRecordWidget(QWidget):
 
         # 创建信号包装器
         self.signals = RealtimeRecorderSignals()
-        
+        self._markers = []
+
         # 文本缓冲区（用于批量更新）
         self._transcription_buffer = []
         self._translation_buffer = []
@@ -82,7 +86,8 @@ class RealtimeRecordWidget(QWidget):
             on_transcription=self._on_transcription,
             on_translation=self._on_translation,
             on_error=self._on_error,
-            on_audio_data=self._on_audio_data
+            on_audio_data=self._on_audio_data,
+            on_marker=self._on_marker
         )
 
         # 连接信号到槽（使用 QueuedConnection 确保线程安全）
@@ -108,6 +113,10 @@ class RealtimeRecordWidget(QWidget):
         )
         self.signals.recording_stopped.connect(
             self._on_recording_stopped,
+            Qt.ConnectionType.QueuedConnection
+        )
+        self.signals.marker_added.connect(
+            self._append_marker_item,
             Qt.ConnectionType.QueuedConnection
         )
 
@@ -371,6 +380,14 @@ class RealtimeRecordWidget(QWidget):
         self.record_button.clicked.connect(self._toggle_recording)
         layout.addWidget(self.record_button)
 
+        # 添加标记按钮
+        self.add_marker_button = QPushButton()
+        self.add_marker_button.setObjectName("add_marker_button")
+        self.add_marker_button.setMinimumHeight(40)
+        self.add_marker_button.setEnabled(False)
+        self.add_marker_button.clicked.connect(self._add_marker)
+        layout.addWidget(self.add_marker_button)
+
         layout.addSpacing(30)
 
         # 录制时长标签
@@ -434,6 +451,25 @@ class RealtimeRecordWidget(QWidget):
 
         translation_group.setLayout(translation_layout)
         layout.addWidget(translation_group, stretch=1)
+
+        # 标记列表组
+        markers_group = QGroupBox()
+        markers_group.setObjectName("markers_group")
+        markers_layout = QVBoxLayout()
+        markers_layout.setContentsMargins(0, 0, 0, 0)
+        markers_layout.setSpacing(0)
+
+        self.markers_list = QListWidget()
+        self.markers_list.setObjectName("markers_list")
+        self.markers_list.setAlternatingRowColors(True)
+        self.markers_list.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.markers_list.setSelectionMode(
+            QListWidget.SelectionMode.NoSelection
+        )
+        markers_layout.addWidget(self.markers_list)
+
+        markers_group.setLayout(markers_layout)
+        layout.addWidget(markers_group, stretch=0)
 
         return container
 
@@ -538,6 +574,15 @@ class RealtimeRecordWidget(QWidget):
         if record_button:
             record_button.setEnabled(self._audio_available)
             record_button.setToolTip('' if self._audio_available else tooltip)
+
+        add_marker_button = getattr(self, 'add_marker_button', None)
+        if add_marker_button:
+            add_marker_button.setEnabled(
+                self._audio_available and self.recorder.is_recording
+            )
+            add_marker_button.setToolTip(
+                '' if self._audio_available else tooltip
+            )
 
         for widget_name in ('input_combo', 'gain_slider', 'gain_value_label', 'audio_visualizer'):
             widget = getattr(self, widget_name, None)
@@ -742,6 +787,12 @@ class RealtimeRecordWidget(QWidget):
                     self.i18n.t("realtime_record.start_recording")
                 )
 
+        add_marker_button = self.findChild(QPushButton, "add_marker_button")
+        if add_marker_button:
+            add_marker_button.setText(
+                self.i18n.t("realtime_record.add_marker")
+            )
+
         duration_label = self.findChild(QLabel, "duration_label")
         if duration_label:
             duration_label.setText(
@@ -761,7 +812,19 @@ class RealtimeRecordWidget(QWidget):
             translation_group.setTitle(
                 self.i18n.t("realtime_record.translation_text")
             )
-        
+
+        markers_group = self.findChild(QGroupBox, "markers_group")
+        if markers_group:
+            markers_group.setTitle(
+                self.i18n.t("realtime_record.markers")
+            )
+
+        if hasattr(self, 'markers_list') and hasattr(self.markers_list, 'setPlaceholderText'):
+            self.markers_list.setPlaceholderText(
+                self.i18n.t("realtime_record.markers_placeholder")
+            )
+            self._refresh_markers_list()
+
         # 如果翻译引擎不可用，显示提示信息
         if not self.recorder.translation_engine and hasattr(self, 'translation_text'):
             self.translation_text.setPlaceholderText(
@@ -812,6 +875,10 @@ class RealtimeRecordWidget(QWidget):
     def _on_audio_data(self, audio_chunk):
         """音频数据回调（线程安全，用于可视化）"""
         self.signals.audio_data_available.emit(audio_chunk)
+
+    def _on_marker(self, marker):
+        """标记创建回调（线程安全）"""
+        self.signals.marker_added.emit(marker)
 
     # Slot methods (called in UI thread)
     def _update_transcription_display(self, text: str):
@@ -864,6 +931,59 @@ class RealtimeRecordWidget(QWidget):
         except Exception as e:
             logger.error(f"Error updating translation display: {e}")
 
+    def _append_marker_item(self, marker):
+        """在 UI 中追加标记条目。"""
+        if not marker or not hasattr(self, 'markers_list'):
+            return
+
+        self._markers.append(marker)
+        text = self._format_marker_entry(marker)
+        self.markers_list.addItem(text)
+        self.markers_list.scrollToBottom()
+
+    def _refresh_markers_list(self):
+        """根据当前语言刷新标记显示。"""
+        if not hasattr(self, 'markers_list'):
+            return
+
+        self.markers_list.blockSignals(True)
+        self.markers_list.clear()
+        for marker in self._markers:
+            self.markers_list.addItem(self._format_marker_entry(marker))
+        self.markers_list.blockSignals(False)
+        if self._markers:
+            self.markers_list.scrollToBottom()
+
+    def _format_marker_entry(self, marker) -> str:
+        index = marker.get('index', len(self._markers))
+        timestamp = self._format_marker_timestamp(marker.get('offset', 0.0))
+        label = marker.get('label') or ""
+
+        if label:
+            return self.i18n.t(
+                "realtime_record.marker_item_with_label",
+                number=index,
+                timestamp=timestamp,
+                label=label
+            )
+
+        return self.i18n.t(
+            "realtime_record.marker_item",
+            number=index,
+            timestamp=timestamp
+        )
+
+    @staticmethod
+    def _format_marker_timestamp(seconds: float) -> str:
+        total_milliseconds = int(round(seconds * 1000))
+        hours, remainder = divmod(total_milliseconds, 3_600_000)
+        minutes, remainder = divmod(remainder, 60_000)
+        seconds_fraction = remainder / 1000.0
+
+        if hours:
+            return f"{hours:02d}:{minutes:02d}:{seconds_fraction:06.3f}"
+        return f"{minutes:02d}:{seconds_fraction:06.3f}"
+
     def _show_error(self, error: str):
         """显示错误信息（UI 线程）"""
         logger.error(f"Recording error: {error}")
@@ -889,7 +1009,10 @@ class RealtimeRecordWidget(QWidget):
         self.record_button.style().unpolish(self.record_button)
         self.record_button.style().polish(self.record_button)
         self.status_timer.start(100)
-    
+        if hasattr(self, 'add_marker_button'):
+            self.add_marker_button.setEnabled(True)
+            self.add_marker_button.setToolTip("")
+
     def _on_recording_stopped(self):
         """录制停止时的 UI 更新（主线程）"""
         logger.info("Updating UI for recording stopped")
@@ -900,12 +1023,14 @@ class RealtimeRecordWidget(QWidget):
         self.record_button.style().unpolish(self.record_button)
         self.record_button.style().polish(self.record_button)
         self.status_timer.stop()
+        if hasattr(self, 'add_marker_button'):
+            self.add_marker_button.setEnabled(False)
 
     def _update_status(self):
         """定期更新状态"""
         if not self.recorder.is_recording:
             return
-        
+
         status = self.recorder.get_recording_status()
         # 正确解包字典并发射信号
         self.signals.status_changed.emit(
@@ -914,6 +1039,12 @@ class RealtimeRecordWidget(QWidget):
         )
 
     # Event handlers
+    def _reset_markers_ui(self):
+        """清空标记列表显示。"""
+        self._markers.clear()
+        if hasattr(self, 'markers_list'):
+            self.markers_list.clear()
+
     def _on_gain_changed(self, value: int):
         """增益滑块变化处理"""
         gain = value / 100.0
@@ -925,14 +1056,28 @@ class RealtimeRecordWidget(QWidget):
     def _on_translation_toggled(self, state: int):
         """翻译复选框切换处理"""
         enabled = state == Qt.CheckState.Checked.value
-        
+
         # 只有在翻译引擎可用时才启用目标语言选择
         if self.recorder.translation_engine:
             self.target_lang_combo.setEnabled(enabled)
         else:
             self.target_lang_combo.setEnabled(False)
-        
+
         logger.debug(f"Translation {'enabled' if enabled else 'disabled'}")
+
+    def _add_marker(self):
+        """点击按钮添加标记。"""
+        if not self.recorder.is_recording:
+            warning = self.i18n.t("realtime_record.marker_unavailable")
+            logger.warning("Cannot add marker: %s", warning)
+            self.signals.error_occurred.emit(warning)
+            return
+
+        marker = self.recorder.add_marker()
+        if marker is None:
+            warning = self.i18n.t("realtime_record.marker_failed")
+            logger.error("Recorder rejected marker: %s", warning)
+            self.signals.error_occurred.emit(warning)
 
     def _toggle_recording(self):
         """切换录制状态"""
@@ -1033,6 +1178,9 @@ class RealtimeRecordWidget(QWidget):
 
             # 清空音频可视化
             self.audio_visualizer.clear()
+
+            # 清空标记
+            self._reset_markers_ui()
 
             # 开始录制（音频数据会通过 on_audio_data 回调自动发送）
             # 传递事件循环引用

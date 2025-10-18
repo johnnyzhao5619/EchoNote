@@ -88,7 +88,14 @@
     "translation_not_available": "翻译功能不可用。请在 设置 > 转录 中配置 Google Translate API 密钥。",
     "audio_unavailable_short": "无法使用麦克风录制",
     "audio_unavailable_message": "实时录制需要安装 PyAudio。请执行：{command}",
-    "audio_unavailable_tooltip": "安装 PyAudio（pip install pyaudio）后可启用实时录制。"
+    "audio_unavailable_tooltip": "安装 PyAudio（pip install pyaudio）后可启用实时录制。",
+    "add_marker": "添加标记",
+    "markers": "标记列表",
+    "markers_placeholder": "尚无标记，录制时点击“添加标记”。",
+    "marker_unavailable": "开始录制后才能添加标记。",
+    "marker_failed": "未能记录标记，请重试。",
+    "marker_item": "标记 {number} • {timestamp}",
+    "marker_item_with_label": "标记 {number} • {timestamp} – {label}"
   },
   "calendar_hub": {
     "title": "日历中心",

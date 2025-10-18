@@ -13,7 +13,7 @@ Use this navigator to jump straight to the authoritative sections of the [User G
 - **Français** : Préparez le traitement grâce à [Votre première transcription](../user-guide/README.md#first-transcription) et au raccourci de [Transcription par lots](../user-guide/README.md#workflow-batch).
 
 ## 3. Feature Jump List
-- **Real-time Recording / 实时录制 / Enregistrement temps réel**: see [Real-time Recording](../user-guide/README.md#workflow-realtime).
+- **Real-time Recording / 实时录制 / Enregistrement temps réel**: see [Real-time Recording](../user-guide/README.md#workflow-realtime) for microphone setup, marker capture, and export flow.
 - **Calendar Sync / 日历同步 / Synchronisation calendrier**: review [Calendar Hub](../user-guide/README.md#workflow-calendar).
 - **Model Downloads / 模型下载 / Téléchargement de modèles**: manage from [Settings → Model Management](../user-guide/README.md#workflow-models).
 
