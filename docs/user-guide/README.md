@@ -129,7 +129,9 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 ### 3.2 Real-time Recording <a id="workflow-realtime"></a>
 - Choose the input device and gain level; enable VAD to filter silence.
 - Monitor live transcripts, tap **Add Marker** to capture timestamps, and track elapsed time.
-- When stopping, recordings and transcripts are saved to `~/Documents/EchoNote/` directories.
+- When stopping, recordings and transcripts are saved to `~/Documents/EchoNote/` directories. When translation is enabled, the
+  translated text is written to the `Translations/` folder and the API returns the saved path (or an empty string if no
+  translation was produced).
 - The capture sample rate inherits from your selected device or an explicit override. Custom rates are applied to the microphone driver before capture; real-time engines auto-resample local models to 16 kHz and forward true rates to cloud APIs.
 
 > **Quick path:** `Real-time Record → Select microphone → Pick model → Start → Add Marker (optional) → Stop → Export`
@@ -139,7 +141,7 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 
 - 选择音频输入设备与增益值，必要时启用 VAD 减少静音片段。
 - 录制过程中可即时查看转录文本，点击**添加标记**记录时间点。
-- 停止录制后，文件与文本会自动保存至 `~/Documents/EchoNote/` 对应目录。
+- 停止录制后，文件与文本会自动保存至 `~/Documents/EchoNote/` 对应目录；启用翻译时会在 `Translations/` 目录写出翻译文本，若无翻译数据则返回空字符串。
 - 采样率默认沿用所选输入设备，可在录制选项中显式覆盖。自定义值会先应用到麦克风驱动，本地模型自动重采样到 16 kHz，云端接口则携带真实采样率。
 
 > **快捷路径：** `实时录制 → 选择麦克风 → 选择模型 → 开始 → （可选）添加标记 → 停止 → 导出`
@@ -151,7 +153,9 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 
 - Sélectionnez le périphérique d’entrée et le gain ; activez VAD pour filtrer le silence.
 - Surveillez la transcription en direct, cliquez sur **Ajouter un marqueur** pour fixer un horodatage, puis suivez le temps écoulé.
-- À l’arrêt, enregistrements et transcriptions sont stockés dans `~/Documents/EchoNote/`.
+- À l’arrêt, enregistrements et transcriptions sont stockés dans `~/Documents/EchoNote/`. Lorsque la traduction est activée,
+  le texte traduit est enregistré dans `Translations/` et l’API renvoie ce chemin (ou une chaîne vide si aucune traduction n’a
+  été produite).
 - La fréquence d’échantillonnage suit le périphérique choisi ou une valeur forcée. Les micros sont configurés avant capture, les modèles locaux sont rééchantillonnés à 16 kHz et les API cloud reçoivent la fréquence réelle.
 
 > **Chemin rapide :** `Real-time Record → Choisir micro → Sélectionner modèle → Démarrer → Ajouter un marqueur (optionnel) → Arrêter → Exporter`

@@ -189,7 +189,9 @@ Stop recording and save files.
 - `dict`: Recording result
   - `recording_path` (str): Path to saved recording
   - `transcript_path` (str): Path to transcript file
-  - `translation_path` (str, optional): Path to translation file
+  - `translation_path` (str, optional): Saved translation file path when
+    translation data exists; returns an empty string when no translation was
+    generated
   - `event_id` (str, optional): Created calendar event ID
 
 ##### get_transcription_stream
