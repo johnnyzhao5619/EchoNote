@@ -115,6 +115,7 @@ class GoogleEngine(SpeechEngine):
         
         enable_punctuation = kwargs.get('enable_automatic_punctuation', True)
         enable_word_offsets = kwargs.get('enable_word_time_offsets', False)
+        sample_rate = kwargs.get('sample_rate')
         
         logger.info(f"Transcribing file with Google: {audio_path}, language={language}")
         
@@ -126,7 +127,7 @@ class GoogleEngine(SpeechEngine):
         request_data = {
             "config": {
                 "encoding": "LINEAR16",  # 假设 WAV 格式
-                "sampleRateHertz": 16000,
+                "sampleRateHertz": sample_rate or 16000,
                 "languageCode": self._convert_language_code(language),
                 "enableAutomaticPunctuation": enable_punctuation,
                 "enableWordTimeOffsets": enable_word_offsets
@@ -205,25 +206,39 @@ class GoogleEngine(SpeechEngine):
                 if attempt == self.max_retries - 1:
                     raise
 
-    async def transcribe_stream(self, audio_chunk: np.ndarray, language: Optional[str] = None, **kwargs) -> str:
+    async def transcribe_stream(
+        self,
+        audio_chunk: np.ndarray,
+        language: Optional[str] = None,
+        sample_rate: Optional[int] = None,
+        **kwargs
+    ) -> str:
         """
         实时转录音频流
-        
+
         注意：这里使用同步识别 API，真正的流式识别需要使用 gRPC
+
+        Args:
+            audio_chunk: 音频数据块
+            language: 源语言代码
+            sample_rate: 输入音频的采样率
         """
         import tempfile
         import soundfile as sf
         
         logger.debug("Transcribing audio stream with Google")
-        
+
+        effective_rate = sample_rate if sample_rate and sample_rate > 0 else 16000
+
         # 保存为临时文件
         with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp_file:
             tmp_path = tmp_file.name
-            sf.write(tmp_path, audio_chunk, 16000)
-        
+            sf.write(tmp_path, audio_chunk, effective_rate)
+
         try:
             # 转录临时文件
-            result = await self.transcribe_file(tmp_path, language, **kwargs)
+            stream_kwargs = {**kwargs, 'sample_rate': effective_rate}
+            result = await self.transcribe_file(tmp_path, language, **stream_kwargs)
             
             # 合并所有段落的文本
             text = " ".join([seg["text"] for seg in result["segments"]])

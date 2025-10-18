@@ -11,7 +11,7 @@ from typing import Dict, List, Optional
 import numpy as np
 from pathlib import Path
 
-from engines.speech.base import SpeechEngine
+from engines.speech.base import SpeechEngine, ensure_audio_sample_rate
 from config.app_config import get_app_dir
 
 logger = logging.getLogger(__name__)
@@ -386,15 +386,22 @@ class FasterWhisperEngine(SpeechEngine):
             logger.error(f"Transcription failed: {e}")
             raise
 
-    async def transcribe_stream(self, audio_chunk: np.ndarray, language: Optional[str] = None, **kwargs) -> str:
+    async def transcribe_stream(
+        self,
+        audio_chunk: np.ndarray,
+        language: Optional[str] = None,
+        sample_rate: Optional[int] = None,
+        **kwargs
+    ) -> str:
         """
         实时转录音频流
         
         使用滑动窗口机制和 VAD 检测
         
         Args:
-            audio_chunk: 音频数据块（16kHz 采样率）
+            audio_chunk: 音频数据块
             language: 源语言代码
+            sample_rate: 音频块的采样率
             **kwargs: 额外参数
                 - use_vad: 是否使用 VAD（默认 False，因为外部已经做了 VAD）
         """
@@ -412,7 +419,13 @@ class FasterWhisperEngine(SpeechEngine):
             return ""
         
         logger.debug(f"Transcribing audio chunk: length={len(audio_chunk)}, energy={audio_energy:.4f}")
-        
+
+        processed_audio, effective_rate = ensure_audio_sample_rate(
+            audio_chunk,
+            sample_rate,
+            16000
+        )
+
         use_vad = kwargs.get('use_vad', False)
         
         # 如果启用 VAD，先进行语音活动检测
@@ -420,14 +433,14 @@ class FasterWhisperEngine(SpeechEngine):
             self._load_vad_model()
             if self._vad_model is not None:
                 # 检测语音活动
-                speech_timestamps = self._detect_speech(audio_chunk)
+                speech_timestamps = self._detect_speech(processed_audio)
                 if not speech_timestamps:
                     # 没有检测到语音
                     logger.debug("No speech detected by internal VAD")
                     return ""
                 
                 # 提取语音段落
-                audio_chunk = self._extract_speech_segments(audio_chunk, speech_timestamps)
+                processed_audio = self._extract_speech_segments(processed_audio, speech_timestamps)
         
         try:
             # 转录音频块
@@ -437,10 +450,10 @@ class FasterWhisperEngine(SpeechEngine):
             
             with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp_file:
                 tmp_path = tmp_file.name
-            
+
             try:
                 # 写入音频文件
-                sf.write(tmp_path, audio_chunk, 16000)
+                sf.write(tmp_path, processed_audio, effective_rate or 16000)
                 logger.debug(f"Wrote audio to temp file: {tmp_path}")
                 
                 # 转录

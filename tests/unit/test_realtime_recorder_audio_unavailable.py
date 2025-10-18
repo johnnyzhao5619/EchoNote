@@ -1,7 +1,9 @@
 import asyncio
 import sys
+import tempfile
 import types
 from pathlib import Path
+from typing import Optional
 
 import pytest
 
@@ -46,7 +48,36 @@ class DummySpeechEngine:
 
 
 class DummyFileManager:
-    """Placeholder used to satisfy recorder constructor."""
+    """File manager stub that stores data inside a temporary directory."""
+
+    def __init__(self, base_dir: Optional[Path] = None):
+        self.base_dir = Path(base_dir or tempfile.gettempdir()) / "echonote-tests"
+        self.base_dir.mkdir(parents=True, exist_ok=True)
+        self.saved_files = {}
+        self.saved_texts = {}
+
+    def get_temp_path(self, filename: str) -> str:
+        temp_dir = self.base_dir / "tmp"
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        return str(temp_dir / filename)
+
+    def save_file(self, data: bytes, filename: str, subdirectory: Optional[str] = None) -> str:
+        target_dir = self.base_dir / (subdirectory or "misc")
+        target_dir.mkdir(parents=True, exist_ok=True)
+        target_path = target_dir / filename
+        with open(target_path, 'wb') as file:
+            file.write(data)
+        self.saved_files[filename] = str(target_path)
+        return str(target_path)
+
+    def save_text_file(self, content: str, filename: str, subdirectory: Optional[str] = None) -> str:
+        target_dir = self.base_dir / (subdirectory or "text")
+        target_dir.mkdir(parents=True, exist_ok=True)
+        target_path = target_dir / filename
+        with open(target_path, 'w', encoding='utf-8') as file:
+            file.write(content)
+        self.saved_texts[filename] = str(target_path)
+        return str(target_path)
 
 
 class DummyStreamingSpeechEngine(DummySpeechEngine):
@@ -55,10 +86,12 @@ class DummyStreamingSpeechEngine(DummySpeechEngine):
     def __init__(self):
         self.calls = 0
         self.captured_audio = []
+        self.received_sample_rates = []
 
-    async def transcribe_stream(self, audio, language=None):  # noqa: ARG002
+    async def transcribe_stream(self, audio, language=None, sample_rate=None):  # noqa: ARG002
         self.calls += 1
         self.captured_audio.append(audio.copy())
+        self.received_sample_rates.append(sample_rate)
         return f"transcription-{self.calls}"
 
 
@@ -199,9 +232,84 @@ def test_audio_buffer_accumulates_and_clears(monkeypatch):
         assert len(second_audio) == chunk_samples * 3
         np.testing.assert_allclose(second_audio, expected_window)
 
+        assert speech_engine.received_sample_rates == [sample_rate, sample_rate]
+
         await recorder.stop_recording()
 
         assert recorder.audio_buffer is None
         assert not audio_capture.started
 
     asyncio.run(_run_test())
+
+
+def test_custom_sample_rate_propagates(monkeypatch, tmp_path):
+    if not HAS_NUMPY:
+        pytest.skip("numpy is required for audio buffer tests")
+
+    from core.realtime.recorder import RealtimeRecorder
+
+    recorded_rates: list[int] = []
+
+    def _fake_write(path, data, samplerate):  # noqa: ANN001
+        recorded_rates.append(samplerate)
+        tmp_path_local = Path(path)
+        tmp_path_local.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path_local.write_bytes(b"\x00\x00")
+
+    monkeypatch.setattr("soundfile.write", _fake_write)
+
+    sample_rate = 22050
+    audio_capture = DummyAudioCapture(sample_rate=16000)
+    speech_engine = DummyStreamingSpeechEngine()
+    file_manager = DummyFileManager(base_dir=tmp_path)
+
+    recorder = RealtimeRecorder(
+        audio_capture=audio_capture,
+        speech_engine=speech_engine,
+        translation_engine=None,
+        db_connection=None,
+        file_manager=file_manager,
+    )
+
+    options = {
+        'sample_rate': sample_rate,
+        'save_recording': True,
+        'save_transcript': False,
+        'create_calendar_event': False,
+        'enable_translation': False,
+    }
+
+    async def _run_custom_test():
+        loop = asyncio.get_running_loop()
+        await recorder.start_recording(options=options, event_loop=loop)
+
+        assert recorder.sample_rate == sample_rate
+        assert audio_capture.sample_rate == sample_rate
+        assert recorder.audio_buffer is not None
+        assert recorder.audio_buffer.sample_rate == sample_rate
+        assert audio_capture.callback is not None
+
+        callback = audio_capture.callback
+        chunk = np.full(sample_rate, 0.02, dtype=np.float32)
+
+        async def _wait_for(expected_calls: int):
+            async def _poll():
+                while speech_engine.calls < expected_calls:
+                    await asyncio.sleep(0.01)
+
+            await asyncio.wait_for(_poll(), timeout=2.0)
+
+        for _ in range(3):
+            callback(chunk.copy())
+            await asyncio.sleep(0.01)
+
+        await _wait_for(1)
+
+        assert speech_engine.received_sample_rates == [sample_rate]
+
+        await recorder.stop_recording()
+
+    asyncio.run(_run_custom_test())
+
+    assert recorded_rates
+    assert recorded_rates[-1] == sample_rate

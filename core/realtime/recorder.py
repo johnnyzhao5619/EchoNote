@@ -156,6 +156,12 @@ class RealtimeRecorder:
         else:
             self.sample_rate = 16000
 
+        if self.audio_capture is not None and hasattr(self.audio_capture, 'sample_rate'):
+            try:
+                self.audio_capture.sample_rate = self.sample_rate
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(f"Failed to apply sample rate to audio capture: {exc}")
+
         # 重置状态
         self.is_recording = True
         self.recording_start_time = datetime.now()
@@ -322,7 +328,8 @@ class RealtimeRecorder:
                             language = self.current_options.get('language')
                             text = await self.speech_engine.transcribe_stream(
                                 speech_audio,
-                                language=language
+                                language=language,
+                                sample_rate=self.sample_rate
                             )
 
                             logger.info(f"Transcription result: '{text}'")

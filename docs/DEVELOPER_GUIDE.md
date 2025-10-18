@@ -190,6 +190,7 @@ Engine adapters isolate third-party APIs and hardware concerns.
   - `SpeechEngine` defines the contract (`get_name`, `get_supported_languages`, `transcribe_file`, `transcribe_stream`, `get_config_schema`).
   - `faster_whisper_engine.py` provides the default local transcription implementation with GPU detection.
   - `openai_engine.py`, `google_engine.py`, and `azure_engine.py` integrate cloud services and reuse `api_validator.py` and `usage_tracker.py` for quota management.
+  - Streaming adapters now accept the recorder's `sample_rate`; local whisper models resample to 16 kHz, while cloud engines keep the original rate and pass it to their APIs.
 
 - **Audio (`engines/audio/`)**
   - `capture.py` wraps PyAudio streams and exposes async iteration for live capture.
