@@ -6,6 +6,9 @@
 """
 
 import logging
+from concurrent.futures import Future
+from typing import Set
+
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
     QSlider, QCheckBox, QPushButton, QPlainTextEdit, QGroupBox, QListWidget
@@ -71,6 +74,11 @@ class RealtimeRecordWidget(QWidget):
         # 创建信号包装器
         self.signals = RealtimeRecorderSignals()
         self._markers = []
+
+        # 跟踪异步任务与清理状态
+        self._pending_futures: Set[Future] = set()
+        self._cleanup_in_progress = False
+        self._cleanup_done = False
 
         # 文本缓冲区（用于批量更新）
         self._transcription_buffer = []
@@ -147,8 +155,12 @@ class RealtimeRecordWidget(QWidget):
             self._async_loop = asyncio.new_event_loop()
             asyncio.set_event_loop(self._async_loop)
             logger.info("Async event loop started")
-            self._async_loop.run_forever()
-            logger.info("Async event loop stopped")
+            try:
+                self._async_loop.run_forever()
+            finally:
+                logger.info("Async event loop stopping")
+                self._async_loop.close()
+                logger.info("Async event loop stopped")
         
         self._async_thread = threading.Thread(target=run_loop, daemon=True)
         self._async_thread.start()
@@ -1097,25 +1109,47 @@ class RealtimeRecordWidget(QWidget):
     def _run_async_task(self, coro):
         """在专用事件循环中运行异步任务"""
         import asyncio
-        
+
         if self._async_loop is None:
             logger.error("Async event loop not initialized")
             self.signals.error_occurred.emit("Async event loop not initialized")
             return
-        
+
         # 在专用事件循环中调度任务
         future = asyncio.run_coroutine_threadsafe(coro, self._async_loop)
-        
+        self._pending_futures.add(future)
+
         # 可选：等待结果（但不阻塞 UI 线程）
         def check_result():
+            if self._cleanup_in_progress:
+                if not future.done():
+                    future.cancel()
+                self._pending_futures.discard(future)
+                return
+
+            if future.cancelled():
+                self._pending_futures.discard(future)
+                return
+
             try:
                 if future.done():
-                    result = future.result()
-                    logger.debug(f"Async task completed: {result}")
-            except Exception as e:
-                logger.error(f"Async task failed: {e}", exc_info=True)
-                self.signals.error_occurred.emit(str(e))
-        
+                    try:
+                        result = future.result()
+                        logger.debug(f"Async task completed: {result}")
+                    except Exception as e:  # noqa: BLE001
+                        logger.error(f"Async task failed: {e}", exc_info=True)
+                        self.signals.error_occurred.emit(str(e))
+                    finally:
+                        self._pending_futures.discard(future)
+                else:
+                    QTimer.singleShot(100, check_result)
+            except Exception as e:  # noqa: BLE001
+                logger.error(f"Async task check failed: {e}", exc_info=True)
+                try:
+                    self.signals.error_occurred.emit(str(e))
+                finally:
+                    self._pending_futures.discard(future)
+
         # 使用 QTimer 异步检查结果
         from PyQt6.QtCore import QTimer
         QTimer.singleShot(100, check_result)
@@ -1275,3 +1309,114 @@ class RealtimeRecordWidget(QWidget):
     def _save_recording(self):
         """保存录音"""
         logger.info("Save recording - handled automatically on stop")
+
+    # --- 清理与生命周期管理 ---
+
+    def _disconnect_signals(self):
+        """断开外部信号，避免悬挂引用。"""
+        try:
+            self.i18n.language_changed.disconnect(self._update_ui_text)
+        except (TypeError, RuntimeError, AttributeError):
+            pass
+
+        if self.model_manager:
+            try:
+                self.model_manager.models_updated.disconnect(self._update_model_list)
+            except (TypeError, RuntimeError):
+                pass
+
+    def _stop_recorder_if_needed(self):
+        """确保录制停止并等待后台任务完成。"""
+        if not getattr(self, 'recorder', None):
+            return
+
+        if self.recorder.is_recording and self._async_loop is not None:
+            import asyncio
+
+            try:
+                future = asyncio.run_coroutine_threadsafe(
+                    self.recorder.stop_recording(),
+                    self._async_loop
+                )
+                try:
+                    future.result(timeout=10)
+                except Exception as exc:  # noqa: BLE001
+                    logger.error(
+                        "Failed to stop recorder during cleanup: %s",
+                        exc,
+                        exc_info=True
+                    )
+                    future.cancel()
+                finally:
+                    self._pending_futures.discard(future)
+            except Exception as exc:  # noqa: BLE001
+                logger.error(
+                    "Error scheduling recorder shutdown: %s",
+                    exc,
+                    exc_info=True
+                )
+
+        # 释放回调引用，避免循环引用
+        self.recorder.set_callbacks()
+
+    def _shutdown_async_loop(self):
+        """关闭异步事件循环并等待线程退出。"""
+        loop = self._async_loop
+        thread = self._async_thread
+
+        if loop is None:
+            return
+
+        try:
+            if not loop.is_closed():
+                loop.call_soon_threadsafe(loop.stop)
+        except RuntimeError as exc:  # noqa: BLE001
+            logger.debug("Event loop already stopped: %s", exc)
+
+        if thread and thread.is_alive():
+            thread.join(timeout=5)
+            if thread.is_alive():
+                logger.warning("Async event loop thread did not terminate within timeout")
+
+        self._async_loop = None
+        self._async_thread = None
+
+    def _cleanup_resources(self):
+        """执行关闭前的资源清理。"""
+        if self._cleanup_done:
+            return
+
+        self._cleanup_in_progress = True
+
+        # 停止定时器并断开回调
+        if hasattr(self, 'status_timer') and self.status_timer is not None:
+            self.status_timer.stop()
+            try:
+                self.status_timer.timeout.disconnect(self._update_status)
+            except (TypeError, RuntimeError):
+                pass
+            self.status_timer.deleteLater()
+            self.status_timer = None
+
+        self._disconnect_signals()
+
+        # 取消未完成的任务
+        for future in list(self._pending_futures):
+            if not future.done():
+                future.cancel()
+            self._pending_futures.discard(future)
+
+        self._stop_recorder_if_needed()
+        self._shutdown_async_loop()
+
+        self._cleanup_done = True
+
+    def closeEvent(self, event):  # noqa: D401
+        """确保关闭窗口时释放后台资源。"""
+        self._cleanup_resources()
+        super().closeEvent(event)
+
+    def deleteLater(self):  # noqa: D401
+        """在延迟删除前执行资源清理。"""
+        self._cleanup_resources()
+        super().deleteLater()

@@ -210,6 +210,11 @@ UI code under `ui/` follows Qt best practices:
 - Shared components and dialogs live in `ui/common/` and `ui/dialogs/` (e.g., splash screen, notifications, error handling).
 - Qt styles reside in `resources/themes/`, translations in `resources/translations/`, and icons in `resources/icons/`.
 
+#### UI/线程与异步事件循环
+- `ui/realtime_record/widget.py` 为实时录制场景专门启动了一个 asyncio 事件循环线程，用于驱动录制/翻译协程。该线程在控件构造时创建，必须在控件关闭时显式停止：调用 `self._async_loop.call_soon_threadsafe(self._async_loop.stop)`，并在同一清理例程里 `join` 线程，防止线程泄漏。
+- 清理由三个步骤组成：1) 停止 `QTimer`（如状态轮询器）并断开其 `timeout` 回调，避免 Qt 保留悬挂引用；2) 若录制仍在进行，通过 `asyncio.run_coroutine_threadsafe` 提交 `RealtimeRecorder.stop_recording()`，等待结果或在超时时取消；3) 在事件循环停止后将 `set_callbacks()` 设为默认，确保控件被销毁后不会再访问已经释放的 UI 对象。
+- 如需销毁控件，请使用 `close()` 或 `deleteLater()`，它们都会触发上述清理逻辑。不要跳过 `closeEvent`，也不要直接丢弃实例，否则后台线程和回调将保持活动状态并干扰后续页面创建。
+
 ### 6.5 Utilities
 Reusable helpers live under `utils/`:
 - `logger.py` sets up structured logging across modules.
