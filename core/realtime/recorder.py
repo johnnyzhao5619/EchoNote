@@ -5,10 +5,12 @@
 """
 
 import asyncio
+import json
 import logging
 import os
-from datetime import datetime
-from typing import Optional, Dict, AsyncIterator, Callable
+import threading
+from datetime import datetime, timedelta
+from typing import Optional, Dict, AsyncIterator, Callable, List, Any
 import numpy as np
 import soundfile as sf
 
@@ -72,10 +74,15 @@ class RealtimeRecorder:
         self.on_translation_update = None
         self.on_error = None
         self.on_audio_data = None  # 音频数据回调（用于可视化等）
+        self.on_marker_added = None
 
         # 累积的转录和翻译文本
         self.accumulated_transcription = []
         self.accumulated_translation = []
+
+        # 标记数据
+        self.markers: List[Dict[str, Any]] = []
+        self._marker_lock = threading.Lock()
 
         # 事件循环引用（用于线程安全的队列操作）
         self._event_loop = None
@@ -91,7 +98,8 @@ class RealtimeRecorder:
         on_transcription: Optional[Callable[[str], None]] = None,
         on_translation: Optional[Callable[[str], None]] = None,
         on_error: Optional[Callable[[str], None]] = None,
-        on_audio_data: Optional[Callable[[np.ndarray], None]] = None
+        on_audio_data: Optional[Callable[[np.ndarray], None]] = None,
+        on_marker: Optional[Callable[[Dict[str, Any]], None]] = None
     ):
         """
         设置回调函数（用于 UI 更新）
@@ -101,11 +109,13 @@ class RealtimeRecorder:
             on_translation: 翻译文本更新回调
             on_error: 错误回调
             on_audio_data: 音频数据回调（用于可视化等）
+            on_marker: 标记创建回调
         """
         self.on_transcription_update = on_transcription
         self.on_translation_update = on_translation
         self.on_error = on_error
         self.on_audio_data = on_audio_data
+        self.on_marker_added = on_marker
 
     async def start_recording(
         self, input_source: Optional[int] = None,
@@ -169,6 +179,8 @@ class RealtimeRecorder:
         self.audio_buffer = AudioBuffer(sample_rate=self.sample_rate)
         self.accumulated_transcription = []
         self.accumulated_translation = []
+        with self._marker_lock:
+            self.markers = []
 
         # 清空队列
         while not self.transcription_queue.empty():
@@ -510,6 +522,13 @@ class RealtimeRecorder:
             if translation_path:
                 result['translation_path'] = translation_path
 
+        with self._marker_lock:
+            if self.markers:
+                result['markers'] = [marker.copy() for marker in self.markers]
+                markers_path = self._save_markers()
+                if markers_path:
+                    result['markers_path'] = markers_path
+
         # 创建日历事件
         if self.current_options.get('create_calendar_event', True):
             event_id = await self._create_calendar_event(result)
@@ -612,6 +631,35 @@ class RealtimeRecorder:
             logger.warning("No translation data to save")
             return ""
 
+    def _save_markers(self) -> str:
+        """保存标记数据到文件"""
+        if not self.markers or not self.recording_start_time:
+            logger.debug("No markers to save")
+            return ""
+
+        payload = {
+            'start_time': self.recording_start_time.isoformat(),
+            'markers': [marker.copy() for marker in self.markers]
+        }
+
+        timestamp = self.recording_start_time.strftime("%Y%m%d_%H%M%S")
+        filename = f"markers_{timestamp}.json"
+
+        try:
+            json_content = json.dumps(payload, ensure_ascii=False, indent=2)
+            final_path = self.file_manager.save_text_file(
+                json_content,
+                filename,
+                subdirectory='Markers'
+            )
+            logger.info(f"Markers saved: {final_path}")
+            return final_path
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"Failed to save markers: {e}")
+            if self.on_error:
+                self.on_error(f"Failed to save markers: {e}")
+            return ""
+
         # 合并所有翻译文本
         full_translation = "\n".join(self.accumulated_translation)
 
@@ -636,6 +684,43 @@ class RealtimeRecorder:
             if self.on_error:
                 self.on_error(f"Failed to save translation: {e}")
             return ""
+
+    def add_marker(self, label: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """为当前录制添加标记。"""
+        if not self.is_recording or not self.recording_start_time:
+            logger.warning("Cannot add marker when recording is inactive")
+            return None
+
+        offset_seconds = self.get_recording_duration()
+        absolute_time = self.recording_start_time + timedelta(seconds=offset_seconds)
+
+        with self._marker_lock:
+            marker = {
+                'index': len(self.markers) + 1,
+                'offset': offset_seconds,
+                'absolute_time': absolute_time.isoformat(),
+                'label': label or ""
+            }
+            self.markers.append(marker)
+
+        logger.info(
+            "Marker added at %.3f seconds (index %d)",
+            offset_seconds,
+            marker['index']
+        )
+
+        if self.on_marker_added:
+            try:
+                self.on_marker_added(marker.copy())
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Marker callback failed: %s", exc)
+
+        return marker.copy()
+
+    def get_markers(self) -> List[Dict[str, Any]]:
+        """获取当前累积的标记列表。"""
+        with self._marker_lock:
+            return [marker.copy() for marker in self.markers]
 
     async def _create_calendar_event(self, recording_result: Dict) -> str:
         """

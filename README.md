@@ -81,7 +81,7 @@ Released under the [MIT License](LICENSE).
 
 #### Feature Highlights
 1. **Batch Transcription** – `core/transcription` coordinates Faster-Whisper engines, resumable queues, and export formatting.
-2. **Real-time Recording** – `core/realtime` plus `engines/audio` provide capture, gain control, voice activity detection, and optional translation.
+2. **Real-time Recording** – `core/realtime` plus `engines/audio` provide capture, gain control, voice activity detection, inline markers, and optional translation.
 3. **Calendar Hub** – `core/calendar` stores local events while `engines/calendar_sync` integrates Google and Outlook accounts.
 4. **Timeline Automation** – `core/timeline` links events with recordings, maintains auto-task rules, and exposes history queries.
 5. **Secure Storage** – `data/database`, `data/security`, and `data/storage` deliver encrypted SQLite, token vaults, and file lifecycle helpers.
