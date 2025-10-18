@@ -202,13 +202,32 @@ Get real-time transcription text stream.
 
 **Returns:**
 
-- `AsyncIterator[str]`: Stream of transcription text
+- `AsyncIterator[str]`: Stream of transcription text. The iterator produces
+  each new transcription segment as soon as it becomes available and stops
+  automatically after `stop_recording()` is awaited.
+
+**Note:**
+
+- For Qt/UI integrations prefer `set_callbacks()` so updates can be delivered
+  via signals.
+- 该生成器主要用于需要纯异步文本流的服务或后端任务。
 
 **Example:**
 
 ```python
-async for text in recorder.get_transcription_stream():
-    print(f"Transcription: {text}")
+async def consume_transcription(recorder):
+    async for text in recorder.get_transcription_stream():
+        if text:
+            print(f"Transcription: {text}")
+
+await recorder.start_recording(options={"save_recording": False})
+
+consumer = asyncio.create_task(consume_transcription(recorder))
+
+# ... feed audio or wait for callbacks ...
+
+await recorder.stop_recording()
+await consumer
 ```
 
 ##### get_translation_stream
@@ -218,6 +237,36 @@ def get_translation_stream() -> AsyncIterator[str]
 ```
 
 Get real-time translation text stream.
+
+**Returns:**
+
+- `AsyncIterator[str]`: Stream of translation text. Requires
+  `enable_translation=True` when starting the recorder.
+
+**Note:**
+
+- 同样推荐使用 `set_callbacks()` 让 UI 订阅翻译结果；生成器更适合后端任务或测试。
+
+**Example:**
+
+```python
+async def consume_translation(recorder):
+    async for text in recorder.get_translation_stream():
+        print(f"Translation: {text}")
+
+await recorder.start_recording(options={
+    "enable_translation": True,
+    "save_recording": False,
+    "save_transcript": False,
+})
+
+translation_task = asyncio.create_task(consume_translation(recorder))
+
+# ... feed audio or wait for callbacks ...
+
+await recorder.stop_recording()
+await translation_task
+```
 
 ---
 

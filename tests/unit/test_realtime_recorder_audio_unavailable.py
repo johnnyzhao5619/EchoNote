@@ -113,6 +113,34 @@ class DummyAudioCapture:
         self.started = False
 
 
+class AlwaysSpeechVAD:
+    """VAD stub that treats every buffered chunk as valid speech."""
+
+    def __init__(self, *args, **kwargs):  # noqa: D401, ARG002
+        """无状态初始化，兼容真实 VAD 接口。"""
+
+    def detect_speech(self, audio, sample_rate):  # noqa: ARG002
+        if len(audio) == 0:
+            return []
+        return [{'start': 0.0, 'end': len(audio) / sample_rate}]
+
+    def extract_speech(self, audio, timestamps, sample_rate=16000):  # noqa: ARG002
+        return audio
+
+
+class DummyTranslationEngine:
+    """Translation engine stub that records translation calls."""
+
+    def __init__(self):
+        self.calls = 0
+        self.arguments = []
+
+    async def translate(self, text, source_lang='auto', target_lang='en'):
+        self.calls += 1
+        self.arguments.append((text, source_lang, target_lang))
+        return f"{text}-to-{target_lang}"
+
+
 def test_start_recording_without_audio_capture():
     from core.realtime.recorder import RealtimeRecorder
 
@@ -416,3 +444,122 @@ def test_markers_persist_and_save(monkeypatch, tmp_path):
     assert payload['markers'][1]['index'] == 2
     assert payload['markers'][0]['offset'] == pytest.approx(marker['offset'], abs=0.2)
     assert payload['markers'][1]['offset'] == pytest.approx(second_marker['offset'], abs=0.2)
+
+
+def test_transcription_stream_emits_segments(monkeypatch):
+    if not HAS_NUMPY:
+        pytest.skip("numpy is required for streaming tests")
+
+    from core.realtime.recorder import RealtimeRecorder
+
+    monkeypatch.setattr("engines.audio.vad.VADDetector", AlwaysSpeechVAD)
+
+    audio_capture = DummyAudioCapture(sample_rate=16000)
+    speech_engine = DummyStreamingSpeechEngine()
+    recorder = RealtimeRecorder(
+        audio_capture=audio_capture,
+        speech_engine=speech_engine,
+        translation_engine=None,
+        db_connection=None,
+        file_manager=DummyFileManager(),
+    )
+
+    options = {
+        'save_recording': False,
+        'save_transcript': False,
+        'create_calendar_event': False,
+        'enable_translation': False,
+    }
+
+    results: list[str] = []
+
+    async def _run():
+        loop = asyncio.get_running_loop()
+        await recorder.start_recording(options=options, event_loop=loop)
+        assert audio_capture.callback is not None
+
+        ready = asyncio.Event()
+
+        async def _consume_stream():
+            async for text in recorder.get_transcription_stream():
+                results.append(text)
+                if len(results) >= 1:
+                    ready.set()
+
+        consumer_task = asyncio.create_task(_consume_stream())
+
+        chunk = np.full(recorder.sample_rate, 0.05, dtype=np.float32)
+        for _ in range(3):
+            audio_capture.callback(chunk.copy())
+            await asyncio.sleep(0.01)
+
+        await asyncio.wait_for(ready.wait(), timeout=2.0)
+
+        await recorder.stop_recording()
+        await consumer_task
+
+    asyncio.run(_run())
+
+    assert results == ["transcription-1"]
+
+
+def test_translation_stream_emits_segments(monkeypatch):
+    if not HAS_NUMPY:
+        pytest.skip("numpy is required for streaming tests")
+
+    from core.realtime.recorder import RealtimeRecorder
+
+    monkeypatch.setattr("engines.audio.vad.VADDetector", AlwaysSpeechVAD)
+
+    audio_capture = DummyAudioCapture(sample_rate=16000)
+    speech_engine = DummyStreamingSpeechEngine()
+    translation_engine = DummyTranslationEngine()
+    recorder = RealtimeRecorder(
+        audio_capture=audio_capture,
+        speech_engine=speech_engine,
+        translation_engine=translation_engine,
+        db_connection=None,
+        file_manager=DummyFileManager(),
+    )
+
+    options = {
+        'save_recording': False,
+        'save_transcript': False,
+        'create_calendar_event': False,
+        'enable_translation': True,
+        'target_language': 'en',
+    }
+
+    translations: list[str] = []
+
+    async def _run():
+        loop = asyncio.get_running_loop()
+        await recorder.start_recording(options=options, event_loop=loop)
+        assert audio_capture.callback is not None
+
+        ready = asyncio.Event()
+
+        async def _consume_translation():
+            async for text in recorder.get_translation_stream():
+                translations.append(text)
+                if len(translations) >= 1:
+                    ready.set()
+
+        translation_task = asyncio.create_task(_consume_translation())
+
+        chunk = np.full(recorder.sample_rate, 0.05, dtype=np.float32)
+        for _ in range(3):
+            audio_capture.callback(chunk.copy())
+            await asyncio.sleep(0.01)
+
+        await asyncio.wait_for(ready.wait(), timeout=2.0)
+
+        await recorder.stop_recording()
+        await translation_task
+
+    asyncio.run(_run())
+
+    assert translations == ["transcription-1-to-en"]
+    assert translation_engine.calls == 1
+    assert translation_engine.arguments[-1][1] == options.get('language', 'auto')
+    assert translation_engine.arguments[-1][2] == 'en'

@@ -62,6 +62,10 @@ class RealtimeRecorder:
         self.transcription_queue = asyncio.Queue()
         self.translation_queue = asyncio.Queue()
 
+        # 面向外部消费者的文本流队列（用于生成器接口）
+        self._transcription_stream_queue: asyncio.Queue = asyncio.Queue()
+        self._translation_stream_queue: asyncio.Queue = asyncio.Queue()
+
         # 异步任务
         self.processing_task = None
         self.translation_task = None
@@ -183,17 +187,10 @@ class RealtimeRecorder:
             self.markers = []
 
         # 清空队列
-        while not self.transcription_queue.empty():
-            try:
-                self.transcription_queue.get_nowait()
-            except asyncio.QueueEmpty:
-                break
-
-        while not self.translation_queue.empty():
-            try:
-                self.translation_queue.get_nowait()
-            except asyncio.QueueEmpty:
-                break
+        self._drain_queue(self.transcription_queue)
+        self._drain_queue(self.translation_queue)
+        self._drain_queue(self._transcription_stream_queue)
+        self._drain_queue(self._translation_stream_queue)
 
         # 启动音频捕获
         self.audio_capture.start_capture(
@@ -354,6 +351,9 @@ class RealtimeRecorder:
                                     # 累积转录文本
                                     self.accumulated_transcription.append(text)
 
+                                    # 推送到实时转录流
+                                    await self._transcription_stream_queue.put(text)
+
                                     # 通知 UI 更新
                                     if self.on_transcription_update:
                                         try:
@@ -431,6 +431,9 @@ class RealtimeRecorder:
                     # 累积翻译文本
                     self.accumulated_translation.append(translated_text)
 
+                    # 推送到实时翻译流
+                    await self._translation_stream_queue.put(translated_text)
+
                     # 通知 UI 更新
                     if self.on_translation_update:
                         self.on_translation_update(translated_text)
@@ -489,6 +492,10 @@ class RealtimeRecorder:
                 await asyncio.wait_for(self.translation_task, timeout=5.0)
             except asyncio.TimeoutError:
                 logger.warning("Translation task timeout")
+
+        # 标记流式队列完成，确保生成器退出
+        self._signal_stream_completion(self._transcription_stream_queue)
+        self._signal_stream_completion(self._translation_stream_queue)
 
         # 计算录制时长
         recording_end_time = datetime.now()
@@ -799,16 +806,26 @@ class RealtimeRecorder:
             str: 转录文本片段
 
         Note:
-            在实际使用中，建议使用回调函数（set_callbacks）
-            而不是这个生成器方法，因为回调函数更适合与 Qt Signal 集成
+            仍然推荐通过 set_callbacks 与 UI Signal 集成；
+            该生成器主要面向需要纯异步接口的调用方。
         """
-        # 这个方法需要在实际使用中通过 Qt Signal 或其他机制实现
-        # 这里提供一个基本框架
-        while self.is_recording:
-            # 等待转录结果
-            await asyncio.sleep(0.1)
-            # 实际实现应该从队列或缓冲区读取
-            yield ""
+        # 队列由 _process_audio_stream 异步生产文本片段
+        while True:
+            if not self.is_recording and self._transcription_stream_queue.empty():
+                break
+
+            try:
+                item = await asyncio.wait_for(
+                    self._transcription_stream_queue.get(),
+                    timeout=0.2
+                )
+            except asyncio.TimeoutError:
+                continue
+
+            if item is None:
+                break
+
+            yield item
 
     async def get_translation_stream(self) -> AsyncIterator[str]:
         """
@@ -818,16 +835,42 @@ class RealtimeRecorder:
             str: 翻译文本片段
 
         Note:
-            在实际使用中，建议使用回调函数（set_callbacks）
-            而不是这个生成器方法，因为回调函数更适合与 Qt Signal 集成
+            仍然推荐通过 set_callbacks 与 UI Signal 集成；
+            该生成器面向需要纯异步接口的场景。
         """
-        # 这个方法需要在实际使用中通过 Qt Signal 或其他机制实现
-        # 这里提供一个基本框架
-        while self.is_recording:
-            # 等待翻译结果
-            await asyncio.sleep(0.1)
-            # 实际实现应该从队列或缓冲区读取
-            yield ""
+        while True:
+            if not self.is_recording and self._translation_stream_queue.empty():
+                break
+
+            try:
+                item = await asyncio.wait_for(
+                    self._translation_stream_queue.get(),
+                    timeout=0.2
+                )
+            except asyncio.TimeoutError:
+                continue
+
+            if item is None:
+                break
+
+            yield item
+
+    @staticmethod
+    def _drain_queue(queue: asyncio.Queue) -> None:
+        """快速清空异步队列中的残留元素。"""
+        while not queue.empty():
+            try:
+                queue.get_nowait()
+            except asyncio.QueueEmpty:
+                break
+
+    @staticmethod
+    def _signal_stream_completion(queue: asyncio.Queue) -> None:
+        """在生成器队列尾部追加终止标记。"""
+        try:
+            queue.put_nowait(None)
+        except asyncio.QueueFull:  # pragma: no cover - 默认队列无限大
+            logger.warning("Stream queue full when signaling completion")
 
     def get_recording_duration(self) -> float:
         """
