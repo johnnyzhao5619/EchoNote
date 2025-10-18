@@ -206,52 +206,64 @@ class VADDetector:
             logger.error(f"WebRTC VAD detection failed: {e}")
             return []
 
-    def extract_speech_segments(self, audio: np.ndarray, speech_timestamps: List[Dict]) -> np.ndarray:
+    def extract_speech_segments(
+        self,
+        audio: np.ndarray,
+        speech_timestamps: List[Dict],
+        sample_rate: int = 16000
+    ) -> np.ndarray:
         """
         从音频中提取语音段落
-        
+
         Args:
             audio: 完整音频数据
             speech_timestamps: 语音时间戳列表
-            
+            sample_rate: 采样率（Hz）
+
         Returns:
             np.ndarray: 提取的语音段落（合并后）
         """
         if not speech_timestamps:
             return audio
-        
-        sample_rate = 16000  # 假设 16kHz
+
+        rate = sample_rate if sample_rate and sample_rate > 0 else 16000
         segments = []
-        
+
         for ts in speech_timestamps:
-            start_sample = int(ts['start'] * sample_rate)
-            end_sample = int(ts['end'] * sample_rate)
-            
+            start_sample = int(ts['start'] * rate)
+            end_sample = int(ts['end'] * rate)
+
             # 确保索引在有效范围内
             start_sample = max(0, start_sample)
             end_sample = min(len(audio), end_sample)
-            
+
             if start_sample < end_sample:
                 segments.append(audio[start_sample:end_sample])
-        
+
         # 合并所有语音段落
         if segments:
             return np.concatenate(segments)
         else:
             return audio
 
-    def extract_speech(self, audio: np.ndarray, timestamps: list) -> np.ndarray:
+    def extract_speech(
+        self,
+        audio: np.ndarray,
+        timestamps: list,
+        sample_rate: int = 16000
+    ) -> np.ndarray:
         """
         从音频中提取语音段落（别名方法，保持 API 一致性）
-        
+
         Args:
             audio: 完整音频数据
             timestamps: 语音时间戳列表
-            
+            sample_rate: 采样率（Hz）
+
         Returns:
             np.ndarray: 提取的语音段落
         """
-        return self.extract_speech_segments(audio, timestamps)
+        return self.extract_speech_segments(audio, timestamps, sample_rate=sample_rate)
 
     def is_speech_present(self, audio: np.ndarray, sample_rate: int = 16000) -> bool:
         """

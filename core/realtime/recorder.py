@@ -41,6 +41,13 @@ class RealtimeRecorder:
                 "Audio capture not available. Real-time recording features will remain disabled."
             )
 
+        # 默认采样率
+        self.sample_rate = 16000
+        if self.audio_capture is not None:
+            capture_rate = getattr(self.audio_capture, 'sample_rate', None)
+            if isinstance(capture_rate, (int, float)) and capture_rate > 0:
+                self.sample_rate = int(capture_rate)
+
         # 录制状态
         self.is_recording = False
         self.recording_start_time = None
@@ -134,6 +141,17 @@ class RealtimeRecorder:
 
         # 保存选项
         self.current_options = options or {}
+
+        # 同步采样率设置（优先使用选项覆盖，其次使用音频采集配置）
+        option_rate = self.current_options.get('sample_rate')
+        if isinstance(option_rate, (int, float)) and option_rate > 0:
+            self.sample_rate = int(option_rate)
+        elif self.audio_capture is not None:
+            capture_rate = getattr(self.audio_capture, 'sample_rate', None)
+            if isinstance(capture_rate, (int, float)) and capture_rate > 0:
+                self.sample_rate = int(capture_rate)
+        else:
+            self.sample_rate = 16000
 
         # 重置状态
         self.is_recording = True
@@ -230,7 +248,9 @@ class RealtimeRecorder:
         # 使用简单的累积缓冲区，避免滑动窗口重复
         pending_audio = []  # 待处理的音频块
         min_audio_duration = 3.0  # 最小3秒音频才处理
-        
+
+        sample_rate = self.sample_rate if self.sample_rate and self.sample_rate > 0 else 16000
+
         audio_chunks_received = 0
         transcription_attempts = 0
         last_transcription = ""  # 记录上一次转录结果，用于去重
@@ -251,12 +271,12 @@ class RealtimeRecorder:
 
                 # 计算待处理音频的总时长
                 total_samples = sum(len(chunk) for chunk in pending_audio)
-                pending_duration = total_samples / 16000
-                
+                pending_duration = total_samples / sample_rate
+
                 # 检查是否有足够的音频需要处理
                 if pending_duration >= min_audio_duration:
                     logger.info(f"Processing accumulated audio: {pending_duration:.2f}s")
-                    
+
                     # 合并所有待处理的音频
                     window_audio = np.concatenate(pending_audio)
 
@@ -267,14 +287,14 @@ class RealtimeRecorder:
                         if vad is not None:
                             try:
                                 speech_timestamps = vad.detect_speech(
-                                    window_audio, 16000
+                                    window_audio, sample_rate
                                 )
                                 logger.debug(f"VAD detected {len(speech_timestamps)} speech segments")
 
                                 if speech_timestamps:
                                     # 提取语音段落
                                     speech_audio = vad.extract_speech(
-                                        window_audio, speech_timestamps
+                                        window_audio, speech_timestamps, sample_rate=sample_rate
                                     )
                                 else:
                                     logger.debug("No speech detected by VAD, skipping transcription")
@@ -506,7 +526,8 @@ class RealtimeRecorder:
             temp_path = self.file_manager.get_temp_path(filename)
 
             # 写入音频数据
-            sf.write(temp_path, audio_data, 16000)
+            write_rate = self.sample_rate if self.sample_rate and self.sample_rate > 0 else 16000
+            sf.write(temp_path, audio_data, write_rate)
 
             # 移动到最终位置
             with open(temp_path, 'rb') as f:
