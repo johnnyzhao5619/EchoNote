@@ -448,15 +448,22 @@ Transcribe an audio file.
 
 ```python
 @abstractmethod
-async def transcribe_stream(audio_chunk: np.ndarray, language: str = None) -> str
+async def transcribe_stream(
+    audio_chunk: np.ndarray,
+    language: str = None,
+    *,
+    sample_rate: int | None = None,
+    **kwargs,
+) -> str
 ```
 
 Transcribe audio stream chunk.
 
 **Parameters:**
 
-- `audio_chunk` (np.ndarray): Audio data (16kHz, mono)
+- `audio_chunk` (np.ndarray): Audio data (mono)
 - `language` (str, optional): Language code
+- `sample_rate` (int, optional): Actual sampling rate passed through to engines
 
 **Returns:**
 

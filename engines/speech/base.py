@@ -5,8 +5,46 @@
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, AsyncIterator
+from typing import Dict, List, Optional, Tuple
 import numpy as np
+
+
+def ensure_audio_sample_rate(
+    audio_chunk: np.ndarray,
+    source_rate: Optional[int],
+    target_rate: Optional[int]
+) -> Tuple[np.ndarray, Optional[int]]:
+    """确保音频数据与目标采样率一致。
+
+    Args:
+        audio_chunk: 原始音频数据。
+        source_rate: 音频的实际采样率。
+        target_rate: 需要输出的目标采样率；如果为 None 则保持原始采样率。
+
+    Returns:
+        Tuple[np.ndarray, Optional[int]]: 处理后的音频数据及其采样率。
+    """
+    if audio_chunk.size == 0:
+        return audio_chunk, target_rate or source_rate
+
+    if source_rate is None or source_rate <= 0:
+        source_rate = target_rate
+
+    if target_rate is None or target_rate <= 0 or source_rate == target_rate:
+        return audio_chunk, source_rate
+
+    duration = audio_chunk.shape[0] / float(source_rate)
+    if duration == 0:
+        return audio_chunk, target_rate
+
+    target_length = max(1, int(round(duration * target_rate)))
+    if target_length == audio_chunk.shape[0]:
+        return audio_chunk, target_rate
+
+    source_positions = np.linspace(0.0, duration, num=audio_chunk.shape[0], endpoint=False)
+    target_positions = np.linspace(0.0, duration, num=target_length, endpoint=False)
+    resampled = np.interp(target_positions, source_positions, audio_chunk).astype(np.float32)
+    return resampled, target_rate
 
 
 class SpeechEngine(ABC):
@@ -60,15 +98,20 @@ class SpeechEngine(ABC):
         pass
 
     @abstractmethod
-    async def transcribe_stream(self, audio_chunk: np.ndarray, language: Optional[str] = None, **kwargs) -> str:
+    async def transcribe_stream(
+        self,
+        audio_chunk: np.ndarray,
+        language: Optional[str] = None,
+        **kwargs
+    ) -> str:
         """
         转录音频流（实时转录）
-        
+
         Args:
-            audio_chunk: 音频数据块（numpy array，采样率 16kHz）
+            audio_chunk: 音频数据块（numpy array）
             language: 源语言代码（可选）
-            **kwargs: 引擎特定的额外参数
-            
+            **kwargs: 引擎特定的额外参数（如 sample_rate）
+
         Returns:
             str: 转录文本片段
         """

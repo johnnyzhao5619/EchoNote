@@ -130,7 +130,7 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 - Choose the input device and gain level; enable VAD to filter silence.
 - Monitor live transcripts, add markers, and track elapsed time.
 - When stopping, recordings and transcripts are saved to `~/Documents/EchoNote/` directories.
-- The capture sample rate inherits from your selected device (or AudioCapture configuration). Adjust the device settings if you need a different rate.
+- The capture sample rate inherits from your selected device or an explicit override. Custom rates are applied to the microphone driver before capture; real-time engines auto-resample local models to 16 kHz and forward true rates to cloud APIs.
 
 > **Quick path:** `Real-time Record → Select microphone → Pick model → Start → Stop → Export`
 
@@ -140,7 +140,7 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 - 选择音频输入设备与增益值，必要时启用 VAD 减少静音片段。
 - 录制过程中可即时查看转录文本并打标签。
 - 停止录制后，文件与文本会自动保存至 `~/Documents/EchoNote/` 对应目录。
-- 采样率会沿用所选输入设备（或 AudioCapture 配置），如需调整请在系统或设备设置中修改。
+- 采样率默认沿用所选输入设备，可在录制选项中显式覆盖。自定义值会先应用到麦克风驱动，本地模型自动重采样到 16 kHz，云端接口则携带真实采样率。
 
 > **快捷路径：** `实时录制 → 选择麦克风 → 选择模型 → 开始 → 停止 → 导出`
 
@@ -152,7 +152,7 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 - Sélectionnez le périphérique d’entrée et le gain ; activez VAD pour filtrer le silence.
 - Surveillez la transcription en direct, ajoutez des marqueurs et suivez le temps écoulé.
 - À l’arrêt, enregistrements et transcriptions sont stockés dans `~/Documents/EchoNote/`.
-- La fréquence d’échantillonnage suit le périphérique choisi (ou la configuration AudioCapture). Modifiez les réglages du périphérique pour utiliser une autre valeur.
+- La fréquence d’échantillonnage suit le périphérique choisi ou une valeur forcée. Les micros sont configurés avant capture, les modèles locaux sont rééchantillonnés à 16 kHz et les API cloud reçoivent la fréquence réelle.
 
 > **Chemin rapide :** `Real-time Record → Choisir micro → Sélectionner modèle → Démarrer → Arrêter → Exporter`
 

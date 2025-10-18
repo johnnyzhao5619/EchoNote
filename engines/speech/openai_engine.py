@@ -295,6 +295,7 @@ class OpenAIEngine(SpeechEngine):
         self,
         audio_chunk: np.ndarray,
         language: Optional[str] = None,
+        sample_rate: Optional[int] = None,
         **kwargs
     ) -> str:
         """
@@ -304,8 +305,9 @@ class OpenAIEngine(SpeechEngine):
         建议使用 faster-whisper 引擎进行实时转录以获得更好的性能。
 
         Args:
-            audio_chunk: 音频数据块（numpy array，采样率 16kHz）
+            audio_chunk: 音频数据块（numpy array）
             language: 源语言代码（可选）
+            sample_rate: 音频采样率（Hz）
             **kwargs: 引擎特定的额外参数
 
         Returns:
@@ -315,14 +317,16 @@ class OpenAIEngine(SpeechEngine):
         import soundfile as sf
 
         # 检查音频长度（至少需要 1 秒的音频）
-        if len(audio_chunk) < 16000:
+        effective_rate = sample_rate if sample_rate and sample_rate > 0 else 16000
+
+        if len(audio_chunk) < effective_rate:
             logger.debug(
                 f"Audio chunk too short ({len(audio_chunk)} samples), "
                 "skipping transcription"
             )
             return ""
 
-        chunk_duration = len(audio_chunk) / 16000
+        chunk_duration = len(audio_chunk) / float(effective_rate)
         logger.debug(
             f"Transcribing audio stream with OpenAI: "
             f"length={len(audio_chunk)} samples ({chunk_duration:.2f}s)"
@@ -336,10 +340,11 @@ class OpenAIEngine(SpeechEngine):
 
         try:
             # 写入音频文件
-            sf.write(tmp_path, audio_chunk, 16000)
+            sf.write(tmp_path, audio_chunk, effective_rate)
 
             # 转录临时文件
-            result = await self.transcribe_file(tmp_path, language, **kwargs)
+            stream_kwargs = {**kwargs, 'sample_rate': effective_rate}
+            result = await self.transcribe_file(tmp_path, language, **stream_kwargs)
 
             # 合并所有段落的文本
             text = " ".join([seg["text"] for seg in result["segments"]])
