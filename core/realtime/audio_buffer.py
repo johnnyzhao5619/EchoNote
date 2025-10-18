@@ -5,10 +5,11 @@
 """
 
 import logging
-from typing import Optional
-import numpy as np
-from collections import deque
 import threading
+from collections import deque
+from itertools import islice
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -47,10 +48,10 @@ class AudioBuffer:
             audio_chunk: 音频数据（numpy array）
         """
         with self.lock:
-            # 将音频块的每个样本添加到 deque
-            for sample in audio_chunk:
-                self.buffer.append(sample)
-            
+            # 使用 extend 批量写入，避免逐样本循环带来的锁竞争
+            chunk_iter = audio_chunk.astype(np.float32, copy=False).flat
+            self.buffer.extend(chunk_iter)
+
             self.total_samples_added += len(audio_chunk)
             
             logger.debug(f"Added {len(audio_chunk)} samples to buffer (total: {len(self.buffer)})")
@@ -86,12 +87,17 @@ class AudioBuffer:
             
             end_pos = min(end_pos, buffer_size)
             
-            # 提取窗口数据
-            window_data = list(self.buffer)[start_pos:end_pos]
-            
-            logger.debug(f"Retrieved window: duration={duration_seconds}s, offset={offset_seconds}s, samples={len(window_data)}")
-            
-            return np.array(window_data, dtype=np.float32)
+            # 仅在需要的片段上迭代，避免完整拷贝
+            window_length = end_pos - start_pos
+            window_iter = islice(self.buffer, start_pos, end_pos)
+
+            window_array = np.fromiter(window_iter, dtype=np.float32, count=window_length)
+
+            logger.debug(
+                f"Retrieved window: duration={duration_seconds}s, offset={offset_seconds}s, samples={len(window_array)}"
+            )
+
+            return window_array
 
     def get_latest(self, duration_seconds: float) -> np.ndarray:
         """
@@ -113,10 +119,12 @@ class AudioBuffer:
             np.ndarray: 所有音频数据
         """
         with self.lock:
-            if len(self.buffer) == 0:
+            buffer_size = len(self.buffer)
+
+            if buffer_size == 0:
                 return np.array([], dtype=np.float32)
-            
-            return np.array(list(self.buffer), dtype=np.float32)
+
+            return np.fromiter(self.buffer, dtype=np.float32, count=buffer_size)
 
     def get_sliding_windows(self, window_duration_seconds: float, 
                            overlap_seconds: float = 0.0) -> list:
@@ -137,19 +145,22 @@ class AudioBuffer:
                 return []
             
             window_samples = int(window_duration_seconds * self.sample_rate)
+            if window_samples <= 0:
+                logger.warning("Invalid window duration: duration must be positive")
+                return []
+
             step_samples = int((window_duration_seconds - overlap_seconds) * self.sample_rate)
-            
+
             if step_samples <= 0:
                 logger.warning("Invalid overlap: overlap must be less than window duration")
                 return []
             
             windows = []
-            buffer_list = list(self.buffer)
-            
+            buffer_array = np.fromiter(self.buffer, dtype=np.float32, count=buffer_size)
+
             for start_pos in range(0, buffer_size - window_samples + 1, step_samples):
                 end_pos = start_pos + window_samples
-                window_data = buffer_list[start_pos:end_pos]
-                windows.append(np.array(window_data, dtype=np.float32))
+                windows.append(buffer_array[start_pos:end_pos].copy())
             
             logger.debug(f"Generated {len(windows)} sliding windows")
             return windows

@@ -257,6 +257,11 @@ pytest tests/e2e_performance_test.py
 ```
 Add new tests under `tests/unit/` or `tests/integration/` alongside fixtures in `tests/fixtures/`. Prefer deterministic inputs; rely on the existing secrets abstraction rather than hard-coding credentials.
 
+### Performance Notes
+- **Audio buffer operations** – `core/realtime/audio_buffer.AudioBuffer` 使用 `deque.extend` 和 `numpy.fromiter` 避免逐样本锁竞争与整缓冲复制。追加数据时务必传入一维 `numpy.ndarray`，窗口读取应优先通过 `get_window`/`get_sliding_windows`，让内部仅对所需片段迭代。
+- **Window sizing** – 窗口长度和重叠计算使用采样率转换为样本数，确保 `overlap_seconds < window_duration_seconds`，否则内部会直接返回空列表并记录警告。
+- **线程安全** – `AudioBuffer` 对所有公共方法加锁，批量写入越大，锁的占用时间越短；如果需要更高吞吐量，优先合并小帧后再调用 `append`。
+
 ### Linters & Formatters
 ```bash
 # Run the full pre-commit suite on staged changes
