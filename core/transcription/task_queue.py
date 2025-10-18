@@ -94,7 +94,7 @@ class TaskQueue:
         # Add to queue
         await self.queue.put(task_id)
         logger.info(f"Task {task_id} added to queue")
-    
+
     async def start(self):
         """Start processing tasks from the queue."""
         if self.running:
@@ -191,11 +191,37 @@ class TaskQueue:
             self.queue.task_done()
         
         logger.debug(f"Worker {worker_id} stopped")
-    
+
+    def _release_task_resources(self, task_id: str):
+        """Remove task bookkeeping and release references."""
+        removed = self.tasks.pop(task_id, None)
+        if removed is None:
+            logger.debug(f"No resources to release for task {task_id}")
+
+    def _finalize_task(
+        self,
+        task_id: str,
+        *,
+        status: TaskStatus,
+        result: Any = None,
+        error: Optional[str] = None
+    ):
+        """Finalize a task and clean up internal references."""
+        task_info = self.tasks.get(task_id)
+        if not task_info:
+            logger.debug(f"Finalize requested for unknown task {task_id}")
+            return
+
+        task_info['status'] = status
+        task_info['result'] = result
+        task_info['error'] = error
+
+        self._release_task_resources(task_id)
+
     async def _process_task(self, task_id: str, worker_id: int):
         """
         Process a single task with retry logic.
-        
+
         Args:
             task_id: Task identifier
             worker_id: Worker identifier for logging
@@ -203,22 +229,25 @@ class TaskQueue:
         if task_id not in self.tasks:
             logger.error(f"Task {task_id} not found in tasks dict")
             return
-        
+
         task_info = self.tasks[task_id]
-        
+
         # Check if task was cancelled
         if task_info['cancel_event'].is_set():
-            task_info['status'] = TaskStatus.CANCELLED
             logger.info(f"Task {task_id} was cancelled before processing")
+            self._finalize_task(task_id, status=TaskStatus.CANCELLED)
             return
-        
+
         # Acquire semaphore to limit concurrency
         async with self.semaphore:
             # Update status
             task_info['status'] = TaskStatus.PROCESSING
             logger.info(f"Worker {worker_id} processing task {task_id}")
-            
+
             # Retry loop
+            final_status: Optional[TaskStatus] = None
+            final_result: Any = None
+            final_error: Optional[str] = None
             while task_info['retry_count'] <= self.max_retries:
                 try:
                     # Execute task function
@@ -226,29 +255,32 @@ class TaskQueue:
                         *task_info['args'],
                         **task_info['kwargs']
                     )
-                    
+
                     # Check if cancelled during execution
                     if task_info['cancel_event'].is_set():
-                        task_info['status'] = TaskStatus.CANCELLED
+                        final_status = TaskStatus.CANCELLED
+                        final_result = None
+                        final_error = None
                         logger.info(
                             f"Task {task_id} was cancelled during processing"
                         )
                     else:
-                        task_info['status'] = TaskStatus.COMPLETED
-                        task_info['result'] = result
+                        final_status = TaskStatus.COMPLETED
+                        final_result = result
+                        final_error = None
                         logger.info(f"Task {task_id} completed successfully")
-                    
+
                     # Success, break retry loop
                     break
-                    
+
                 except Exception as e:
                     task_info['retry_count'] += 1
-                    task_info['error'] = str(e)
-                    
+                    final_error = str(e)
+
                     if task_info['retry_count'] <= self.max_retries:
                         # Calculate exponential backoff delay
                         delay = self.retry_delay * (2 ** (task_info['retry_count'] - 1))
-                        
+
                         logger.warning(
                             f"Task {task_id} failed (attempt "
                             f"{task_info['retry_count']}/{self.max_retries}): {e}. "
@@ -259,18 +291,30 @@ class TaskQueue:
                         await asyncio.sleep(delay)
                     else:
                         # Max retries exceeded
-                        task_info['status'] = TaskStatus.FAILED
+                        final_status = TaskStatus.FAILED
                         logger.error(
                             f"Task {task_id} failed after {self.max_retries} "
                             f"retries: {e}",
                             exc_info=True
                         )
                         break
-    
+
+            if final_status in {
+                TaskStatus.COMPLETED,
+                TaskStatus.FAILED,
+                TaskStatus.CANCELLED
+            }:
+                self._finalize_task(
+                    task_id,
+                    status=final_status,
+                    result=final_result,
+                    error=final_error
+                )
+
     def get_status(self, task_id: str) -> Optional[str]:
         """
         Get the status of a task.
-        
+
         Args:
             task_id: Task identifier
         
@@ -278,8 +322,11 @@ class TaskQueue:
             Task status string, or None if task not found
         """
         if task_id not in self.tasks:
+            logger.info(
+                f"Task {task_id} status requested but not found; it may have been finalized"
+            )
             return None
-        
+
         return self.tasks[task_id]['status'].value
     
     def get_task_info(self, task_id: str) -> Optional[Dict[str, Any]]:
@@ -293,6 +340,9 @@ class TaskQueue:
             Dict with task info, or None if task not found
         """
         if task_id not in self.tasks:
+            logger.info(
+                f"Task {task_id} info requested but not found; it may have been finalized"
+            )
             return None
         
         task_info = self.tasks[task_id]
