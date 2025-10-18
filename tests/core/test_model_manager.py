@@ -21,7 +21,9 @@ class _StubConfig:
     def __init__(self, overrides: Dict[str, Any]):
         import json
 
-        default_path = Path(__file__).resolve().parents[1] / "config" / "default_config.json"
+        # 默认配置文件位于项目根目录下的 config/default_config.json，
+        # 这里通过测试文件相对于项目根路径的层级关系推导出真实路径。
+        default_path = Path(__file__).resolve().parents[2] / "config" / "default_config.json"
         with open(default_path, "r", encoding="utf-8") as fh:
             self._defaults = json.load(fh)
         self._overrides = overrides
