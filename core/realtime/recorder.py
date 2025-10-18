@@ -638,6 +638,31 @@ class RealtimeRecorder:
             logger.warning("No translation data to save")
             return ""
 
+        # 合并所有翻译文本
+        full_translation = "\n".join(self.accumulated_translation)
+
+        # 生成文件名
+        timestamp = self.recording_start_time.strftime("%Y%m%d_%H%M%S")
+        target_lang = self.current_options.get('target_language', 'en')
+        filename = f"translation_{target_lang}_{timestamp}.txt"
+
+        # 保存文件
+        try:
+            final_path = self.file_manager.save_text_file(
+                full_translation,
+                filename,
+                subdirectory='Translations'
+            )
+
+            logger.info(f"Translation saved: {final_path}")
+            return final_path
+
+        except Exception as e:
+            logger.error(f"Failed to save translation: {e}")
+            if self.on_error:
+                self.on_error(f"Failed to save translation: {e}")
+            return ""
+
     def _save_markers(self) -> str:
         """保存标记数据到文件"""
         if not self.markers or not self.recording_start_time:
@@ -665,31 +690,6 @@ class RealtimeRecorder:
             logger.error(f"Failed to save markers: {e}")
             if self.on_error:
                 self.on_error(f"Failed to save markers: {e}")
-            return ""
-
-        # 合并所有翻译文本
-        full_translation = "\n".join(self.accumulated_translation)
-
-        # 生成文件名
-        timestamp = self.recording_start_time.strftime("%Y%m%d_%H%M%S")
-        target_lang = self.current_options.get('target_language', 'en')
-        filename = f"translation_{target_lang}_{timestamp}.txt"
-
-        # 保存文件
-        try:
-            final_path = self.file_manager.save_text_file(
-                full_translation,
-                filename,
-                subdirectory='Translations'
-            )
-
-            logger.info(f"Translation saved: {final_path}")
-            return final_path
-
-        except Exception as e:
-            logger.error(f"Failed to save translation: {e}")
-            if self.on_error:
-                self.on_error(f"Failed to save translation: {e}")
             return ""
 
     def add_marker(self, label: Optional[str] = None) -> Optional[Dict[str, Any]]:

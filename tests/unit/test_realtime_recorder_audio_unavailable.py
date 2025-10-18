@@ -563,3 +563,54 @@ def test_translation_stream_emits_segments(monkeypatch):
     assert translation_engine.calls == 1
     assert translation_engine.arguments[-1][1] == options.get('language', 'auto')
     assert translation_engine.arguments[-1][2] == 'en'
+
+
+def test_stop_recording_persists_translation_file(monkeypatch, tmp_path):
+    from core.realtime.recorder import RealtimeRecorder
+
+    monkeypatch.setattr("engines.audio.vad.VADDetector", AlwaysSpeechVAD)
+
+    audio_capture = DummyAudioCapture(sample_rate=16000)
+    speech_engine = DummyStreamingSpeechEngine()
+    translation_engine = DummyTranslationEngine()
+    file_manager = DummyFileManager(base_dir=tmp_path)
+
+    recorder = RealtimeRecorder(
+        audio_capture=audio_capture,
+        speech_engine=speech_engine,
+        translation_engine=translation_engine,
+        db_connection=None,
+        file_manager=file_manager,
+    )
+
+    options = {
+        'save_recording': False,
+        'save_transcript': False,
+        'create_calendar_event': False,
+        'enable_translation': True,
+        'target_language': 'en',
+    }
+
+    async def _run():
+        loop = asyncio.get_running_loop()
+        await recorder.start_recording(options=options, event_loop=loop)
+        assert audio_capture.callback is not None
+
+        translated_text = await translation_engine.translate(
+            "transcription-1",
+            source_lang=options.get('language', 'auto'),
+            target_lang=options['target_language'],
+        )
+        recorder.accumulated_translation.append(translated_text)
+
+        return await recorder.stop_recording()
+
+    result = asyncio.run(_run())
+
+    translation_path = result.get('translation_path')
+    assert translation_path, "Expected translation_path in stop_recording result"
+
+    saved_path = Path(translation_path)
+    assert saved_path.exists()
+    content = saved_path.read_text(encoding='utf-8').strip()
+    assert "transcription-1-to-en" in content
