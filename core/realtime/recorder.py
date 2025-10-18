@@ -12,6 +12,8 @@ from typing import Optional, Dict, AsyncIterator, Callable
 import numpy as np
 import soundfile as sf
 
+from core.realtime.audio_buffer import AudioBuffer
+
 logger = logging.getLogger(__name__)
 
 
@@ -52,6 +54,7 @@ class RealtimeRecorder:
         self.is_recording = False
         self.recording_start_time = None
         self.recording_audio_buffer = []
+        self.audio_buffer: Optional[AudioBuffer] = None
 
         # 转录和翻译队列
         self.transcription_queue = asyncio.Queue()
@@ -157,6 +160,7 @@ class RealtimeRecorder:
         self.is_recording = True
         self.recording_start_time = datetime.now()
         self.recording_audio_buffer = []
+        self.audio_buffer = AudioBuffer(sample_rate=self.sample_rate)
         self.accumulated_transcription = []
         self.accumulated_translation = []
 
@@ -245,11 +249,14 @@ class RealtimeRecorder:
             logger.warning(f"Failed to initialize VAD: {e}. Will process all audio without VAD.")
             # 不返回，继续处理但不使用 VAD
 
-        # 使用简单的累积缓冲区，避免滑动窗口重复
-        pending_audio = []  # 待处理的音频块
-        min_audio_duration = 3.0  # 最小3秒音频才处理
-
         sample_rate = self.sample_rate if self.sample_rate and self.sample_rate > 0 else 16000
+
+        audio_buffer = self.audio_buffer
+        if audio_buffer is None:
+            audio_buffer = AudioBuffer(sample_rate=sample_rate)
+            self.audio_buffer = audio_buffer
+
+        min_audio_duration = 3.0  # 最小3秒音频才处理
 
         audio_chunks_received = 0
         transcription_attempts = 0
@@ -266,19 +273,18 @@ class RealtimeRecorder:
                 audio_chunks_received += 1
                 logger.debug(f"Received audio chunk #{audio_chunks_received}, size: {len(audio_chunk)}")
 
-                # 添加到待处理缓冲区
-                pending_audio.append(audio_chunk)
+                # 添加到音频缓冲区
+                audio_buffer.append(audio_chunk)
 
                 # 计算待处理音频的总时长
-                total_samples = sum(len(chunk) for chunk in pending_audio)
-                pending_duration = total_samples / sample_rate
+                pending_duration = audio_buffer.get_duration()
 
                 # 检查是否有足够的音频需要处理
                 if pending_duration >= min_audio_duration:
                     logger.info(f"Processing accumulated audio: {pending_duration:.2f}s")
 
-                    # 合并所有待处理的音频
-                    window_audio = np.concatenate(pending_audio)
+                    # 获取满足最小时长的音频窗口
+                    window_audio = audio_buffer.get_latest(pending_duration)
 
                     if len(window_audio) > 0:
                         logger.debug(f"Window audio size: {len(window_audio)} samples")
@@ -299,7 +305,7 @@ class RealtimeRecorder:
                                 else:
                                     logger.debug("No speech detected by VAD, skipping transcription")
                                     # 清空待处理缓冲区，继续等待新的音频
-                                    pending_audio.clear()
+                                    audio_buffer.clear()
                                     continue
                             except Exception as e:
                                 logger.warning(f"VAD detection failed: {e}, processing all audio")
@@ -356,7 +362,7 @@ class RealtimeRecorder:
                                 self.on_error(f"Transcription error: {e}")
 
                     # 清空待处理缓冲区（已处理完成）
-                    pending_audio.clear()
+                    audio_buffer.clear()
 
             except asyncio.TimeoutError:
                 # 超时，继续等待
@@ -470,6 +476,10 @@ class RealtimeRecorder:
         duration = (
             recording_end_time - self.recording_start_time
         ).total_seconds()
+
+        if self.audio_buffer is not None:
+            self.audio_buffer.clear()
+            self.audio_buffer = None
 
         result = {
             'duration': duration,
