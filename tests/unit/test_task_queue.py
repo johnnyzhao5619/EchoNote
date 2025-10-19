@@ -96,3 +96,37 @@ def test_failed_task_removed_after_retries():
             await queue.stop()
 
     asyncio.run(_run())
+
+
+def test_pause_after_dequeue_allows_completion():
+    async def _run():
+        queue = TaskQueue(max_concurrent=1, max_retries=0)
+
+        task_started = asyncio.Event()
+
+        async def sample_task():
+            task_started.set()
+            await asyncio.sleep(0)
+
+        try:
+            await queue.start()
+            await asyncio.sleep(0)
+
+            await queue.pause()
+            await queue.add_task("pause-resume", sample_task)
+
+            await asyncio.sleep(0.05)
+            assert not task_started.is_set()
+
+            await queue.resume()
+
+            await asyncio.wait_for(task_started.wait(), timeout=1)
+            await asyncio.wait_for(queue.wait_for_completion(), timeout=1)
+
+            assert queue.get_status("pause-resume") is None
+            assert "pause-resume" not in queue.tasks
+            assert queue.get_queue_size() == 0
+        finally:
+            await queue.stop()
+
+    asyncio.run(_run())
