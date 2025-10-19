@@ -200,17 +200,17 @@ class CalendarEvent:
         if source:
             query = """
                 SELECT * FROM calendar_events
-                WHERE start_time >= ? AND end_time <= ? AND source = ?
+                WHERE start_time < ? AND end_time > ? AND source = ?
                 ORDER BY start_time
             """
-            result = db_connection.execute(query, (start_time, end_time, source))
+            result = db_connection.execute(query, (end_time, start_time, source))
         else:
             query = """
                 SELECT * FROM calendar_events
-                WHERE start_time >= ? AND end_time <= ?
+                WHERE start_time < ? AND end_time > ?
                 ORDER BY start_time
             """
-            result = db_connection.execute(query, (start_time, end_time))
+            result = db_connection.execute(query, (end_time, start_time))
         
         return [CalendarEvent.from_db_row(row) for row in result]
     
