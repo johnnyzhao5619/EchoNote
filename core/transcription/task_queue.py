@@ -258,6 +258,7 @@ class TaskQueue:
             final_status: Optional[TaskStatus] = None
             final_result: Any = None
             final_error: Optional[str] = None
+            cancelled_exc: Optional[asyncio.CancelledError] = None
             while task_info['retry_count'] <= self.max_retries:
                 try:
                     # Execute task function
@@ -281,6 +282,14 @@ class TaskQueue:
                         logger.info(f"Task {task_id} completed successfully")
 
                     # Success, break retry loop
+                    break
+
+                except asyncio.CancelledError as exc:
+                    final_status = TaskStatus.CANCELLED
+                    final_result = None
+                    final_error = None
+                    cancelled_exc = exc
+                    logger.info(f"Task {task_id} was cancelled during processing")
                     break
 
                 except Exception as e:
@@ -320,6 +329,9 @@ class TaskQueue:
                     result=final_result,
                     error=final_error
                 )
+
+            if cancelled_exc is not None:
+                raise cancelled_exc
 
     def get_status(self, task_id: str) -> Optional[str]:
         """

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import sys
 from pathlib import Path
 
@@ -128,5 +129,54 @@ def test_pause_after_dequeue_allows_completion():
             assert queue.get_queue_size() == 0
         finally:
             await queue.stop()
-
+    
     asyncio.run(_run())
+
+
+def test_running_task_cancelled_by_stop(caplog):
+    async def _run():
+        queue = TaskQueue(max_concurrent=1, max_retries=1, retry_delay=0)
+
+        task_started = asyncio.Event()
+
+        async def long_running_task():
+            task_started.set()
+            await asyncio.sleep(10)
+
+        try:
+            await queue.start()
+            await queue.add_task("task-stop-cancel", long_running_task)
+
+            await asyncio.wait_for(task_started.wait(), timeout=1)
+
+            wait_task = asyncio.create_task(queue.wait_for_completion())
+
+            await asyncio.sleep(0)
+
+            await queue.stop()
+
+            await asyncio.wait_for(wait_task, timeout=1)
+
+            assert queue.get_status("task-stop-cancel") is None
+            assert "task-stop-cancel" not in queue.tasks
+        finally:
+            await queue.stop()
+
+    with caplog.at_level(logging.INFO, logger="echonote.transcription.task_queue"):
+        asyncio.run(_run())
+
+    task_logs = [
+        record for record in caplog.records
+        if record.name == "echonote.transcription.task_queue"
+        and "task-stop-cancel" in record.getMessage()
+    ]
+
+    assert any(
+        "cancelled" in record.getMessage().lower()
+        for record in task_logs
+    ), "Cancellation log not found"
+
+    assert not any(
+        "failed" in record.getMessage().lower()
+        for record in task_logs
+    ), "Failure log detected for cancelled task"
