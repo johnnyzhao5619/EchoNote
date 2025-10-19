@@ -140,6 +140,9 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 - Supported recording formats: WAV (built-in) and MP3. MP3 export requires a
   working FFmpeg installation; when FFmpeg is missing the recorder automatically
   saves as WAV and surfaces a warning.
+- Automatic calendar event creation requires a valid database connection. When
+  the database is unavailable the recorder logs the issue and skips the calendar
+  step without interrupting export.
 
 <details>
 <summary>中文</summary>
@@ -153,6 +156,8 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 
 - 支持的录音格式：内置 WAV，MP3 需要系统可执行的 FFmpeg。如未检测到 FFmpeg，录制会自动以
   WAV 保存并提示警告。
+- 自动创建日历事件需要配置可用的数据库连接；若未配置，系统会记录说明并跳过该步骤，
+  不会影响音频与文本导出。
 - 「设置 → 实时录制」中的“录音格式 / 自动保存录音”会立即作用于实时录制页面，无需重启应用或重新打开页面。
 
 </details>

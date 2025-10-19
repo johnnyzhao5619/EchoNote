@@ -186,6 +186,69 @@ def test_stop_recording_without_start():
     assert result == {}
 
 
+def test_stop_recording_without_database_skips_calendar_event(monkeypatch):
+    from core.realtime.recorder import RealtimeRecorder
+
+    monkeypatch.setattr("engines.audio.vad.VADDetector", AlwaysSpeechVAD)
+
+    audio_capture = DummyAudioCapture()
+    recorder = RealtimeRecorder(
+        audio_capture=audio_capture,
+        speech_engine=DummySpeechEngine(),
+        translation_engine=None,
+        db_connection=None,
+        file_manager=DummyFileManager(),
+    )
+
+    errors: list[str] = []
+    recorder.set_callbacks(on_error=errors.append)
+
+    options = {
+        'save_recording': False,
+        'save_transcript': False,
+        'create_calendar_event': True,
+        'enable_translation': False,
+    }
+
+    async def _run():
+        loop = asyncio.get_running_loop()
+        await recorder.start_recording(options=options, event_loop=loop)
+        return await recorder.stop_recording()
+
+    result = asyncio.run(_run())
+
+    assert 'event_id' not in result
+    assert errors == []
+
+
+def test_create_calendar_event_requires_database_connection():
+    from core.realtime.recorder import RealtimeRecorder
+
+    recorder = RealtimeRecorder(
+        audio_capture=None,
+        speech_engine=DummySpeechEngine(),
+        translation_engine=None,
+        db_connection=None,
+        file_manager=DummyFileManager(),
+    )
+
+    warnings: list[str] = []
+    recorder.set_callbacks(on_error=warnings.append)
+
+    now = datetime.now()
+    recorder.recording_start_time = now
+
+    result = asyncio.run(recorder._create_calendar_event({
+        'start_time': now.isoformat(),
+        'end_time': (now + timedelta(seconds=1)).isoformat(),
+        'duration': 1.0,
+    }))
+
+    assert result == ""
+    assert warnings
+    assert "database" in warnings[-1].lower()
+
+
 def test_start_recording_failure_rolls_back_state():
     from core.realtime.recorder import RealtimeRecorder
 
