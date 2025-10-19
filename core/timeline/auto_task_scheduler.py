@@ -15,6 +15,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from ui.common.notification import get_notification_manager
 from data.database.models import EventAttachment
+from core.timeline.manager import to_local_naive
 
 
 logger = logging.getLogger('echonote.timeline.auto_task_scheduler')
@@ -144,14 +145,14 @@ class AutoTaskScheduler:
         This method is called every minute by the scheduler.
         """
         try:
-            now = datetime.now()
+            now_local = to_local_naive(datetime.now().astimezone())
 
             past_window_days = self._past_window_minutes / (24 * 60)
             future_window_days = self._future_window_minutes / (24 * 60)
 
             # Get events within the configured windows to drive reminders
             timeline_data = self.timeline_manager.get_timeline_events(
-                center_time=now,
+                center_time=now_local,
                 past_days=past_window_days,
                 future_days=future_window_days
             )
@@ -169,8 +170,8 @@ class AutoTaskScheduler:
                         auto_tasks.get('enable_recording')):
                     continue
 
-                event_start = datetime.fromisoformat(event.start_time)
-                time_until_start = self._seconds_until(event_start)
+                event_start = to_local_naive(event.start_time)
+                time_until_start = (event_start - now_local).total_seconds()
 
                 # Send reminder N minutes before event
                 reminder_seconds = self.reminder_minutes * 60
@@ -191,11 +192,11 @@ class AutoTaskScheduler:
             # Process past events (stop recordings)
             for event_data in past_events:
                 event = event_data['event']
-                
+
                 # Check if this event has an active recording
                 if event.id in self.active_recordings:
-                    event_end = datetime.fromisoformat(event.end_time)
-                    time_since_end = self._seconds_since(event_end)
+                    event_end = to_local_naive(event.end_time)
+                    time_since_end = (now_local - event_end).total_seconds()
                     
                     # Stop recording if event ended (within 2 minutes)
                     if 0 <= time_since_end <= 120:
@@ -203,7 +204,7 @@ class AutoTaskScheduler:
 
             # Clean up old event IDs from tracking sets
             # (events more than 1 hour old)
-            self._cleanup_tracking_sets(now)
+            self._cleanup_tracking_sets(now_local)
 
         except Exception as e:
             logger.error(f"Error checking upcoming events: {e}", exc_info=True)
@@ -382,7 +383,7 @@ class AutoTaskScheduler:
             self.active_recordings[event.id] = {
                 'event': event,
                 'auto_tasks': auto_tasks,
-                'start_time': datetime.now(),
+                'start_time': to_local_naive(datetime.now().astimezone()),
                 'loop': loop,
                 'thread': thread
             }
@@ -638,18 +639,3 @@ class AutoTaskScheduler:
         except Exception as e:
             logger.error(f"Error cleaning up tracking sets: {e}", exc_info=True)
 
-    @staticmethod
-    def _seconds_until(target: datetime) -> float:
-        """Return seconds until a target datetime, accounting for timezone."""
-        reference_now = datetime.now(
-            target.tzinfo
-        ) if target.tzinfo else datetime.now()
-        return (target - reference_now).total_seconds()
-
-    @staticmethod
-    def _seconds_since(target: datetime) -> float:
-        """Return seconds elapsed since a target datetime, accounting for timezone."""
-        reference_now = datetime.now(
-            target.tzinfo
-        ) if target.tzinfo else datetime.now()
-        return (reference_now - target).total_seconds()
