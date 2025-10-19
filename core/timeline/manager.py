@@ -1,11 +1,7 @@
-"""
-Timeline Manager for EchoNote.
-
-Manages timeline view data, auto-task configurations, and event search.
-"""
+"""Timeline Manager for EchoNote."""
 
 import logging
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 from datetime import datetime, timedelta
 
 from data.database.models import (
@@ -16,6 +12,25 @@ from data.database.models import (
 
 
 logger = logging.getLogger('echonote.timeline.manager')
+
+
+def to_local_naive(value: Union[datetime, str]) -> datetime:
+    """Convert datetime/ISO string to local-time naive datetime."""
+    if isinstance(value, str):
+        text = value.strip()
+        if text.endswith('Z'):
+            text = text[:-1] + '+00:00'
+        dt = datetime.fromisoformat(text)
+    elif isinstance(value, datetime):
+        dt = value
+    else:
+        raise TypeError(
+            f"Unsupported value type for to_local_naive: {type(value)!r}"
+        )
+
+    if dt.tzinfo is not None:
+        return dt.astimezone().replace(tzinfo=None)
+    return dt
 
 
 class TimelineManager:
@@ -65,10 +80,12 @@ class TimelineManager:
             - past_events: List of past events with artifacts
             - future_events: List of future events with auto-task configs
         """
+        center_time_local = to_local_naive(center_time)
+
         try:
             # Calculate time range
-            start_time = center_time - timedelta(days=past_days)
-            end_time = center_time + timedelta(days=future_days)
+            start_time = center_time_local - timedelta(days=past_days)
+            end_time = center_time_local + timedelta(days=future_days)
 
             # Get all events in range
             all_events = self.calendar_manager.get_events(
@@ -81,9 +98,9 @@ class TimelineManager:
             future_events = []
 
             for event in all_events:
-                event_start = datetime.fromisoformat(event.start_time)
+                event_start = to_local_naive(event.start_time)
 
-                if event_start < center_time:
+                if event_start < center_time_local:
                     # Past event - get artifacts
                     artifacts = self.get_event_artifacts(event.id)
                     past_events.append({
@@ -106,11 +123,11 @@ class TimelineManager:
 
             # Sort events
             past_events.sort(
-                key=lambda x: x['event'].start_time,
+                key=lambda x: to_local_naive(x['event'].start_time),
                 reverse=True  # Most recent first
             )
             future_events.sort(
-                key=lambda x: x['event'].start_time  # Earliest first
+                key=lambda x: to_local_naive(x['event'].start_time)
             )
 
             # Apply pagination
@@ -127,7 +144,7 @@ class TimelineManager:
             future_end = max(0, end_idx - len(past_events))
 
             result = {
-                'current_time': center_time.isoformat(),
+                'current_time': center_time_local.isoformat(),
                 'past_events': (
                     past_events[start_idx:past_end]
                     if start_idx < len(past_events) else []
@@ -148,7 +165,7 @@ class TimelineManager:
         except Exception as e:
             logger.error(f"Failed to get timeline events: {e}")
             return {
-                'current_time': center_time.isoformat(),
+                'current_time': center_time_local.isoformat(),
                 'past_events': [],
                 'future_events': [],
                 'total_count': 0,
@@ -296,12 +313,15 @@ class TimelineManager:
 
             # Apply date range filter
             if filters.get('start_date') or filters.get('end_date'):
-                start_date = filters.get('start_date', '1970-01-01')
-                end_date = filters.get('end_date', '2099-12-31')
+                start_date_value = filters.get('start_date', '1970-01-01')
+                end_date_value = filters.get('end_date', '2099-12-31')
+
+                start_dt = to_local_naive(start_date_value)
+                end_dt = to_local_naive(end_date_value)
 
                 events = [
                     e for e in events
-                    if start_date <= e.start_time <= end_date
+                    if start_dt <= to_local_naive(e.start_time) <= end_dt
                 ]
 
             # Apply attendees filter

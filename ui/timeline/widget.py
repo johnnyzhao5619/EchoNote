@@ -6,7 +6,7 @@ Displays a vertical timeline of past and future events with search and filtering
 
 import logging
 from typing import Optional, Dict, Any, List
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QScrollArea,
@@ -16,6 +16,7 @@ from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtGui import QPalette
 
 from utils.i18n import I18nQtManager
+from core.timeline.manager import to_local_naive
 
 
 logger = logging.getLogger('echonote.ui.timeline.widget')
@@ -229,7 +230,8 @@ class TimelineWidget(QWidget):
                 self.clear_timeline()
             
             # Get timeline data
-            center_time = datetime.now()
+            center_time = datetime.now().astimezone()
+            center_time_local = to_local_naive(center_time)
             
             if self.current_query:
                 # Search mode
@@ -244,9 +246,9 @@ class TimelineWidget(QWidget):
                 
                 for result in results:
                     event = result['event']
-                    event_start = datetime.fromisoformat(event.start_time)
-                    
-                    if event_start < center_time:
+                    event_start = to_local_naive(event.start_time)
+
+                    if event_start < center_time_local:
                         past_events.append(result)
                     else:
                         future_events.append({
@@ -257,7 +259,7 @@ class TimelineWidget(QWidget):
                         })
                 
                 data = {
-                    'current_time': center_time.isoformat(),
+                    'current_time': center_time_local.isoformat(),
                     'past_events': past_events,
                     'future_events': future_events,
                     'has_more': False
@@ -265,7 +267,7 @@ class TimelineWidget(QWidget):
             else:
                 # Normal timeline mode
                 data = self.timeline_manager.get_timeline_events(
-                    center_time=center_time,
+                    center_time=center_time_local,
                     past_days=30,
                     future_days=30,
                     page=self.current_page,
