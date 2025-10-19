@@ -100,7 +100,13 @@
     "marker_unavailable": "开始录制后才能添加标记。",
     "marker_failed": "未能记录标记，请重试。",
     "marker_item": "标记 {number} • {timestamp}",
-    "marker_item_with_label": "标记 {number} • {timestamp} – {label}"
+    "marker_item_with_label": "标记 {number} • {timestamp} – {label}",
+    "feedback": {
+      "error_prefix": "录制错误",
+      "success_prefix": "录制完成",
+      "success_detail": "时长 {duration}",
+      "success_detail_with_path": "时长 {duration} • 保存至 {path}"
+    }
   },
   "calendar_hub": {
     "title": "日历中心",
@@ -494,6 +500,7 @@
     "transcription_complete": "转录完成：{filename}",
     "transcription_failed": "转录失败：{filename}",
     "recording_saved": "录音已保存",
+    "recording_failed": "录制失败",
     "event_reminder": "{title} 即将开始",
     "sync_complete": "日历同步完成",
     "sync_failed": "日历同步失败"

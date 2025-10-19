@@ -100,7 +100,13 @@
     "marker_unavailable": "Start recording before adding markers.",
     "marker_failed": "Unable to capture the marker. Please try again.",
     "marker_item": "#{number} • {timestamp}",
-    "marker_item_with_label": "#{number} • {timestamp} – {label}"
+    "marker_item_with_label": "#{number} • {timestamp} – {label}",
+    "feedback": {
+      "error_prefix": "Recording error",
+      "success_prefix": "Recording saved",
+      "success_detail": "Duration {duration}",
+      "success_detail_with_path": "Duration {duration} • Saved to {path}"
+    }
   },
   "calendar_hub": {
     "title": "Calendar Hub",
@@ -496,6 +502,7 @@
     "transcription_complete": "Transcription complete: {filename}",
     "transcription_failed": "Transcription failed: {filename}",
     "recording_saved": "Recording saved",
+    "recording_failed": "Recording failed",
     "event_reminder": "{title} is about to start",
     "sync_complete": "Calendar sync complete",
     "sync_failed": "Calendar sync failed"

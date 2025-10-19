@@ -7,14 +7,16 @@
 
 import logging
 from concurrent.futures import Future
-from typing import Optional, Set
+from typing import Dict, Optional, Set
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
     QSlider, QCheckBox, QPushButton, QPlainTextEdit, QGroupBox, QListWidget
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QObject
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QObject, QThread
 import threading
+
+from ui.common.notification import get_notification_manager
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +44,9 @@ class RealtimeRecorderSignals(QObject):
     
     # Signal emitted when recording stops (for UI update)
     recording_stopped = pyqtSignal()
+
+    # Signal emitted when recording stops successfully with metadata
+    recording_succeeded = pyqtSignal(dict)
 
     # Signal emitted when a marker is added
     marker_added = pyqtSignal(object)
@@ -100,6 +105,15 @@ class RealtimeRecordWidget(QWidget):
         self._auto_save_enabled = True
         self._refresh_recording_preferences()
 
+        # 通知管理器（用于桌面通知反馈）
+        try:
+            self._notification_manager = get_notification_manager()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Notification manager unavailable: %s", exc, exc_info=True
+            )
+            self._notification_manager = None
+
         # Connect model manager signals if available
         if self.model_manager:
             self.model_manager.models_updated.connect(self._update_model_list)
@@ -147,6 +161,10 @@ class RealtimeRecordWidget(QWidget):
         )
         self.signals.recording_stopped.connect(
             self._on_recording_stopped,
+            Qt.ConnectionType.QueuedConnection
+        )
+        self.signals.recording_succeeded.connect(
+            self._on_recording_succeeded,
             Qt.ConnectionType.QueuedConnection
         )
         self.signals.marker_added.connect(
@@ -250,6 +268,13 @@ class RealtimeRecordWidget(QWidget):
         # 录制控制组
         control_group = self._create_control_group()
         layout.addWidget(control_group)
+
+        # 状态反馈标签（用于展示录制成功/失败信息）
+        self.feedback_label = QLabel()
+        self.feedback_label.setObjectName("feedback_label")
+        self.feedback_label.setWordWrap(True)
+        self.feedback_label.setVisible(False)
+        layout.addWidget(self.feedback_label)
 
         # 文本显示区域 - 使用水平分割器以避免堆叠
         text_container = self._create_text_display_container()
@@ -1049,19 +1074,64 @@ class RealtimeRecordWidget(QWidget):
             return f"{hours:02d}:{minutes:02d}:{seconds_fraction:06.3f}"
         return f"{minutes:02d}:{seconds_fraction:06.3f}"
 
+    @staticmethod
+    def _format_duration_hhmmss(duration: float) -> str:
+        total_seconds = max(int(duration), 0)
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+        seconds = total_seconds % 60
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+    def _update_status_message(self, message: str, level: str) -> None:
+        """在状态标签上更新反馈信息。"""
+        if not hasattr(self, 'feedback_label') or self.feedback_label is None:
+            return
+
+        if not message:
+            self.feedback_label.clear()
+            self.feedback_label.setVisible(False)
+            return
+
+        palette = {
+            'error': '#B3261E',
+            'success': '#1B5E20',
+            'info': '#1E88E5'
+        }
+        color = palette.get(level, '#1E88E5')
+        self.feedback_label.setStyleSheet(
+            f"color: {color}; font-weight: 600;"
+        )
+        self.feedback_label.setText(message)
+        self.feedback_label.setVisible(True)
+
     def _show_error(self, error: str):
-        """显示错误信息（UI 线程）"""
-        logger.error(f"Recording error: {error}")
-        # TODO: Show error dialog or status message
+        """显示错误信息，并确保在主线程执行。"""
+        if QThread.currentThread() != self.thread():
+            # 通过信号重新投递到主线程
+            self.signals.error_occurred.emit(error)
+            return
+
+        error_detail = error or self.i18n.t('errors.unknown_error')
+        logger.error("Recording error: %s", error_detail)
+
+        prefix = self.i18n.t('realtime_record.feedback.error_prefix')
+        label_message = f"{prefix}: {error_detail}"
+        self._update_status_message(label_message, 'error')
+
+        if self._notification_manager is not None:
+            try:
+                title = self.i18n.t('notifications.recording_failed')
+                self._notification_manager.send_error(title, error_detail)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "Failed to send error notification: %s", exc, exc_info=True
+                )
 
     def _update_status_display(self, is_recording: bool, duration: float):
         """更新状态显示（UI 线程）"""
         # 更新录制时长
-        hours = int(duration // 3600)
-        minutes = int((duration % 3600) // 60)
-        seconds = int(duration % 60)
         self.duration_value_label.setText(
-            f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+            self._format_duration_hhmmss(duration)
         )
     
     def _on_recording_started(self):
@@ -1299,11 +1369,51 @@ class RealtimeRecordWidget(QWidget):
 
             logger.info(f"Recording stopped: {result}")
 
-            # TODO: Show success notification
+            self.signals.recording_succeeded.emit(result or {})
 
         except Exception as e:
             logger.error(f"Failed to stop recording: {e}", exc_info=True)
             self.signals.error_occurred.emit(f"Failed to stop recording: {e}")
+
+    def _on_recording_succeeded(self, result: Dict):
+        """录制成功后的反馈展示（主线程）。"""
+        if not isinstance(result, dict):
+            result = {}
+
+        duration_seconds = float(result.get('duration') or 0.0)
+        duration_text = self._format_duration_hhmmss(duration_seconds)
+
+        save_path = (
+            result.get('recording_path')
+            or result.get('transcript_path')
+            or result.get('translation_path')
+            or ''
+        )
+
+        success_prefix = self.i18n.t('realtime_record.feedback.success_prefix')
+        if save_path:
+            detail = self.i18n.t(
+                'realtime_record.feedback.success_detail_with_path',
+                duration=duration_text,
+                path=save_path
+            )
+        else:
+            detail = self.i18n.t(
+                'realtime_record.feedback.success_detail',
+                duration=duration_text
+            )
+
+        label_message = f"{success_prefix}: {detail}"
+        self._update_status_message(label_message, 'success')
+
+        if self._notification_manager is not None:
+            try:
+                title = self.i18n.t('notifications.recording_saved')
+                self._notification_manager.send_success(title, detail)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "Failed to send success notification: %s", exc, exc_info=True
+                )
 
     def _export_transcription(self):
         """导出转录文本"""
