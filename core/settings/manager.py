@@ -5,7 +5,9 @@ Provides a unified interface for managing application settings with validation,
 change notifications, and persistence.
 """
 
+import copy
 import logging
+from collections.abc import Mapping
 from typing import Any, Dict, Optional
 from PyQt6.QtCore import QObject, pyqtSignal
 
@@ -49,8 +51,22 @@ class SettingsManager(QObject):
         Returns:
             Dictionary of default configuration values
         """
-        # Get defaults from the config manager's default config file
-        return self.config_manager.get_all()
+        defaults = self.config_manager.get_defaults()
+        return self._clone_defaults(defaults)
+
+    @staticmethod
+    def _clone_defaults(value: Any) -> Any:
+        """Return a deep, mutable copy of default configuration structures."""
+        if isinstance(value, Mapping):
+            return {
+                key: SettingsManager._clone_defaults(sub_value)
+                for key, sub_value in value.items()
+            }
+        if isinstance(value, tuple):
+            return [SettingsManager._clone_defaults(item) for item in value]
+        if isinstance(value, list):
+            return [SettingsManager._clone_defaults(item) for item in value]
+        return copy.deepcopy(value)
 
     def get_setting(self, key: str) -> Any:
         """
@@ -405,7 +421,7 @@ class SettingsManager(QObject):
                 # Reset all settings
                 logger.info("Resetting all settings to defaults")
                 for k, v in self._default_config.items():
-                    self.config_manager.set(k, v)
+                    self.config_manager.set(k, copy.deepcopy(v))
                 # Signal all settings changed
                 self.setting_changed.emit("*", None)
             else:
@@ -416,7 +432,7 @@ class SettingsManager(QObject):
                         f"Resetting setting '{key}' to "
                         f"default: {default_value}"
                     )
-                    self.config_manager.set(key, default_value)
+                    self.config_manager.set(key, copy.deepcopy(default_value))
                     self.setting_changed.emit(key, default_value)
                 else:
                     logger.warning(
@@ -449,7 +465,7 @@ class SettingsManager(QObject):
             else:
                 return None
 
-        return value
+        return copy.deepcopy(value)
 
     # Convenience methods for common settings
 
