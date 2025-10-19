@@ -58,6 +58,31 @@ class TranscriptionManager:
         self.speech_engine = speech_engine
         self.config = config or {}
 
+        self._default_save_path: Optional[str] = None
+        raw_default_path = self.config.get('default_save_path')
+        if isinstance(raw_default_path, (str, os.PathLike)) and raw_default_path:
+            try:
+                default_path = Path(raw_default_path).expanduser()
+                default_path = default_path.resolve()
+                default_path.mkdir(parents=True, exist_ok=True)
+                try:
+                    os.chmod(default_path, 0o700)
+                except Exception as permission_error:
+                    logger.warning(
+                        f"Could not set directory permissions for default save path {default_path}: "
+                        f"{permission_error}"
+                    )
+                self._default_save_path = str(default_path)
+            except Exception as exc:
+                logger.error(
+                    f"Failed to prepare default save path '{raw_default_path}': {exc}",
+                    exc_info=True
+                )
+        elif raw_default_path:
+            logger.warning(
+                f"Ignoring default_save_path with unsupported type: {type(raw_default_path).__name__}"
+            )
+
         task_queue_config = self.config.get('task_queue', {})
         if not isinstance(task_queue_config, dict):
             task_queue_config = {}
@@ -595,16 +620,16 @@ class TranscriptionManager:
                 
                 # Generate default output path if not set
                 if not task.output_path:
-                    # Use the same directory as the source file
                     source_path = Path(task.file_path)
-                    output_dir = source_path.parent
-                    
-                    # Create output filename: original_name.txt
                     output_filename = f"{source_path.stem}.{default_format}"
+                    if self._default_save_path:
+                        output_dir = Path(self._default_save_path)
+                    else:
+                        output_dir = source_path.parent
                     output_path = output_dir / output_filename
                 else:
-                    output_path = task.output_path
-                
+                    output_path = Path(task.output_path)
+
                 self.export_result(
                     task_id,
                     output_format=default_format,
@@ -842,36 +867,52 @@ class TranscriptionManager:
         )
         
         # Write to output file
-        output_path = Path(output_path).expanduser().resolve()
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        # Set secure directory permissions
-        import os
+        path_obj = Path(output_path).expanduser()
         try:
-            os.chmod(output_path.parent, 0o700)
+            resolved_output_path = path_obj.resolve()
+        except Exception as exc:
+            logger.error(
+                f"Failed to resolve output path '{path_obj}': {exc}",
+                exc_info=True
+            )
+            raise
+
+        output_dir = resolved_output_path.parent
+        try:
+            output_dir.mkdir(parents=True, exist_ok=True)
+        except Exception as exc:
+            logger.error(
+                f"Failed to create output directory '{output_dir}': {exc}",
+                exc_info=True
+            )
+            raise
+
+        # Set secure directory permissions
+        try:
+            os.chmod(output_dir, 0o700)
         except Exception as e:
             logger.warning(f"Could not set directory permissions: {e}")
-        
-        with open(output_path, 'w', encoding='utf-8') as f:
+
+        with open(resolved_output_path, 'w', encoding='utf-8') as f:
             f.write(converted_text)
-        
+
         # Set secure file permissions (owner read/write only)
         try:
-            os.chmod(output_path, 0o600)
+            os.chmod(resolved_output_path, 0o600)
         except Exception as e:
             logger.warning(f"Could not set file permissions: {e}")
-        
+
         # Update task record
-        task.output_path = str(output_path)
+        task.output_path = str(resolved_output_path)
         task.output_format = output_format
         task.save(self.db)
-        
+
         logger.info(
-            f"Exported task {task_id} to {output_path} "
+            f"Exported task {task_id} to {resolved_output_path} "
             f"in {output_format} format"
         )
-        
-        return str(output_path)
+
+        return str(resolved_output_path)
     
     def get_all_tasks(
         self,
