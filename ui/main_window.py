@@ -186,6 +186,7 @@ class MainWindow(QMainWindow):
                     self.managers['realtime_recorder'],
                     self.managers['audio_capture'],
                     self.i18n,
+                    settings_manager=self.managers.get('settings_manager'),
                     model_manager=self.managers.get('model_manager')
                 )
                 content_area.addWidget(realtime_widget)

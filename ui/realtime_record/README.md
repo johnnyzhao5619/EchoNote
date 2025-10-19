@@ -26,12 +26,16 @@ Main widget for real-time recording interface.
 - Audio waveform visualization
 - Export functionality
 - Marker capture button with timestamp list
+- Respects global realtime preferences (`realtime.recording_format` /
+  `realtime.auto_save`) provided by `SettingsManager`
 
 **Usage:**
 
 ```python
 from PyQt6.QtWidgets import QApplication
 from ui.realtime_record import RealtimeRecordWidget
+from config.app_config import ConfigManager
+from core.settings.manager import SettingsManager
 from core.realtime.recorder import RealtimeRecorder
 from engines.audio.capture import AudioCapture
 from engines.speech.faster_whisper_engine import FasterWhisperEngine
@@ -47,6 +51,7 @@ translation_engine = GoogleTranslateEngine()
 db = DatabaseConnection('~/.echonote/data.db')
 file_manager = FileManager('~/.echonote')
 i18n = I18nQtManager()
+settings_manager = SettingsManager(ConfigManager())
 
 # Create recorder
 recorder = RealtimeRecorder(
@@ -61,7 +66,8 @@ recorder = RealtimeRecorder(
 widget = RealtimeRecordWidget(
     recorder=recorder,
     audio_capture=audio_capture,
-    i18n_manager=i18n
+    i18n_manager=i18n,
+    settings_manager=settings_manager
 )
 
 # Show widget
@@ -113,7 +119,8 @@ class MainWindow(QMainWindow):
         self.realtime_widget = RealtimeRecordWidget(
             recorder=self.recorder,
             audio_capture=self.audio_capture,
-            i18n_manager=self.i18n
+            i18n_manager=self.i18n,
+            settings_manager=self.settings_manager
         )
 
         # Add to stacked widget

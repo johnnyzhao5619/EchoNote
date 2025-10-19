@@ -133,6 +133,7 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
   and transcript exports are saved to `~/Documents/EchoNote/` directories; translations land in the `Translations/` folder when
   generated, and marker metadata is persisted to a JSON file whenever markers exist.
 - The capture sample rate inherits from your selected device or an explicit override. Custom rates are applied to the microphone driver before capture; real-time engines auto-resample local models to 16 kHz and forward true rates to cloud APIs.
+- The realtime settings page immediately updates export behavior—changing the recording format or toggling auto-save takes effect the next time you start recording without reopening the widget.
 
 > **Quick path:** `Real-time Record → Select microphone → Pick model → Start → Add Marker (optional) → Stop → Export`
 
@@ -152,6 +153,7 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 
 - 支持的录音格式：内置 WAV，MP3 需要系统可执行的 FFmpeg。如未检测到 FFmpeg，录制会自动以
   WAV 保存并提示警告。
+- 「设置 → 实时录制」中的“录音格式 / 自动保存录音”会立即作用于实时录制页面，无需重启应用或重新打开页面。
 
 </details>
 

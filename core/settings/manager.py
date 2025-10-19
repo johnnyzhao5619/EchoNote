@@ -69,6 +69,36 @@ class SettingsManager(QObject):
         logger.debug(f"Retrieved setting '{key}': {value}")
         return value
 
+    def get_realtime_preferences(self) -> Dict[str, Any]:
+        """Return realtime recording preferences with defaults applied."""
+        realtime_defaults = self._default_config.get('realtime', {})
+        preferences = {
+            'recording_format': realtime_defaults.get('recording_format', 'wav'),
+            'auto_save': realtime_defaults.get('auto_save', True)
+        }
+
+        try:
+            recording_format = self.get_setting('realtime.recording_format')
+            if recording_format in ('wav', 'mp3'):
+                preferences['recording_format'] = recording_format
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Failed to read realtime.recording_format: %s", exc,
+                exc_info=True
+            )
+
+        try:
+            auto_save = self.get_setting('realtime.auto_save')
+            if auto_save is not None:
+                preferences['auto_save'] = bool(auto_save)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Failed to read realtime.auto_save: %s", exc,
+                exc_info=True
+            )
+
+        return preferences
+
     def set_setting(self, key: str, value: Any) -> bool:
         """
         Set a setting value with validation.

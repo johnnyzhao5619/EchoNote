@@ -29,6 +29,7 @@
     "default_input_source": "default",
     "default_gain": 1.0,
     "recording_format": "wav",
+    "auto_save": true,
     "recording_save_path": "~/Documents/EchoNote/Recordings",
     "vad_threshold": 0.5,
     "silence_duration_ms": 2000
