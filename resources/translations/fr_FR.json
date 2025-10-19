@@ -309,6 +309,8 @@
       "gain_level": "Niveau de Gain",
       "recording": "Paramètres d'Enregistrement",
       "recording_format": "Format d'Enregistrement",
+      "mp3_requires_ffmpeg": "L'export MP3 nécessite FFmpeg. Installez FFmpeg pour activer cette option.",
+      "mp3_enabled_ffmpeg": "L'export MP3 utilise FFmpeg pour la conversion lorsque disponible.",
       "recording_path": "Emplacement de Sauvegarde de l'Enregistrement",
       "browse": "Parcourir",
       "select_directory": "Sélectionner le Répertoire",

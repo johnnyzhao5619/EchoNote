@@ -614,3 +614,115 @@ def test_stop_recording_persists_translation_file(monkeypatch, tmp_path):
     assert saved_path.exists()
     content = saved_path.read_text(encoding='utf-8').strip()
     assert "transcription-1-to-en" in content
+
+
+def test_save_recording_mp3_with_ffmpeg(monkeypatch, tmp_path):
+    from core.realtime.recorder import RealtimeRecorder
+
+    audio_capture = DummyAudioCapture()
+    file_manager = DummyFileManager(base_dir=tmp_path)
+    recorder = RealtimeRecorder(
+        audio_capture=audio_capture,
+        speech_engine=DummySpeechEngine(),
+        translation_engine=None,
+        db_connection=None,
+        file_manager=file_manager,
+    )
+
+    if HAS_NUMPY:
+        recorder.recording_audio_buffer = [
+            np.zeros(160, dtype=np.float32)
+        ]
+    else:
+        class _NPStub:
+            @staticmethod
+            def concatenate(buffers):
+                return b''.join(buffers)
+
+        monkeypatch.setattr('core.realtime.recorder.np', _NPStub())
+        recorder.recording_audio_buffer = [b'DUMMY']
+    recorder.recording_start_time = datetime.now()
+    recorder.sample_rate = 16000
+    recorder.current_options = {'recording_format': 'mp3'}
+
+    monkeypatch.setattr(
+        recorder,
+        '_is_mp3_conversion_available',
+        lambda: True
+    )
+
+    def _fake_convert(_, wav_path: str, mp3_path: str):  # type: ignore[override]
+        Path(mp3_path).parent.mkdir(parents=True, exist_ok=True)
+        with open(mp3_path, 'wb') as mp3_file:
+            mp3_file.write(b'MP3DATA')
+
+    monkeypatch.setattr(
+        recorder,
+        '_convert_wav_to_mp3',
+        _fake_convert.__get__(recorder, recorder.__class__)  # type: ignore[arg-type]
+    )
+
+    def _fake_write(path, data, samplerate):  # noqa: ARG001
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        with open(path, 'wb') as wav_file:
+            wav_file.write(b'WAVDATA')
+
+    monkeypatch.setattr('soundfile.write', _fake_write)
+
+    path = asyncio.run(recorder._save_recording())
+
+    assert path.endswith('.mp3')
+    assert any(name.endswith('.mp3') for name in file_manager.saved_files)
+
+
+def test_save_recording_mp3_without_ffmpeg(monkeypatch, tmp_path):
+    from core.realtime.recorder import RealtimeRecorder
+
+    audio_capture = DummyAudioCapture()
+    file_manager = DummyFileManager(base_dir=tmp_path)
+    recorder = RealtimeRecorder(
+        audio_capture=audio_capture,
+        speech_engine=DummySpeechEngine(),
+        translation_engine=None,
+        db_connection=None,
+        file_manager=file_manager,
+    )
+
+    messages = []
+    recorder.on_error = messages.append
+
+    if HAS_NUMPY:
+        recorder.recording_audio_buffer = [
+            np.zeros(160, dtype=np.float32)
+        ]
+    else:
+        class _NPStub:
+            @staticmethod
+            def concatenate(buffers):
+                return b''.join(buffers)
+
+        monkeypatch.setattr('core.realtime.recorder.np', _NPStub())
+        recorder.recording_audio_buffer = [b'DUMMY']
+    recorder.recording_start_time = datetime.now()
+    recorder.sample_rate = 16000
+    recorder.current_options = {'recording_format': 'mp3'}
+
+    monkeypatch.setattr(
+        recorder,
+        '_is_mp3_conversion_available',
+        lambda: False
+    )
+
+    def _fake_write(path, data, samplerate):  # noqa: ARG001
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        with open(path, 'wb') as wav_file:
+            wav_file.write(b'WAVDATA')
+
+    monkeypatch.setattr('soundfile.write', _fake_write)
+
+    path = asyncio.run(recorder._save_recording())
+
+    assert path.endswith('.wav')
+    assert any(name.endswith('.wav') for name in file_manager.saved_files)
+    assert messages
+    assert any('MP3' in message for message in messages)

@@ -165,7 +165,9 @@ Start real-time recording, streaming transcription, and optional translation.
   - `language` (str): Source language code used for transcription.
   - `enable_translation` (bool): Enable translation dispatch.
   - `target_language` (str): Target language for translation jobs.
-  - `recording_format` (str): `'wav'` or `'mp3'` export format.
+  - `recording_format` (str): `'wav'` or `'mp3'` export format. MP3 output
+    requires a reachable FFmpeg binary; without it the recorder falls back to
+    WAV and reports a warning through the `on_error` callback.
   - `sample_rate` (int): Override microphone sample rate before capture.
   - `save_recording` (bool): Persist raw audio to disk (default `True`).
   - `save_transcript` (bool): Persist aggregated transcript text (default `True`).

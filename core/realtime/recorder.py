@@ -8,6 +8,8 @@ import asyncio
 import json
 import logging
 import os
+import shutil
+import subprocess
 import threading
 from datetime import datetime, timedelta
 from typing import Optional, Dict, AsyncIterator, Callable, List, Any
@@ -560,20 +562,64 @@ class RealtimeRecorder:
 
         # 生成文件名
         timestamp = self.recording_start_time.strftime("%Y%m%d_%H%M%S")
-        recording_format = self.current_options.get('recording_format', 'wav')
-        filename = f"recording_{timestamp}.{recording_format}"
+        requested_format = str(
+            self.current_options.get('recording_format', 'wav')
+        ).lower()
+        base_filename = f"recording_{timestamp}"
+        mp3_requested = requested_format == 'mp3'
+        mp3_supported = False
+        if mp3_requested:
+            try:
+                mp3_supported = self._is_mp3_conversion_available()
+            except Exception as exc:  # noqa: BLE001
+                logger.error(
+                    "Failed to determine MP3 conversion capability: %s", exc
+                )
+                mp3_supported = False
+
+            if not mp3_supported:
+                warning_message = (
+                    "MP3 recording requires FFmpeg. Saved recording as WAV instead."
+                )
+                logger.warning(warning_message)
+                if self.on_error:
+                    self.on_error(warning_message)
+
+        final_format = 'mp3' if mp3_requested and mp3_supported else 'wav'
+        filename = f"{base_filename}.{final_format}"
 
         # 保存文件
         try:
             # 创建临时文件
-            temp_path = self.file_manager.get_temp_path(filename)
+            temp_wav_name = f"{base_filename}.wav"
+            temp_path = self.file_manager.get_temp_path(temp_wav_name)
 
             # 写入音频数据
             write_rate = self.sample_rate if self.sample_rate and self.sample_rate > 0 else 16000
             sf.write(temp_path, audio_data, write_rate)
 
+            source_path = temp_path
+            temp_mp3_path = None
+            if final_format == 'mp3':
+                temp_mp3_name = f"{base_filename}.mp3"
+                temp_mp3_path = self.file_manager.get_temp_path(temp_mp3_name)
+                try:
+                    self._convert_wav_to_mp3(temp_path, temp_mp3_path)
+                    source_path = temp_mp3_path
+                except Exception as exc:  # noqa: BLE001
+                    error_message = (
+                        f"Failed to convert recording to MP3: {exc}. Saved as WAV instead."
+                    )
+                    logger.error(error_message)
+                    if self.on_error:
+                        self.on_error(error_message)
+                    final_format = 'wav'
+                    filename = f"{base_filename}.wav"
+                    source_path = temp_path
+                    temp_mp3_path = None
+
             # 移动到最终位置
-            with open(temp_path, 'rb') as f:
+            with open(source_path, 'rb') as f:
                 final_path = self.file_manager.save_file(
                     f.read(),
                     filename,
@@ -581,7 +627,17 @@ class RealtimeRecorder:
                 )
 
             # 删除临时文件
-            os.unlink(temp_path)
+            try:
+                os.unlink(temp_path)
+            except FileNotFoundError:
+                logger.debug("Temporary WAV file already removed: %s", temp_path)
+            if temp_mp3_path:
+                try:
+                    os.unlink(temp_mp3_path)
+                except FileNotFoundError:
+                    logger.debug(
+                        "Temporary MP3 file already removed: %s", temp_mp3_path
+                    )
 
             logger.info(f"Recording saved: {final_path}")
             return final_path
@@ -591,6 +647,43 @@ class RealtimeRecorder:
             if self.on_error:
                 self.on_error(f"Failed to save recording: {e}")
             return ""
+
+    def _is_mp3_conversion_available(self) -> bool:
+        """MP3 转换工具是否可用。"""
+        try:
+            from utils.ffmpeg_checker import get_ffmpeg_checker
+        except Exception:  # noqa: BLE001
+            fallback_available = shutil.which('ffmpeg') is not None
+            logger.debug(
+                "FFmpeg checker unavailable; fallback detection result: %s",
+                fallback_available
+            )
+            return fallback_available
+
+        checker = get_ffmpeg_checker()
+        available = checker.is_ffmpeg_available()
+        logger.debug("MP3 conversion availability: %s", available)
+        return available
+
+    def _convert_wav_to_mp3(self, wav_path: str, mp3_path: str) -> None:
+        """使用 FFmpeg 将 WAV 转换成 MP3。"""
+        command = [
+            'ffmpeg',
+            '-y',
+            '-i', wav_path,
+            '-codec:a', 'libmp3lame',
+            mp3_path
+        ]
+        logger.debug("Converting WAV to MP3 via command: %s", ' '.join(command))
+        completed = subprocess.run(
+            command,
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        logger.debug(
+            "FFmpeg conversion completed with return code %s", completed.returncode
+        )
 
     async def _save_transcript(self) -> str:
         """
