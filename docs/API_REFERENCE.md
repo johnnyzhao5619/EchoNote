@@ -224,6 +224,8 @@ Stop recording and save files.
 - `event_id` (str, optional): Created calendar event ID when
     `create_calendar_event` succeeds. Absent when no database connection is configured.
 
+**Note:** When multiple recordings finish within the same second, EchoNote automatically appends a counter or millisecond suffix to every exported filename (audio, transcript, translation, and markers) to avoid collisions.
+
 ##### get_transcription_stream
 
 ```python

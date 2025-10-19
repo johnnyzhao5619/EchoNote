@@ -614,7 +614,14 @@ class RealtimeRecorder:
                     self.on_error(warning_message)
 
         final_format = 'mp3' if mp3_requested and mp3_supported else 'wav'
-        filename = f"{base_filename}.{final_format}"
+        def _generate_filename(extension: str) -> str:
+            return self.file_manager.create_unique_filename(
+                base_filename,
+                extension,
+                subdirectory='Recordings'
+            )
+
+        filename = _generate_filename(final_format)
 
         # 保存文件
         try:
@@ -642,7 +649,7 @@ class RealtimeRecorder:
                     if self.on_error:
                         self.on_error(error_message)
                     final_format = 'wav'
-                    filename = f"{base_filename}.wav"
+                    filename = _generate_filename(final_format)
                     source_path = temp_path
                     temp_mp3_path = None
 
@@ -729,7 +736,14 @@ class RealtimeRecorder:
 
         # 生成文件名
         timestamp = self.recording_start_time.strftime("%Y%m%d_%H%M%S")
-        filename = f"transcript_{timestamp}.txt"
+        def _generate_filename(extension: str) -> str:
+            return self.file_manager.create_unique_filename(
+                f"transcript_{timestamp}",
+                extension,
+                subdirectory='Transcripts'
+            )
+
+        filename = _generate_filename('txt')
 
         # 保存文件
         try:
@@ -765,7 +779,14 @@ class RealtimeRecorder:
         # 生成文件名
         timestamp = self.recording_start_time.strftime("%Y%m%d_%H%M%S")
         target_lang = self.current_options.get('target_language', 'en')
-        filename = f"translation_{target_lang}_{timestamp}.txt"
+        def _generate_filename(extension: str) -> str:
+            return self.file_manager.create_unique_filename(
+                f"translation_{target_lang}_{timestamp}",
+                extension,
+                subdirectory='Translations'
+            )
+
+        filename = _generate_filename('txt')
 
         # 保存文件
         try:
@@ -796,7 +817,14 @@ class RealtimeRecorder:
         }
 
         timestamp = self.recording_start_time.strftime("%Y%m%d_%H%M%S")
-        filename = f"markers_{timestamp}.json"
+        def _generate_filename(extension: str) -> str:
+            return self.file_manager.create_unique_filename(
+                f"markers_{timestamp}",
+                extension,
+                subdirectory='Markers'
+            )
+
+        filename = _generate_filename('json')
 
         try:
             json_content = json.dumps(payload, ensure_ascii=False, indent=2)

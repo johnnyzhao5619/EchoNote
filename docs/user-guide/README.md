@@ -131,7 +131,8 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 - Monitor live transcripts, tap **Add Marker** to capture timestamps, and track elapsed time.
 - When stopping, `stop_recording()` returns the session duration, ISO timestamps, and any markers alongside file paths. Audio
   and transcript exports are saved to `~/Documents/EchoNote/` directories; translations land in the `Translations/` folder when
-  generated, and marker metadata is persisted to a JSON file whenever markers exist.
+  generated, and marker metadata is persisted to a JSON file whenever markers exist. When multiple exports finish within the same
+  second, EchoNote automatically appends a numeric or millisecond suffix so filenames stay unique.
 - The capture sample rate inherits from your selected device or an explicit override. Custom rates are applied to the microphone driver before capture; real-time engines auto-resample local models to 16 kHz and forward true rates to cloud APIs.
 - The realtime settings page immediately updates export behavior—changing the recording format or toggling auto-save takes effect the next time you start recording without reopening the widget.
 
@@ -149,7 +150,7 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 
 - 选择音频输入设备与增益值；EchoNote 会自动应用语音活动检测 (VAD) 以减少静音。目前尚无开关，计划在「设置 → 实时录制 → 语音活动检测」中新增（即将推出）。
 - 录制过程中可即时查看转录文本，点击**添加标记**记录时间点。
-- 停止录制后，`stop_recording()` 会返回录制时长、开始/结束时间以及所有标记；音频与转录会写入 `~/Documents/EchoNote/` 对应目录；启用翻译时会在 `Translations/` 目录写出翻译文本，有标记时会额外生成 JSON 文件保存标记详情。
+- 停止录制后，`stop_recording()` 会返回录制时长、开始/结束时间以及所有标记；音频与转录会写入 `~/Documents/EchoNote/` 对应目录；启用翻译时会在 `Translations/` 目录写出翻译文本，有标记时会额外生成 JSON 文件保存标记详情；若同一秒内连续导出多次，系统会自动追加序号或毫秒后缀以避免文件名冲突。
 - 采样率默认沿用所选输入设备，可在录制选项中显式覆盖。自定义值会先应用到麦克风驱动，本地模型自动重采样到 16 kHz，云端接口则携带真实采样率。
 
 > **快捷路径：** `实时录制 → 选择麦克风 → 选择模型 → 开始 → （可选）添加标记 → 停止 → 导出`
