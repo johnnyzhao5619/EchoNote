@@ -5,6 +5,7 @@ Provides UI for configuring real-time transcription and recording settings.
 """
 
 import logging
+import shutil
 from pathlib import Path
 from typing import Tuple
 
@@ -34,6 +35,8 @@ class RealtimeSettingsPage(BaseSettingsPage):
         """
         super().__init__(settings_manager, i18n)
         
+        self._mp3_supported = self._detect_mp3_support()
+
         # Setup UI
         self.setup_ui()
         
@@ -110,11 +113,34 @@ class RealtimeSettingsPage(BaseSettingsPage):
         self.format_label.setMinimumWidth(200)
         self.format_combo = QComboBox()
         self.format_combo.addItems(['wav', 'mp3'])
+        if not self._mp3_supported:
+            index = self.format_combo.findText('mp3')
+            if index >= 0:
+                model = self.format_combo.model()
+                model.setData(
+                    model.index(index, 0),
+                    False,
+                    Qt.ItemDataRole.EnabledRole
+                )
+            self.format_combo.setCurrentText('wav')
+            self.format_combo.setToolTip(
+                self.i18n.t('settings.realtime.mp3_requires_ffmpeg')
+            )
+        else:
+            self.format_combo.setToolTip(
+                self.i18n.t('settings.realtime.mp3_enabled_ffmpeg')
+            )
         self.format_combo.currentTextChanged.connect(self._emit_changed)
         format_layout.addWidget(self.format_label)
         format_layout.addWidget(self.format_combo)
         format_layout.addStretch()
         self.content_layout.addLayout(format_layout)
+
+        self.format_hint_label = QLabel()
+        self.format_hint_label.setWordWrap(True)
+        self.format_hint_label.setStyleSheet("color: #666; font-size: 11px;")
+        self._update_format_hint_text()
+        self.content_layout.addWidget(self.format_hint_label)
         
         # Recording save path
         path_layout = QHBoxLayout()
@@ -218,9 +244,16 @@ class RealtimeSettingsPage(BaseSettingsPage):
                 'realtime.recording_format'
             )
             if recording_format:
-                index = self.format_combo.findText(recording_format)
-                if index >= 0:
-                    self.format_combo.setCurrentIndex(index)
+                if recording_format == 'mp3' and not self._mp3_supported:
+                    logger.warning(
+                        "MP3 format selected in settings but FFmpeg is unavailable. "
+                        "Falling back to WAV in UI."
+                    )
+                    self.format_combo.setCurrentText('wav')
+                else:
+                    index = self.format_combo.findText(recording_format)
+                    if index >= 0:
+                        self.format_combo.setCurrentIndex(index)
             
             # Recording save path
             save_path = self.settings_manager.get_setting(
@@ -263,7 +296,7 @@ class RealtimeSettingsPage(BaseSettingsPage):
             # Recording format
             self.settings_manager.set_setting(
                 'realtime.recording_format',
-                self.format_combo.currentText()
+                self._get_selected_format()
             )
             
             # Recording save path
@@ -358,6 +391,54 @@ class RealtimeSettingsPage(BaseSettingsPage):
             self.auto_save_check.setText(
                 self.i18n.t('settings.realtime.auto_save')
             )
+
+        if hasattr(self, 'format_hint_label'):
+            self._update_format_hint_text()
+
+        if hasattr(self, 'format_combo'):
+            if not self._mp3_supported:
+                self.format_combo.setToolTip(
+                    self.i18n.t('settings.realtime.mp3_requires_ffmpeg')
+                )
+            else:
+                self.format_combo.setToolTip(
+                    self.i18n.t('settings.realtime.mp3_enabled_ffmpeg')
+                )
+
+    def _detect_mp3_support(self) -> bool:
+        try:
+            from utils.ffmpeg_checker import get_ffmpeg_checker
+        except Exception:  # noqa: BLE001
+            fallback_available = shutil.which('ffmpeg') is not None
+            logger.debug(
+                "FFmpeg checker unavailable when building realtime settings page. "
+                "Fallback detection: %s",
+                fallback_available
+            )
+            return fallback_available
+
+        checker = get_ffmpeg_checker()
+        available = checker.is_ffmpeg_available()
+        logger.debug("MP3 support in settings UI: %s", available)
+        return available
+
+    def _update_format_hint_text(self):
+        if not hasattr(self, 'format_hint_label'):
+            return
+        if self._mp3_supported:
+            self.format_hint_label.setText(
+                self.i18n.t('settings.realtime.mp3_enabled_ffmpeg')
+            )
+        else:
+            self.format_hint_label.setText(
+                self.i18n.t('settings.realtime.mp3_requires_ffmpeg')
+            )
+
+    def _get_selected_format(self) -> str:
+        current = self.format_combo.currentText()
+        if current == 'mp3' and not self._mp3_supported:
+            return 'wav'
+        return current
         
         # Update combo box items
         if hasattr(self, 'source_combo'):

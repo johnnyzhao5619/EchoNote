@@ -136,6 +136,10 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 
 > **Quick path:** `Real-time Record → Select microphone → Pick model → Start → Add Marker (optional) → Stop → Export`
 
+- Supported recording formats: WAV (built-in) and MP3. MP3 export requires a
+  working FFmpeg installation; when FFmpeg is missing the recorder automatically
+  saves as WAV and surfaces a warning.
+
 <details>
 <summary>中文</summary>
 
@@ -145,6 +149,9 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 - 采样率默认沿用所选输入设备，可在录制选项中显式覆盖。自定义值会先应用到麦克风驱动，本地模型自动重采样到 16 kHz，云端接口则携带真实采样率。
 
 > **快捷路径：** `实时录制 → 选择麦克风 → 选择模型 → 开始 → （可选）添加标记 → 停止 → 导出`
+
+- 支持的录音格式：内置 WAV，MP3 需要系统可执行的 FFmpeg。如未检测到 FFmpeg，录制会自动以
+  WAV 保存并提示警告。
 
 </details>
 
@@ -159,6 +166,10 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 - La fréquence d’échantillonnage suit le périphérique choisi ou une valeur forcée. Les micros sont configurés avant capture, les modèles locaux sont rééchantillonnés à 16 kHz et les API cloud reçoivent la fréquence réelle.
 
 > **Chemin rapide :** `Real-time Record → Choisir micro → Sélectionner modèle → Démarrer → Ajouter un marqueur (optionnel) → Arrêter → Exporter`
+
+- Formats d’enregistrement pris en charge : WAV (nativement) et MP3. L’export
+  MP3 nécessite FFmpeg disponible sur le système ; en son absence, l’enregistrement
+  est automatiquement conservé en WAV avec un avertissement dans l’application.
 
 </details>
 

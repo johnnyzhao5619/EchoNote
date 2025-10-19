@@ -311,6 +311,8 @@
       "gain_level": "Gain Level",
       "recording": "Recording Settings",
       "recording_format": "Recording Format",
+      "mp3_requires_ffmpeg": "MP3 export requires FFmpeg. Install FFmpeg to enable this option.",
+      "mp3_enabled_ffmpeg": "MP3 export uses FFmpeg for conversion when available.",
       "recording_path": "Recording Save Location",
       "browse": "Browse",
       "select_directory": "Select Directory",

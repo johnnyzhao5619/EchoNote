@@ -311,6 +311,8 @@
       "gain_level": "增益级别",
       "recording": "录音设置",
       "recording_format": "录音格式",
+      "mp3_requires_ffmpeg": "MP3 导出需要 FFmpeg，请安装后再启用此选项。",
+      "mp3_enabled_ffmpeg": "MP3 导出通过 FFmpeg 转换（已检测到可用环境）。",
       "recording_path": "录音保存位置",
       "browse": "浏览",
       "select_directory": "选择目录",
