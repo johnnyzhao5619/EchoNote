@@ -67,3 +67,26 @@ def test_reset_to_default_restores_nested_structure(settings_manager):
     settings_manager.set_setting("calendar.colors.local", "#123456")
     settings_manager.reset_to_default("calendar.colors")
     assert settings_manager.get_setting("calendar.colors") == default_colors
+
+
+def test_new_settings_manager_resets_to_original_defaults(tmp_path, monkeypatch):
+    monkeypatch.setattr(app_config.Path, "home", lambda: tmp_path)
+    config_manager = ConfigManager()
+
+    defaults = config_manager.get_defaults()
+    default_colors_mapping = defaults["calendar"]["colors"]
+    default_colors = {key: default_colors_mapping[key] for key in default_colors_mapping}
+    default_page_size = defaults["timeline"]["page_size"]
+
+    config_manager.set("calendar.colors.local", "#000111")
+    config_manager.set("timeline.page_size", default_page_size + 10)
+
+    settings_manager = SettingsManager(config_manager)
+
+    assert settings_manager.get_setting("calendar.colors.local") == "#000111"
+    assert settings_manager.reset_to_default("calendar.colors")
+    assert settings_manager.get_setting("calendar.colors") == default_colors
+
+    assert settings_manager.get_setting("timeline.page_size") == default_page_size + 10
+    assert settings_manager.reset_to_default("timeline.page_size")
+    assert settings_manager.get_setting("timeline.page_size") == default_page_size

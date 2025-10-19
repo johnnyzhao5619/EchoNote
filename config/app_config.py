@@ -4,6 +4,7 @@ Configuration management for EchoNote application.
 Handles loading, validation, and saving of application configuration.
 """
 
+import copy
 import json
 import logging
 from collections.abc import Mapping
@@ -337,15 +338,24 @@ class ConfigManager:
                 if isinstance(base_value, dict) and isinstance(override_value, dict):
                     result[key] = cls._deep_merge(base_value, override_value)
                 else:
-                    result[key] = override_value
+                    result[key] = cls._clone_value(override_value)
             else:
-                result[key] = base_value
+                result[key] = cls._clone_value(base_value)
 
         for key, override_value in override.items():
             if key not in base:
-                result[key] = override_value
+                result[key] = cls._clone_value(override_value)
 
         return result
+
+    @classmethod
+    def _clone_value(cls, value: Any) -> Any:
+        """Return a deep copy of supported container types."""
+        if isinstance(value, dict):
+            return {k: cls._clone_value(v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [cls._clone_value(v) for v in value]
+        return copy.deepcopy(value)
 
     @classmethod
     def _deep_freeze(cls, value: Any) -> Any:
