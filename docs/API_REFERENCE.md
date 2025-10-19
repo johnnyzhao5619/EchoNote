@@ -167,9 +167,12 @@ Start real-time recording, streaming transcription, and optional translation.
   - `target_language` (str): Target language for translation jobs.
   - `recording_format` (str): `'wav'` or `'mp3'` export format. MP3 output
     requires a reachable FFmpeg binary; without it the recorder falls back to
-    WAV and reports a warning through the `on_error` callback.
+    WAV and reports a warning through the `on_error` callback. When this option
+    is omitted, `SettingsManager.get_realtime_preferences()` supplies the
+    default chosen in the settings UI.
   - `sample_rate` (int): Override microphone sample rate before capture.
-  - `save_recording` (bool): Persist raw audio to disk (default `True`).
+  - `save_recording` (bool): Persist raw audio to disk. Defaults to the
+    realtime auto-save toggle exposed in the settings UI.
   - `save_transcript` (bool): Persist aggregated transcript text (default `True`).
   - `create_calendar_event` (bool): Create a calendar event with attachments (default `True`).
 - `event_loop` (asyncio.AbstractEventLoop, optional) – Explicit loop reference used

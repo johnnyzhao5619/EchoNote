@@ -7,7 +7,7 @@
 
 import logging
 from concurrent.futures import Future
-from typing import Set
+from typing import Optional, Set
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
@@ -53,7 +53,15 @@ class RealtimeRecorderSignals(QObject):
 class RealtimeRecordWidget(QWidget):
     """实时录制主界面"""
 
-    def __init__(self, recorder, audio_capture, i18n_manager, model_manager=None, parent=None):
+    def __init__(
+        self,
+        recorder,
+        audio_capture,
+        i18n_manager,
+        settings_manager: Optional[object] = None,
+        model_manager=None,
+        parent=None
+    ):
         """
         初始化实时录制界面
 
@@ -61,6 +69,7 @@ class RealtimeRecordWidget(QWidget):
             recorder: RealtimeRecorder 实例
             audio_capture: AudioCapture 实例
             i18n_manager: I18nQtManager 实例
+            settings_manager: SettingsManager 实例（可选）
             model_manager: ModelManager 实例（可选）
             parent: 父窗口
         """
@@ -69,6 +78,7 @@ class RealtimeRecordWidget(QWidget):
         self.audio_capture = audio_capture
         self._audio_available = audio_capture is not None
         self.i18n = i18n_manager
+        self.settings_manager = settings_manager
         self.model_manager = model_manager
 
         # 创建信号包装器
@@ -85,9 +95,25 @@ class RealtimeRecordWidget(QWidget):
         self._translation_buffer = []
         self._buffer_lock = threading.Lock()
 
+        # 记录实时录制首选项
+        self._recording_format = 'wav'
+        self._auto_save_enabled = True
+        self._refresh_recording_preferences()
+
         # Connect model manager signals if available
         if self.model_manager:
             self.model_manager.models_updated.connect(self._update_model_list)
+
+        if self.settings_manager and hasattr(self.settings_manager, 'setting_changed'):
+            try:
+                self.settings_manager.setting_changed.connect(
+                    self._on_settings_changed
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "Failed to connect to settings_manager.setting_changed: %s",
+                    exc
+                )
 
         # 设置回调函数
         self.recorder.set_callbacks(
@@ -144,6 +170,33 @@ class RealtimeRecordWidget(QWidget):
         self.i18n.language_changed.connect(self._update_ui_text)
 
         logger.info("RealtimeRecordWidget initialized")
+
+    def _refresh_recording_preferences(self) -> None:
+        """加载录音格式与保存策略设置。"""
+        if self.settings_manager and hasattr(
+            self.settings_manager, 'get_realtime_preferences'
+        ):
+            try:
+                preferences = self.settings_manager.get_realtime_preferences()
+                self._recording_format = preferences.get('recording_format', 'wav')
+                self._auto_save_enabled = bool(
+                    preferences.get('auto_save', True)
+                )
+                return
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "Failed to refresh realtime preferences: %s", exc,
+                    exc_info=True
+                )
+
+        # 设置管理器不可用或读取失败时退回到默认值
+        self._recording_format = 'wav'
+        self._auto_save_enabled = True
+
+    def _on_settings_changed(self, key: str, _value: object) -> None:
+        """当设置变更时刷新实时录制首选项。"""
+        if key in {'realtime.recording_format', 'realtime.auto_save'}:
+            self._refresh_recording_preferences()
     
     def _init_async_loop(self):
         """初始化异步事件循环"""
@@ -1157,6 +1210,8 @@ class RealtimeRecordWidget(QWidget):
     async def _start_recording(self):
         """开始录制"""
         try:
+            self._refresh_recording_preferences()
+
             # Check if model is selected (if model_manager is available)
             if self.model_manager and hasattr(self, 'model_combo'):
                 selected_model = self.model_combo.currentData()
@@ -1188,8 +1243,8 @@ class RealtimeRecordWidget(QWidget):
                 'language': source_lang,
                 'enable_translation': enable_translation,
                 'target_language': target_lang,
-                'recording_format': 'wav',
-                'save_recording': True,
+                'recording_format': self._recording_format,
+                'save_recording': self._auto_save_enabled,
                 'save_transcript': True,
                 'create_calendar_event': True
             }
@@ -1323,6 +1378,14 @@ class RealtimeRecordWidget(QWidget):
             try:
                 self.model_manager.models_updated.disconnect(self._update_model_list)
             except (TypeError, RuntimeError):
+                pass
+
+        if self.settings_manager and hasattr(self.settings_manager, 'setting_changed'):
+            try:
+                self.settings_manager.setting_changed.disconnect(
+                    self._on_settings_changed
+                )
+            except (TypeError, RuntimeError, AttributeError):
                 pass
 
     def _stop_recorder_if_needed(self):

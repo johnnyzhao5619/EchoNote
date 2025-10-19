@@ -24,7 +24,14 @@ def _create_sync_scheduler(calendar_manager, sync_interval):
     return SyncScheduler(calendar_manager, sync_interval)
 
 
-def _create_auto_task_scheduler(timeline_manager, realtime_recorder, db, file_manager, reminder_minutes):
+def _create_auto_task_scheduler(
+    timeline_manager,
+    realtime_recorder,
+    db,
+    file_manager,
+    reminder_minutes,
+    settings_manager
+):
     """Create auto task scheduler (for background initialization)."""
     from core.timeline.auto_task_scheduler import AutoTaskScheduler
     return AutoTaskScheduler(
@@ -32,7 +39,8 @@ def _create_auto_task_scheduler(timeline_manager, realtime_recorder, db, file_ma
         realtime_recorder=realtime_recorder,
         db_connection=db,
         file_manager=file_manager,
-        reminder_minutes=reminder_minutes
+        reminder_minutes=reminder_minutes,
+        settings_manager=settings_manager
     )
 
 
@@ -641,7 +649,12 @@ def main():
         bg_init_functions = [
             ('sync_scheduler', lambda: _create_sync_scheduler(calendar_manager, sync_interval)),
             ('auto_task_scheduler', lambda: _create_auto_task_scheduler(
-                timeline_manager, realtime_recorder, db, file_manager, reminder_minutes
+                timeline_manager,
+                realtime_recorder,
+                db,
+                file_manager,
+                reminder_minutes,
+                settings_manager
             )),
         ]
         

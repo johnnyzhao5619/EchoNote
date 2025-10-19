@@ -171,6 +171,7 @@ Each subpackage inside `core/` houses a manager that encapsulates domain logic a
 - **Real-time recording (`core/realtime/`)**
   - `RealtimeRecorder` streams audio frames from `engines/audio/capture.py`, applies voice-activity detection, and dispatches transcripts to listeners.
   - `audio_buffer.py` maintains rolling buffers for low-latency playback or streaming transcripts.
+  - `SettingsManager.get_realtime_preferences()` centralizes the default recording format and auto-save toggle. UI (`ui/realtime_record/widget.py`) and background schedulers (`core/timeline/auto_task_scheduler.py`) both consult it before starting a session so that changing settings propagates immediately.
 
 - **Calendar (`core/calendar/`)**
   - `CalendarManager` exposes CRUD methods (`create_event`, `update_event`, `delete_event`, `get_event`, `get_events`) and synchronization entrypoints (`sync_external_calendar`).

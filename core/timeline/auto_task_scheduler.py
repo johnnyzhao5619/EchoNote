@@ -37,7 +37,8 @@ class AutoTaskScheduler:
         realtime_recorder,
         db_connection,
         file_manager,
-        reminder_minutes: int = 5
+        reminder_minutes: int = 5,
+        settings_manager=None
     ):
         """
         Initialize the auto task scheduler.
@@ -48,6 +49,7 @@ class AutoTaskScheduler:
             db_connection: Database connection instance
             file_manager: FileManager instance
             reminder_minutes: Minutes before event to send reminder (default: 5)
+            settings_manager: SettingsManager instance providing global defaults
         """
         self.timeline_manager = timeline_manager
         self.realtime_recorder = realtime_recorder
@@ -56,6 +58,7 @@ class AutoTaskScheduler:
         self.scheduler = BackgroundScheduler()
         self.is_running = False
         self.reminder_minutes = reminder_minutes
+        self.settings_manager = settings_manager
 
         # Track events that have been notified/started/stopped
         self.notified_events = set()
@@ -243,6 +246,46 @@ class AutoTaskScheduler:
                 exc_info=True
             )
 
+    def _get_realtime_preferences(self) -> Dict[str, Any]:
+        """Load realtime recording defaults from settings manager."""
+        if self.settings_manager and hasattr(
+            self.settings_manager, 'get_realtime_preferences'
+        ):
+            try:
+                return self.settings_manager.get_realtime_preferences()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "Failed to load realtime preferences for auto tasks: %s",
+                    exc,
+                    exc_info=True
+                )
+
+        return {'recording_format': 'wav', 'auto_save': True}
+
+    def _build_recording_options(self, event, auto_tasks: dict) -> Dict[str, Any]:
+        """Assemble recording options for auto-started sessions."""
+        preferences = self._get_realtime_preferences()
+
+        enable_recording = auto_tasks.get('enable_recording')
+        if enable_recording is None:
+            save_recording = preferences.get('auto_save', True)
+        else:
+            save_recording = bool(enable_recording)
+
+        options = {
+            'event_id': event.id,
+            'event_title': event.title,
+            'language': auto_tasks.get('transcription_language'),
+            'enable_translation': auto_tasks.get('enable_translation', False),
+            'target_language': auto_tasks.get('translation_target_language'),
+            'recording_format': preferences.get('recording_format', 'wav'),
+            'save_recording': save_recording,
+            'save_transcript': auto_tasks.get('enable_transcription', True),
+            'create_calendar_event': False
+        }
+
+        return options
+
     def _start_auto_tasks(self, event, auto_tasks: dict):
         """
         Start automatic tasks for an event.
@@ -271,20 +314,7 @@ class AutoTaskScheduler:
                 return
 
             # Prepare recording options
-            options = {
-                'event_id': event.id,
-                'event_title': event.title,
-                'language': auto_tasks.get('transcription_language'),
-                'enable_translation': auto_tasks.get(
-                    'enable_translation', False
-                ),
-                'target_language': auto_tasks.get(
-                    'translation_target_language'
-                ),
-                'save_recording': auto_tasks.get('enable_recording', True),
-                'save_transcript': auto_tasks.get('enable_transcription', True),
-                'create_calendar_event': False  # Don't create duplicate event
-            }
+            options = self._build_recording_options(event, auto_tasks)
 
             # Create a new event loop for this recording
             loop = asyncio.new_event_loop()
