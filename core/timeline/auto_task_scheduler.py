@@ -7,6 +7,7 @@ Monitors upcoming events and automatically starts configured tasks
 
 import logging
 import asyncio
+import queue
 import threading
 from datetime import datetime
 from typing import Dict, Any
@@ -177,8 +178,9 @@ class AutoTaskScheduler:
                 # (within 1 minute of start time)
                 if (-60 <= time_until_start <= 60 and
                         event.id not in self.started_events):
-                    self._start_auto_tasks(event, auto_tasks)
-                    self.started_events.add(event.id)
+                    started = self._start_auto_tasks(event, auto_tasks)
+                    if started:
+                        self.started_events.add(event.id)
 
             # Process past events (stop recordings)
             for event_data in past_events:
@@ -286,7 +288,7 @@ class AutoTaskScheduler:
 
         return options
 
-    def _start_auto_tasks(self, event, auto_tasks: dict):
+    def _start_auto_tasks(self, event, auto_tasks: dict) -> bool:
         """
         Start automatic tasks for an event.
 
@@ -294,6 +296,10 @@ class AutoTaskScheduler:
             event: CalendarEvent instance
             auto_tasks: Dictionary of auto-task configuration
         """
+        loop = None
+        thread = None
+        result_queue = queue.Queue(maxsize=1)
+
         try:
             logger.info(
                 f"Starting auto tasks for event: {event.id} - {event.title}"
@@ -311,14 +317,14 @@ class AutoTaskScheduler:
                     f"无法为事件 '{event.title}' 启动自动录制：\n"
                     f"录制器正在使用中"
                 )
-                return
+                return False
 
             # Prepare recording options
             options = self._build_recording_options(event, auto_tasks)
 
             # Create a new event loop for this recording
             loop = asyncio.new_event_loop()
-            
+
             # Define async function to start recording
             async def start_recording_async():
                 await self.realtime_recorder.start_recording(
@@ -326,26 +332,46 @@ class AutoTaskScheduler:
                     options=options,
                     event_loop=loop
                 )
-            
+
             # Start the event loop in a separate thread
             def run_loop():
                 asyncio.set_event_loop(loop)
                 try:
                     loop.run_until_complete(start_recording_async())
+                except Exception as exc:  # noqa: BLE001
+                    logger.error("Error in event loop while starting: %s", exc, exc_info=True)
+                    try:
+                        result_queue.put_nowait(('error', exc))
+                    except queue.Full:
+                        pass
+                else:
+                    try:
+                        result_queue.put_nowait(('success', None))
+                    except queue.Full:
+                        pass
                     # Keep loop running for background tasks
                     loop.run_forever()
-                except Exception as e:
-                    logger.error(f"Error in event loop: {e}", exc_info=True)
                 finally:
                     loop.close()
-            
+
             thread = threading.Thread(target=run_loop, daemon=True)
             thread.start()
-            
-            # Wait a bit for recording to actually start
-            import time
-            time.sleep(0.5)
-            
+
+            # Wait for start result from background thread
+            try:
+                status, payload = result_queue.get(timeout=5.0)
+            except queue.Empty:
+                status = 'success' if self.realtime_recorder.is_recording else 'error'
+                payload = None
+
+            if status == 'error':
+                raise RuntimeError(
+                    f"自动录制启动失败：{payload}" if payload else "自动录制启动失败"
+                )
+
+            if not self.realtime_recorder.is_recording:
+                raise RuntimeError("自动录制未在预期时间内启动")
+
             # Store recording info for later stopping
             self.active_recordings[event.id] = {
                 'event': event,
@@ -354,28 +380,44 @@ class AutoTaskScheduler:
                 'loop': loop,
                 'thread': thread
             }
-            
+
             logger.info(
                 f"Successfully started auto tasks for event {event.id}"
             )
-            
+
             # Send success notification
             self.notification_manager.send_success(
                 'EchoNote - 自动任务已启动',
                 f"已为事件 '{event.title}' 启动自动录制"
             )
+            return True
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(
                 f"Failed to start auto tasks for event {event.id}: {e}",
                 exc_info=True
             )
-            
+
+            # Ensure no stale state remains
+            self.active_recordings.pop(event.id, None)
+            self.started_events.discard(event.id)
+
+            if loop is not None:
+                try:
+                    if not loop.is_closed():
+                        loop.call_soon_threadsafe(loop.stop)
+                except Exception:  # noqa: BLE001
+                    pass
+
+            if thread is not None and thread.is_alive():
+                thread.join(timeout=2.0)
+
             # Send error notification
             self.notification_manager.send_error(
                 'EchoNote - 自动任务启动失败',
                 f"无法为事件 '{event.title}' 启动自动录制：\n{str(e)}"
             )
+            return False
             # Don't raise - we want the scheduler to continue
 
     def _stop_auto_tasks(self, event):

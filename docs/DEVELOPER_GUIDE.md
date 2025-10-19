@@ -180,6 +180,7 @@ Each subpackage inside `core/` houses a manager that encapsulates domain logic a
 - **Timeline (`core/timeline/`)**
   - `TimelineManager` aggregates events and artifacts (`get_timeline_events`, `search_events`, `get_event_artifacts`).
   - `AutoTaskScheduler` observes upcoming events and can trigger `RealtimeRecorder` or transcription tasks automatically.
+  - Auto task startup waits for explicit confirmation from the `RealtimeRecorder` thread. If microphone capture or other dependencies fail during startup, the scheduler clears any pending state and emits an error notification—ensure audio drivers and required binaries are ready before enabling automatic recording.
 
 - **Settings (`core/settings/manager.py`)**
   - Centralizes user preferences, theme toggles, language selection, API credentials, and persists values through `ConfigManager` and the secrets store.

@@ -148,6 +148,37 @@ class DummyTranslationEngine:
         return f"{text}-to-{target_lang}"
 
 
+class StubNotificationManager:
+    def __init__(self):
+        self.success_messages = []
+        self.error_messages = []
+        self.warning_messages = []
+
+    def send_success(self, title, message):
+        self.success_messages.append((title, message))
+
+    def send_error(self, title, message):
+        self.error_messages.append((title, message))
+
+    def send_warning(self, title, message):
+        self.warning_messages.append((title, message))
+
+
+class DummyBackgroundScheduler:
+    def __init__(self):
+        self.jobs = []
+        self.started = False
+
+    def add_job(self, func, trigger, **kwargs):  # noqa: ARG002
+        self.jobs.append((func, trigger, kwargs))
+
+    def start(self):
+        self.started = True
+
+    def shutdown(self, wait=True):  # noqa: ARG002
+        self.started = False
+
+
 def test_start_recording_without_audio_capture():
     from core.realtime.recorder import RealtimeRecorder
 
@@ -184,6 +215,85 @@ def test_stop_recording_without_start():
 
     result = asyncio.run(recorder.stop_recording())
     assert result == {}
+
+
+def test_auto_scheduler_reports_start_failure(monkeypatch):
+    from core.realtime.recorder import RealtimeRecorder
+
+    notification_stub = StubNotificationManager()
+
+    background_module = types.ModuleType("apscheduler.schedulers.background")
+    background_module.BackgroundScheduler = DummyBackgroundScheduler
+    schedulers_module = types.ModuleType("apscheduler.schedulers")
+    schedulers_module.background = background_module
+    apscheduler_module = types.ModuleType("apscheduler")
+    apscheduler_module.schedulers = schedulers_module
+
+    monkeypatch.setitem(sys.modules, "apscheduler", apscheduler_module)
+    monkeypatch.setitem(sys.modules, "apscheduler.schedulers", schedulers_module)
+    monkeypatch.setitem(
+        sys.modules,
+        "apscheduler.schedulers.background",
+        background_module,
+    )
+
+    ui_module = types.ModuleType("ui")
+    common_module = types.ModuleType("ui.common")
+    notification_module = types.ModuleType("ui.common.notification")
+
+    notification_module.get_notification_manager = lambda: notification_stub
+    notification_module.NotificationManager = object
+
+    common_module.notification = notification_module
+    ui_module.common = common_module
+
+    monkeypatch.setitem(sys.modules, "ui", ui_module)
+    monkeypatch.setitem(sys.modules, "ui.common", common_module)
+    monkeypatch.setitem(
+        sys.modules,
+        "ui.common.notification",
+        notification_module,
+    )
+
+    from core.timeline import auto_task_scheduler as scheduler_module
+
+    monkeypatch.setattr(
+        scheduler_module,
+        "get_notification_manager",
+        lambda: notification_stub,
+    )
+
+    recorder = RealtimeRecorder(
+        audio_capture=FailingAudioCapture(),
+        speech_engine=DummySpeechEngine(),
+        translation_engine=None,
+        db_connection=None,
+        file_manager=DummyFileManager(),
+    )
+
+    scheduler = scheduler_module.AutoTaskScheduler(
+        timeline_manager=object(),
+        realtime_recorder=recorder,
+        db_connection=None,
+        file_manager=DummyFileManager(),
+        reminder_minutes=5,
+        settings_manager=None,
+    )
+
+    event = types.SimpleNamespace(id='evt-fail', title='Broken capture')
+    auto_tasks = {'enable_recording': True, 'enable_transcription': True}
+
+    started = scheduler._start_auto_tasks(event, auto_tasks)
+
+    assert started is False
+    assert recorder.is_recording is False
+    assert event.id not in scheduler.active_recordings
+    assert event.id not in scheduler.started_events
+    assert notification_stub.success_messages == []
+    assert notification_stub.error_messages, "Error notification should be sent"
+    assert "自动任务启动失败" in notification_stub.error_messages[-1][0]
+
+    scheduler.scheduler.shutdown(wait=False)
 
 
 def test_stop_recording_without_database_skips_calendar_event(monkeypatch):
