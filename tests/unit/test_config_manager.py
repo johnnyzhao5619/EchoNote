@@ -41,6 +41,21 @@ def test_config_manager_merges_defaults(tmp_path, monkeypatch):
     )
     assert manager.get("timeline.page_size") == 50
 
+    timeline_page_size = manager.get("timeline.page_size")
+    database_path = manager.get("database.path")
+    calendar_local_color = manager.get("calendar.colors.local")
+    ui_theme = manager.get("ui.theme")
+
+    merged["timeline"]["page_size"] = timeline_page_size + 10
+    merged["database"]["path"] = "modified-path"
+    merged["calendar"]["colors"]["local"] = "#FFFFFF"
+    merged["ui"]["theme"] = "invalid-theme"
+
+    assert manager.get("timeline.page_size") == timeline_page_size
+    assert manager.get("database.path") == database_path
+    assert manager.get("calendar.colors.local") == calendar_local_color
+    assert manager.get("ui.theme") == ui_theme
+
     defaults = manager.get_defaults()
     assert (
         defaults["transcription"]["faster_whisper"]["default_model"]

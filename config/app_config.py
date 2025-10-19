@@ -317,7 +317,7 @@ class ConfigManager:
         Returns:
             Complete configuration dictionary
         """
-        return self._config.copy()
+        return self._clone_value(self._config)
 
     def reload(self) -> None:
         """Reload configuration from disk."""
