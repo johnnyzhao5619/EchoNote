@@ -170,6 +170,7 @@ Each subpackage inside `core/` houses a manager that encapsulates domain logic a
 
 - **Real-time recording (`core/realtime/`)**
   - `RealtimeRecorder` streams audio frames from `engines/audio/capture.py`, applies voice-activity detection with the default thresholds, and dispatches transcripts to listeners. VAD currently runs automatically with no user-facing toggle; a forthcoming control will live under **Settings → Real-time Recording → Voice Activity Detection** once exposed in the UI.
+  - 每次调用 `RealtimeRecorder.start_recording` 都会重新构建内部转录、翻译及流式输出队列，确保它们在各自事件循环内首次消费时才绑定，避免 “bound to a different event loop” 错误。
   - `audio_buffer.py` maintains rolling buffers for low-latency playback or streaming transcripts.
   - `SettingsManager.get_realtime_preferences()` centralizes the default recording format and auto-save toggle. UI (`ui/realtime_record/widget.py`) and background schedulers (`core/timeline/auto_task_scheduler.py`) both consult it before starting a session so that changing settings propagates immediately.
 
@@ -180,7 +181,7 @@ Each subpackage inside `core/` houses a manager that encapsulates domain logic a
 - **Timeline (`core/timeline/`)**
   - `TimelineManager` aggregates events and artifacts (`get_timeline_events`, `search_events`, `get_event_artifacts`).
   - `AutoTaskScheduler` observes upcoming events and can trigger `RealtimeRecorder` or transcription tasks automatically.
-  - Auto task startup waits for explicit confirmation from the `RealtimeRecorder` thread. If microphone capture or other dependencies fail during startup, the scheduler clears any pending state and emits an error notification—ensure audio drivers and required binaries are ready before enabling automatic recording.
+  - Auto task startup waits for explicit confirmation from the `RealtimeRecorder` thread. If microphone capture or other dependencies fail during startup, the scheduler clears any pending state and emits an error notification—ensure audio drivers and required binaries are ready before enabling automatic recording. 自动任务会在独立线程中运行新的 asyncio 事件循环；录制器会为每次会话重建队列，因此可以在 UI 事件循环与自动任务循环之间无缝切换。
 
 - **Settings (`core/settings/manager.py`)**
   - Centralizes user preferences, theme toggles, language selection, API credentials, and persists values through `ConfigManager` and the secrets store.

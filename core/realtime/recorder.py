@@ -61,13 +61,13 @@ class RealtimeRecorder:
         self.recording_audio_buffer = []
         self.audio_buffer: Optional[AudioBuffer] = None
 
-        # 转录和翻译队列
-        self.transcription_queue = asyncio.Queue()
-        self.translation_queue = asyncio.Queue()
+        # 转录和翻译队列（在每次会话开始时重新构建）
+        self.transcription_queue: Optional[asyncio.Queue] = None
+        self.translation_queue: Optional[asyncio.Queue] = None
 
         # 面向外部消费者的文本流队列（用于生成器接口）
-        self._transcription_stream_queue: asyncio.Queue = asyncio.Queue()
-        self._translation_stream_queue: asyncio.Queue = asyncio.Queue()
+        self._transcription_stream_queue: Optional[asyncio.Queue] = None
+        self._translation_stream_queue: Optional[asyncio.Queue] = None
 
         # 异步任务
         self.processing_task = None
@@ -124,6 +124,29 @@ class RealtimeRecorder:
         self.on_audio_data = on_audio_data
         self.on_marker_added = on_marker
 
+    def _initialize_session_queues(self) -> None:
+        """在当前事件循环中创建新的异步队列。"""
+        for queue in (
+            self.transcription_queue,
+            self.translation_queue,
+            self._transcription_stream_queue,
+            self._translation_stream_queue,
+        ):
+            self._drain_queue(queue)
+
+        self.transcription_queue = asyncio.Queue()
+        self.translation_queue = asyncio.Queue()
+        self._transcription_stream_queue = asyncio.Queue()
+        self._translation_stream_queue = asyncio.Queue()
+
+    def _release_session_queues(self) -> None:
+        """释放异步队列引用，等待下次会话重新创建。"""
+        self.transcription_queue = None
+        self.translation_queue = None
+        self._transcription_stream_queue = None
+        self._translation_stream_queue = None
+        self._event_loop = None
+
     async def start_recording(
         self, input_source: Optional[int] = None,
         options: Optional[Dict] = None,
@@ -179,6 +202,9 @@ class RealtimeRecorder:
             except Exception as exc:  # noqa: BLE001
                 logger.warning(f"Failed to apply sample rate to audio capture: {exc}")
 
+        # 为本次会话重建异步队列，确保绑定当前事件循环
+        self._initialize_session_queues()
+
         # 重置状态
         self.is_recording = True
         self.recording_start_time = datetime.now()
@@ -188,12 +214,6 @@ class RealtimeRecorder:
         self.accumulated_translation = []
         with self._marker_lock:
             self.markers = []
-
-        # 清空队列
-        self._drain_queue(self.transcription_queue)
-        self._drain_queue(self.translation_queue)
-        self._drain_queue(self._transcription_stream_queue)
-        self._drain_queue(self._translation_stream_queue)
 
         try:
             # 启动音频捕获
@@ -250,13 +270,17 @@ class RealtimeRecorder:
         # 将音频块放入转录队列（使用线程安全的方式）
         try:
             # 使用 call_soon_threadsafe 来在事件循环中安全地添加任务
-            if hasattr(self, '_event_loop') and self._event_loop is not None:
+            if (
+                hasattr(self, '_event_loop')
+                and self._event_loop is not None
+                and self.transcription_queue is not None
+            ):
                 self._event_loop.call_soon_threadsafe(
                     self.transcription_queue.put_nowait,
                     audio_chunk.copy()
                 )
             else:
-                logger.debug("Event loop not set, audio chunk not queued")
+                logger.debug("Event loop or transcription queue not ready, audio chunk skipped")
         except Exception as e:
             logger.warning(f"Failed to queue audio chunk: {e}")
 
@@ -273,6 +297,12 @@ class RealtimeRecorder:
 
         # 导入 VAD 检测器
         from engines.audio.vad import VADDetector
+
+        queue = self.transcription_queue
+        stream_queue = self._transcription_stream_queue
+        if queue is None or stream_queue is None:
+            logger.error("Transcription queues are not initialized; aborting audio stream processing")
+            return
 
         # 创建 VAD 检测器和音频缓冲区
         vad = None
@@ -304,7 +334,7 @@ class RealtimeRecorder:
             try:
                 # 从队列获取音频块（超时 0.5 秒）
                 audio_chunk = await asyncio.wait_for(
-                    self.transcription_queue.get(),
+                    queue.get(),
                     timeout=0.5
                 )
                 
@@ -375,7 +405,7 @@ class RealtimeRecorder:
                                     self.accumulated_transcription.append(text)
 
                                     # 推送到实时转录流
-                                    await self._transcription_stream_queue.put(text)
+                                    await stream_queue.put(text)
 
                                     # 通知 UI 更新
                                     if self.on_transcription_update:
@@ -390,7 +420,9 @@ class RealtimeRecorder:
                                         'enable_translation', False
                                     )
                                     if enable_trans:
-                                        await self.translation_queue.put(text)
+                                        translation_queue = self.translation_queue
+                                        if translation_queue is not None:
+                                            await translation_queue.put(text)
 
                                     logger.info(f"Transcribed successfully: {text[:50]}...")
                                     
@@ -423,7 +455,7 @@ class RealtimeRecorder:
     async def _process_translation_stream(self):
         """处理翻译流的异步任务"""
         logger.info("Translation stream processing started")
-        
+
         # 检查翻译引擎是否可用
         if not self.translation_engine:
             logger.warning("Translation engine not available")
@@ -431,11 +463,17 @@ class RealtimeRecorder:
                 self.on_error("Translation not available: No API key configured")
             return
 
-        while self.is_recording or not self.translation_queue.empty():
+        queue = self.translation_queue
+        stream_queue = self._translation_stream_queue
+        if queue is None or stream_queue is None:
+            logger.error("Translation queues are not initialized; aborting translation stream processing")
+            return
+
+        while self.is_recording or not queue.empty():
             try:
                 # 从队列获取转录文本（超时 0.5 秒）
                 text = await asyncio.wait_for(
-                    self.translation_queue.get(),
+                    queue.get(),
                     timeout=0.5
                 )
 
@@ -455,7 +493,7 @@ class RealtimeRecorder:
                     self.accumulated_translation.append(translated_text)
 
                     # 推送到实时翻译流
-                    await self._translation_stream_queue.put(translated_text)
+                    await stream_queue.put(translated_text)
 
                     # 通知 UI 更新
                     if self.on_translation_update:
@@ -517,8 +555,10 @@ class RealtimeRecorder:
                 logger.warning("Translation task timeout")
 
         # 标记流式队列完成，确保生成器退出
-        self._signal_stream_completion(self._transcription_stream_queue)
-        self._signal_stream_completion(self._translation_stream_queue)
+        transcription_stream_queue = self._transcription_stream_queue
+        translation_stream_queue = self._translation_stream_queue
+        self._signal_stream_completion(transcription_stream_queue)
+        self._signal_stream_completion(translation_stream_queue)
 
         # 计算录制时长
         recording_end_time = datetime.now()
@@ -572,6 +612,10 @@ class RealtimeRecorder:
             result['event_id'] = event_id
 
         logger.info(f"Recording stopped: duration={duration:.2f}s")
+
+        # 本次会话完成后清理队列引用
+        self._release_session_queues()
+
         return result
 
     async def _save_recording(self) -> str:
@@ -975,14 +1019,18 @@ class RealtimeRecorder:
             仍然推荐通过 set_callbacks 与 UI Signal 集成；
             该生成器主要面向需要纯异步接口的调用方。
         """
+        queue = self._transcription_stream_queue
+        if queue is None:
+            return
+
         # 队列由 _process_audio_stream 异步生产文本片段
         while True:
-            if not self.is_recording and self._transcription_stream_queue.empty():
+            if not self.is_recording and queue.empty():
                 break
 
             try:
                 item = await asyncio.wait_for(
-                    self._transcription_stream_queue.get(),
+                    queue.get(),
                     timeout=0.2
                 )
             except asyncio.TimeoutError:
@@ -1004,13 +1052,17 @@ class RealtimeRecorder:
             仍然推荐通过 set_callbacks 与 UI Signal 集成；
             该生成器面向需要纯异步接口的场景。
         """
+        queue = self._translation_stream_queue
+        if queue is None:
+            return
+
         while True:
-            if not self.is_recording and self._translation_stream_queue.empty():
+            if not self.is_recording and queue.empty():
                 break
 
             try:
                 item = await asyncio.wait_for(
-                    self._translation_stream_queue.get(),
+                    queue.get(),
                     timeout=0.2
                 )
             except asyncio.TimeoutError:
@@ -1022,8 +1074,11 @@ class RealtimeRecorder:
             yield item
 
     @staticmethod
-    def _drain_queue(queue: asyncio.Queue) -> None:
+    def _drain_queue(queue: Optional[asyncio.Queue]) -> None:
         """快速清空异步队列中的残留元素。"""
+        if queue is None:
+            return
+
         while not queue.empty():
             try:
                 queue.get_nowait()
@@ -1031,8 +1086,11 @@ class RealtimeRecorder:
                 break
 
     @staticmethod
-    def _signal_stream_completion(queue: asyncio.Queue) -> None:
+    def _signal_stream_completion(queue: Optional[asyncio.Queue]) -> None:
         """在生成器队列尾部追加终止标记。"""
+        if queue is None:
+            return
+
         try:
             queue.put_nowait(None)
         except asyncio.QueueFull:  # pragma: no cover - 默认队列无限大
@@ -1066,8 +1124,16 @@ class RealtimeRecorder:
             'duration': self.get_recording_duration(),
             'start_time': start_time,
             'buffer_size': len(self.recording_audio_buffer),
-            'transcription_queue_size': self.transcription_queue.qsize(),
-            'translation_queue_size': self.translation_queue.qsize(),
+            'transcription_queue_size': (
+                self.transcription_queue.qsize()
+                if self.transcription_queue is not None
+                else 0
+            ),
+            'translation_queue_size': (
+                self.translation_queue.qsize()
+                if self.translation_queue is not None
+                else 0
+            ),
             'transcription_count': len(self.accumulated_transcription),
             'translation_count': len(self.accumulated_translation)
         }
@@ -1131,6 +1197,8 @@ class RealtimeRecorder:
         self._drain_queue(self.translation_queue)
         self._drain_queue(self._transcription_stream_queue)
         self._drain_queue(self._translation_stream_queue)
+
+        self._release_session_queues()
     
     def _is_duplicate_transcription(self, new_text: str, last_text: str) -> bool:
         """
