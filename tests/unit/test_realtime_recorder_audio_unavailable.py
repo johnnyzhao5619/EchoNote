@@ -198,6 +198,51 @@ class DummyBackgroundScheduler:
         self.started = False
 
 
+def _configure_scheduler_stubs(monkeypatch, notification_stub):
+    background_module = types.ModuleType("apscheduler.schedulers.background")
+    background_module.BackgroundScheduler = DummyBackgroundScheduler
+    schedulers_module = types.ModuleType("apscheduler.schedulers")
+    schedulers_module.background = background_module
+    apscheduler_module = types.ModuleType("apscheduler")
+    apscheduler_module.schedulers = schedulers_module
+
+    monkeypatch.setitem(sys.modules, "apscheduler", apscheduler_module)
+    monkeypatch.setitem(sys.modules, "apscheduler.schedulers", schedulers_module)
+    monkeypatch.setitem(
+        sys.modules,
+        "apscheduler.schedulers.background",
+        background_module,
+    )
+
+    ui_module = types.ModuleType("ui")
+    common_module = types.ModuleType("ui.common")
+    notification_module = types.ModuleType("ui.common.notification")
+
+    notification_module.get_notification_manager = lambda: notification_stub
+    notification_module.NotificationManager = object
+
+    common_module.notification = notification_module
+    ui_module.common = common_module
+
+    monkeypatch.setitem(sys.modules, "ui", ui_module)
+    monkeypatch.setitem(sys.modules, "ui.common", common_module)
+    monkeypatch.setitem(
+        sys.modules,
+        "ui.common.notification",
+        notification_module,
+    )
+
+    from core.timeline import auto_task_scheduler as scheduler_module
+
+    monkeypatch.setattr(
+        scheduler_module,
+        "get_notification_manager",
+        lambda: notification_stub,
+    )
+
+    return scheduler_module
+
+
 def test_start_recording_without_audio_capture():
     from core.realtime.recorder import RealtimeRecorder
 
@@ -241,46 +286,7 @@ def test_auto_scheduler_reports_start_failure(monkeypatch):
 
     notification_stub = StubNotificationManager()
 
-    background_module = types.ModuleType("apscheduler.schedulers.background")
-    background_module.BackgroundScheduler = DummyBackgroundScheduler
-    schedulers_module = types.ModuleType("apscheduler.schedulers")
-    schedulers_module.background = background_module
-    apscheduler_module = types.ModuleType("apscheduler")
-    apscheduler_module.schedulers = schedulers_module
-
-    monkeypatch.setitem(sys.modules, "apscheduler", apscheduler_module)
-    monkeypatch.setitem(sys.modules, "apscheduler.schedulers", schedulers_module)
-    monkeypatch.setitem(
-        sys.modules,
-        "apscheduler.schedulers.background",
-        background_module,
-    )
-
-    ui_module = types.ModuleType("ui")
-    common_module = types.ModuleType("ui.common")
-    notification_module = types.ModuleType("ui.common.notification")
-
-    notification_module.get_notification_manager = lambda: notification_stub
-    notification_module.NotificationManager = object
-
-    common_module.notification = notification_module
-    ui_module.common = common_module
-
-    monkeypatch.setitem(sys.modules, "ui", ui_module)
-    monkeypatch.setitem(sys.modules, "ui.common", common_module)
-    monkeypatch.setitem(
-        sys.modules,
-        "ui.common.notification",
-        notification_module,
-    )
-
-    from core.timeline import auto_task_scheduler as scheduler_module
-
-    monkeypatch.setattr(
-        scheduler_module,
-        "get_notification_manager",
-        lambda: notification_stub,
-    )
+    scheduler_module = _configure_scheduler_stubs(monkeypatch, notification_stub)
 
     recorder = RealtimeRecorder(
         audio_capture=FailingAudioCapture(),
@@ -313,6 +319,86 @@ def test_auto_scheduler_reports_start_failure(monkeypatch):
     assert "自动任务启动失败" in notification_stub.error_messages[-1][0]
 
     scheduler.scheduler.shutdown(wait=False)
+
+
+def test_recorder_reinitializes_queues_between_event_loops(monkeypatch):
+    from core.realtime.recorder import RealtimeRecorder
+
+    monkeypatch.setattr("engines.audio.vad.VADDetector", AlwaysSpeechVAD)
+
+    audio_capture = DummyAudioCapture()
+    speech_engine = DummyStreamingSpeechEngine()
+    recorder = RealtimeRecorder(
+        audio_capture=audio_capture,
+        speech_engine=speech_engine,
+        translation_engine=None,
+        db_connection=None,
+        file_manager=DummyFileManager(),
+    )
+
+    options = {
+        'save_recording': False,
+        'save_transcript': False,
+        'create_calendar_event': False,
+        'enable_translation': False,
+    }
+
+    first_session_queues: dict[str, asyncio.Queue] = {}
+
+    async def _widget_session():
+        loop = asyncio.get_running_loop()
+        await recorder.start_recording(options=options, event_loop=loop)
+        first_session_queues['transcription'] = recorder.transcription_queue
+        first_session_queues['translation'] = recorder.translation_queue
+        first_session_queues['transcription_stream'] = recorder._transcription_stream_queue
+        first_session_queues['translation_stream'] = recorder._translation_stream_queue
+        await recorder.stop_recording()
+
+    asyncio.run(_widget_session())
+
+    for queue in first_session_queues.values():
+        assert queue is not None
+
+    notification_stub = StubNotificationManager()
+    scheduler_module = _configure_scheduler_stubs(monkeypatch, notification_stub)
+
+    scheduler = scheduler_module.AutoTaskScheduler(
+        timeline_manager=object(),
+        realtime_recorder=recorder,
+        db_connection=None,
+        file_manager=DummyFileManager(),
+        reminder_minutes=5,
+        settings_manager=None,
+    )
+
+    event = types.SimpleNamespace(id='evt-loop', title='Multi-loop test')
+    auto_tasks = {
+        'enable_recording': True,
+        'enable_transcription': True,
+        'enable_translation': False,
+    }
+
+    second_session_queues: dict[str, asyncio.Queue] = {}
+    started = False
+    try:
+        started = scheduler._start_auto_tasks(event, auto_tasks)
+        assert started is True
+        assert recorder.is_recording is True
+
+        second_session_queues['transcription'] = recorder.transcription_queue
+        second_session_queues['translation'] = recorder.translation_queue
+        second_session_queues['transcription_stream'] = recorder._transcription_stream_queue
+        second_session_queues['translation_stream'] = recorder._translation_stream_queue
+
+        for key, queue in second_session_queues.items():
+            assert queue is not None
+            assert queue is not first_session_queues[key]
+    finally:
+        if started and event.id in scheduler.active_recordings:
+            scheduler._stop_auto_tasks(event)
+        scheduler.scheduler.shutdown(wait=False)
+
+    assert notification_stub.error_messages == []
 
 
 def test_stop_recording_without_database_skips_calendar_event(monkeypatch):
@@ -409,10 +495,10 @@ def test_start_recording_failure_rolls_back_state():
     assert recorder.audio_buffer is None
     assert recorder.processing_task is None
     assert recorder.translation_task is None
-    assert recorder.transcription_queue.empty()
-    assert recorder.translation_queue.empty()
-    assert recorder._transcription_stream_queue.empty()
-    assert recorder._translation_stream_queue.empty()
+    assert recorder.transcription_queue is None
+    assert recorder.translation_queue is None
+    assert recorder._transcription_stream_queue is None
+    assert recorder._translation_stream_queue is None
     assert errors, "Expected on_error to be triggered"
     assert "Failed to start recording" in errors[-1]
 
