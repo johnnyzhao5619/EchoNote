@@ -52,6 +52,8 @@ class TaskQueue:
         self.tasks: Dict[str, Dict[str, Any]] = {}
         self.running = False
         self.paused = False
+        self._pause_event = asyncio.Event()
+        self._pause_event.set()
         self.worker_tasks = []
         
         logger.info(
@@ -100,8 +102,9 @@ class TaskQueue:
         if self.running:
             logger.warning("Task queue is already running")
             return
-        
+
         self.running = True
+        self._pause_event.set()
         logger.info("Starting task queue processing")
         
         # Create worker tasks
@@ -137,6 +140,7 @@ class TaskQueue:
             return
 
         self.paused = True
+        self._pause_event.clear()
         logger.info("Task queue paused")
 
     async def resume(self):
@@ -146,6 +150,7 @@ class TaskQueue:
             return
 
         self.paused = False
+        self._pause_event.set()
         logger.info("Task queue resumed")
 
     def is_paused(self) -> bool:
@@ -155,19 +160,19 @@ class TaskQueue:
     async def _worker(self, worker_id: int):
         """
         Worker coroutine that processes tasks from the queue.
-        
+
         Args:
             worker_id: Worker identifier for logging
         """
         logger.debug(f"Worker {worker_id} started")
-        
-        while self.running:
-            # Check if paused
-            if self.paused:
-                await asyncio.sleep(1.0)
-                continue
 
+        while self.running:
             try:
+                # Wait until the queue is resumed before attempting to fetch
+                await self._pause_event.wait()
+                if not self.running:
+                    break
+
                 # Get task from queue with timeout
                 task_id = await asyncio.wait_for(
                     self.queue.get(),
@@ -178,18 +183,23 @@ class TaskQueue:
             except asyncio.CancelledError:
                 logger.debug(f"Worker {worker_id} cancelled")
                 break
-            
-            # Check again if paused (task was retrieved but queue is paused)
-            if self.paused:
-                # Put task back in queue
-                await self.queue.put(task_id)
-                await asyncio.sleep(1.0)
-                continue
 
-            # Process task
-            await self._process_task(task_id, worker_id)
-            self.queue.task_done()
-        
+            try:
+                if self.paused:
+                    await self._pause_event.wait()
+                    if not self.running:
+                        break
+
+                # Process task
+                await self._process_task(task_id, worker_id)
+            except asyncio.CancelledError:
+                logger.debug(
+                    f"Worker {worker_id} cancelled while handling task {task_id}"
+                )
+                raise
+            finally:
+                self.queue.task_done()
+
         logger.debug(f"Worker {worker_id} stopped")
 
     def _release_task_resources(self, task_id: str):
