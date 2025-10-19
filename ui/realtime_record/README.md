@@ -45,13 +45,18 @@ from data.storage.file_manager import FileManager
 from utils.i18n import I18nQtManager
 
 # Initialize dependencies
+config_manager = ConfigManager()
 audio_capture = AudioCapture()
 speech_engine = FasterWhisperEngine(model_size='base')
-translation_engine = GoogleTranslateEngine()
+google_api_key = config_manager.get('translation.google.api_key')
+if google_api_key:
+    translation_engine = GoogleTranslateEngine(api_key=google_api_key)
+else:
+    translation_engine = None  # 未配置 Google API Key 时请禁用翻译功能
 db = DatabaseConnection('~/.echonote/data.db')
 file_manager = FileManager('~/.echonote')
 i18n = I18nQtManager()
-settings_manager = SettingsManager(ConfigManager())
+settings_manager = SettingsManager(config_manager)
 
 # Create recorder
 recorder = RealtimeRecorder(
@@ -73,6 +78,8 @@ widget = RealtimeRecordWidget(
 # Show widget
 widget.show()
 ```
+
+> **重要提示**：要启用翻译功能，必须在配置中提供有效的 `translation.google.api_key` 并将其传入 `GoogleTranslateEngine`；如果无法提供有效的 Google API Key，请将 `translation_engine` 设置为 `None`，确保在界面中禁用翻译相关功能。
 
 ### AudioVisualizer
 
