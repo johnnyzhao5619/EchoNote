@@ -213,6 +213,7 @@ UI code under `ui/` follows Qt best practices:
 
 #### UI/线程与异步事件循环
 - `ui/realtime_record/widget.py` 为实时录制场景专门启动了一个 asyncio 事件循环线程，用于驱动录制/翻译协程。该线程在控件构造时创建，必须在控件关闭时显式停止：调用 `self._async_loop.call_soon_threadsafe(self._async_loop.stop)`，并在同一清理例程里 `join` 线程，防止线程泄漏。
+- `core/realtime/recorder.py` 在启动录音失败时会自动回滚内部状态：取消已调度的任务、清空音频缓冲与队列，并恢复 `is_recording` 等标记。调用方一旦收到异常或 `on_error` 回调即可安全重试，无需手动清理。
 - 清理由三个步骤组成：1) 停止 `QTimer`（如状态轮询器）并断开其 `timeout` 回调，避免 Qt 保留悬挂引用；2) 若录制仍在进行，通过 `asyncio.run_coroutine_threadsafe` 提交 `RealtimeRecorder.stop_recording()`，等待结果或在超时时取消；3) 在事件循环停止后将 `set_callbacks()` 设为默认，确保控件被销毁后不会再访问已经释放的 UI 对象。
 - 如需销毁控件，请使用 `close()` 或 `deleteLater()`，它们都会触发上述清理逻辑。不要跳过 `closeEvent`，也不要直接丢弃实例，否则后台线程和回调将保持活动状态并干扰后续页面创建。
 

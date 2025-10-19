@@ -113,6 +113,13 @@ class DummyAudioCapture:
         self.started = False
 
 
+class FailingAudioCapture(DummyAudioCapture):
+    """Audio capture stub that raises when starting capture."""
+
+    def start_capture(self, device_index=None, callback=None):  # noqa: ARG002
+        raise RuntimeError("boom")
+
+
 class AlwaysSpeechVAD:
     """VAD stub that treats every buffered chunk as valid speech."""
 
@@ -177,6 +184,45 @@ def test_stop_recording_without_start():
 
     result = asyncio.run(recorder.stop_recording())
     assert result == {}
+
+
+def test_start_recording_failure_rolls_back_state():
+    from core.realtime.recorder import RealtimeRecorder
+
+    audio_capture = FailingAudioCapture()
+    recorder = RealtimeRecorder(
+        audio_capture=audio_capture,
+        speech_engine=DummySpeechEngine(),
+        translation_engine=None,
+        db_connection=None,
+        file_manager=DummyFileManager(),
+    )
+
+    errors = []
+
+    def _on_error(message):
+        errors.append(message)
+
+    recorder.set_callbacks(on_error=_on_error)
+
+    async def _start():
+        await recorder.start_recording()
+
+    with pytest.raises(RuntimeError, match="boom"):
+        asyncio.run(_start())
+
+    assert recorder.is_recording is False
+    assert recorder.recording_start_time is None
+    assert recorder.recording_audio_buffer == []
+    assert recorder.audio_buffer is None
+    assert recorder.processing_task is None
+    assert recorder.translation_task is None
+    assert recorder.transcription_queue.empty()
+    assert recorder.translation_queue.empty()
+    assert recorder._transcription_stream_queue.empty()
+    assert recorder._translation_stream_queue.empty()
+    assert errors, "Expected on_error to be triggered"
+    assert "Failed to start recording" in errors[-1]
 
 
 def test_audio_buffer_accumulates_and_clears(monkeypatch):
