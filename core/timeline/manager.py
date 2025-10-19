@@ -44,8 +44,8 @@ class TimelineManager:
     def get_timeline_events(
         self,
         center_time: datetime,
-        past_days: int,
-        future_days: int,
+        past_days: float,
+        future_days: float,
         page: int = 0,
         page_size: int = 50
     ) -> Dict[str, Any]:
@@ -54,8 +54,8 @@ class TimelineManager:
 
         Args:
             center_time: Center time for the timeline
-            past_days: Number of days to look back
-            future_days: Number of days to look forward
+            past_days: Number of days to look back (supports fractional days)
+            future_days: Number of days to look forward (supports fractional days)
             page: Page number for pagination (0-indexed)
             page_size: Number of events per page
 

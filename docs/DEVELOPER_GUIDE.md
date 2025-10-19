@@ -22,6 +22,7 @@
 9. [Runbook & Troubleshooting](#9-runbook--troubleshooting)
 10. [Contribution Workflow](#10-contribution-workflow)
 11. [Reference Resources](#11-reference-resources)
+12. [Architecture Review Notes (2025-02)](#12-architecture-review-notes-2025-02)
 
 ---
 
@@ -329,3 +330,18 @@ Enable debug logging (set `ECHO_NOTE_LOG_LEVEL=DEBUG` before launch) to get verb
 - `docs/GOOGLE_OAUTH_SETUP.md` – configuring Google API credentials
 
 For unresolved questions, open a GitHub issue or start a discussion thread so decisions remain discoverable.
+
+---
+
+## 12. Architecture Review Notes (2025-02)
+
+### 12.1 已交付的改进
+- **日历入口数据校验强化**：`CalendarManager.create_event` 现在会验证标题与起止时间、并在必要时统一时区后比较时间顺序，防止脏数据写入数据库并避免后续 UI/自动化流程崩溃。【F:core/calendar/manager.py†L68-L140】【F:core/calendar/manager.py†L603-L655】
+- **OAuth 令牌过期计算更健壮**：刷新逻辑会在有时区信息时使用相同的时区基准计算 `expires_in`，规避天真地减法导致的 `TypeError` 并减少无谓的重试。【F:core/calendar/manager.py†L316-L348】
+- **时间线调度窗口可配置**：自动任务调度器以分钟维度定义前后窗口并转换为天数传递给时间线查询，移除硬编码常数，也新增了针对不同时区的秒数计算辅助方法。【F:core/timeline/auto_task_scheduler.py†L55-L198】【F:core/timeline/auto_task_scheduler.py†L641-L655】
+- **时间线接口类型修正**：`TimelineManager.get_timeline_events` 接受浮点天数并更新文档，明确允许使用细粒度窗口，提高调用方的可读性与类型一致性。【F:core/timeline/manager.py†L44-L106】
+
+### 12.2 待跟进的重点事项
+- **实时与批量 UI 待完成交互**：批量转录暂停按钮、实时录制错误/成功提示仍为 TODO，建议补齐用户反馈与状态同步逻辑以避免功能缺失。【F:ui/batch_transcribe/widget.py†L655-L678】【F:ui/realtime_record/widget.py†L1052-L1079】【F:ui/realtime_record/widget.py†L1282-L1306】
+- **时间戳与时区统一策略**：目前数据库保存的 ISO 字符串可能混合无时区和含时区两种格式（例如事件与 OAuth 令牌），后续应制定统一规范（例如统一转换为 UTC 并在 UI 层进行本地化），以免不同模块再度引入比较错误。【F:core/calendar/manager.py†L68-L140】【F:core/timeline/auto_task_scheduler.py†L147-L206】
+- **数据层脚本测试化**：`data/test_data_layer.py` 仍以脚本方式运行并依赖 `print`，建议迁移到 `pytest` 体系，复用现有夹具以保持自动化测试一致性。【F:data/test_data_layer.py†L1-L80】

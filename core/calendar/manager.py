@@ -6,8 +6,8 @@ synchronization.
 """
 
 import logging
-from typing import Optional, List, Dict, Any, TYPE_CHECKING
-from datetime import datetime
+from datetime import datetime, timezone
+from typing import Optional, List, Dict, Any, TYPE_CHECKING, Tuple
 
 from data.database.models import CalendarEvent, CalendarSyncStatus
 
@@ -66,6 +66,26 @@ class CalendarManager:
             Event ID
         """
         try:
+            # Basic validation for required fields
+            required_fields = ['title', 'start_time', 'end_time']
+            missing_fields = [
+                field for field in required_fields
+                if not event_data.get(field)
+            ]
+            if missing_fields:
+                raise ValueError(
+                    f"Missing required event fields: {', '.join(missing_fields)}"
+                )
+
+            start_dt, end_dt = self._normalize_event_window(
+                event_data['start_time'],
+                event_data['end_time']
+            )
+            if start_dt >= end_dt:
+                raise ValueError(
+                    "Event end_time must be later than start_time"
+                )
+
             # Create local event
             event = CalendarEvent(
                 title=event_data.get('title', ''),
@@ -304,8 +324,11 @@ class CalendarManager:
 
                             try:
                                 expires_at_dt = datetime.fromisoformat(expires_at_value)
+                                current_time = datetime.now(
+                                    expires_at_dt.tzinfo
+                                ) if expires_at_dt.tzinfo else datetime.now()
                                 resolved = max(
-                                    int((expires_at_dt - datetime.now()).total_seconds()),
+                                    int((expires_at_dt - current_time).total_seconds()),
                                     0
                                 )
                                 logger.debug(
@@ -532,3 +555,48 @@ class CalendarManager:
 
         except Exception as e:
             logger.error(f"Failed to save external event: {e}")
+
+    @staticmethod
+    def _normalize_event_window(
+        start_time: str,
+        end_time: str
+    ) -> Tuple[datetime, datetime]:
+        """Normalize event window datetimes for comparison.
+
+        Args:
+            start_time: Event start time in ISO format
+            end_time: Event end time in ISO format
+
+        Returns:
+            Tuple containing normalized start and end datetimes.
+
+        Raises:
+            ValueError: If either value is not a valid ISO datetime string.
+        """
+        try:
+            start_dt = datetime.fromisoformat(start_time)
+            end_dt = datetime.fromisoformat(end_time)
+        except ValueError as exc:  # pragma: no cover - defensive branch
+            raise ValueError(
+                "Event start_time and end_time must be ISO 8601 strings"
+            ) from exc
+
+        if start_dt.tzinfo and end_dt.tzinfo:
+            return (
+                start_dt.astimezone(timezone.utc),
+                end_dt.astimezone(timezone.utc)
+            )
+
+        if start_dt.tzinfo and not end_dt.tzinfo:
+            return (
+                start_dt.astimezone().replace(tzinfo=None),
+                end_dt
+            )
+
+        if end_dt.tzinfo and not start_dt.tzinfo:
+            return (
+                start_dt,
+                end_dt.astimezone().replace(tzinfo=None)
+            )
+
+        return start_dt, end_dt
