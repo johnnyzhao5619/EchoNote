@@ -401,9 +401,21 @@ class TranscriptionManager:
         self._running = False
         
         if self._loop and self._loop.is_running():
-            # Stop the event loop
-            self._loop.call_soon_threadsafe(self._loop.stop)
-        
+            try:
+                stop_future = asyncio.run_coroutine_threadsafe(
+                    self.task_queue.stop(),
+                    self._loop
+                )
+                stop_future.result(timeout=5.0)
+            except Exception as exc:
+                logger.warning(
+                    "Failed to stop task queue gracefully: %s",
+                    exc
+                )
+            finally:
+                # Stop the event loop
+                self._loop.call_soon_threadsafe(self._loop.stop)
+
         if self._thread:
             # Wait for thread to finish (with timeout)
             self._thread.join(timeout=5.0)
