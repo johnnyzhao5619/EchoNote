@@ -167,20 +167,27 @@ class AutoTaskScheduler:
         # 通过信号通知 UI 层显示通知
         self.reminder_signal.emit(event.id, event.title, auto_tasks)
 
-    def _start_auto_tasks(self, event, auto_tasks):
+    async def _start_auto_tasks(self, event, auto_tasks):
         """启动自动任务"""
+        options = {}
+
         if auto_tasks.get('enable_transcription'):
-            self.realtime_recorder.start_recording(
-                transcription=True,
-                event_id=event.id
-            )
+            options['enable_transcription'] = True
 
         if auto_tasks.get('enable_recording'):
-            self.realtime_recorder.start_recording(
-                recording=True,
-                event_id=event.id
-            )
+            options['enable_recording'] = True
+
+        if not options:
+            return
+
+        await self.realtime_recorder.start_recording(
+            input_source=None,
+            options=options,
+            event_id=event.id,
+        )
 ```
+
+> **提示**：`options` 只需包含与当前事件有关的增量配置。其他默认值应统一来自 `SettingsManager.get_realtime_preferences()`，以便 UI、调度器与实时录制模块共享同一套首选项，避免在多个位置硬编码开关或阈值。调度器在准备 `options` 前应优先读取全局首选项，并复用同一字典以保持行为一致。
 
 ## 为什么这样分离？
 
