@@ -7,7 +7,7 @@ synchronization.
 
 import logging
 from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any, TYPE_CHECKING, Tuple
+from typing import Optional, List, Dict, Any, TYPE_CHECKING, Tuple, Union
 
 from data.database.models import CalendarEvent, CalendarSyncStatus
 
@@ -85,6 +85,8 @@ class CalendarManager:
                 raise ValueError(
                     "Event end_time must be later than start_time"
                 )
+            event_data['start_time'] = start_dt.isoformat()
+            event_data['end_time'] = end_dt.isoformat()
 
             # Create local event
             event = CalendarEvent(
@@ -157,6 +159,20 @@ class CalendarManager:
                 raise ValueError(
                     f"Cannot update readonly event from {event.source}"
                 )
+
+            if 'start_time' in event_data or 'end_time' in event_data:
+                start_dt, end_dt = self._normalize_event_window(
+                    event_data.get('start_time', event.start_time),
+                    event_data.get('end_time', event.end_time)
+                )
+                if start_dt >= end_dt:
+                    raise ValueError(
+                        "Event end_time must be later than start_time"
+                    )
+                if 'start_time' in event_data:
+                    event_data['start_time'] = start_dt.isoformat()
+                if 'end_time' in event_data:
+                    event_data['end_time'] = end_dt.isoformat()
 
             # Update fields
             if 'title' in event_data:
@@ -558,28 +574,38 @@ class CalendarManager:
 
     @staticmethod
     def _normalize_event_window(
-        start_time: str,
-        end_time: str
+        start_time: Union[str, datetime],
+        end_time: Union[str, datetime]
     ) -> Tuple[datetime, datetime]:
         """Normalize event window datetimes for comparison.
 
         Args:
-            start_time: Event start time in ISO format
-            end_time: Event end time in ISO format
+            start_time: Event start time as ISO string or ``datetime``
+            end_time: Event end time as ISO string or ``datetime``
 
         Returns:
             Tuple containing normalized start and end datetimes.
 
         Raises:
-            ValueError: If either value is not a valid ISO datetime string.
+            ValueError: If either value cannot be converted to ``datetime``.
         """
-        try:
-            start_dt = datetime.fromisoformat(start_time)
-            end_dt = datetime.fromisoformat(end_time)
-        except ValueError as exc:  # pragma: no cover - defensive branch
+
+        def _coerce(value: Union[str, datetime], label: str) -> datetime:
+            if isinstance(value, datetime):
+                return value
+            if isinstance(value, str):
+                try:
+                    return datetime.fromisoformat(value)
+                except ValueError as exc:  # pragma: no cover - defensive branch
+                    raise ValueError(
+                        f"Event {label} must be a datetime instance or ISO 8601 string"
+                    ) from exc
             raise ValueError(
-                "Event start_time and end_time must be ISO 8601 strings"
-            ) from exc
+                f"Event {label} must be a datetime instance or ISO 8601 string"
+            )
+
+        start_dt = _coerce(start_time, 'start_time')
+        end_dt = _coerce(end_time, 'end_time')
 
         if start_dt.tzinfo and end_dt.tzinfo:
             return (
