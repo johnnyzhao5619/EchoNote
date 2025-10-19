@@ -162,7 +162,17 @@ class CalendarEvent:
     def save(self, db_connection):
         """Save or update event in database."""
         self.updated_at = current_timestamp()
-        
+
+        def _ensure_iso(value):
+            if isinstance(value, datetime):
+                return value.isoformat()
+            return value
+
+        self.start_time = _ensure_iso(self.start_time)
+        self.end_time = _ensure_iso(self.end_time)
+        self.created_at = _ensure_iso(self.created_at)
+        self.updated_at = _ensure_iso(self.updated_at)
+
         query = """
             INSERT OR REPLACE INTO calendar_events (
                 id, title, event_type, start_time, end_time, location,
