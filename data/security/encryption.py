@@ -5,7 +5,9 @@ Provides AES-256-GCM encryption for sensitive data with machine-specific key der
 """
 
 import base64
+import binascii
 import hashlib
+import hmac
 import logging
 import os
 import uuid
@@ -24,10 +26,14 @@ logger = logging.getLogger('echonote.security')
 class SecurityManager:
     """
     Manages encryption and decryption of sensitive data.
-    
+
     Uses AES-256-GCM for authenticated encryption with machine-specific
     key derivation for additional security.
     """
+
+    PASSWORD_SALT_SIZE = 16
+    PASSWORD_HASH_LENGTH = 32
+    PASSWORD_HASH_ITERATIONS = 200_000
 
     def __init__(self, config_dir: Optional[str] = None):
         """
@@ -264,37 +270,89 @@ class SecurityManager:
         
         return decrypted
     
+    def _hash_with_pbkdf2(self, password: str, salt: bytes) -> bytes:
+        """Derive a password hash using PBKDF2-HMAC(SHA-256)."""
+
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=self.PASSWORD_HASH_LENGTH,
+            salt=salt,
+            iterations=self.PASSWORD_HASH_ITERATIONS,
+        )
+        return kdf.derive(password.encode("utf-8"))
+
+    def _legacy_hash_password(self, password: str) -> str:
+        """Replicate the legacy SHA-256(salt||password) hashing scheme."""
+
+        hash_obj = hashlib.sha256()
+        hash_obj.update(password.encode("utf-8"))
+        hash_obj.update(self.salt)
+        return base64.b64encode(hash_obj.digest()).decode("utf-8")
+
     def hash_password(self, password: str) -> str:
         """
-        Create a secure hash of a password.
+        Create a secure hash of a password using per-password salt.
 
         Args:
             password: Password to hash
 
         Returns:
-            Base64-encoded hash
+            Encoded string containing salt and hash in the form salt$hash
         """
-        # Use SHA-256 for hashing
-        hash_obj = hashlib.sha256()
-        hash_obj.update(password.encode('utf-8'))
-        hash_obj.update(self.salt)
-        
-        hashed = base64.b64encode(hash_obj.digest()).decode('utf-8')
-        return hashed
-    
-    def verify_password(self, password: str, hashed: str) -> bool:
+
+        salt = os.urandom(self.PASSWORD_SALT_SIZE)
+        derived = self._hash_with_pbkdf2(password, salt)
+
+        encoded_salt = base64.b64encode(salt).decode("utf-8")
+        encoded_hash = base64.b64encode(derived).decode("utf-8")
+        return f"{encoded_salt}${encoded_hash}"
+
+    def verify_password(
+        self,
+        password: str,
+        hashed: str,
+        *,
+        return_new_hash: bool = False,
+    ):
         """
-        Verify a password against its hash.
+        Verify a password against its stored hash.
 
         Args:
             password: Password to verify
-            hashed: Expected hash
+            hashed: Stored hash value (either new or legacy format)
+            return_new_hash: When True, return a tuple of (is_valid, migrated_hash)
 
         Returns:
-            True if password matches hash
+            True if password matches hash. When ``return_new_hash`` is True,
+            returns a tuple where the second value contains a migrated hash for
+            legacy entries.
         """
-        computed_hash = self.hash_password(password)
-        return computed_hash == hashed
+
+        if "$" in hashed:
+            try:
+                encoded_salt, encoded_hash = hashed.split("$", 1)
+                salt = base64.b64decode(encoded_salt)
+                expected_hash = base64.b64decode(encoded_hash)
+            except (ValueError, binascii.Error) as exc:
+                logger.error("Invalid password hash format: %s", exc)
+                result = False
+                if return_new_hash:
+                    return result, None
+                return result
+
+            derived = self._hash_with_pbkdf2(password, salt)
+            result = hmac.compare_digest(derived, expected_hash)
+            if return_new_hash:
+                return result, None
+            return result
+
+        legacy_hash = self._legacy_hash_password(password)
+        result = hmac.compare_digest(legacy_hash.encode("utf-8"), hashed.encode("utf-8"))
+        migrated_hash = self.hash_password(password) if result else None
+
+        if return_new_hash:
+            return result, migrated_hash
+        return result
     
     def reset_encryption_key(self):
         """

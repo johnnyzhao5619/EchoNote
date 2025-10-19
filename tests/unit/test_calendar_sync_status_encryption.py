@@ -54,3 +54,33 @@ def test_calendar_sync_status_persists_encrypted_sync_token(tmp_path):
     assert retrieved.sync_token == sync_token
 
     db.close_all()
+
+
+def test_security_manager_password_hashing_migration(tmp_path):
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+
+    security_manager = SecurityManager(str(config_dir))
+
+    password = "StrongPass!123"
+    new_hash = security_manager.hash_password(password)
+
+    assert "$" in new_hash
+    assert security_manager.verify_password(password, new_hash)
+    is_valid, migrated = security_manager.verify_password(
+        password,
+        new_hash,
+        return_new_hash=True,
+    )
+    assert is_valid and migrated is None
+
+    legacy_hash = security_manager._legacy_hash_password(password)
+
+    is_valid, migrated = security_manager.verify_password(
+        password,
+        legacy_hash,
+        return_new_hash=True,
+    )
+    assert is_valid
+    assert migrated is not None and "$" in migrated
+    assert not security_manager.verify_password("wrong", legacy_hash)

@@ -110,6 +110,12 @@ Configuration is managed by `config/app_config.py`.
 - Secrets such as OAuth credentials and encryption keys are stored via `data/security/secrets_manager.py` and encrypted when possible.
 - Engine API keys should be set via the settings UI, which delegates to the `SettingsManager` to persist encrypted values.
 
+### Credential storage strategy
+- Password-like secrets (e.g., cached service credentials) use the `SecurityManager` in `data/security/encryption.py`.
+- Each hash now stores a **per-password 16-byte random salt** alongside a PBKDF2-HMAC(SHA-256) digest with 200k iterations.
+- Hashes are encoded as `salt$hash` (both segments Base64). Verification understands both the new and legacy formats so existing data can be migrated lazily on first successful login.
+- Call `verify_password(..., return_new_hash=True)` to detect legacy entries and persist the returned migrated hash. Legacy hashes are SHA-256 of the password plus the historical machine salt and should be replaced as soon as feasible.
+
 When adding new settings:
 1. Extend the schema in `config/default_config.json`.
 2. Update `ConfigManager` getters/setters.
