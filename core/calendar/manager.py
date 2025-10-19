@@ -88,6 +88,13 @@ class CalendarManager:
             event_data['start_time'] = start_dt.isoformat()
             event_data['end_time'] = end_dt.isoformat()
 
+            attendees = event_data.get('attendees') or []
+            if not isinstance(attendees, list):
+                if isinstance(attendees, (set, tuple)):
+                    attendees = list(attendees)
+                else:
+                    attendees = [attendees]
+
             # Create local event
             event = CalendarEvent(
                 title=event_data.get('title', ''),
@@ -95,7 +102,7 @@ class CalendarManager:
                 start_time=event_data.get('start_time', ''),
                 end_time=event_data.get('end_time', ''),
                 location=event_data.get('location'),
-                attendees=event_data.get('attendees', []),
+                attendees=attendees,
                 description=event_data.get('description'),
                 reminder_minutes=event_data.get('reminder_minutes'),
                 recurrence_rule=event_data.get('recurrence_rule'),
@@ -186,7 +193,13 @@ class CalendarManager:
             if 'location' in event_data:
                 event.location = event_data['location']
             if 'attendees' in event_data:
-                event.attendees = event_data['attendees']
+                attendees = event_data.get('attendees') or []
+                if not isinstance(attendees, list):
+                    if isinstance(attendees, (set, tuple)):
+                        attendees = list(attendees)
+                    else:
+                        attendees = [attendees]
+                event.attendees = attendees
             if 'description' in event_data:
                 event.description = event_data['description']
             if 'reminder_minutes' in event_data:

@@ -140,7 +140,24 @@ class CalendarEvent:
     @classmethod
     def from_db_row(cls, row) -> 'CalendarEvent':
         """Create instance from database row."""
-        attendees = json.loads(row['attendees']) if row['attendees'] else []
+        attendees: List[str] = []
+        if row['attendees']:
+            try:
+                loaded = json.loads(row['attendees'])
+            except json.JSONDecodeError:
+                logger.warning(
+                    "Failed to decode attendees for event %s", row.get('id')
+                )
+                loaded = []
+
+            if isinstance(loaded, list):
+                attendees = loaded
+            elif loaded is None:
+                attendees = []
+            elif isinstance(loaded, (set, tuple)):
+                attendees = list(loaded)
+            else:
+                attendees = [loaded]
         return cls(
             id=row['id'],
             title=row['title'],
@@ -172,6 +189,16 @@ class CalendarEvent:
         self.end_time = _ensure_iso(self.end_time)
         self.created_at = _ensure_iso(self.created_at)
         self.updated_at = _ensure_iso(self.updated_at)
+
+        attendees_value = self.attendees
+        if attendees_value is None:
+            attendees_value = []
+        elif isinstance(attendees_value, (set, tuple)):
+            attendees_value = list(attendees_value)
+        elif not isinstance(attendees_value, list):
+            attendees_value = [attendees_value]
+
+        self.attendees = attendees_value
 
         query = """
             INSERT OR REPLACE INTO calendar_events (

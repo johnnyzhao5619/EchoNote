@@ -122,3 +122,63 @@ def test_search_events_applies_timezone_filters(monkeypatch):
     )
 
     assert [item['event'].id for item in results] == ['in-range']
+
+
+def test_search_events_filters_attendees_without_errors(monkeypatch):
+    base_row = {
+        'event_type': 'Event',
+        'start_time': '2024-03-05T09:00:00Z',
+        'end_time': '2024-03-05T10:00:00Z',
+        'location': None,
+        'description': None,
+        'reminder_minutes': None,
+        'recurrence_rule': None,
+        'source': 'local',
+        'external_id': None,
+        'created_at': '2024-03-01T00:00:00Z',
+        'updated_at': '2024-03-01T00:00:00Z',
+    }
+
+    row_without_attendees = {
+        **base_row,
+        'id': 'no-attendees',
+        'title': 'Solo Work',
+        'attendees': 'null',
+        'is_readonly': 0,
+    }
+
+    row_with_attendees = {
+        **base_row,
+        'id': 'with-attendees',
+        'title': 'Team Sync',
+        'attendees': '["alice@example.com"]',
+        'is_readonly': 0,
+    }
+
+    no_attendees_event = CalendarEvent.from_db_row(row_without_attendees)
+    with_attendees_event = CalendarEvent.from_db_row(row_with_attendees)
+
+    events = [with_attendees_event, no_attendees_event]
+
+    manager = TimelineManagerForTest(
+        calendar_manager=DummyCalendarManager(events),
+        db_connection=None,
+    )
+
+    monkeypatch.setattr(
+        CalendarEvent,
+        'search',
+        staticmethod(lambda db, keyword=None, event_type=None, source=None: events),
+    )
+    monkeypatch.setattr(
+        EventAttachment,
+        'get_by_event_id',
+        staticmethod(lambda db, event_id: []),
+    )
+
+    filtered = manager.search_events(
+        query='Team',
+        filters={'attendees': ['alice@example.com']},
+    )
+
+    assert [item['event'].id for item in filtered] == ['with-attendees']
