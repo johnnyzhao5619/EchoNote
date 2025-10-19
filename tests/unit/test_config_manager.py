@@ -57,3 +57,22 @@ def test_config_manager_merges_defaults(tmp_path, monkeypatch):
         saved_config["transcription"]["faster_whisper"]["default_model"]
         == "base"
     )
+
+
+def test_config_manager_set_does_not_mutate_defaults(tmp_path, monkeypatch):
+    monkeypatch.setattr(app_config.Path, "home", lambda: tmp_path)
+
+    manager = ConfigManager()
+
+    defaults = manager.get_defaults()
+    original_page_size = defaults["timeline"]["page_size"]
+    original_local_color = defaults["calendar"]["colors"]["local"]
+
+    manager.set("timeline.page_size", original_page_size + 5)
+    manager.set("calendar.colors.local", "#000000")
+
+    assert manager.get("timeline.page_size") == original_page_size + 5
+
+    defaults_after = manager.get_defaults()
+    assert defaults_after["timeline"]["page_size"] == original_page_size
+    assert defaults_after["calendar"]["colors"]["local"] == original_local_color
