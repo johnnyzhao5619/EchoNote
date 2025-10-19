@@ -127,7 +127,7 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 </details>
 
 ### 3.2 Real-time Recording <a id="workflow-realtime"></a>
-- Choose the input device and gain level; enable VAD to filter silence.
+- Choose the input device and gain level; EchoNote automatically applies voice activity detection (VAD) to filter silence. A dedicated toggle under **Settings → Real-time Recording → Voice Activity Detection** is coming soon.
 - Monitor live transcripts, tap **Add Marker** to capture timestamps, and track elapsed time.
 - When stopping, `stop_recording()` returns the session duration, ISO timestamps, and any markers alongside file paths. Audio
   and transcript exports are saved to `~/Documents/EchoNote/` directories; translations land in the `Translations/` folder when
@@ -147,7 +147,7 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 <details>
 <summary>中文</summary>
 
-- 选择音频输入设备与增益值，必要时启用 VAD 减少静音片段。
+- 选择音频输入设备与增益值；EchoNote 会自动应用语音活动检测 (VAD) 以减少静音。目前尚无开关，计划在「设置 → 实时录制 → 语音活动检测」中新增（即将推出）。
 - 录制过程中可即时查看转录文本，点击**添加标记**记录时间点。
 - 停止录制后，`stop_recording()` 会返回录制时长、开始/结束时间以及所有标记；音频与转录会写入 `~/Documents/EchoNote/` 对应目录；启用翻译时会在 `Translations/` 目录写出翻译文本，有标记时会额外生成 JSON 文件保存标记详情。
 - 采样率默认沿用所选输入设备，可在录制选项中显式覆盖。自定义值会先应用到麦克风驱动，本地模型自动重采样到 16 kHz，云端接口则携带真实采样率。
@@ -165,7 +165,7 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 <details>
 <summary>Français</summary>
 
-- Sélectionnez le périphérique d’entrée et le gain ; activez VAD pour filtrer le silence.
+- Sélectionnez le périphérique d’entrée et le gain ; EchoNote applique automatiquement la détection d’activité vocale (VAD) pour filtrer les silences. Un interrupteur dédié dans **Paramètres → Enregistrement temps réel → Détection d’activité vocale** arrive bientôt.
 - Surveillez la transcription en direct, cliquez sur **Ajouter un marqueur** pour fixer un horodatage, puis suivez le temps écoulé.
 - À l’arrêt, `stop_recording()` renvoie la durée de session, les horodatages ISO et les marqueurs collectés. Les enregistrements
   et transcriptions sont stockés dans `~/Documents/EchoNote/`; lorsque la traduction est activée, le texte traduit est écrit dans

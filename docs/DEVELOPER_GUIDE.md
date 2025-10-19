@@ -169,7 +169,7 @@ Each subpackage inside `core/` houses a manager that encapsulates domain logic a
   - `FormatConverter` exports transcripts to TXT/SRT/Markdown and attaches metadata.
 
 - **Real-time recording (`core/realtime/`)**
-  - `RealtimeRecorder` streams audio frames from `engines/audio/capture.py`, applies voice-activity detection, and dispatches transcripts to listeners.
+  - `RealtimeRecorder` streams audio frames from `engines/audio/capture.py`, applies voice-activity detection with the default thresholds, and dispatches transcripts to listeners. VAD currently runs automatically with no user-facing toggle; a forthcoming control will live under **Settings → Real-time Recording → Voice Activity Detection** once exposed in the UI.
   - `audio_buffer.py` maintains rolling buffers for low-latency playback or streaming transcripts.
   - `SettingsManager.get_realtime_preferences()` centralizes the default recording format and auto-save toggle. UI (`ui/realtime_record/widget.py`) and background schedulers (`core/timeline/auto_task_scheduler.py`) both consult it before starting a session so that changing settings propagates immediately.
 
