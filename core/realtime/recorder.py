@@ -5,6 +5,7 @@
 """
 
 import asyncio
+import contextlib
 import json
 import logging
 import os
@@ -194,22 +195,42 @@ class RealtimeRecorder:
         self._drain_queue(self._transcription_stream_queue)
         self._drain_queue(self._translation_stream_queue)
 
-        # 启动音频捕获
-        self.audio_capture.start_capture(
-            device_index=input_source,
-            callback=self._audio_callback
-        )
-
-        # 启动异步处理任务
-        self.processing_task = asyncio.create_task(
-            self._process_audio_stream()
-        )
-
-        # 如果启用翻译，启动翻译任务
-        if self.current_options.get('enable_translation', False):
-            self.translation_task = asyncio.create_task(
-                self._process_translation_stream()
+        try:
+            # 启动音频捕获
+            self.audio_capture.start_capture(
+                device_index=input_source,
+                callback=self._audio_callback
             )
+
+            # 启动异步处理任务
+            self.processing_task = asyncio.create_task(
+                self._process_audio_stream()
+            )
+
+            # 如果启用翻译，启动翻译任务
+            if self.current_options.get('enable_translation', False):
+                self.translation_task = asyncio.create_task(
+                    self._process_translation_stream()
+                )
+        except Exception as exc:
+            logger.error(
+                "Failed to start real-time recording: %s", exc,
+                exc_info=True
+            )
+            await self._rollback_failed_start()
+
+            message = f"Failed to start recording: {exc}"
+            if self.on_error:
+                try:
+                    self.on_error(message)
+                except Exception as callback_exc:  # noqa: BLE001
+                    logger.error(
+                        "Error invoking start failure callback: %s",
+                        callback_exc,
+                        exc_info=True
+                    )
+
+            raise
 
         logger.info(f"Recording started (input_source={input_source})")
 
@@ -1016,6 +1037,48 @@ class RealtimeRecorder:
             str: 完整的翻译文本
         """
         return "\n".join(self.accumulated_translation)
+
+    async def _rollback_failed_start(self) -> None:
+        """在录音启动失败后回滚内部状态。"""
+        if self.audio_capture is not None and hasattr(self.audio_capture, 'stop_capture'):
+            try:
+                self.audio_capture.stop_capture()
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("Stop capture during rollback failed: %s", exc)
+
+        tasks_to_await = []
+        if self.processing_task:
+            self.processing_task.cancel()
+            tasks_to_await.append(self.processing_task)
+            self.processing_task = None
+
+        if self.translation_task:
+            self.translation_task.cancel()
+            tasks_to_await.append(self.translation_task)
+            self.translation_task = None
+
+        for task in tasks_to_await:
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+
+        self.is_recording = False
+        self.recording_start_time = None
+        self.recording_audio_buffer = []
+
+        if self.audio_buffer is not None:
+            self.audio_buffer.clear()
+            self.audio_buffer = None
+
+        self.accumulated_transcription = []
+        self.accumulated_translation = []
+
+        with self._marker_lock:
+            self.markers = []
+
+        self._drain_queue(self.transcription_queue)
+        self._drain_queue(self.translation_queue)
+        self._drain_queue(self._transcription_stream_queue)
+        self._drain_queue(self._translation_stream_queue)
     
     def _is_duplicate_transcription(self, new_text: str, last_text: str) -> bool:
         """
