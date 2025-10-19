@@ -100,7 +100,13 @@
     "marker_unavailable": "Démarrez l’enregistrement avant d’ajouter un marqueur.",
     "marker_failed": "Impossible d’enregistrer le marqueur. Réessayez.",
     "marker_item": "Marqueur {number} • {timestamp}",
-    "marker_item_with_label": "Marqueur {number} • {timestamp} – {label}"
+    "marker_item_with_label": "Marqueur {number} • {timestamp} – {label}",
+    "feedback": {
+      "error_prefix": "Erreur d'enregistrement",
+      "success_prefix": "Enregistrement sauvegardé",
+      "success_detail": "Durée {duration}",
+      "success_detail_with_path": "Durée {duration} • Enregistré dans {path}"
+    }
   },
   "calendar_hub": {
     "title": "Centre de Calendrier",
@@ -492,6 +498,7 @@
     "transcription_complete": "Transcription terminée : {filename}",
     "transcription_failed": "Échec de la transcription : {filename}",
     "recording_saved": "Enregistrement sauvegardé",
+    "recording_failed": "Échec de l'enregistrement",
     "event_reminder": "{title} va bientôt commencer",
     "sync_complete": "Synchronisation du calendrier terminée",
     "sync_failed": "Échec de la synchronisation du calendrier"

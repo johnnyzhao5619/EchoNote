@@ -1,4 +1,5 @@
 import asyncio
+import threading
 import types
 
 import pytest
@@ -54,11 +55,12 @@ class FakeI18n:
 
 
 class FakeRecorder:
-    def __init__(self):
+    def __init__(self, stop_result=None):
         self.is_recording = False
         self.audio_capture = None
         self.translation_engine = None
         self.start_kwargs = None
+        self._stop_result = dict(stop_result or {})
 
     def set_callbacks(
         self,
@@ -90,7 +92,7 @@ class FakeRecorder:
 
     async def stop_recording(self):
         self.is_recording = False
-        return {}
+        return dict(self._stop_result)
 
     def get_recording_status(self):
         return {'is_recording': self.is_recording, 'duration': 0.0}
@@ -103,6 +105,18 @@ class FakeRecorder:
 
     def add_marker(self):
         return {'offset': 0.0, 'label': None}
+
+
+class StubNotificationManager:
+    def __init__(self):
+        self.success_messages = []
+        self.error_messages = []
+
+    def send_success(self, title, message):
+        self.success_messages.append((title, message))
+
+    def send_error(self, title, message):
+        self.error_messages.append((title, message))
 
 
 @pytest.fixture(scope="module")
@@ -136,6 +150,105 @@ def test_realtime_widget_uses_settings_preferences(qapp):
 
     widget.deleteLater()
     qapp.processEvents()
+
+
+def test_widget_show_error_updates_feedback_and_notifies(qapp, monkeypatch):
+    notification_stub = StubNotificationManager()
+    monkeypatch.setattr(
+        'ui.realtime_record.widget.get_notification_manager',
+        lambda: notification_stub
+    )
+
+    settings = FakeSettingsManager({'recording_format': 'wav', 'auto_save': True})
+    recorder = FakeRecorder()
+    widget = RealtimeRecordWidget(
+        recorder=recorder,
+        audio_capture=None,
+        i18n_manager=FakeI18n(),
+        settings_manager=settings
+    )
+
+    try:
+        widget._show_error('Microphone missing')
+        qapp.processEvents()
+
+        assert widget.feedback_label.isVisible()
+        assert 'Microphone missing' in widget.feedback_label.text()
+        assert notification_stub.error_messages
+        assert 'Microphone missing' in notification_stub.error_messages[-1][1]
+    finally:
+        widget.deleteLater()
+        qapp.processEvents()
+
+
+def test_widget_show_error_from_worker_thread(qapp, monkeypatch):
+    notification_stub = StubNotificationManager()
+    monkeypatch.setattr(
+        'ui.realtime_record.widget.get_notification_manager',
+        lambda: notification_stub
+    )
+
+    recorder = FakeRecorder()
+    widget = RealtimeRecordWidget(
+        recorder=recorder,
+        audio_capture=None,
+        i18n_manager=FakeI18n(),
+        settings_manager=None
+    )
+
+    try:
+        thread = threading.Thread(
+            target=widget._show_error,
+            args=('Background failure',),
+            daemon=True
+        )
+        thread.start()
+        thread.join()
+
+        qapp.processEvents()
+
+        assert notification_stub.error_messages
+        assert any('Background failure' in msg for _, msg in notification_stub.error_messages)
+    finally:
+        widget.deleteLater()
+        qapp.processEvents()
+
+
+def test_widget_stop_recording_emits_success_feedback(qapp, monkeypatch):
+    notification_stub = StubNotificationManager()
+    monkeypatch.setattr(
+        'ui.realtime_record.widget.get_notification_manager',
+        lambda: notification_stub
+    )
+
+    stop_result = {
+        'duration': 12.0,
+        'recording_path': '/tmp/test-session.wav'
+    }
+    recorder = FakeRecorder(stop_result=stop_result)
+    recorder.is_recording = True
+
+    widget = RealtimeRecordWidget(
+        recorder=recorder,
+        audio_capture=None,
+        i18n_manager=FakeI18n(),
+        settings_manager=None
+    )
+
+    try:
+        asyncio.run(widget._stop_recording())
+        qapp.processEvents()
+
+        assert notification_stub.success_messages
+        title, message = notification_stub.success_messages[-1]
+        assert 'recording_saved' in title
+        assert '/tmp/test-session.wav' in message
+
+        assert widget.feedback_label.isVisible()
+        assert '/tmp/test-session.wav' in widget.feedback_label.text()
+    finally:
+        widget.deleteLater()
+        qapp.processEvents()
 
 
 def test_auto_task_scheduler_inherits_global_preferences():
