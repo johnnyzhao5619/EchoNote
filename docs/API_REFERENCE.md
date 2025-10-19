@@ -148,31 +148,45 @@ RealtimeRecorder(audio_capture, speech_engine, translation_engine, db_connection
 ##### start_recording
 
 ```python
-async def start_recording(input_source: str, options: dict)
+async def start_recording(
+    input_source: Optional[int] = None,
+    options: dict | None = None,
+    event_loop: asyncio.AbstractEventLoop | None = None,
+)
 ```
 
-Start real-time recording and transcription.
+Start real-time recording, streaming transcription, and optional translation.
 
 **Parameters:**
 
-- `input_source` (str): Audio input source name
-- `options` (dict): Recording options
-  - `language` (str): Source language code
-  - `enable_translation` (bool): Enable translation
-  - `target_language` (str): Target language for translation
-  - `recording_format` (str): 'wav' or 'mp3'
+- `input_source` (Optional[int]) – Audio device index passed to `AudioCapture`. Use
+  `None` to rely on the default device configured by the capture backend.
+- `options` (dict, optional) – Recording options:
+  - `language` (str): Source language code used for transcription.
+  - `enable_translation` (bool): Enable translation dispatch.
+  - `target_language` (str): Target language for translation jobs.
+  - `recording_format` (str): `'wav'` or `'mp3'` export format.
+  - `sample_rate` (int): Override microphone sample rate before capture.
+  - `save_recording` (bool): Persist raw audio to disk (default `True`).
+  - `save_transcript` (bool): Persist aggregated transcript text (default `True`).
+  - `create_calendar_event` (bool): Create a calendar event with attachments (default `True`).
+- `event_loop` (asyncio.AbstractEventLoop, optional) – Explicit loop reference used
+  when bridging from GUI threads (e.g., Qt) into the recorder coroutine.
 
 **Example:**
 
 ```python
 await recorder.start_recording(
-    input_source="default",
+    input_source=0,
     options={
         "language": "zh",
         "enable_translation": True,
         "target_language": "en",
-        "recording_format": "wav"
-    }
+        "recording_format": "wav",
+        "sample_rate": 48000,
+        "save_transcript": True,
+        "create_calendar_event": False,
+    },
 )
 ```
 
@@ -187,12 +201,21 @@ Stop recording and save files.
 **Returns:**
 
 - `dict`: Recording result
-  - `recording_path` (str): Path to saved recording
-  - `transcript_path` (str): Path to transcript file
-  - `translation_path` (str, optional): Saved translation file path when
-    translation data exists; returns an empty string when no translation was
-    generated
-  - `event_id` (str, optional): Created calendar event ID
+  - `duration` (float): Total recording time in seconds.
+  - `start_time` (str): ISO 8601 timestamp when capture began.
+  - `end_time` (str): ISO 8601 timestamp when capture finished.
+  - `recording_path` (str, optional): Saved recording path when `save_recording`
+    is enabled and audio data exists.
+  - `transcript_path` (str, optional): Transcript file path when
+    `save_transcript` is enabled and transcription text was produced.
+  - `translation_path` (str, optional): Translation file path when
+    `enable_translation` is true and translated text exists.
+  - `markers` (list[dict], optional): In-memory markers captured during the
+    session. Present only when at least one marker was recorded.
+  - `markers_path` (str, optional): JSON export of markers when markers exist and
+    saving succeeds.
+  - `event_id` (str, optional): Created calendar event ID when
+    `create_calendar_event` succeeds.
 
 ##### get_transcription_stream
 
@@ -1080,12 +1103,14 @@ recorder = RealtimeRecorder(
 
 # Start recording
 await recorder.start_recording(
-    input_source="default",
+    input_source=0,
     options={
         "language": "zh",
         "enable_translation": True,
-        "target_language": "en"
-    }
+        "target_language": "en",
+        "recording_format": "wav",
+        "save_recording": True,
+    },
 )
 
 # Get streams
@@ -1105,7 +1130,11 @@ await asyncio.gather(
 
 # Stop recording
 result = await recorder.stop_recording()
-print(f"Saved to: {result['recording_path']}")
+print(
+    "Duration:", result["duration"],
+    "Recording:", result.get("recording_path", ""),
+    "Markers:", len(result.get("markers", [])),
+)
 ```
 
 ---
