@@ -173,15 +173,23 @@ recorder.set_callbacks(
 
 ## Async/Await Support
 
-The widget handles async operations using `asyncio.create_task()`:
+The widget dispatches coroutines to a dedicated asyncio event loop thread. 录制开关示例：
 
 ```python
 def _toggle_recording(self):
     if not self.recorder.is_recording:
-        asyncio.create_task(self._start_recording())
+        self._run_async_task(self._start_recording())
     else:
-        asyncio.create_task(self._stop_recording())
+        self._run_async_task(self._stop_recording())
 ```
+
+`_run_async_task` 会将协程提交到 `_init_async_loop` 创建的事件循环中，并跟踪返回的 `Future`，便于在清理阶段安全取消或等待任务完成。这一封装确保 UI 线程保持响应，并集中管理错误处理与状态反馈。
+
+### 专用事件循环线程的生命周期
+
+- **初始化**：`_init_async_loop` 在后台线程中构建事件循环，调用 `asyncio.new_event_loop()` 与 `loop.run_forever()`，并在启动前等待循环就绪，保证后续调度立即生效。
+- **调度执行**：`_run_async_task` 使用 `asyncio.run_coroutine_threadsafe` 将协程投递到该循环，同时注册定时检查以捕获异常、更新状态并在必要时重新调度检查。
+- **资源回收**：`_cleanup_resources` 会标记清理状态、取消挂起的 `Future`、停止录音器、再调用 `_shutdown_async_loop` 请求事件循环停止并等待后台线程结束，最终避免悬挂任务或线程泄漏。
 
 ## Internationalization
 
