@@ -55,10 +55,15 @@
     "actions": {
       "start": "Start",
       "pause": "Pause",
+      "resume": "Resume",
       "cancel": "Cancel",
       "retry": "Retry",
       "view": "View",
       "export": "Export"
+    },
+    "feedback": {
+      "paused": "Batch transcription paused.",
+      "resumed": "Batch transcription resumed."
     }
   },
   "realtime_record": {

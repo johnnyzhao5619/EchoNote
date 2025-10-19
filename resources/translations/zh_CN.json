@@ -55,10 +55,15 @@
     "actions": {
       "start": "开始",
       "pause": "暂停",
+      "resume": "继续",
       "cancel": "取消",
       "retry": "重试",
       "view": "查看",
       "export": "导出"
+    },
+    "feedback": {
+      "paused": "批量转录已暂停。",
+      "resumed": "批量转录已继续。"
     }
   },
   "realtime_record": {

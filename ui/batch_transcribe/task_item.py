@@ -55,6 +55,7 @@ class TaskItem(QWidget):
         self.task_data = task_data
         self.task_id = task_data['id']
         self.i18n = i18n
+        self._processing_paused = False
 
         # Setup UI
         self.setup_ui()
@@ -231,9 +232,7 @@ class TaskItem(QWidget):
             self.start_btn.setText(
                 self.i18n.t('batch_transcribe.actions.start')
             )
-            self.pause_btn.setText(
-                self.i18n.t('batch_transcribe.actions.pause')
-            )
+            self._update_pause_button_text()
             self.cancel_btn.setText(
                 self.i18n.t('batch_transcribe.actions.cancel')
             )
@@ -379,6 +378,8 @@ class TaskItem(QWidget):
             self.delete_btn.setVisible(True)
         elif status == 'processing':
             self.cancel_btn.setVisible(True)
+            self.pause_btn.setVisible(True)
+            self._update_pause_button_text()
         elif status == 'completed':
             self.view_btn.setVisible(True)
             self.export_btn.setVisible(True)
@@ -386,6 +387,31 @@ class TaskItem(QWidget):
         elif status == 'failed':
             self.retry_btn.setVisible(True)
             self.delete_btn.setVisible(True)
+
+    def set_processing_paused(self, paused: bool):
+        """Update pause/resume state for processing tasks."""
+        if self._processing_paused == paused:
+            return
+
+        self._processing_paused = paused
+        self._update_pause_button_text()
+
+        status = self.task_data.get('status', 'pending')
+        if status == 'processing':
+            self.pause_btn.setVisible(True)
+
+    def _update_pause_button_text(self):
+        """Update pause button text based on processing state."""
+        action_key = (
+            'batch_transcribe.actions.resume'
+            if self._processing_paused
+            else 'batch_transcribe.actions.pause'
+        )
+        try:
+            self.pause_btn.setText(self.i18n.t(action_key))
+        except Exception:
+            # Fallback to default text in case translation missing
+            self.pause_btn.setText('Resume' if self._processing_paused else 'Pause')
 
     def update_task_data(self, task_data: Dict[str, Any]):
         """

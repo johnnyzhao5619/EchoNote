@@ -580,8 +580,11 @@ class BatchTranscribeWidget(QWidget):
                     if full_task_data:
                         self._add_task_item(full_task_data)
 
-            # Update queue label
+            # Update queue label and sync pause state for task buttons
             self.update_translations()
+            self._set_tasks_pause_state(
+                self.transcription_manager.is_paused()
+            )
 
         except Exception as e:
             logger.error(f"Error refreshing tasks: {e}")
@@ -618,6 +621,11 @@ class BatchTranscribeWidget(QWidget):
 
             # Store reference
             self.task_items[task_id] = task_item
+
+            # Ensure pause button reflects current processing state
+            task_item.set_processing_paused(
+                self.transcription_manager.is_paused()
+            )
 
             logger.debug(f"Added task item for task {task_id}")
 
@@ -663,10 +671,24 @@ class BatchTranscribeWidget(QWidget):
     def _on_task_pause(self, task_id: str):
         """Handle task pause button click."""
         try:
-            # TODO: Implement pause functionality
-            logger.info(f"Pause requested for task {task_id}")
+            logger.debug(f"Pause toggle requested by task {task_id}")
+
+            if self.transcription_manager.is_paused():
+                self.transcription_manager.resume_processing()
+                self._set_tasks_pause_state(False)
+                message = self.i18n.t('batch_transcribe.feedback.resumed')
+            else:
+                self.transcription_manager.pause_processing()
+                self._set_tasks_pause_state(True)
+                message = self.i18n.t('batch_transcribe.feedback.paused')
+
+            self._notify_user(message)
         except Exception as e:
-            logger.error(f"Error pausing task: {e}")
+            logger.error(f"Error toggling pause state: {e}")
+            self._show_error(
+                self.i18n.t('errors.unknown_error'),
+                str(e)
+            )
 
     def _on_task_cancel(self, task_id: str):
         """Handle task cancel button click."""
@@ -845,6 +867,27 @@ class BatchTranscribeWidget(QWidget):
             message,
             QMessageBox.StandardButton.Ok
         )
+
+    def _set_tasks_pause_state(self, paused: bool):
+        """Update pause button state for all task items."""
+        for task_item in self.task_items.values():
+            task_item.set_processing_paused(paused)
+
+    def _notify_user(self, message: str):
+        """Display feedback to the user and log it."""
+        status_bar = None
+        main_window = self.window()
+
+        if hasattr(main_window, 'statusBar'):
+            try:
+                status_bar = main_window.statusBar()
+            except Exception:
+                status_bar = None
+
+        if status_bar:
+            status_bar.showMessage(message, 5000)
+
+        logger.info(message)
     
     def close_all_viewers(self):
         """Close all open transcript viewer windows."""

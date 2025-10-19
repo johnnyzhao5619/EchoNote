@@ -55,10 +55,15 @@
     "actions": {
       "start": "Démarrer",
       "pause": "Pause",
+      "resume": "Reprendre",
       "cancel": "Annuler",
       "retry": "Réessayer",
       "view": "Voir",
       "export": "Exporter"
+    },
+    "feedback": {
+      "paused": "Transcription par lots en pause.",
+      "resumed": "Transcription par lots reprise."
     }
   },
   "realtime_record": {
