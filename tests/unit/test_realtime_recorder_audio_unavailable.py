@@ -63,6 +63,25 @@ class DummyFileManager:
         temp_dir.mkdir(parents=True, exist_ok=True)
         return str(temp_dir / filename)
 
+    def create_unique_filename(
+        self,
+        base_name: str,
+        extension: str,
+        subdirectory: Optional[str] = None
+    ) -> str:
+        if not extension.startswith('.'):
+            extension = '.' + extension
+
+        target_dir = self.base_dir / subdirectory if subdirectory else self.base_dir
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        candidate = f"{base_name}{extension}"
+        counter = 1
+        while (target_dir / candidate).exists():
+            candidate = f"{base_name}_{counter}{extension}"
+            counter += 1
+        return candidate
+
     def save_file(self, data: bytes, filename: str, subdirectory: Optional[str] = None) -> str:
         target_dir = self.base_dir / (subdirectory or "misc")
         target_dir.mkdir(parents=True, exist_ok=True)
@@ -945,3 +964,107 @@ def test_save_recording_mp3_without_ffmpeg(monkeypatch, tmp_path):
     assert any(name.endswith('.wav') for name in file_manager.saved_files)
     assert messages
     assert any('MP3' in message for message in messages)
+
+
+def test_exports_use_unique_filenames(monkeypatch, tmp_path):
+    from core.realtime.recorder import RealtimeRecorder
+
+    audio_capture = DummyAudioCapture()
+    file_manager = DummyFileManager(base_dir=tmp_path)
+    recorder = RealtimeRecorder(
+        audio_capture=audio_capture,
+        speech_engine=DummySpeechEngine(),
+        translation_engine=None,
+        db_connection=None,
+        file_manager=file_manager,
+    )
+
+    base_time = datetime(2024, 1, 1, 12, 0, 0)
+    recorder.sample_rate = 16000
+    recorder.current_options = {
+        'recording_format': 'wav',
+        'target_language': 'en',
+    }
+
+    if HAS_NUMPY:
+        sample_chunk = np.zeros(160, dtype=np.float32)
+
+        def _prepare_audio_buffer():
+            recorder.recording_audio_buffer = [sample_chunk.copy()]
+    else:
+        class _NPStub:
+            @staticmethod
+            def concatenate(buffers):
+                return b''.join(buffers)
+
+        monkeypatch.setattr('core.realtime.recorder.np', _NPStub())
+        sample_chunk = b'DUMMY'
+
+        def _prepare_audio_buffer():
+            recorder.recording_audio_buffer = [sample_chunk]
+
+    def _fake_write(path, data, samplerate):  # noqa: ARG001
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        with open(path, 'wb') as wav_file:
+            wav_file.write(b'WAVDATA')
+
+    monkeypatch.setattr('soundfile.write', _fake_write)
+
+    recorder.recording_start_time = base_time
+    _prepare_audio_buffer()
+    first_recording = asyncio.run(recorder._save_recording())
+
+    recorder.recording_start_time = base_time
+    _prepare_audio_buffer()
+    second_recording = asyncio.run(recorder._save_recording())
+
+    assert first_recording
+    assert second_recording
+    assert Path(first_recording).name != Path(second_recording).name
+    assert Path(first_recording).parent == Path(second_recording).parent
+
+    recorder.recording_start_time = base_time
+    recorder.accumulated_transcription = ['first transcript']
+    first_transcript = asyncio.run(recorder._save_transcript())
+
+    recorder.recording_start_time = base_time
+    recorder.accumulated_transcription = ['second transcript']
+    second_transcript = asyncio.run(recorder._save_transcript())
+
+    assert first_transcript
+    assert second_transcript
+    assert Path(first_transcript).name != Path(second_transcript).name
+
+    recorder.recording_start_time = base_time
+    recorder.accumulated_translation = ['hola']
+    first_translation = asyncio.run(recorder._save_translation())
+
+    recorder.recording_start_time = base_time
+    recorder.accumulated_translation = ['adios']
+    second_translation = asyncio.run(recorder._save_translation())
+
+    assert first_translation
+    assert second_translation
+    assert Path(first_translation).name != Path(second_translation).name
+
+    recorder.recording_start_time = base_time
+    recorder.markers = [{
+        'index': 1,
+        'offset': 0.0,
+        'absolute_time': base_time.isoformat(),
+        'label': 'first'
+    }]
+    first_markers = recorder._save_markers()
+
+    recorder.recording_start_time = base_time
+    recorder.markers = [{
+        'index': 1,
+        'offset': 1.0,
+        'absolute_time': base_time.isoformat(),
+        'label': 'second'
+    }]
+    second_markers = recorder._save_markers()
+
+    assert first_markers
+    assert second_markers
+    assert Path(first_markers).name != Path(second_markers).name
