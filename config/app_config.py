@@ -6,7 +6,9 @@ Handles loading, validation, and saving of application configuration.
 
 import json
 import logging
+from collections.abc import Mapping
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any, Dict
 
 
@@ -32,29 +34,29 @@ class ConfigManager:
         self.user_config_dir = get_app_dir()
         self.user_config_path = self.user_config_dir / "app_config.json"
         self._config: Dict[str, Any] = {}
+        self._default_config: Dict[str, Any] = {}
         self._load_config()
-    
+
     def _load_config(self) -> None:
         """Load configuration from user config or default config."""
         try:
-            # Try to load user configuration first
+            logger.info(
+                f"Loading default configuration from "
+                f"{self.default_config_path}"
+            )
+            with open(self.default_config_path, 'r', encoding='utf-8') as f:
+                self._default_config = json.load(f)
+
+            user_config: Dict[str, Any] = {}
             if self.user_config_path.exists():
                 logger.info(
                     f"Loading user configuration from "
                     f"{self.user_config_path}"
                 )
-                with open(self.user_config_path, 'r',
-                          encoding='utf-8') as f:
-                    self._config = json.load(f)
-            else:
-                # Fall back to default configuration
-                logger.info(
-                    f"Loading default configuration from "
-                    f"{self.default_config_path}"
-                )
-                with open(self.default_config_path, 'r',
-                          encoding='utf-8') as f:
-                    self._config = json.load(f)
+                with open(self.user_config_path, 'r', encoding='utf-8') as f:
+                    user_config = json.load(f)
+
+            self._config = self._deep_merge(self._default_config, user_config)
 
             # Validate the loaded configuration
             self._validate_config()
@@ -315,7 +317,42 @@ class ConfigManager:
             Complete configuration dictionary
         """
         return self._config.copy()
-    
+
     def reload(self) -> None:
         """Reload configuration from disk."""
         self._load_config()
+
+    def get_defaults(self) -> Mapping[str, Any]:
+        """Return an immutable view of the default configuration."""
+        return self._deep_freeze(self._default_config)
+
+    @classmethod
+    def _deep_merge(cls, base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
+        """Recursively merge two dictionaries without mutating inputs."""
+        result: Dict[str, Any] = {}
+
+        for key, base_value in base.items():
+            if key in override:
+                override_value = override[key]
+                if isinstance(base_value, dict) and isinstance(override_value, dict):
+                    result[key] = cls._deep_merge(base_value, override_value)
+                else:
+                    result[key] = override_value
+            else:
+                result[key] = base_value
+
+        for key, override_value in override.items():
+            if key not in base:
+                result[key] = override_value
+
+        return result
+
+    @classmethod
+    def _deep_freeze(cls, value: Any) -> Any:
+        """Create an immutable representation of nested configuration data."""
+        if isinstance(value, dict):
+            frozen = {k: cls._deep_freeze(v) for k, v in value.items()}
+            return MappingProxyType(frozen)
+        if isinstance(value, list):
+            return tuple(cls._deep_freeze(v) for v in value)
+        return value
