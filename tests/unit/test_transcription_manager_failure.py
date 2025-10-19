@@ -108,6 +108,21 @@ class StubSpeechEngine:
         raise RuntimeError("simulated failure")
 
 
+class SuccessfulSpeechEngine:
+    def get_name(self) -> str:
+        return "successful-engine"
+
+    async def transcribe_file(self, file_path, language=None, progress_callback=None):
+        if progress_callback:
+            progress_callback(55.0)
+        return {
+            "duration": 1.2,
+            "segments": [
+                {"start": 0.0, "end": 1.0, "text": "hello world"},
+            ],
+        }
+
+
 @pytest.fixture()
 def initialized_db(tmp_path):
     db_path = tmp_path / "test.db"
@@ -240,3 +255,41 @@ def test_default_output_format_override(initialized_db, tmp_path):
 
     assert task is not None
     assert task.output_format == 'md'
+
+
+def test_successful_process_uses_default_save_path(initialized_db, tmp_path):
+    default_dir = tmp_path / "exports"
+    engine = SuccessfulSpeechEngine()
+    manager = TranscriptionManager(
+        initialized_db,
+        engine,
+        config={
+            "default_save_path": str(default_dir),
+            "default_output_format": "txt",
+        },
+    )
+
+    audio_file = tmp_path / "sample.wav"
+    audio_file.write_bytes(b"fake-audio")
+
+    task = TranscriptionTask(
+        file_path=str(audio_file),
+        file_name=audio_file.name,
+        file_size=audio_file.stat().st_size,
+        status="pending",
+        output_format="txt",
+    )
+    task.save(initialized_db)
+
+    asyncio.run(manager._process_task_async(task.id))
+
+    expected_output = (default_dir / f"{audio_file.stem}.txt").resolve()
+    assert expected_output.exists()
+
+    with open(expected_output, "r", encoding="utf-8") as exported:
+        content = exported.read()
+    assert "hello world" in content
+
+    refreshed_task = TranscriptionTask.get_by_id(initialized_db, task.id)
+    assert refreshed_task is not None
+    assert refreshed_task.output_path == str(expected_output)
