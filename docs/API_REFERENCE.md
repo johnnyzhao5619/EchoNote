@@ -175,6 +175,8 @@ Start real-time recording, streaming transcription, and optional translation.
     realtime auto-save toggle exposed in the settings UI.
   - `save_transcript` (bool): Persist aggregated transcript text (default `True`).
   - `create_calendar_event` (bool): Create a calendar event with attachments (default `True`).
+    Requires a configured database connection; when the database is unavailable the
+    recorder automatically skips this step.
 - `event_loop` (asyncio.AbstractEventLoop, optional) – Explicit loop reference used
   when bridging from GUI threads (e.g., Qt) into the recorder coroutine.
 
@@ -219,8 +221,8 @@ Stop recording and save files.
     session. Present only when at least one marker was recorded.
   - `markers_path` (str, optional): JSON export of markers when markers exist and
     saving succeeds.
-  - `event_id` (str, optional): Created calendar event ID when
-    `create_calendar_event` succeeds.
+- `event_id` (str, optional): Created calendar event ID when
+    `create_calendar_event` succeeds. Absent when no database connection is configured.
 
 ##### get_transcription_stream
 

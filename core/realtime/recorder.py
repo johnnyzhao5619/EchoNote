@@ -560,7 +560,14 @@ class RealtimeRecorder:
                     result['markers_path'] = markers_path
 
         # 创建日历事件
-        if self.current_options.get('create_calendar_event', True):
+        create_event_requested = self.current_options.get('create_calendar_event', True)
+        if create_event_requested and self.db is None:
+            logger.info(
+                "Skipping calendar event creation: database connection is not configured."
+            )
+            create_event_requested = False
+
+        if create_event_requested:
             event_id = await self._create_calendar_event(result)
             result['event_id'] = event_id
 
@@ -853,6 +860,23 @@ class RealtimeRecorder:
         Returns:
             str: 事件 ID
         """
+        if self.db is None:
+            warning_message = (
+                "Cannot create calendar event because no database connection is configured. "
+                "Configure the database to enable calendar integrations."
+            )
+            logger.warning(warning_message)
+            if self.on_error:
+                try:
+                    self.on_error(warning_message)
+                except Exception as callback_exc:  # noqa: BLE001
+                    logger.error(
+                        "Error invoking calendar warning callback: %s",
+                        callback_exc,
+                        exc_info=True
+                    )
+            return ""
+
         try:
             from data.database.models import CalendarEvent, EventAttachment
 
