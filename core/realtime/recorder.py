@@ -520,13 +520,18 @@ class RealtimeRecorder:
         停止录制
 
         Returns:
-            Dict: 录制结果
-                {
-                    'recording_path': str,  # 录音文件路径
-                    'transcript_path': str,  # 转录文本路径
-                    'duration': float,  # 录制时长（秒）
-                    'event_id': str  # 日历事件 ID（如果创建）
-                }
+            Dict: 录制结果。始终包含以下键：
+                - ``duration`` (float)：录制时长（秒）。
+                - ``start_time`` (str)：会话开始时间（ISO 8601）。
+                - ``end_time`` (str)：会话结束时间（ISO 8601）。
+
+            根据配置与会话内容，可能额外包含：
+                - ``recording_path`` (str)：当 ``save_recording`` 启用且存在音频数据时，指向保存的音频文件。
+                - ``transcript_path`` (str)：当 ``save_transcript`` 启用且转录文本生成成功时，指向保存的转录文件。
+                - ``translation_path`` (str)：当 ``enable_translation`` 启用且翻译文本生成成功时，指向保存的翻译文件。
+                - ``markers`` (List[Dict])：会话期间创建的标记，仅在存在标记时返回。
+                - ``markers_path`` (str)：当存在标记且标记导出成功时，指向保存的标记 JSON 文件。
+                - ``event_id`` (str)：当 ``create_calendar_event`` 成功创建日历事件时返回；若数据库未配置或创建失败则缺失。
         """
         if not self.is_recording:
             logger.warning("Recording is not in progress")
