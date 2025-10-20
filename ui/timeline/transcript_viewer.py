@@ -96,15 +96,23 @@ class TranscriptViewer(QWidget):
         search_layout.addWidget(self.search_button)
         
         # Previous/Next match buttons
-        self.prev_button = QPushButton("◀")
-        self.prev_button.setToolTip("Previous match")
+        self.prev_button = QPushButton(
+            self.i18n.t('transcript.previous_match_button')
+        )
+        self.prev_button.setToolTip(
+            self.i18n.t('transcript.previous_match_tooltip')
+        )
         self.prev_button.setMaximumWidth(40)
         self.prev_button.clicked.connect(self._on_previous_match)
         self.prev_button.setEnabled(False)
         search_layout.addWidget(self.prev_button)
-        
-        self.next_button = QPushButton("▶")
-        self.next_button.setToolTip("Next match")
+
+        self.next_button = QPushButton(
+            self.i18n.t('transcript.next_match_button')
+        )
+        self.next_button.setToolTip(
+            self.i18n.t('transcript.next_match_tooltip')
+        )
         self.next_button.setMaximumWidth(40)
         self.next_button.clicked.connect(self._on_next_match)
         self.next_button.setEnabled(False)
@@ -357,6 +365,18 @@ class TranscriptViewer(QWidget):
         )
         self.copy_button.setText(self.i18n.t('transcript.copy_all'))
         self.export_button.setText(self.i18n.t('transcript.export'))
+        self.prev_button.setText(
+            self.i18n.t('transcript.previous_match_button')
+        )
+        self.prev_button.setToolTip(
+            self.i18n.t('transcript.previous_match_tooltip')
+        )
+        self.next_button.setText(
+            self.i18n.t('transcript.next_match_button')
+        )
+        self.next_button.setToolTip(
+            self.i18n.t('transcript.next_match_tooltip')
+        )
 
 
 class TranscriptViewerDialog(QDialog):
