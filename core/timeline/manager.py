@@ -83,7 +83,9 @@ class TimelineManager:
             Dictionary containing:
             - current_time: ISO format timestamp
             - past_events: List of past events with artifacts
-            - future_events: List of future events with auto-task configs
+            - future_events: List of future events with auto-task configs.
+              Always populated (when events exist) regardless of how many
+              historical events fall into the current page window.
         """
         center_time_local = to_local_naive(center_time)
 
@@ -139,22 +141,33 @@ class TimelineManager:
             start_idx = page * page_size
             end_idx = start_idx + page_size
 
-            # For simplicity, paginate the combined list
-            # In a real implementation, you might want separate pagination
             total_events = len(past_events) + len(future_events)
 
-            # Calculate pagination indices
-            past_end = min(end_idx, len(past_events))
-            future_start = max(0, start_idx - len(past_events))
-            future_end = max(0, end_idx - len(past_events))
+            # First slice the past events for the current page
+            if start_idx < len(past_events):
+                past_end = min(end_idx, len(past_events))
+                past_page = past_events[start_idx:past_end]
+            else:
+                past_page = []
+
+            # Determine how many future events to return.
+            # Prefer filling the remaining quota from the current page, but
+            # always provide future events when available so callers can plan
+            # ahead even if past events dominate the page window.
+            remaining_quota = max(page_size - len(past_page), 0)
+
+            if start_idx >= len(past_events):
+                future_start = start_idx - len(past_events)
+            else:
+                future_start = 0
+
+            future_quota = remaining_quota if remaining_quota > 0 else page_size
+            future_page = future_events[future_start:future_start + future_quota]
 
             result = {
                 'current_time': center_time_local.isoformat(),
-                'past_events': (
-                    past_events[start_idx:past_end]
-                    if start_idx < len(past_events) else []
-                ),
-                'future_events': future_events[future_start:future_end],
+                'past_events': past_page,
+                'future_events': future_page,
                 'total_count': total_events,
                 'page': page,
                 'page_size': page_size,

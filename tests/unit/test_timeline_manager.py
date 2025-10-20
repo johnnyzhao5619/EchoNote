@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import sys
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 import pytest
 from types import SimpleNamespace
@@ -87,6 +87,57 @@ def test_get_timeline_events_handles_mixed_timezones():
     assert past_ids == ['recent-past', 'offset-past']
     assert future_ids == ['future']
     assert result['current_time'] == to_local_naive(center_time).isoformat()
+
+
+def test_get_timeline_events_includes_future_when_past_exceeds_page():
+    center_time = datetime(2024, 5, 20, 12, 0, tzinfo=timezone.utc)
+
+    past_events = []
+    for index in range(5):
+        start = center_time - timedelta(hours=2 + index)
+        end = start + timedelta(minutes=45)
+        past_events.append(
+            CalendarEvent(
+                id=f'past-{index}',
+                title=f'Past #{index}',
+                start_time=iso_z(start),
+                end_time=iso_z(end),
+            )
+        )
+
+    future_events = []
+    for index in range(2):
+        start = center_time + timedelta(hours=1 + index)
+        end = start + timedelta(minutes=30)
+        future_events.append(
+            CalendarEvent(
+                id=f'future-{index}',
+                title=f'Future #{index}',
+                start_time=iso_z(start),
+                end_time=iso_z(end),
+            )
+        )
+
+    manager = TimelineManagerForTest(
+        calendar_manager=DummyCalendarManager(past_events + future_events),
+        db_connection=None,
+    )
+
+    result = manager.get_timeline_events(
+        center_time=center_time,
+        past_days=1,
+        future_days=1,
+        page_size=3,
+    )
+
+    # 过去事件应按时间倒序分页
+    assert [item['event'].id for item in result['past_events']] == [
+        'past-0', 'past-1', 'past-2'
+    ]
+
+    future_ids = [item['event'].id for item in result['future_events']]
+    assert future_ids == ['future-0', 'future-1']
+    assert result['total_count'] == len(past_events) + len(future_events)
 
 
 def test_search_events_applies_timezone_filters(monkeypatch):
