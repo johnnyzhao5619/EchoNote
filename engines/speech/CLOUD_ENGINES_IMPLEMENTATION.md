@@ -64,7 +64,7 @@ This document summarizes the implementation of cloud-based speech recognition en
 
 - OpenAI: $0.006 per minute
 - Google: $0.006 per minute (first 60 minutes free)
-- Azure: $0.001 per minute (standard tier)
+- Azure: $0.0167 per minute (standard tier — $1.00/hour)
 
 **Key Methods**:
 
@@ -215,7 +215,7 @@ The following tasks are marked as optional in the task list:
 2. **Azure Speech Engine** (Task 5.3)
    - Uses Azure Speech Service REST API
    - Requires region and subscription key
-   - Pricing: $0.001 per minute (standard tier)
+   - Pricing: $0.0167 per minute (standard tier — $1.00/hour)
 
 ### Recommended Improvements
 
