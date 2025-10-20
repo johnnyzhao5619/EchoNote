@@ -500,6 +500,26 @@ class AutoTaskConfig:
         if result:
             return AutoTaskConfig.from_db_row(result[0])
         return None
+
+    @staticmethod
+    def get_by_event_ids(
+        db_connection,
+        event_ids: List[str]
+    ) -> List['AutoTaskConfig']:
+        """Get configurations for multiple events in a single query."""
+        if not event_ids:
+            return []
+
+        # Preserve caller order while removing duplicates to avoid redundant
+        # placeholders in the IN clause.
+        unique_ids = list(dict.fromkeys(event_ids))
+        placeholders = ', '.join(['?'] * len(unique_ids))
+        query = (
+            "SELECT * FROM auto_task_configs "
+            f"WHERE event_id IN ({placeholders})"
+        )
+        result = db_connection.execute(query, tuple(unique_ids))
+        return [AutoTaskConfig.from_db_row(row) for row in result]
     
     def delete(self, db_connection):
         """Delete configuration from database."""
