@@ -185,6 +185,7 @@ Each subpackage inside `core/` houses a manager that encapsulates domain logic a
 - **Calendar (`core/calendar/`)**
   - `CalendarManager` exposes CRUD methods (`create_event`, `update_event`, `delete_event`, `get_event`, `get_events`) and synchronization entrypoints (`sync_external_calendar`).
   - Provider-specific identifiers now live in `calendar_event_links`, allowing the same event to sync with multiple services. Migration `004_calendar_event_links.sql` copies legacy `calendar_events.external_id` values and tags ambiguous records with `provider='default'` so older data remains addressable.
+  - Local updates persist first, then each linked provider adapter receives the change via `update_event`. Failures are logged and surfaced back to the caller with the provider list, while successful calls refresh the mapping timestamp. Deletions follow the reverse order: adapters are asked to `delete_event` before the local record and links are removed, preventing silent drifts when an API call is rejected.
   - `SyncScheduler` polls external providers on an interval, tracks sync tokens, and reconciles conflicts.
 
 - **Timeline (`core/timeline/`)**
