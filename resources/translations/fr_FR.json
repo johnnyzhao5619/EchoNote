@@ -38,6 +38,7 @@
     "import_file": "Importer un Fichier",
     "import_folder": "Importer un Dossier",
     "clear_queue": "Vider la File",
+    "confirm_clear_queue": "Voulez-vous vraiment vider toutes les tâches ?",
     "engine": "Moteur",
     "model": "Modèle",
     "task_queue": "File de Tâches",
@@ -62,6 +63,7 @@
       "view": "Voir",
       "export": "Exporter"
     },
+    "export_success": "Exporté vers : {path}",
     "feedback": {
       "paused": "Transcription par lots en pause.",
       "resumed": "Transcription par lots reprise."

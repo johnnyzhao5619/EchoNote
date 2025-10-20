@@ -38,6 +38,7 @@
     "import_file": "Import File",
     "import_folder": "Import Folder",
     "clear_queue": "Clear Queue",
+    "confirm_clear_queue": "Are you sure you want to clear all tasks?",
     "engine": "Engine",
     "model": "Model",
     "task_queue": "Task Queue",
@@ -62,6 +63,7 @@
       "view": "View",
       "export": "Export"
     },
+    "export_success": "Exported to: {path}",
     "feedback": {
       "paused": "Batch transcription paused.",
       "resumed": "Batch transcription resumed."

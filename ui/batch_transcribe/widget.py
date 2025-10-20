@@ -465,7 +465,7 @@ class BatchTranscribeWidget(QWidget):
             reply = QMessageBox.question(
                 self,
                 self.i18n.t('batch_transcribe.clear_queue'),
-                "Are you sure you want to clear all tasks?",
+                self.i18n.t('batch_transcribe.confirm_clear_queue'),
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No
             )
@@ -830,7 +830,10 @@ class BatchTranscribeWidget(QWidget):
             QMessageBox.information(
                 self,
                 self.i18n.t('common.success'),
-                f"Exported to: {file_path}"
+                self.i18n.t(
+                    'batch_transcribe.export_success',
+                    path=file_path
+                )
             )
 
             logger.info(f"Exported task {task_id} to {file_path}")
