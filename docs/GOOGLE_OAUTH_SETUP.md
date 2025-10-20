@@ -41,6 +41,8 @@ Choose either option below:
 ```
 Save to `config/default_config.json`.
 
+> You can change `callback_port` to any free local port. Make sure the port number matches the `redirect_uri` value and is authorized in the Google Cloud console. EchoNote's OAuth dialog will automatically use this configured port when launching the local callback server.
+
 ### Option B: Create a user-level configuration (recommended for production)
 ```json
 {
@@ -132,6 +134,8 @@ After completing these steps, EchoNote can sync and manage Google Calendar event
 ```
 保存到 `config/default_config.json`。
 
+> `callback_port` 可以调整为任意可用端口，同时务必同步更新 `redirect_uri` 并在 Google Cloud 控制台中授权该回调地址。EchoNote 的 OAuth 对话框会自动读取该配置以确保 UI 与回调监听端口保持一致。
+
 ### 方式 B：创建用户级配置（生产场景推荐）
 ```json
 {
@@ -222,6 +226,8 @@ Choisissez l’une des options suivantes :
 }
 ```
 Enregistrez dans `config/default_config.json`.
+
+> Vous pouvez remplacer `callback_port` par un port local disponible. Assurez-vous que la valeur correspond à `redirect_uri` et qu'elle est autorisée dans la console Google Cloud. La boîte de dialogue OAuth d'EchoNote utilisera automatiquement ce port configuré pour le serveur de rappel local.
 
 ### Option B : Créer une configuration utilisateur (recommandé en production)
 ```json

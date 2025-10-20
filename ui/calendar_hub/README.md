@@ -116,7 +116,7 @@ Dialogs for handling OAuth authorization flow with external calendar services.
 **Features:**
 
 - Browser integration
-- Local callback server (port 8080)
+- Local callback server (configurable callback port, default 8080)
 - Thread-safe callback handling
 - Error handling and user feedback
 

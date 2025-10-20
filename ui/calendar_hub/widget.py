@@ -6,8 +6,9 @@ and account management.
 """
 
 import logging
+from urllib.parse import urlparse
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
@@ -59,6 +60,7 @@ class CalendarHubWidget(QWidget):
         self.calendar_manager = calendar_manager
         self.oauth_manager = oauth_manager
         self.i18n = i18n
+        self._config_manager = None
         
         # Current view and date
         self.current_view = 'week'
@@ -535,12 +537,16 @@ class CalendarHubWidget(QWidget):
             
             # Show OAuth dialog
             from ui.calendar_hub.oauth_dialog import OAuthDialog
-            
+
+            callback_host, callback_port = self._load_oauth_callback_settings(provider)
+
             oauth_dialog = OAuthDialog(
                 provider,
                 auth_url,
                 self.i18n,
-                self
+                self,
+                callback_host=callback_host,
+                callback_port=callback_port
             )
             
             # Connect signals
@@ -561,6 +567,47 @@ class CalendarHubWidget(QWidget):
                 "Error",
                 f"Failed to start authorization: {str(e)}"
             )
+
+    def _load_oauth_callback_settings(self, provider: str) -> Tuple[Optional[str], Optional[int]]:
+        """Load configured OAuth callback host and port."""
+        host: Optional[str] = None
+        port: Optional[int] = None
+
+        try:
+            if self._config_manager is None:
+                from config.app_config import ConfigManager
+
+                self._config_manager = ConfigManager()
+
+            port_value = self._config_manager.get('calendar.oauth.callback_port')
+            if port_value is not None:
+                port = int(port_value)
+
+            redirect_uri = self._config_manager.get('calendar.oauth.redirect_uri')
+            if redirect_uri:
+                parsed = urlparse(redirect_uri)
+                host = parsed.hostname or host
+                if parsed.port:
+                    port = parsed.port
+
+        except Exception as exc:
+            logger.warning(
+                "Unable to load OAuth callback configuration for %s: %s",
+                provider,
+                exc
+            )
+
+        # Fall back to adapter redirect URI when config is missing
+        if host is None or port is None:
+            adapter = self.calendar_manager.sync_adapters.get(provider)
+            redirect_uri = getattr(adapter, 'redirect_uri', None) if adapter else None
+            if redirect_uri:
+                parsed = urlparse(redirect_uri)
+                host = host or parsed.hostname
+                if port is None and parsed.port:
+                    port = parsed.port
+
+        return host, port
     
     def _complete_oauth_flow(self, provider: str, code: str):
         """
