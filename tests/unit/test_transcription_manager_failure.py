@@ -1,7 +1,9 @@
 import asyncio
+import logging
 import sys
 import types
 from pathlib import Path
+import time
 
 import pytest
 
@@ -293,3 +295,46 @@ def test_successful_process_uses_default_save_path(initialized_db, tmp_path):
     refreshed_task = TranscriptionTask.get_by_id(initialized_db, task.id)
     assert refreshed_task is not None
     assert refreshed_task.output_path == str(expected_output)
+
+
+def test_background_shutdown_logs_and_cleans_up(initialized_db, monkeypatch, caplog):
+    engine = StubSpeechEngine()
+    manager = TranscriptionManager(initialized_db, engine, config={})
+
+    async def failing_stop():
+        raise RuntimeError("simulated stop failure")
+
+    monkeypatch.setattr(manager.task_queue, "stop", failing_stop)
+
+    caplog.set_level(logging.DEBUG, logger="echonote.transcription.manager")
+
+    manager.start_processing()
+
+    deadline = time.time() + 5.0
+    while (manager._loop is None or not manager._loop.is_running()) and time.time() < deadline:
+        time.sleep(0.05)
+
+    assert manager._loop is not None
+    assert manager._loop.is_running()
+
+    manager._loop.call_soon_threadsafe(manager._loop.stop)
+
+    if manager._thread is not None:
+        manager._thread.join(timeout=5.0)
+        assert not manager._thread.is_alive()
+
+    assert manager._loop is None
+    assert manager._running is False
+    assert manager.task_queue.worker_tasks == []
+
+    manager._thread = None
+
+    manager_logs = [
+        record.getMessage()
+        for record in caplog.records
+        if record.name == "echonote.transcription.manager"
+    ]
+
+    assert any("Task queue stop attempt" in message for message in manager_logs)
+    assert any("forced shutdown" in message for message in manager_logs)
+    assert any("closed with prior shutdown errors" in message for message in manager_logs)

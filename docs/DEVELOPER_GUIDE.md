@@ -174,6 +174,7 @@ Each subpackage inside `core/` houses a manager that encapsulates domain logic a
   - `TranscriptionManager` handles task creation (`add_task`, `add_tasks_from_folder`), background processing (`start_processing`, `pause_processing`, `resume_processing`, `stop_all_tasks`), and progress callbacks.
   - `TaskQueue` provides coroutine scheduling with retry logic (`start`, `add_task`, `pause`, `resume`, `stop`).
   - `FormatConverter` exports transcripts to TXT/SRT/Markdown and attaches metadata.
+  - 后台事件循环在关闭时会捕获 `TaskQueue.stop()` 的异常：管理器会记录失败、重试一次并在必要时强制取消剩余协程，随后关闭事件循环线程，避免遗留僵尸线程。
 
 - **Real-time recording (`core/realtime/`)**
   - `RealtimeRecorder` streams audio frames from `engines/audio/capture.py`, applies voice-activity detection with the default thresholds, and dispatches transcripts to listeners. VAD currently runs automatically with no user-facing toggle; a forthcoming control will live under **Settings → Real-time Recording → Voice Activity Detection** once exposed in the UI.
