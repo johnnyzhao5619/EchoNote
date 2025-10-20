@@ -11,7 +11,7 @@ import httpx
 from pathlib import Path
 import base64
 
-from engines.speech.base import SpeechEngine
+from engines.speech.base import SpeechEngine, convert_audio_to_wav_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -116,18 +116,29 @@ class GoogleEngine(SpeechEngine):
         enable_punctuation = kwargs.get('enable_automatic_punctuation', True)
         enable_word_offsets = kwargs.get('enable_word_time_offsets', False)
         sample_rate = kwargs.get('sample_rate')
-        
+
         logger.info(f"Transcribing file with Google: {audio_path}, language={language}")
-        
-        # 读取音频文件并编码为 base64
-        with open(audio_path, 'rb') as f:
-            audio_content = base64.b64encode(f.read()).decode('utf-8')
+
+        target_rate = sample_rate or 16000
+        wav_bytes, effective_rate, original_rate, detected_format = convert_audio_to_wav_bytes(
+            audio_path,
+            target_rate
+        )
+
+        logger.debug(
+            "Google audio prepared: format=%s, original_rate=%s, effective_rate=%s",
+            detected_format,
+            original_rate,
+            effective_rate
+        )
+
+        audio_content = base64.b64encode(wav_bytes).decode('utf-8')
         
         # 准备请求数据
         request_data = {
             "config": {
-                "encoding": "LINEAR16",  # 假设 WAV 格式
-                "sampleRateHertz": sample_rate or 16000,
+                "encoding": "LINEAR16",
+                "sampleRateHertz": effective_rate,
                 "languageCode": self._convert_language_code(language),
                 "enableAutomaticPunctuation": enable_punctuation,
                 "enableWordTimeOffsets": enable_word_offsets

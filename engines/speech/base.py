@@ -5,8 +5,11 @@
 """
 
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+import io
 import numpy as np
+import soundfile as sf
 
 
 def ensure_audio_sample_rate(
@@ -45,6 +48,82 @@ def ensure_audio_sample_rate(
     target_positions = np.linspace(0.0, duration, num=target_length, endpoint=False)
     resampled = np.interp(target_positions, source_positions, audio_chunk).astype(np.float32)
     return resampled, target_rate
+
+
+def convert_audio_to_wav_bytes(
+    audio_path: str,
+    target_rate: Optional[int] = None
+) -> Tuple[bytes, int, int, str]:
+    """读取音频文件并转换为指定采样率的 16-bit PCM WAV。
+
+    Args:
+        audio_path: 音频文件路径。
+        target_rate: 目标采样率；若为 ``None`` 则保持原采样率。
+
+    Returns:
+        Tuple[bytes, int, int, str]:
+            - 转换后的 WAV 字节数据；
+            - 输出音频采样率；
+            - 原始音频采样率；
+            - 检测到的音频格式标识。
+    """
+
+    detected_format = "UNKNOWN"
+
+    try:
+        info = sf.info(audio_path)
+        if info.format:
+            detected_format = info.format
+    except RuntimeError:
+        # soundfile 无法识别格式，稍后回退到 librosa
+        pass
+
+    try:
+        data, source_rate = sf.read(audio_path, always_2d=True)
+    except RuntimeError:
+        try:
+            import importlib
+            librosa = importlib.import_module("librosa")
+        except ModuleNotFoundError as exc:  # pragma: no cover - 运行环境缺少 librosa 的极端情况
+            raise RuntimeError("无法解码音频文件，缺少 librosa 依赖。") from exc
+
+        waveform, source_rate = librosa.load(audio_path, sr=None, mono=False)  # type: ignore[attr-defined]
+        if waveform.ndim == 1:
+            data = waveform.reshape(-1, 1)
+        else:
+            data = np.transpose(waveform)
+        if detected_format == "UNKNOWN":
+            detected_format = Path(audio_path).suffix.lstrip('.').upper() or "UNKNOWN"
+    else:
+        if detected_format == "UNKNOWN":
+            detected_format = Path(audio_path).suffix.lstrip('.').upper() or "UNKNOWN"
+
+    if data.ndim != 2 or data.shape[1] == 0:
+        raise ValueError("音频数据格式无效，无法确定声道信息。")
+
+    if source_rate is None or source_rate <= 0:
+        raise ValueError("无法确定音频文件的采样率。")
+
+    if data.shape[1] > 1:
+        mono_audio = data.mean(axis=1)
+    else:
+        mono_audio = data[:, 0]
+
+    mono_audio = mono_audio.astype(np.float32)
+
+    desired_rate = target_rate if target_rate and target_rate > 0 else source_rate
+    processed_audio, effective_rate = ensure_audio_sample_rate(mono_audio, source_rate, desired_rate)
+
+    if effective_rate is None or effective_rate <= 0:
+        raise ValueError("音频采样率转换失败。")
+
+    processed_audio = np.clip(processed_audio, -1.0, 1.0).astype(np.float32)
+
+    buffer = io.BytesIO()
+    sf.write(buffer, processed_audio, effective_rate, format="WAV", subtype="PCM_16")
+    wav_bytes = buffer.getvalue()
+
+    return wav_bytes, effective_rate, source_rate, detected_format
 
 
 class SpeechEngine(ABC):

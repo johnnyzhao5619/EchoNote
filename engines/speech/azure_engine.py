@@ -8,9 +8,8 @@ import logging
 from typing import Dict, List, Optional
 import numpy as np
 import httpx
-from pathlib import Path
 
-from engines.speech.base import SpeechEngine
+from engines.speech.base import SpeechEngine, convert_audio_to_wav_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -122,17 +121,29 @@ class AzureEngine(SpeechEngine):
             "profanity": profanity
         }
         
-        # 读取音频文件
-        with open(audio_path, 'rb') as f:
-            audio_data = f.read()
-        
+        target_rate = sample_rate or 16000
+        audio_data, effective_rate, original_rate, detected_format = convert_audio_to_wav_bytes(
+            audio_path,
+            target_rate
+        )
+
+        logger.debug(
+            "Azure audio prepared: format=%s, original_rate=%s, effective_rate=%s",
+            detected_format,
+            original_rate,
+            effective_rate
+        )
+
         # 发送请求（带重试）
         for attempt in range(self.max_retries):
             try:
+                headers = dict(self.client.headers)
+                headers["Content-Type"] = f"audio/wav; codecs=audio/pcm; samplerate={effective_rate}"
                 response = await self.client.post(
                     self.api_base_url,
                     params=params,
-                    content=audio_data
+                    content=audio_data,
+                    headers=headers
                 )
                 response.raise_for_status()
                 
