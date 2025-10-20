@@ -593,7 +593,11 @@ def main():
         logger.info("Initializing timeline manager...")
         from core.timeline.manager import TimelineManager
         
-        timeline_manager = TimelineManager(calendar_manager, db)
+        timeline_manager = TimelineManager(
+            calendar_manager,
+            db,
+            i18n=i18n,
+        )
         managers['timeline_manager'] = timeline_manager
         logger.info("Timeline manager initialized")
         timer.checkpoint("critical_managers_initialized")

@@ -355,6 +355,7 @@ For unresolved questions, open a GitHub issue or start a discussion thread so de
 - **OAuth 令牌过期计算更健壮**：刷新逻辑会在有时区信息时使用相同的时区基准计算 `expires_in`，规避天真地减法导致的 `TypeError` 并减少无谓的重试。【F:core/calendar/manager.py†L316-L348】
 - **时间线调度窗口可配置**：自动任务调度器以分钟维度定义前后窗口并转换为天数传递给时间线查询，移除硬编码常数，也新增了针对不同时区的秒数计算辅助方法。【F:core/timeline/auto_task_scheduler.py†L55-L198】【F:core/timeline/auto_task_scheduler.py†L641-L655】
 - **时间线接口类型修正**：`TimelineManager.get_timeline_events` 接受浮点天数并更新文档，明确允许使用细粒度窗口，提高调用方的可读性与类型一致性。【F:core/timeline/manager.py†L44-L106】
+- **时间线搜索片段国际化**：`TimelineManager` 现在可注入全局 `I18nQtManager` 或自定义取词回调，所有标题、描述、转录前缀与缺失提示均改用 `timeline.snippet.*` 翻译键，并在英文、中文与法文资源中补充默认值，同时补充了单元测试验证本地化回退逻辑。【F:core/timeline/manager.py†L44-L575】【F:main.py†L596-L601】【F:resources/translations/en_US.json†L143-L149】【F:resources/translations/zh_CN.json†L143-L149】【F:resources/translations/fr_FR.json†L143-L149】【F:tests/unit/test_timeline_manager.py†L37-L458】
 - **提醒通知时间本地化**：`AutoTaskScheduler` 在提醒文案中通过 `to_local_naive` 统一转换事件开始时间，确保含时区字符串以本地时间展示，并补充了针对该场景的单元测试。【F:core/timeline/auto_task_scheduler.py†L240-L287】【F:tests/unit/test_auto_task_scheduler.py†L360-L545】
 - **自动任务通知国际化**：`AutoTaskScheduler` 现在通过共享的 `I18nQtManager` 渲染启动、完成与异常提示文案，并同步更新了多语言资源及回归测试，保证所有桌面通知均可随语言切换即时本地化。【F:core/timeline/auto_task_scheduler.py†L352-L470】【F:main.py†L24-L102】【F:resources/translations/zh_CN.json†L1-L40】【F:tests/unit/test_realtime_recorder_audio_unavailable.py†L300-L380】
 

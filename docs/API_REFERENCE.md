@@ -384,8 +384,16 @@ Provides timeline data, auto-task configuration, and artifact lookups for past r
 #### Constructor
 
 ```python
-TimelineManager(calendar_manager, db_connection)
+TimelineManager(
+    calendar_manager,
+    db_connection,
+    i18n=None,
+    translate=None,
+)
 ```
+
+`i18n` expects an object exposing `t(key: str, **kwargs) -> str`. When omitted, `translate` can provide a compatible callable. Both
+parameters are optional and enable localized snippets for search results and transcript fallbacks.
 
 #### Methods
 
