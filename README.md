@@ -54,7 +54,7 @@ EchoNote/
 - Python 3.10+
 - Optional accelerants: PyAudio (capture), FFmpeg (media), CUDA GPU (Faster-Whisper)
 - Environment setup (`python -m venv .venv && source .venv/bin/activate`)
-- Install dependencies with `pip install -r requirements.txt`
+- Install dependencies with `pip install -r requirements.txt` (includes `requests>=2.31.0` for model downloads—download the wheel ahead of time when preparing offline machines)
 - Launch the desktop client via `python main.py`
 - Extended tooling: `pip install -r requirements-dev.txt`
 - Testing guardrails:
@@ -75,7 +75,7 @@ Released under the [MIT License](LICENSE).
 
 #### Quick Start Checklist
 1. Create and activate a virtual environment.
-2. `pip install -r requirements.txt`
+2. `pip install -r requirements.txt` (installs `requests>=2.31.0` to power model downloads; fetch the wheel beforehand if the target host is offline)
 3. Run `python main.py`
 4. On first launch complete the guided setup (storage paths, FFmpeg check, model download recommendation).
 
@@ -127,7 +127,7 @@ Released under the [MIT License](LICENSE).
 
 #### 快速启动清单
 1. 创建并激活虚拟环境。
-2. 执行 `pip install -r requirements.txt` 安装依赖。
+2. 执行 `pip install -r requirements.txt` 安装依赖（其中包含 `requests>=2.31.0`，用于模型下载；离线环境需提前准备相应的 wheel 包）。
 3. 运行 `python main.py` 启动桌面客户端。
 4. 首次启动按向导完成存储路径、FFmpeg 检测、模型下载建议等设置。
 
@@ -180,7 +180,7 @@ Released under the [MIT License](LICENSE).
 
 #### Démarrage rapide
 1. Créez et activez un environnement virtuel.
-2. Installez les dépendances avec `pip install -r requirements.txt`.
+2. Installez les dépendances avec `pip install -r requirements.txt` (inclut `requests>=2.31.0` pour les téléchargements de modèles ; pré-téléchargez la roue si la cible est hors ligne).
 3. Lancez `python main.py` pour ouvrir le client.
 4. Suivez l’assistant initial (chemins de stockage, vérification FFmpeg, recommandation de modèle).
 

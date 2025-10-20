@@ -87,7 +87,7 @@ source .venv/bin/activate          # Windows: .venv\Scripts\activate
 
 # 3. Install runtime dependencies
 pip install --upgrade pip
-pip install -r requirements.txt
+pip install -r requirements.txt    # ships requests>=2.31.0 for the model downloader; download the wheel in advance for offline hosts
 
 # 4. Install development extras (linters, type-checkers, tests)
 pip install -r requirements-dev.txt

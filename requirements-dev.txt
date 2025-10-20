@@ -26,6 +26,9 @@ sphinx-autodoc-typehints>=1.24.0
 ipython>=8.14.0
 ipdb>=0.13.13
 
+# HTTP Client (parity with production)
+requests>=2.31.0
+
 # Build Tools
 pyinstaller>=5.13.0
 py2app>=0.28.0  # macOS only

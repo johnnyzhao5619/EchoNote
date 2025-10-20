@@ -88,7 +88,7 @@ Before you begin, ensure you have:
 5. **Install Dependencies**
 
    ```bash
-   pip install -r requirements.txt
+   pip install -r requirements.txt   # includes requests>=2.31.0 for model downloads; grab the wheel early if you contribute offline
    pip install -r requirements-dev.txt
    ```
 
