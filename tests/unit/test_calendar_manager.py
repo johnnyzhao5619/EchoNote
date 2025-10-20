@@ -9,6 +9,22 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 
+def _ensure_soundfile_stub():
+    if "soundfile" in sys.modules:
+        return
+
+    soundfile_module = types.ModuleType("soundfile")
+
+    def _write_stub(*args, **kwargs):  # noqa: ARG002
+        return None
+
+    soundfile_module.write = _write_stub  # type: ignore[attr-defined]
+    sys.modules["soundfile"] = soundfile_module
+
+
+_ensure_soundfile_stub()
+
+
 from tests.unit.test_transcription_manager_failure import _ensure_cryptography_stubs
 
 

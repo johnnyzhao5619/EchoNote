@@ -820,8 +820,10 @@ class CalendarManager:
                 return
 
             remaining_links = CalendarEventLink.list_for_event(self.db, event_id)
+            remaining_link_count = len(remaining_links)
+            should_delete_event = event.source == provider and remaining_link_count == 0
 
-            if event.source == provider and not remaining_links:
+            if should_delete_event:
                 attachments = EventAttachment.get_by_event_id(self.db, event_id)
                 for attachment in attachments:
                     attachment.delete(self.db)
@@ -835,7 +837,7 @@ class CalendarManager:
                     "Detached provider %s from event %s; %d other link(s) remain",
                     provider,
                     event_id,
-                    len(remaining_links),
+                    remaining_link_count,
                 )
 
         except Exception as exc:
