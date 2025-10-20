@@ -4,6 +4,11 @@
 
 This document summarizes the implementation of cloud-based speech recognition engines for EchoNote, specifically the OpenAI Whisper API engine and the usage tracking system.
 
+### Audio Normalization (Google & Azure)
+
+- Cloud engines now detect the real audio format (MP3, WAV, FLAC, etc.), convert it to mono 16-bit PCM WAV in memory, and resample to the requested rate (default 16 kHz) before sending any request.
+- Google requests update `sampleRateHertz` to the normalized value, and Azure requests set `Content-Type: audio/wav; codecs=audio/pcm; samplerate=<rate>` to reflect the actual payload.
+
 ## Implemented Components
 
 ### 1. OpenAI Whisper API Engine (`openai_engine.py`)
