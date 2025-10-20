@@ -106,6 +106,8 @@ The first launch triggers `utils.first_run_setup.FirstRunSetup` which creates th
 Configuration is managed by `config/app_config.py`.
 
 - **Defaults** live in `config/default_config.json` (version, paths, scheduler cadence, engine defaults).
+- **Application version** is sourced from `ConfigManager`. Update `config/default_config.json` during releases and read the
+  value via `ConfigManager().get("version")` instead of hard-coding it in UI or bootstrap code.
 - **User overrides** are persisted to `~/.echonote/app_config.json`.
 - Secrets such as OAuth credentials and encryption keys are stored via `data/security/secrets_manager.py` and encrypted when possible.
 - Engine API keys should be set via the settings UI, which delegates to the `SettingsManager` to persist encrypted values.
