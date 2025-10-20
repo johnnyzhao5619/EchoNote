@@ -243,6 +243,8 @@ Reusable helpers live under `utils/`:
 The data layer is anchored by `data/database`:
 - `connection.py` offers a thread-local connection pool with optional SQLCipher encryption (`initialize_schema` applies `schema.sql`).
 - `models.py` contains dataclass-backed models (`TranscriptionTask`, `CalendarEvent`, `EventAttachment`, `AutoTaskConfig`, `CalendarSyncStatus`, etc.) with helpers to persist and query records.
+- Calendar re-authorization always overwrites the existing `CalendarSyncStatus` row for the provider. `_complete_oauth_flow` reuses the record, clears any stale `sync_token`, and marks it active again. The `save()` helper enforces a single active row per provider by deactivating older entries, so keep this uniqueness assumption in mind when writing migrations or manual data fixes.
+- 日历重新授权会覆盖该提供商现有的 `CalendarSyncStatus` 记录：`_complete_oauth_flow` 会复用原有行、清空过期的 `sync_token` 并重新激活，`save()` 通过停用旧行保证每个提供商仅存在一条活跃记录。编写迁移或手动修复数据时必须遵循这一唯一性约定。
 - `schema.sql` is the authoritative schema. Update it when adding tables or columns and bump the schema migration logic in `utils/first_run_setup.py` accordingly.
 
 Additional support modules:

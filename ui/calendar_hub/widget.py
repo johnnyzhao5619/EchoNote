@@ -662,15 +662,32 @@ class CalendarHubWidget(QWidget):
             # Get user email (try to fetch from provider)
             email = self._get_user_email(provider, adapter)
             
-            # Create CalendarSyncStatus record
+            # Create or update CalendarSyncStatus record
             from data.database.models import CalendarSyncStatus
-            
-            sync_status = CalendarSyncStatus(
-                provider=provider,
-                user_email=email,
-                is_active=True
-            )
-            sync_status.save(self.calendar_manager.db)
+
+            db = self.calendar_manager.db
+            sync_status = CalendarSyncStatus.get_by_provider(db, provider)
+
+            if sync_status:
+                logger.debug(
+                    "Reusing existing sync status for %s; resetting sync token",
+                    provider
+                )
+                sync_status.user_email = email
+                sync_status.is_active = True
+                sync_status.last_sync_time = None
+                sync_status.sync_token = None
+            else:
+                logger.debug(
+                    "Creating new sync status for %s", provider
+                )
+                sync_status = CalendarSyncStatus(
+                    provider=provider,
+                    user_email=email,
+                    is_active=True
+                )
+
+            sync_status.save(db)
             
             # Add connected account badge
             self.add_connected_account(provider, email)
