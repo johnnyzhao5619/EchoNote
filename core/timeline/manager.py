@@ -187,41 +187,31 @@ class TimelineManager:
                 key=lambda x: to_local_naive(x['event'].start_time)
             )
 
-            # Apply pagination
-            start_idx = page * page_size
-            end_idx = start_idx + page_size
-
-            total_events = len(past_events) + len(future_events)
-
-            # First slice the past events for the current page
-            if start_idx < len(past_events):
-                past_end = min(end_idx, len(past_events))
-                past_page = past_events[start_idx:past_end]
-            else:
-                past_page = []
-
-            # Determine which future events fall inside the requested slice.
+            # Apply pagination for past events only
             total_past = len(past_events)
             total_future = len(future_events)
 
-            future_page: List[Dict[str, Any]] = []
-            if total_future:
-                future_start_idx = max(start_idx, total_past)
-                future_end_idx = min(end_idx, total_past + total_future)
+            start_idx = max(page, 0) * page_size
+            end_idx = start_idx + page_size
 
-                if future_start_idx < future_end_idx:
-                    relative_start = future_start_idx - total_past
-                    relative_end = future_end_idx - total_past
-                    future_page = future_events[relative_start:relative_end]
+            past_page = past_events[start_idx:end_idx]
+
+            # Future events always returned on the first page to avoid being
+            # paged out by the historical window. Subsequent pages omit them.
+            if page == 0:
+                future_page = future_events
+            else:
+                future_page = []
 
             result = {
                 'current_time': center_time_local.isoformat(),
                 'past_events': past_page,
                 'future_events': future_page,
-                'total_count': total_events,
+                'total_count': total_past,
+                'future_total_count': total_future,
                 'page': page,
                 'page_size': page_size,
-                'has_more': end_idx < total_events
+                'has_more': end_idx < total_past
             }
 
             logger.debug(
@@ -237,6 +227,7 @@ class TimelineManager:
                 'past_events': [],
                 'future_events': [],
                 'total_count': 0,
+                'future_total_count': 0,
                 'page': page,
                 'page_size': page_size,
                 'has_more': False

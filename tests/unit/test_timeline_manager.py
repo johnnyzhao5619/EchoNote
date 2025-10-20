@@ -132,6 +132,7 @@ def test_get_timeline_events_history_only_pagination():
     ]
     assert first_page['future_events'] == []
     assert first_page['total_count'] == len(history)
+    assert first_page['future_total_count'] == 0
     assert first_page['has_more']
 
     second_page = manager.get_timeline_events(
@@ -147,6 +148,7 @@ def test_get_timeline_events_history_only_pagination():
     ]
     assert second_page['future_events'] == []
     assert second_page['total_count'] == len(history)
+    assert second_page['future_total_count'] == 0
     assert second_page['has_more']
 
 
@@ -179,8 +181,9 @@ def test_get_timeline_events_future_only_pagination():
     assert [item['event'].id for item in first_page['future_events']] == [
         'future-0', 'future-1'
     ]
-    assert first_page['total_count'] == len(upcoming)
-    assert first_page['has_more']
+    assert first_page['total_count'] == 0
+    assert first_page['future_total_count'] == len(upcoming)
+    assert not first_page['has_more']
 
     second_page = manager.get_timeline_events(
         center_time=center_time,
@@ -191,11 +194,57 @@ def test_get_timeline_events_future_only_pagination():
     )
 
     assert second_page['past_events'] == []
-    assert [item['event'].id for item in second_page['future_events']] == [
-        'future-2', 'future-3'
-    ]
-    assert second_page['total_count'] == len(upcoming)
+    assert second_page['future_events'] == []
+    assert second_page['total_count'] == 0
+    assert second_page['future_total_count'] == len(upcoming)
     assert not second_page['has_more']
+
+
+def test_get_timeline_events_future_preserved_on_first_page():
+    center_time = datetime(2024, 5, 20, 12, 0, tzinfo=timezone.utc)
+
+    history = []
+    for index in range(30):
+        start = center_time - timedelta(minutes=30 + index)
+        end = start + timedelta(minutes=25)
+        history.append(
+            CalendarEvent(
+                id=f'past-{index}',
+                title=f'Past #{index}',
+                start_time=iso_z(start),
+                end_time=iso_z(end),
+            )
+        )
+
+    future = []
+    for index in range(3):
+        start = center_time + timedelta(hours=2 + index)
+        end = start + timedelta(minutes=45)
+        future.append(
+            CalendarEvent(
+                id=f'future-{index}',
+                title=f'Future #{index}',
+                start_time=iso_z(start),
+                end_time=iso_z(end),
+            )
+        )
+
+    manager = _build_manager(history + future)
+
+    result = manager.get_timeline_events(
+        center_time=center_time,
+        past_days=2,
+        future_days=2,
+        page_size=10,
+    )
+
+    assert len(result['past_events']) == 10
+    assert [item['event'].id for item in result['future_events']] == [
+        'future-0', 'future-1', 'future-2'
+    ]
+    assert result['future_total_count'] == 3
+    assert result['total_count'] == len(history)
+    assert result['has_more']
 
 
 def test_get_timeline_events_mixed_across_pages_without_future_duplicates():
@@ -239,7 +288,10 @@ def test_get_timeline_events_mixed_across_pages_without_future_duplicates():
     assert [item['event'].id for item in first_page['past_events']] == [
         'past-0', 'past-1'
     ]
-    assert first_page['future_events'] == []
+    assert [item['event'].id for item in first_page['future_events']] == [
+        'future-0', 'future-1', 'future-2'
+    ]
+    assert first_page['future_total_count'] == 3
     assert first_page['has_more']
 
     second_page = manager.get_timeline_events(
@@ -251,24 +303,9 @@ def test_get_timeline_events_mixed_across_pages_without_future_duplicates():
     )
 
     assert [item['event'].id for item in second_page['past_events']] == ['past-2']
-    assert [item['event'].id for item in second_page['future_events']] == [
-        'future-0'
-    ]
-    assert second_page['has_more']
-
-    third_page = manager.get_timeline_events(
-        center_time=center_time,
-        past_days=1,
-        future_days=1,
-        page_size=2,
-        page=2,
-    )
-
-    assert third_page['past_events'] == []
-    assert [item['event'].id for item in third_page['future_events']] == [
-        'future-1', 'future-2'
-    ]
-    assert not third_page['has_more']
+    assert second_page['future_events'] == []
+    assert second_page['future_total_count'] == 3
+    assert not second_page['has_more']
 
 
 def test_search_events_applies_timezone_filters(monkeypatch):
