@@ -6,7 +6,6 @@ Displays event information with different layouts for past and future events.
 
 import logging
 from typing import Optional, Dict, Any
-from datetime import datetime
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
@@ -16,6 +15,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QPalette, QColor
 
 from utils.i18n import I18nQtManager
+from core.timeline.manager import to_local_naive
 
 
 logger = logging.getLogger('echonote.ui.timeline.event_card')
@@ -178,13 +178,24 @@ class EventCard(QFrame):
         time_layout = QHBoxLayout()
         
         # Format time
-        start_time = datetime.fromisoformat(self.event.start_time)
-        end_time = datetime.fromisoformat(self.event.end_time)
-        
-        time_str = (
-            f"{start_time.strftime('%Y-%m-%d %H:%M')} - "
-            f"{end_time.strftime('%H:%M')}"
-        )
+        start_value = self.event.start_time
+        end_value = self.event.end_time
+
+        try:
+            start_time = to_local_naive(start_value)
+            end_time = to_local_naive(end_value)
+        except Exception as exc:  # pragma: no cover - defensive log
+            logger.warning(
+                "Failed to localize event time for %s: %s",
+                getattr(self.event, 'id', '<unknown>'),
+                exc,
+            )
+            time_str = f"{start_value} - {end_value}"
+        else:
+            time_str = (
+                f"{start_time.strftime('%Y-%m-%d %H:%M')} - "
+                f"{end_time.strftime('%H:%M')}"
+            )
         
         time_label = QLabel(time_str)
         time_label.setObjectName("time_label")
