@@ -54,10 +54,10 @@ class FileManager:
         for directory in directories:
             directory.mkdir(parents=True, exist_ok=True)
             # Set directory permissions (owner read/write/execute only)
-            os.chmod(directory, 0o700)
-        
+            self._set_directory_permissions(directory)
+
         logger.debug("Initialized directory structure")
-    
+
     def _set_file_permissions(self, file_path: Path):
         """
         Set secure file permissions (owner read/write only).
@@ -68,8 +68,18 @@ class FileManager:
         try:
             os.chmod(file_path, 0o600)
             logger.debug(f"Set secure permissions for: {file_path}")
-        except Exception as e:
-            logger.warning(f"Could not set file permissions: {e}")
+        except (PermissionError, OSError) as e:
+            logger.warning(f"Could not set file permissions for {file_path}: {e}")
+
+    def _set_directory_permissions(self, directory: Path):
+        """Set secure directory permissions (owner read/write/execute only)."""
+        try:
+            os.chmod(directory, 0o700)
+            logger.debug(f"Set secure permissions for directory: {directory}")
+        except (PermissionError, OSError) as e:
+            logger.warning(
+                f"Could not set directory permissions for {directory}: {e}"
+            )
     
     def save_file(
         self,
@@ -97,7 +107,7 @@ class FileManager:
         if subdirectory:
             target_dir = self.base_dir / subdirectory
             target_dir.mkdir(parents=True, exist_ok=True)
-            os.chmod(target_dir, 0o700)
+            self._set_directory_permissions(target_dir)
         else:
             target_dir = self.base_dir
         
