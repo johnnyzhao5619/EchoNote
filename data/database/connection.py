@@ -66,24 +66,39 @@ class DatabaseConnection:
             # Apply encryption if key is provided
             if self.encryption_key:
                 try:
-                    # Try to use SQLCipher
-                    conn.execute(f"PRAGMA key = '{self.encryption_key}'")
+                    # Try to use SQLCipher with parameter binding to avoid injection
+                    conn.execute("PRAGMA key = ?", (self.encryption_key,))
                     # Test if encryption is working
                     conn.execute("SELECT count(*) FROM sqlite_master")
                     logger.info("Database encryption enabled (SQLCipher)")
                 except sqlite3.OperationalError as e:
-                    logger.warning(
-                        f"SQLCipher not available, falling back to unencrypted: {e}"
+                    logger.debug(
+                        "PRAGMA key parameter binding failed, attempting quoted fallback: %s",
+                        e,
                     )
-                    # Reconnect without encryption
-                    conn.close()
-                    conn = sqlite3.connect(
-                        str(self.db_path),
-                        check_same_thread=False,
-                        timeout=30.0
-                    )
-                    conn.execute("PRAGMA foreign_keys = ON")
-                    conn.row_factory = sqlite3.Row
+                    try:
+                        quoted_key = conn.execute(
+                            "SELECT quote(?)", (self.encryption_key,)
+                        ).fetchone()[0]
+                        conn.execute(f"PRAGMA key = {quoted_key}")
+                        conn.execute("SELECT count(*) FROM sqlite_master")
+                        logger.info(
+                            "Database encryption enabled (SQLCipher, quoted key fallback)"
+                        )
+                    except sqlite3.OperationalError as enc_error:
+                        logger.warning(
+                            "SQLCipher not available, falling back to unencrypted: %s",
+                            enc_error,
+                        )
+                        # Reconnect without encryption
+                        conn.close()
+                        conn = sqlite3.connect(
+                            str(self.db_path),
+                            check_same_thread=False,
+                            timeout=30.0
+                        )
+                        conn.execute("PRAGMA foreign_keys = ON")
+                        conn.row_factory = sqlite3.Row
             
             self._local.connection = conn
         
