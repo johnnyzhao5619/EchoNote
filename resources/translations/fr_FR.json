@@ -516,6 +516,28 @@
       "recording": "Enregistrement de réunion",
       "separator": ", ",
       "none": "Aucune tâche"
+    },
+    "notifications": {
+      "start_success": {
+        "title": "{app_name} - Tâches automatiques démarrées",
+        "message": "L'enregistrement automatique a démarré pour « {event_title} »."
+      },
+      "start_error": {
+        "title": "{app_name} - Échec du démarrage des tâches automatiques",
+        "message": "Impossible de démarrer l'enregistrement automatique pour « {event_title} » :\\n{error_message}"
+      },
+      "stop_success": {
+        "title": "{app_name} - Enregistrement automatique terminé",
+        "message": "L'enregistrement de « {event_title} » est terminé\\nDurée : {duration_seconds} secondes"
+      },
+      "stop_error": {
+        "title": "{app_name} - Échec de l'arrêt de l'enregistrement",
+        "message": "Impossible d'arrêter l'enregistrement de « {event_title} » :\\n{error_message}"
+      },
+      "recorder_busy": {
+        "title": "{app_name} - Impossible de démarrer les tâches automatiques",
+        "message": "Impossible de démarrer l'enregistrement automatique pour « {event_title} » :\\nL'enregistreur est déjà utilisé"
+      }
     }
   },
   "ffmpeg": {

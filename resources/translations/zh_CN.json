@@ -518,6 +518,28 @@
       "recording": "会议录音",
       "separator": "、",
       "none": "无任务"
+    },
+    "notifications": {
+      "start_success": {
+        "title": "{app_name} - 自动任务已启动",
+        "message": "已为事件「{event_title}」启动自动录制"
+      },
+      "start_error": {
+        "title": "{app_name} - 自动任务启动失败",
+        "message": "无法为事件「{event_title}」启动自动录制：\\n{error_message}"
+      },
+      "stop_success": {
+        "title": "{app_name} - 自动录制已完成",
+        "message": "事件「{event_title}」的录制已完成\\n录制时长：{duration_seconds} 秒"
+      },
+      "stop_error": {
+        "title": "{app_name} - 自动录制停止失败",
+        "message": "无法停止事件「{event_title}」的录制：\\n{error_message}"
+      },
+      "recorder_busy": {
+        "title": "{app_name} - 无法启动自动任务",
+        "message": "无法为事件「{event_title}」启动自动录制：\\n录制器正在使用中"
+      }
     }
   },
   "wizard": {

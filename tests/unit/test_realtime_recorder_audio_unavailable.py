@@ -316,7 +316,21 @@ def test_auto_scheduler_reports_start_failure(monkeypatch):
     assert event.id not in scheduler.started_events
     assert notification_stub.success_messages == []
     assert notification_stub.error_messages, "Error notification should be sent"
-    assert "自动任务启动失败" in notification_stub.error_messages[-1][0]
+
+    error_title, error_message = notification_stub.error_messages[-1]
+    app_name = scheduler.i18n.t('app.name')
+    expected_title = scheduler.i18n.t(
+        'auto_task.notifications.start_error.title',
+        app_name=app_name
+    )
+    assert error_title == expected_title
+
+    expected_message = scheduler.i18n.t(
+        'auto_task.notifications.start_error.message',
+        event_title=event.title,
+        error_message="自动录制启动失败：boom"
+    )
+    assert error_message == expected_message
 
     scheduler.scheduler.shutdown(wait=False)
 
@@ -399,6 +413,34 @@ def test_recorder_reinitializes_queues_between_event_loops(monkeypatch):
         scheduler.scheduler.shutdown(wait=False)
 
     assert notification_stub.error_messages == []
+    assert notification_stub.success_messages, "Success notifications should be sent"
+
+    app_name = scheduler.i18n.t('app.name')
+
+    start_title, start_message = notification_stub.success_messages[0]
+    expected_start_title = scheduler.i18n.t(
+        'auto_task.notifications.start_success.title',
+        app_name=app_name
+    )
+    expected_start_message = scheduler.i18n.t(
+        'auto_task.notifications.start_success.message',
+        event_title=event.title
+    )
+    assert start_title == expected_start_title
+    assert start_message == expected_start_message
+
+    stop_title, stop_message = notification_stub.success_messages[-1]
+    expected_stop_title = scheduler.i18n.t(
+        'auto_task.notifications.stop_success.title',
+        app_name=app_name
+    )
+    expected_stop_message = scheduler.i18n.t(
+        'auto_task.notifications.stop_success.message',
+        event_title=event.title,
+        duration_seconds="0.0"
+    )
+    assert stop_title == expected_stop_title
+    assert stop_message == expected_stop_message
 
 
 def test_stop_recording_without_database_skips_calendar_event(monkeypatch):
