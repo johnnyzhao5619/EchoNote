@@ -89,13 +89,116 @@ def test_get_timeline_events_handles_mixed_timezones():
     assert result['current_time'] == to_local_naive(center_time).isoformat()
 
 
-def test_get_timeline_events_includes_future_when_past_exceeds_page():
+def _build_manager(events):
+    return TimelineManagerForTest(
+        calendar_manager=DummyCalendarManager(events),
+        db_connection=None,
+    )
+
+
+def test_get_timeline_events_history_only_pagination():
+    center_time = datetime(2024, 5, 20, 12, 0, tzinfo=timezone.utc)
+
+    history = []
+    for index in range(5):
+        start = center_time - timedelta(hours=1 + index)
+        end = start + timedelta(minutes=30)
+        history.append(
+            CalendarEvent(
+                id=f'past-{index}',
+                title=f'Past #{index}',
+                start_time=iso_z(start),
+                end_time=iso_z(end),
+            )
+        )
+
+    manager = _build_manager(history)
+
+    first_page = manager.get_timeline_events(
+        center_time=center_time,
+        past_days=1,
+        future_days=1,
+        page_size=2,
+    )
+
+    assert [item['event'].id for item in first_page['past_events']] == [
+        'past-0', 'past-1'
+    ]
+    assert first_page['future_events'] == []
+    assert first_page['total_count'] == len(history)
+    assert first_page['has_more']
+
+    second_page = manager.get_timeline_events(
+        center_time=center_time,
+        past_days=1,
+        future_days=1,
+        page_size=2,
+        page=1,
+    )
+
+    assert [item['event'].id for item in second_page['past_events']] == [
+        'past-2', 'past-3'
+    ]
+    assert second_page['future_events'] == []
+    assert second_page['total_count'] == len(history)
+    assert second_page['has_more']
+
+
+def test_get_timeline_events_future_only_pagination():
+    center_time = datetime(2024, 5, 20, 12, 0, tzinfo=timezone.utc)
+
+    upcoming = []
+    for index in range(4):
+        start = center_time + timedelta(hours=1 + index)
+        end = start + timedelta(minutes=45)
+        upcoming.append(
+            CalendarEvent(
+                id=f'future-{index}',
+                title=f'Future #{index}',
+                start_time=iso_z(start),
+                end_time=iso_z(end),
+            )
+        )
+
+    manager = _build_manager(upcoming)
+
+    first_page = manager.get_timeline_events(
+        center_time=center_time,
+        past_days=1,
+        future_days=1,
+        page_size=2,
+    )
+
+    assert first_page['past_events'] == []
+    assert [item['event'].id for item in first_page['future_events']] == [
+        'future-0', 'future-1'
+    ]
+    assert first_page['total_count'] == len(upcoming)
+    assert first_page['has_more']
+
+    second_page = manager.get_timeline_events(
+        center_time=center_time,
+        past_days=1,
+        future_days=1,
+        page_size=2,
+        page=1,
+    )
+
+    assert second_page['past_events'] == []
+    assert [item['event'].id for item in second_page['future_events']] == [
+        'future-2', 'future-3'
+    ]
+    assert second_page['total_count'] == len(upcoming)
+    assert not second_page['has_more']
+
+
+def test_get_timeline_events_mixed_across_pages_without_future_duplicates():
     center_time = datetime(2024, 5, 20, 12, 0, tzinfo=timezone.utc)
 
     past_events = []
-    for index in range(5):
-        start = center_time - timedelta(hours=2 + index)
-        end = start + timedelta(minutes=45)
+    for index in range(3):
+        start = center_time - timedelta(hours=1 + index)
+        end = start + timedelta(minutes=30)
         past_events.append(
             CalendarEvent(
                 id=f'past-{index}',
@@ -106,7 +209,7 @@ def test_get_timeline_events_includes_future_when_past_exceeds_page():
         )
 
     future_events = []
-    for index in range(2):
+    for index in range(3):
         start = center_time + timedelta(hours=1 + index)
         end = start + timedelta(minutes=30)
         future_events.append(
@@ -118,26 +221,48 @@ def test_get_timeline_events_includes_future_when_past_exceeds_page():
             )
         )
 
-    manager = TimelineManagerForTest(
-        calendar_manager=DummyCalendarManager(past_events + future_events),
-        db_connection=None,
-    )
+    manager = _build_manager(past_events + future_events)
 
-    result = manager.get_timeline_events(
+    first_page = manager.get_timeline_events(
         center_time=center_time,
         past_days=1,
         future_days=1,
-        page_size=3,
+        page_size=2,
     )
 
-    # 过去事件应按时间倒序分页
-    assert [item['event'].id for item in result['past_events']] == [
-        'past-0', 'past-1', 'past-2'
+    assert [item['event'].id for item in first_page['past_events']] == [
+        'past-0', 'past-1'
     ]
+    assert first_page['future_events'] == []
+    assert first_page['has_more']
 
-    future_ids = [item['event'].id for item in result['future_events']]
-    assert future_ids == ['future-0', 'future-1']
-    assert result['total_count'] == len(past_events) + len(future_events)
+    second_page = manager.get_timeline_events(
+        center_time=center_time,
+        past_days=1,
+        future_days=1,
+        page_size=2,
+        page=1,
+    )
+
+    assert [item['event'].id for item in second_page['past_events']] == ['past-2']
+    assert [item['event'].id for item in second_page['future_events']] == [
+        'future-0'
+    ]
+    assert second_page['has_more']
+
+    third_page = manager.get_timeline_events(
+        center_time=center_time,
+        past_days=1,
+        future_days=1,
+        page_size=2,
+        page=2,
+    )
+
+    assert third_page['past_events'] == []
+    assert [item['event'].id for item in third_page['future_events']] == [
+        'future-1', 'future-2'
+    ]
+    assert not third_page['has_more']
 
 
 def test_search_events_applies_timezone_filters(monkeypatch):

@@ -150,19 +150,19 @@ class TimelineManager:
             else:
                 past_page = []
 
-            # Determine how many future events to return.
-            # Prefer filling the remaining quota from the current page, but
-            # always provide future events when available so callers can plan
-            # ahead even if past events dominate the page window.
-            remaining_quota = max(page_size - len(past_page), 0)
+            # Determine which future events fall inside the requested slice.
+            total_past = len(past_events)
+            total_future = len(future_events)
 
-            if start_idx >= len(past_events):
-                future_start = start_idx - len(past_events)
-            else:
-                future_start = 0
+            future_page: List[Dict[str, Any]] = []
+            if total_future:
+                future_start_idx = max(start_idx, total_past)
+                future_end_idx = min(end_idx, total_past + total_future)
 
-            future_quota = remaining_quota if remaining_quota > 0 else page_size
-            future_page = future_events[future_start:future_start + future_quota]
+                if future_start_idx < future_end_idx:
+                    relative_start = future_start_idx - total_past
+                    relative_end = future_end_idx - total_past
+                    future_page = future_events[relative_start:relative_end]
 
             result = {
                 'current_time': center_time_local.isoformat(),
