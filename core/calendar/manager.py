@@ -770,13 +770,26 @@ class CalendarManager:
             return
 
         try:
-            if not external_id:
+            link: Optional[CalendarEventLink] = None
+
+            if external_id:
+                link = CalendarEventLink.get_by_provider_and_external_id(
+                    self.db,
+                    provider,
+                    external_id,
+                )
+
+            if not link and event_id:
                 link = CalendarEventLink.get_by_event_and_provider(
                     self.db,
                     event_id,
                     provider,
-                ) if event_id else None
-                external_id = link.external_id if link else None
+                )
+                if link and not external_id:
+                    external_id = link.external_id
+
+            if link and not event_id:
+                event_id = link.event_id
 
             if external_id:
                 delete_link_query = (
@@ -788,18 +801,42 @@ class CalendarManager:
                     (provider, external_id),
                     commit=True,
                 )
+            elif event_id:
+                delete_link_query = (
+                    "DELETE FROM calendar_event_links "
+                    "WHERE provider = ? AND event_id = ?"
+                )
+                self.db.execute(
+                    delete_link_query,
+                    (provider, event_id),
+                    commit=True,
+                )
 
-            if event_id:
+            if not event_id:
+                return
+
+            event = CalendarEvent.get_by_id(self.db, event_id)
+            if not event:
+                return
+
+            remaining_links = CalendarEventLink.list_for_event(self.db, event_id)
+
+            if event.source == provider and not remaining_links:
                 attachments = EventAttachment.get_by_event_id(self.db, event_id)
                 for attachment in attachments:
                     attachment.delete(self.db)
 
-                event = CalendarEvent.get_by_id(self.db, event_id)
-                if event:
-                    event.delete(self.db)
-                    logger.info(
-                        "Removed local event %s for provider %s", event_id, provider
-                    )
+                event.delete(self.db)
+                logger.info(
+                    "Removed local event %s for provider %s", event_id, provider
+                )
+            else:
+                logger.info(
+                    "Detached provider %s from event %s; %d other link(s) remain",
+                    provider,
+                    event_id,
+                    len(remaining_links),
+                )
 
         except Exception as exc:
             logger.error(
