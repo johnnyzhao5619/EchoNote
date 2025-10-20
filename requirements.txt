@@ -17,6 +17,7 @@ webrtcvad>=2.0.10
 
 # HTTP Client & API
 httpx>=0.25.0
+requests>=2.31.0
 authlib>=1.2.0
 
 # Database
