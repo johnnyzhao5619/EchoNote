@@ -14,8 +14,6 @@ pytest.importorskip('cryptography')
 from core.timeline.manager import (
     TimelineManager,
     to_local_naive,
-    MISSING_TRANSCRIPT_MESSAGE,
-    UNREADABLE_TRANSCRIPT_MESSAGE,
 )
 from data.database.models import CalendarEvent, EventAttachment
 
@@ -40,6 +38,14 @@ class TimelineManagerForTest(TimelineManager):
 
     def get_auto_task(self, event_id: str):  # noqa: D401
         return {'enable_transcription': True}
+
+
+class StubI18n:
+    def __init__(self, mapping):
+        self._mapping = dict(mapping)
+
+    def t(self, key, **kwargs):  # noqa: D401
+        return self._mapping.get(key, key)
 
 
 def iso_z(dt: datetime) -> str:
@@ -367,6 +373,29 @@ def test_search_events_filters_attendees_without_errors(monkeypatch):
     assert [item['event'].id for item in filtered] == ['with-attendees']
 
 
+def test_get_search_snippet_uses_translated_prefix():
+    event = CalendarEvent(
+        id='prefixed-title',
+        title='Weekly Sync',
+        start_time=iso_z(datetime(2024, 3, 5, 9, 0, tzinfo=timezone.utc)),
+        end_time=iso_z(datetime(2024, 3, 5, 10, 0, tzinfo=timezone.utc)),
+        description='Discuss weekly action items',
+    )
+
+    manager = TimelineManagerForTest(
+        calendar_manager=DummyCalendarManager([event]),
+        db_connection=None,
+        i18n=StubI18n({
+            'timeline.snippet.title_prefix': '标题',
+            'timeline.snippet.description_prefix': '描述',
+        }),
+    )
+
+    snippet = manager.get_search_snippet(event, 'weekly')
+
+    assert snippet == '标题: ...Weekly Sync...'
+
+
 def test_get_search_snippet_returns_missing_message(monkeypatch, caplog, tmp_path):
     event = CalendarEvent(
         id='missing-transcript',
@@ -398,7 +427,7 @@ def test_get_search_snippet_returns_missing_message(monkeypatch, caplog, tmp_pat
     with caplog.at_level(logging.WARNING, logger='echonote.timeline.manager'):
         snippet = manager.get_search_snippet(event, 'notes')
 
-    assert snippet == MISSING_TRANSCRIPT_MESSAGE
+    assert snippet == 'Transcript unavailable (file missing)'
     assert 'Transcript file not found' in caplog.text
 
 
@@ -434,5 +463,41 @@ def test_get_search_snippet_returns_unreadable_message(monkeypatch, caplog, tmp_
     with caplog.at_level(logging.ERROR, logger='echonote.timeline.manager'):
         snippet = manager.get_search_snippet(event, 'notes')
 
-    assert snippet == UNREADABLE_TRANSCRIPT_MESSAGE
+    assert snippet == 'Transcript unavailable (cannot read transcript)'
     assert 'Failed to decode transcript' in caplog.text
+
+
+def test_get_search_snippet_missing_transcript_uses_translation(monkeypatch, tmp_path):
+    event = CalendarEvent(
+        id='missing-transcript-i18n',
+        title='Weekly Sync',
+        start_time=iso_z(datetime(2024, 3, 5, 9, 0, tzinfo=timezone.utc)),
+        end_time=iso_z(datetime(2024, 3, 5, 10, 0, tzinfo=timezone.utc)),
+    )
+
+    missing_path = tmp_path / 'missing.txt'
+
+    manager = TimelineManagerForTest(
+        calendar_manager=DummyCalendarManager([event]),
+        db_connection=None,
+        i18n=StubI18n({
+            'timeline.snippet.missing_transcript': '转录文件缺失',
+        }),
+    )
+
+    monkeypatch.setattr(
+        EventAttachment,
+        'get_by_event_id',
+        staticmethod(
+            lambda db, event_id: [
+                SimpleNamespace(
+                    attachment_type='transcript',
+                    file_path=str(missing_path),
+                )
+            ]
+        ),
+    )
+
+    snippet = manager.get_search_snippet(event, 'notes')
+
+    assert snippet == '转录文件缺失'

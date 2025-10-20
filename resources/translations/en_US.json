@@ -144,7 +144,15 @@
     "play_recording": "Play Recording",
     "view_transcript": "View Transcript",
     "no_artifacts": "No artifacts",
-    "audio_player_title": "Audio Player"
+    "audio_player_title": "Audio Player",
+    "snippet": {
+      "title_prefix": "Title",
+      "description_prefix": "Description",
+      "transcript_prefix": "Transcript",
+      "missing_transcript": "Transcript unavailable (file missing)",
+      "unreadable_transcript": "Transcript unavailable (cannot read transcript)",
+      "generic_transcript": "Transcript unavailable"
+    }
   },
   "transcript": {
     "viewer_title": "Transcript Viewer",

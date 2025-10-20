@@ -1,7 +1,7 @@
 """Timeline Manager for EchoNote."""
 
 import logging
-from typing import Optional, List, Dict, Any, Union
+from typing import Optional, List, Dict, Any, Union, Callable, TYPE_CHECKING
 from datetime import datetime, timedelta
 
 from data.database.models import (
@@ -10,13 +10,11 @@ from data.database.models import (
     AutoTaskConfig
 )
 
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from utils.i18n import I18nManager
+
 
 logger = logging.getLogger('echonote.timeline.manager')
-
-
-MISSING_TRANSCRIPT_MESSAGE = "Transcript unavailable (file missing)"
-UNREADABLE_TRANSCRIPT_MESSAGE = "Transcript unavailable (cannot read transcript)"
-GENERIC_TRANSCRIPT_MESSAGE = "Transcript unavailable"
 
 
 def to_local_naive(value: Union[datetime, str]) -> datetime:
@@ -49,17 +47,69 @@ class TimelineManager:
     - Retrieve event artifacts (recordings, transcripts)
     """
 
-    def __init__(self, calendar_manager, db_connection):
+    def __init__(
+        self,
+        calendar_manager,
+        db_connection,
+        i18n: Optional['I18nManager'] = None,
+        translate: Optional[Callable[[str], str]] = None,
+    ):
         """
         Initialize the timeline manager.
 
         Args:
             calendar_manager: CalendarManager instance
             db_connection: Database connection instance
+            i18n: Optional translation manager providing ``t`` method
+            translate: Optional translation callback taking a translation key
         """
         self.calendar_manager = calendar_manager
         self.db = db_connection
+        if i18n is not None and translate is not None:
+            raise ValueError(
+                "Provide either an i18n manager or a translation callback, not both"
+            )
+        self._translate_callback = translate or (i18n.t if i18n else None)
         logger.info("TimelineManager initialized")
+
+    def _translate(self, key: str, default: str) -> str:
+        """Return translated text for ``key`` with ``default`` fallback."""
+        if self._translate_callback is None:
+            return default
+
+        try:
+            value = self._translate_callback(key)
+        except TypeError:
+            # Some callbacks might require keyword arguments for clarity.
+            try:
+                value = self._translate_callback(key=key)  # type: ignore[call-arg]
+            except Exception as exc:  # pragma: no cover - defensive logging
+                logger.warning(
+                    "Translation callback invocation failed for %s: %s",
+                    key,
+                    exc,
+                )
+                return default
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.warning(
+                "Translation callback invocation failed for %s: %s",
+                key,
+                exc,
+            )
+            return default
+
+        if not isinstance(value, str):
+            logger.warning(
+                "Translation callback returned non-string for %s: %r",
+                key,
+                value,
+            )
+            return default
+
+        if not value or value == key:
+            return default
+
+        return value
 
     def get_timeline_events(
         self,
@@ -485,7 +535,11 @@ class TimelineManager:
 
         # Check title
         if query_lower in event.title.lower():
-            return f"Title: ...{event.title}..."
+            title_prefix = self._translate(
+                'timeline.snippet.title_prefix',
+                'Title'
+            )
+            return f"{title_prefix}: ...{event.title}..."
 
         # Check description
         if event.description and query_lower in event.description.lower():
@@ -494,7 +548,11 @@ class TimelineManager:
             start = max(0, pos - 30)
             end = min(len(event.description), pos + len(query) + 30)
             snippet = event.description[start:end]
-            return f"Description: ...{snippet}..."
+            description_prefix = self._translate(
+                'timeline.snippet.description_prefix',
+                'Description'
+            )
+            return f"{description_prefix}: ...{snippet}..."
 
         # Check transcripts
         attachments = EventAttachment.get_by_event_id(self.db, event.id)
@@ -513,7 +571,11 @@ class TimelineManager:
                                 len(content), pos + len(query) + 30
                             )
                             snippet = content[start:end]
-                            return f"Transcript: ...{snippet}..."
+                            transcript_prefix = self._translate(
+                                'timeline.snippet.transcript_prefix',
+                                'Transcript'
+                            )
+                            return f"{transcript_prefix}: ...{snippet}..."
                 except FileNotFoundError:
                     logger.warning(
                         "Transcript file not found for event %s: %s",
@@ -521,7 +583,10 @@ class TimelineManager:
                         attachment.file_path,
                     )
                     if fallback_message is None:
-                        fallback_message = MISSING_TRANSCRIPT_MESSAGE
+                        fallback_message = self._translate(
+                            'timeline.snippet.missing_transcript',
+                            'Transcript unavailable (file missing)'
+                        )
                 except UnicodeDecodeError:
                     logger.error(
                         "Failed to decode transcript for event %s: %s",
@@ -530,7 +595,10 @@ class TimelineManager:
                         exc_info=True,
                     )
                     if fallback_message is None:
-                        fallback_message = UNREADABLE_TRANSCRIPT_MESSAGE
+                        fallback_message = self._translate(
+                            'timeline.snippet.unreadable_transcript',
+                            'Transcript unavailable (cannot read transcript)'
+                        )
                 except Exception as exc:
                     logger.warning(
                         "Failed to read transcript %s for event %s: %s",
@@ -539,7 +607,10 @@ class TimelineManager:
                         exc,
                     )
                     if fallback_message is None:
-                        fallback_message = GENERIC_TRANSCRIPT_MESSAGE
+                        fallback_message = self._translate(
+                            'timeline.snippet.generic_transcript',
+                            'Transcript unavailable'
+                        )
 
         return fallback_message
 

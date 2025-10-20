@@ -144,7 +144,15 @@
     "play_recording": "播放录音",
     "view_transcript": "查看转录",
     "no_artifacts": "无附件",
-    "audio_player_title": "音频播放器"
+    "audio_player_title": "音频播放器",
+    "snippet": {
+      "title_prefix": "标题",
+      "description_prefix": "描述",
+      "transcript_prefix": "转录",
+      "missing_transcript": "无法获取转录（文件缺失）",
+      "unreadable_transcript": "无法获取转录（无法读取）",
+      "generic_transcript": "无法获取转录"
+    }
   },
   "transcript": {
     "viewer_title": "转录文本查看器",

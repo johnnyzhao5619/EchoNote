@@ -142,7 +142,15 @@
     "play_recording": "Lire l'Enregistrement",
     "view_transcript": "Voir la Transcription",
     "no_artifacts": "Aucun artefact",
-    "audio_player_title": "Lecteur Audio"
+    "audio_player_title": "Lecteur Audio",
+    "snippet": {
+      "title_prefix": "Titre",
+      "description_prefix": "Description",
+      "transcript_prefix": "Transcription",
+      "missing_transcript": "Transcription indisponible (fichier introuvable)",
+      "unreadable_transcript": "Transcription indisponible (lecture impossible)",
+      "generic_transcript": "Transcription indisponible"
+    }
   },
   "transcript": {
     "viewer_title": "Visionneuse de Transcription",
