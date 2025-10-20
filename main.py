@@ -133,13 +133,18 @@ def main():
         app.setApplicationName("EchoNote")
         app.setOrganizationName("EchoNote")
         app.setOrganizationDomain("echonote.app")
-        
+
         logger.info("PyQt application initialized")
         timer.checkpoint("qt_initialized")
-        
+
+        # Load configuration early to display accurate version on splash screen
+        logger.info("Loading configuration...")
+        config = ConfigManager()
+        app_version = config.get('version', '') or ''
+
         # Show splash screen
         from ui.common.splash_screen import SplashScreen
-        splash = SplashScreen()
+        splash = SplashScreen(version=app_version)
         splash.show()
         splash.show_progress("Initializing...", 0)
         app.processEvents()  # Process events to show splash
@@ -156,16 +161,11 @@ def main():
         
         timer.checkpoint("first_run_checked")
 
-        # Load configuration
+        # Load configuration (already loaded above; update splash for user feedback)
         splash.show_progress("Loading configuration...", 10)
         app.processEvents()
-        
-        logger.info("Loading configuration...")
-        config = ConfigManager()
-        logger.info(
-            f"Configuration loaded successfully "
-            f"(version: {config.get('version')})"
-        )
+
+        logger.info("Configuration loaded successfully (version: %s)", app_version or "unknown")
         timer.checkpoint("config_loaded")
         
         # Early FFmpeg check - detect system and log status

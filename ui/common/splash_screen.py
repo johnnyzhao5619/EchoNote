@@ -20,13 +20,19 @@ class SplashScreen(QSplashScreen):
     Shows application name, version, and initialization progress.
     """
     
-    def __init__(self, width: int = 500, height: int = 300):
+    def __init__(
+        self,
+        width: int = 500,
+        height: int = 300,
+        version: str | None = None
+    ):
         """
         Initialize splash screen.
         
         Args:
             width: Splash screen width
             height: Splash screen height
+            version: Application version label displayed on the splash screen
         """
         # Create a simple pixmap for the splash screen
         pixmap = QPixmap(width, height)
@@ -36,6 +42,7 @@ class SplashScreen(QSplashScreen):
         
         self.width = width
         self.height = height
+        self._version = self._format_version(version)
         
         # Set window flags
         self.setWindowFlags(
@@ -46,9 +53,29 @@ class SplashScreen(QSplashScreen):
         # Initialize progress text
         self._progress_text = "Initializing..."
         self._progress_percent = 0
-        
+
         logger.debug("Splash screen initialized")
-    
+
+    @staticmethod
+    def _format_version(version: str | None) -> str:
+        """Return formatted version label for display."""
+        if not version:
+            return ""
+
+        normalized = version.strip()
+        if not normalized:
+            return ""
+
+        if normalized.lower().startswith("v"):
+            return normalized
+
+        return f"v{normalized}"
+
+    @property
+    def version(self) -> str:
+        """Return formatted version label displayed on the splash screen."""
+        return self._version
+
     def drawContents(self, painter: QPainter):
         """
         Draw splash screen contents.
@@ -66,13 +93,14 @@ class SplashScreen(QSplashScreen):
             "EchoNote"
         )
         
-        # Draw version
-        version_font = QFont("Arial", 12)
-        painter.setFont(version_font)
-        painter.drawText(
-            20, 110,
-            "v1.0.0"
-        )
+        # Draw version (if available)
+        if self._version:
+            version_font = QFont("Arial", 12)
+            painter.setFont(version_font)
+            painter.drawText(
+                20, 110,
+                self._version
+            )
         
         # Draw progress text
         progress_font = QFont("Arial", 11)
