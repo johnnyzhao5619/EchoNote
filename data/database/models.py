@@ -435,28 +435,59 @@ class CalendarSyncStatus:
     
     def save(self, db_connection):
         """Save sync status in database."""
-        self.updated_at = current_timestamp()
-        
+        now = current_timestamp()
+        self.updated_at = now
+
         # Encrypt sync_token before saving
         encrypted_sync_token = encrypt_sensitive_field(self.sync_token)
-        
-        query = """
-            INSERT OR REPLACE INTO calendar_sync_status (
-                id, provider, user_email, last_sync_time, sync_token,
-                is_active, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """
-        params = (
-            self.id, self.provider, self.user_email, self.last_sync_time,
-            encrypted_sync_token, int(self.is_active), self.created_at, self.updated_at
+
+        with db_connection.get_cursor(commit=True) as cursor:
+            if self.is_active:
+                cursor.execute(
+                    """
+                    UPDATE calendar_sync_status
+                    SET is_active = 0,
+                        sync_token = NULL,
+                        updated_at = ?
+                    WHERE provider = ?
+                      AND id != ?
+                      AND is_active = 1
+                    """,
+                    (now, self.provider, self.id)
+                )
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO calendar_sync_status (
+                    id, provider, user_email, last_sync_time, sync_token,
+                    is_active, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    self.id,
+                    self.provider,
+                    self.user_email,
+                    self.last_sync_time,
+                    encrypted_sync_token,
+                    int(self.is_active),
+                    self.created_at,
+                    self.updated_at
+                )
+            )
+
+        logger.debug(
+            "Saved calendar sync status: %s (active=%s)",
+            self.id,
+            self.is_active
         )
-        db_connection.execute(query, params, commit=True)
-        logger.debug(f"Saved calendar sync status: {self.id}")
     
     @staticmethod
     def get_by_provider(db_connection, provider: str) -> Optional['CalendarSyncStatus']:
         """Get sync status for a provider."""
-        query = "SELECT * FROM calendar_sync_status WHERE provider = ? AND is_active = 1"
+        query = (
+            "SELECT * FROM calendar_sync_status "
+            "WHERE provider = ? AND is_active = 1 "
+            "ORDER BY updated_at DESC LIMIT 1"
+        )
         result = db_connection.execute(query, (provider,))
         if result:
             return CalendarSyncStatus.from_db_row(result[0])
