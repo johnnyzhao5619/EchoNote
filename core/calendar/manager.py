@@ -13,6 +13,7 @@ from data.database.models import (
     CalendarEvent,
     CalendarEventLink,
     CalendarSyncStatus,
+    EventAttachment,
 )
 
 
@@ -427,6 +428,33 @@ class CalendarManager:
 
             adapter = self.sync_adapters[provider]
 
+            existing_links = self.db.execute(
+                (
+                    "SELECT event_id, external_id FROM calendar_event_links "
+                    "WHERE provider = ?"
+                ),
+                (provider,),
+            )
+
+            existing_map: Dict[str, Optional[str]] = {}
+            for row in existing_links or []:
+                external_id = row["external_id"]
+                if external_id:
+                    existing_map[external_id] = row["event_id"]
+
+            legacy_rows = self.db.execute(
+                (
+                    "SELECT id, external_id FROM calendar_events "
+                    "WHERE source = ? AND external_id IS NOT NULL"
+                ),
+                (provider,),
+            )
+
+            for row in legacy_rows or []:
+                external_id = row["external_id"]
+                if external_id and external_id not in existing_map:
+                    existing_map[external_id] = row["id"]
+
             token_before_refresh: Optional[Dict[str, Any]] = None
             refresh_result: Dict[str, Any] = {}
 
@@ -573,9 +601,33 @@ class CalendarManager:
             external_events = result.get('events', [])
             new_sync_token = result.get('sync_token')
 
+            deleted_external_ids = set(result.get('deleted', []) or [])
+            remote_external_ids: set = set()
+
             # Save external events to local database
             for ext_event in external_events:
+                if not isinstance(ext_event, dict):
+                    continue
+
+                if ext_event.get('deleted'):
+                    if ext_event.get('id'):
+                        deleted_external_ids.add(ext_event['id'])
+                    continue
+
+                ext_identifier = ext_event.get('id')
+                if ext_identifier:
+                    remote_external_ids.add(ext_identifier)
+
                 self._save_external_event(ext_event, provider)
+
+            removable_ids = (
+                {external_id for external_id in existing_map}
+                - remote_external_ids
+            ) | (deleted_external_ids & set(existing_map.keys()))
+
+            for external_id in removable_ids:
+                event_id = existing_map.get(external_id)
+                self._remove_external_event(event_id, provider, external_id)
 
             # Update sync status
             sync_status.last_sync_time = datetime.now().isoformat()
@@ -705,6 +757,57 @@ class CalendarManager:
 
         except Exception as e:
             logger.error(f"Failed to save external event: {e}")
+
+    def _remove_external_event(
+        self,
+        event_id: Optional[str],
+        provider: str,
+        external_id: Optional[str] = None,
+    ) -> None:
+        """Remove a local event and associated metadata for a provider."""
+
+        if not event_id and not external_id:
+            return
+
+        try:
+            if not external_id:
+                link = CalendarEventLink.get_by_event_and_provider(
+                    self.db,
+                    event_id,
+                    provider,
+                ) if event_id else None
+                external_id = link.external_id if link else None
+
+            if external_id:
+                delete_link_query = (
+                    "DELETE FROM calendar_event_links "
+                    "WHERE provider = ? AND external_id = ?"
+                )
+                self.db.execute(
+                    delete_link_query,
+                    (provider, external_id),
+                    commit=True,
+                )
+
+            if event_id:
+                attachments = EventAttachment.get_by_event_id(self.db, event_id)
+                for attachment in attachments:
+                    attachment.delete(self.db)
+
+                event = CalendarEvent.get_by_id(self.db, event_id)
+                if event:
+                    event.delete(self.db)
+                    logger.info(
+                        "Removed local event %s for provider %s", event_id, provider
+                    )
+
+        except Exception as exc:
+            logger.error(
+                "Failed to remove external event %s/%s: %s",
+                provider,
+                external_id or event_id,
+                exc,
+            )
 
     def _upsert_event_link(
         self,
