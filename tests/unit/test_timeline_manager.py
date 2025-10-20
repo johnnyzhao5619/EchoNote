@@ -1,15 +1,22 @@
 from __future__ import annotations
 
+import logging
 import sys
 from pathlib import Path
 from datetime import datetime, timezone
 
 import pytest
+from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 pytest.importorskip('cryptography')
 
-from core.timeline.manager import TimelineManager, to_local_naive
+from core.timeline.manager import (
+    TimelineManager,
+    to_local_naive,
+    MISSING_TRANSCRIPT_MESSAGE,
+    UNREADABLE_TRANSCRIPT_MESSAGE,
+)
 from data.database.models import CalendarEvent, EventAttachment
 
 
@@ -182,3 +189,74 @@ def test_search_events_filters_attendees_without_errors(monkeypatch):
     )
 
     assert [item['event'].id for item in filtered] == ['with-attendees']
+
+
+def test_get_search_snippet_returns_missing_message(monkeypatch, caplog, tmp_path):
+    event = CalendarEvent(
+        id='missing-transcript',
+        title='Weekly Sync',
+        start_time=iso_z(datetime(2024, 3, 5, 9, 0, tzinfo=timezone.utc)),
+        end_time=iso_z(datetime(2024, 3, 5, 10, 0, tzinfo=timezone.utc)),
+    )
+
+    missing_path = tmp_path / 'missing.txt'
+
+    manager = TimelineManagerForTest(
+        calendar_manager=DummyCalendarManager([event]),
+        db_connection=None,
+    )
+
+    monkeypatch.setattr(
+        EventAttachment,
+        'get_by_event_id',
+        staticmethod(
+            lambda db, event_id: [
+                SimpleNamespace(
+                    attachment_type='transcript',
+                    file_path=str(missing_path),
+                )
+            ]
+        ),
+    )
+
+    with caplog.at_level(logging.WARNING, logger='echonote.timeline.manager'):
+        snippet = manager.get_search_snippet(event, 'notes')
+
+    assert snippet == MISSING_TRANSCRIPT_MESSAGE
+    assert 'Transcript file not found' in caplog.text
+
+
+def test_get_search_snippet_returns_unreadable_message(monkeypatch, caplog, tmp_path):
+    event = CalendarEvent(
+        id='corrupt-transcript',
+        title='Design Review',
+        start_time=iso_z(datetime(2024, 3, 6, 9, 0, tzinfo=timezone.utc)),
+        end_time=iso_z(datetime(2024, 3, 6, 10, 0, tzinfo=timezone.utc)),
+    )
+
+    corrupt_path = tmp_path / 'corrupt.txt'
+    corrupt_path.write_bytes(b'\xff\xfe\xfd')
+
+    manager = TimelineManagerForTest(
+        calendar_manager=DummyCalendarManager([event]),
+        db_connection=None,
+    )
+
+    monkeypatch.setattr(
+        EventAttachment,
+        'get_by_event_id',
+        staticmethod(
+            lambda db, event_id: [
+                SimpleNamespace(
+                    attachment_type='transcript',
+                    file_path=str(corrupt_path),
+                )
+            ]
+        ),
+    )
+
+    with caplog.at_level(logging.ERROR, logger='echonote.timeline.manager'):
+        snippet = manager.get_search_snippet(event, 'notes')
+
+    assert snippet == UNREADABLE_TRANSCRIPT_MESSAGE
+    assert 'Failed to decode transcript' in caplog.text

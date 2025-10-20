@@ -14,6 +14,11 @@ from data.database.models import (
 logger = logging.getLogger('echonote.timeline.manager')
 
 
+MISSING_TRANSCRIPT_MESSAGE = "Transcript unavailable (file missing)"
+UNREADABLE_TRANSCRIPT_MESSAGE = "Transcript unavailable (cannot read transcript)"
+GENERIC_TRANSCRIPT_MESSAGE = "Transcript unavailable"
+
+
 def to_local_naive(value: Union[datetime, str]) -> datetime:
     """Convert datetime/ISO string to local-time naive datetime."""
     if isinstance(value, str):
@@ -379,7 +384,7 @@ class TimelineManager:
                 results.append({
                     'event': event,
                     'artifacts': artifacts,
-                    'match_snippet': self._get_match_snippet(
+                    'match_snippet': self.get_search_snippet(
                         event, query
                     )
                 })
@@ -445,7 +450,7 @@ class TimelineManager:
                 'attachments': []
             }
 
-    def _get_match_snippet(
+    def get_search_snippet(
         self,
         event: CalendarEvent,
         query: str
@@ -480,6 +485,7 @@ class TimelineManager:
 
         # Check transcripts
         attachments = EventAttachment.get_by_event_id(self.db, event.id)
+        fallback_message: Optional[str] = None
         for attachment in attachments:
             if attachment.attachment_type == 'transcript':
                 try:
@@ -495,7 +501,39 @@ class TimelineManager:
                             )
                             snippet = content[start:end]
                             return f"Transcript: ...{snippet}..."
-                except Exception:
-                    pass
+                except FileNotFoundError:
+                    logger.warning(
+                        "Transcript file not found for event %s: %s",
+                        event.id,
+                        attachment.file_path,
+                    )
+                    if fallback_message is None:
+                        fallback_message = MISSING_TRANSCRIPT_MESSAGE
+                except UnicodeDecodeError:
+                    logger.error(
+                        "Failed to decode transcript for event %s: %s",
+                        event.id,
+                        attachment.file_path,
+                        exc_info=True,
+                    )
+                    if fallback_message is None:
+                        fallback_message = UNREADABLE_TRANSCRIPT_MESSAGE
+                except Exception as exc:
+                    logger.warning(
+                        "Failed to read transcript %s for event %s: %s",
+                        attachment.file_path,
+                        event.id,
+                        exc,
+                    )
+                    if fallback_message is None:
+                        fallback_message = GENERIC_TRANSCRIPT_MESSAGE
 
-        return None
+        return fallback_message
+
+    def _get_match_snippet(
+        self,
+        event: CalendarEvent,
+        query: str
+    ) -> Optional[str]:
+        """Compatibility wrapper for older callers."""
+        return self.get_search_snippet(event, query)
