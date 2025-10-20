@@ -161,8 +161,10 @@ class TimelineWidget(QWidget):
         filter_row.setSpacing(10)
         
         # Date range filter
-        date_label = QLabel("Date Range:")
-        filter_row.addWidget(date_label)
+        self.date_range_label = QLabel(
+            self.i18n.t('timeline.filter_date_range_label')
+        )
+        filter_row.addWidget(self.date_range_label)
         
         self.start_date_edit = QDateEdit()
         self.start_date_edit.setCalendarPopup(True)
@@ -170,7 +172,10 @@ class TimelineWidget(QWidget):
         self.start_date_edit.dateChanged.connect(self._on_filter_changed)
         filter_row.addWidget(self.start_date_edit)
         
-        filter_row.addWidget(QLabel("to"))
+        self.date_range_separator = QLabel(
+            self.i18n.t('timeline.filter_date_range_separator')
+        )
+        filter_row.addWidget(self.date_range_separator)
         
         self.end_date_edit = QDateEdit()
         self.end_date_edit.setCalendarPopup(True)
@@ -475,7 +480,17 @@ class TimelineWidget(QWidget):
             self.i18n.t('timeline.search_placeholder')
         )
         self.search_button.setText(self.i18n.t('timeline.search'))
-        
+
+        if hasattr(self, 'date_range_label'):
+            self.date_range_label.setText(
+                self.i18n.t('timeline.filter_date_range_label')
+            )
+
+        if hasattr(self, 'date_range_separator'):
+            self.date_range_separator.setText(
+                self.i18n.t('timeline.filter_date_range_separator')
+            )
+
         # Update filter combo boxes
         self.type_filter.setItemText(
             0, self.i18n.t('timeline.filter_all')

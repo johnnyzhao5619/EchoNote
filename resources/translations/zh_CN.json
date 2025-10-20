@@ -136,6 +136,8 @@
     "filter_event": "事件",
     "filter_task": "任务",
     "filter_appointment": "约会",
+    "filter_date_range_label": "日期范围：",
+    "filter_date_range_separator": "至",
     "source_all": "全部来源",
     "source_local": "本地",
     "source_google": "Google",

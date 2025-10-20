@@ -134,6 +134,8 @@
     "filter_event": "Événement",
     "filter_task": "Tâche",
     "filter_appointment": "Rendez-vous",
+    "filter_date_range_label": "Plage de dates :",
+    "filter_date_range_separator": "à",
     "source_all": "Toutes les Sources",
     "source_local": "Local",
     "source_google": "Google",

@@ -136,6 +136,8 @@
     "filter_event": "Event",
     "filter_task": "Task",
     "filter_appointment": "Appointment",
+    "filter_date_range_label": "Date Range:",
+    "filter_date_range_separator": "to",
     "source_all": "All Sources",
     "source_local": "Local",
     "source_google": "Google",
