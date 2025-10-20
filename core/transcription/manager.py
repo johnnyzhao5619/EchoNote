@@ -377,13 +377,75 @@ class TranscriptionManager:
                 logger.error(f"Error in transcription event loop: {e}")
             finally:
                 # Clean up
-                try:
-                    self._loop.run_until_complete(self.task_queue.stop())
-                except Exception:
-                    pass
-                self._loop.close()
+                loop = self._loop
+                shutdown_error = None
+
+                if loop and not loop.is_closed():
+                    for attempt in range(1, 3):
+                        try:
+                            loop.run_until_complete(self.task_queue.stop())
+                            shutdown_error = None
+                            break
+                        except Exception as exc:
+                            shutdown_error = exc
+                            logger.error(
+                                "Task queue stop attempt %d failed: %s",
+                                attempt,
+                                exc,
+                                exc_info=True,
+                            )
+
+                            pending_tasks = [
+                                task
+                                for task in asyncio.all_tasks(loop=loop)
+                                if not task.done()
+                            ]
+
+                            if pending_tasks:
+                                for task in pending_tasks:
+                                    task.cancel()
+
+                                try:
+                                    loop.run_until_complete(
+                                        asyncio.gather(
+                                            *pending_tasks,
+                                            return_exceptions=True,
+                                        )
+                                    )
+                                except Exception as gather_exc:
+                                    logger.error(
+                                        "Error while awaiting cancelled tasks during shutdown: %s",
+                                        gather_exc,
+                                        exc_info=True,
+                                    )
+
+                            if attempt == 2:
+                                logger.error(
+                                    "Task queue stop failed after %d attempts; proceeding with forced shutdown",
+                                    attempt,
+                                )
+
+                    self.task_queue.running = False
+                    self.task_queue.worker_tasks = []
+
+                if loop and not loop.is_closed():
+                    try:
+                        loop.close()
+                    except Exception as loop_exc:
+                        logger.error(
+                            "Error closing transcription event loop: %s",
+                            loop_exc,
+                            exc_info=True,
+                        )
+
                 self._loop = None
                 self._running = False
+
+                if shutdown_error:
+                    logger.warning(
+                        "Transcription event loop closed with prior shutdown errors"
+                    )
+
                 logger.info("Transcription event loop closed")
 
         # Start background thread
