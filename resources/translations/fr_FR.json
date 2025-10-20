@@ -42,6 +42,7 @@
     "model": "Modèle",
     "task_queue": "File de Tâches",
     "tasks_count": "{count} tâches",
+    "confirm_delete_task": "Êtes-vous sûr de vouloir supprimer cette tâche ?",
     "no_models_available": "Veuillez d'abord télécharger un modèle",
     "no_models_message": "Vous n'avez pas encore téléchargé de modèles. Veuillez télécharger un modèle pour commencer la transcription.",
     "go_to_download": "Aller au Téléchargement de Modèles",
