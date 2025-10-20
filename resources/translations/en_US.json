@@ -430,8 +430,6 @@
       "delete_suggestion_in_use": "The model file is currently in use. Please close all applications using this model and try again.",
       "delete_suggestion_permission": "Insufficient permissions to delete model files. Please check file permissions or run as administrator.",
       "delete_suggestion_general": "Please check if the file exists and if you have sufficient permissions. If the problem persists, check the log file.",
-      "delete_error_title": "Delete Failed",
-      "delete_error_message": "Failed to delete model {model}",
       "details_title": "Model Details",
       "model_name": "Model Name",
       "model_version": "Model Version",
@@ -520,6 +518,28 @@
       "recording": "Meeting Recording",
       "separator": ", ",
       "none": "None"
+    },
+    "notifications": {
+      "start_success": {
+        "title": "{app_name} - Auto tasks started",
+        "message": "Automatic recording started for \"{event_title}\"."
+      },
+      "start_error": {
+        "title": "{app_name} - Failed to start auto tasks",
+        "message": "Could not start automatic recording for \"{event_title}\":\\n{error_message}"
+      },
+      "stop_success": {
+        "title": "{app_name} - Auto recording completed",
+        "message": "Recording for \"{event_title}\" finished.\\nDuration: {duration_seconds} seconds"
+      },
+      "stop_error": {
+        "title": "{app_name} - Failed to stop auto recording",
+        "message": "Could not stop recording for \"{event_title}\":\\n{error_message}"
+      },
+      "recorder_busy": {
+        "title": "{app_name} - Unable to start auto tasks",
+        "message": "Could not start automatic recording for \"{event_title}\":\\nRecorder is already in use"
+      }
     }
   },
   "ffmpeg": {

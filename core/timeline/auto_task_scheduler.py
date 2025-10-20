@@ -358,11 +358,16 @@ class AutoTaskScheduler:
                     f"recorder is already active"
                 )
                 # Send notification to user
-                self.notification_manager.send_warning(
-                    'EchoNote - 无法启动自动任务',
-                    f"无法为事件 '{event.title}' 启动自动录制：\n"
-                    f"录制器正在使用中"
+                app_name = self.i18n.t('app.name')
+                title = self.i18n.t(
+                    'auto_task.notifications.recorder_busy.title',
+                    app_name=app_name
                 )
+                message = self.i18n.t(
+                    'auto_task.notifications.recorder_busy.message',
+                    event_title=event.title
+                )
+                self.notification_manager.send_warning(title, message)
                 return False
 
             # Prepare recording options
@@ -432,10 +437,16 @@ class AutoTaskScheduler:
             )
 
             # Send success notification
-            self.notification_manager.send_success(
-                'EchoNote - 自动任务已启动',
-                f"已为事件 '{event.title}' 启动自动录制"
+            app_name = self.i18n.t('app.name')
+            title = self.i18n.t(
+                'auto_task.notifications.start_success.title',
+                app_name=app_name
             )
+            message = self.i18n.t(
+                'auto_task.notifications.start_success.message',
+                event_title=event.title
+            )
+            self.notification_manager.send_success(title, message)
             return True
 
         except Exception as e:  # noqa: BLE001
@@ -458,11 +469,21 @@ class AutoTaskScheduler:
             if thread is not None and thread.is_alive():
                 thread.join(timeout=2.0)
 
-            # Send error notification
-            self.notification_manager.send_error(
-                'EchoNote - 自动任务启动失败',
-                f"无法为事件 '{event.title}' 启动自动录制：\n{str(e)}"
+            app_name = self.i18n.t('app.name')
+            title = self.i18n.t(
+                'auto_task.notifications.start_error.title',
+                app_name=app_name
             )
+            error_detail = str(e)
+            if not error_detail:
+                error_detail = repr(e)
+            message = self.i18n.t(
+                'auto_task.notifications.start_error.message',
+                event_title=event.title,
+                error_message=error_detail
+            )
+            # Send error notification
+            self.notification_manager.send_error(title, message)
             return False
             # Don't raise - we want the scheduler to continue
 
@@ -524,11 +545,17 @@ class AutoTaskScheduler:
                     
                     # Send success notification
                     duration = result.get('duration', 0)
-                    self.notification_manager.send_success(
-                        'EchoNote - 自动录制已完成',
-                        f"事件 '{event.title}' 的录制已完成\n"
-                        f"录制时长：{duration:.1f} 秒"
+                    app_name = self.i18n.t('app.name')
+                    title = self.i18n.t(
+                        'auto_task.notifications.stop_success.title',
+                        app_name=app_name
                     )
+                    message = self.i18n.t(
+                        'auto_task.notifications.stop_success.message',
+                        event_title=event.title,
+                        duration_seconds=f"{duration:.1f}"
+                    )
+                    self.notification_manager.send_success(title, message)
                 else:
                     logger.warning(
                         f"Event loop for event {event.id} is closed or invalid"
@@ -559,11 +586,21 @@ class AutoTaskScheduler:
                 exc_info=True
             )
             
-            # Send error notification
-            self.notification_manager.send_error(
-                'EchoNote - 自动录制停止失败',
-                f"无法停止事件 '{event.title}' 的录制：\n{str(e)}"
+            app_name = self.i18n.t('app.name')
+            title = self.i18n.t(
+                'auto_task.notifications.stop_error.title',
+                app_name=app_name
             )
+            error_detail = str(e)
+            if not error_detail:
+                error_detail = repr(e)
+            message = self.i18n.t(
+                'auto_task.notifications.stop_error.message',
+                event_title=event.title,
+                error_message=error_detail
+            )
+            # Send error notification
+            self.notification_manager.send_error(title, message)
             # Don't raise - we want the scheduler to continue
 
     def _save_event_attachments(self, event_id: str, recording_result: Dict[str, Any]):

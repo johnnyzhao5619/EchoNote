@@ -30,7 +30,8 @@ def _create_auto_task_scheduler(
     db,
     file_manager,
     reminder_minutes,
-    settings_manager
+    settings_manager,
+    i18n_manager=None,
 ):
     """Create auto task scheduler (for background initialization)."""
     from core.timeline.auto_task_scheduler import AutoTaskScheduler
@@ -40,7 +41,8 @@ def _create_auto_task_scheduler(
         db_connection=db,
         file_manager=file_manager,
         reminder_minutes=reminder_minutes,
-        settings_manager=settings_manager
+        settings_manager=settings_manager,
+        i18n_manager=i18n_manager
     )
 
 
@@ -654,7 +656,8 @@ def main():
                 db,
                 file_manager,
                 reminder_minutes,
-                settings_manager
+                settings_manager,
+                i18n
             )),
         ]
         
