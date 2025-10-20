@@ -11,6 +11,7 @@ from typing import Optional, Callable
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 import threading
+from html import escape
 
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel,
@@ -40,33 +41,38 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
         error = query_params.get('error', [None])[0]
         
         # Send response to browser
+        html_template = (
+            "<html>"
+            "<head><title>{title}</title></head>"
+            "<body>"
+            "    <h1>{heading}</h1>"
+            "    {content}"
+            "</body>"
+            "</html>"
+        )
+
         if code:
-            response = b"""
-            <html>
-            <head><title>Authorization Successful</title></head>
-            <body>
-                <h1>Authorization Successful!</h1>
-                <p>You can close this window and return to EchoNote.</p>
-            </body>
-            </html>
-            """
+            response_body = html_template.format(
+                title="Authorization Successful",
+                heading="Authorization Successful!",
+                content="<p>You can close this window and return to EchoNote.</p>"
+            )
             self.send_response(200)
         else:
-            response = b"""
-            <html>
-            <head><title>Authorization Failed</title></head>
-            <body>
-                <h1>Authorization Failed</h1>
-                <p>Error: """ + (error or b'Unknown error') + b"""</p>
-                <p>You can close this window and try again.</p>
-            </body>
-            </html>
-            """
+            error_message = str(error or "Unknown error")
+            response_body = html_template.format(
+                title="Authorization Failed",
+                heading="Authorization Failed",
+                content=(
+                    f"<p>Error: {escape(error_message)}</p>"
+                    "<p>You can close this window and try again.</p>"
+                ),
+            )
             self.send_response(400)
-        
+
         self.send_header('Content-type', 'text/html')
         self.end_headers()
-        self.wfile.write(response)
+        self.wfile.write(response_body.encode('utf-8'))
         
         # Call callback function
         if self.callback_received:
