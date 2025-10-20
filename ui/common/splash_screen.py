@@ -20,11 +20,17 @@ class SplashScreen(QSplashScreen):
     Shows application name, version, and initialization progress.
     """
     
-    def __init__(self, width: int = 500, height: int = 300):
+    def __init__(
+        self,
+        version: str,
+        width: int = 500,
+        height: int = 300
+    ):
         """
         Initialize splash screen.
         
         Args:
+            version: Application version text to display
             width: Splash screen width
             height: Splash screen height
         """
@@ -36,6 +42,8 @@ class SplashScreen(QSplashScreen):
         
         self.width = width
         self.height = height
+        self._version_text = ""
+        self._set_version(version)
         
         # Set window flags
         self.setWindowFlags(
@@ -48,6 +56,23 @@ class SplashScreen(QSplashScreen):
         self._progress_percent = 0
         
         logger.debug("Splash screen initialized")
+
+    @property
+    def version(self) -> str:
+        """Return the formatted application version shown on the splash."""
+        return self._version_text
+
+    def set_version(self, version: str) -> None:
+        """Update the application version shown on the splash screen."""
+        self._set_version(version)
+        self.repaint()
+
+    def _set_version(self, version: str) -> None:
+        """Normalize version text with a leading 'v' prefix when missing."""
+        normalized = (version or "").strip()
+        if normalized and not normalized.lower().startswith("v"):
+            normalized = f"v{normalized}"
+        self._version_text = normalized
     
     def drawContents(self, painter: QPainter):
         """
@@ -71,7 +96,7 @@ class SplashScreen(QSplashScreen):
         painter.setFont(version_font)
         painter.drawText(
             20, 110,
-            "v1.0.0"
+            self._version_text
         )
         
         # Draw progress text

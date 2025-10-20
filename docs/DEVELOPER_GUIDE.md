@@ -109,6 +109,7 @@ Configuration is managed by `config/app_config.py`.
 - **User overrides** are persisted to `~/.echonote/app_config.json`.
 - Secrets such as OAuth credentials and encryption keys are stored via `data/security/secrets_manager.py` and encrypted when possible.
 - Engine API keys should be set via the settings UI, which delegates to the `SettingsManager` to persist encrypted values.
+- **Version source** – update the `version` field in `config/default_config.json` only; runtime components (including the splash screen) read the value through `ConfigManager.get_default_config_version()` or `ConfigManager.get("version")`. Avoid duplicating the version string elsewhere.
 
 ### Credential storage strategy
 - Password-like secrets (e.g., cached service credentials) use the `SecurityManager` in `data/security/encryption.py`.

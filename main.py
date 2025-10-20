@@ -10,7 +10,7 @@ import traceback
 
 from utils.logger import setup_logging
 from utils.first_run_setup import FirstRunSetup
-from config.app_config import ConfigManager
+from config.app_config import ConfigManager, get_default_config_version
 from utils.error_handler import ErrorHandler
 
 
@@ -139,7 +139,7 @@ def main():
         
         # Show splash screen
         from ui.common.splash_screen import SplashScreen
-        splash = SplashScreen()
+        splash = SplashScreen(version=get_default_config_version())
         splash.show()
         splash.show_progress("Initializing...", 0)
         app.processEvents()  # Process events to show splash
@@ -162,6 +162,7 @@ def main():
         
         logger.info("Loading configuration...")
         config = ConfigManager()
+        splash.set_version(config.get("version", get_default_config_version()))
         logger.info(
             f"Configuration loaded successfully "
             f"(version: {config.get('version')})"

@@ -8,6 +8,7 @@ import copy
 import json
 import logging
 from collections.abc import Mapping
+from functools import lru_cache
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Dict
@@ -22,6 +23,35 @@ def get_app_dir() -> Path:
 
 
 logger = logging.getLogger(__name__)
+
+
+@lru_cache(maxsize=1)
+def get_default_config_version() -> str:
+    """Return the application version defined in the default config."""
+    default_config_path = Path(__file__).parent / "default_config.json"
+
+    try:
+        with open(default_config_path, "r", encoding="utf-8") as config_file:
+            data = json.load(config_file)
+    except FileNotFoundError:
+        logger.error("Default configuration file not found: %s", default_config_path)
+        return "0.0.0"
+    except json.JSONDecodeError as exc:
+        logger.error(
+            "Invalid JSON in default configuration file %s: %s",
+            default_config_path,
+            exc
+        )
+        return "0.0.0"
+
+    version = data.get("version")
+    if isinstance(version, str) and version.strip():
+        return version.strip()
+
+    logger.warning(
+        "Default configuration missing valid 'version'; falling back to 0.0.0"
+    )
+    return "0.0.0"
 
 
 class ConfigManager:
