@@ -260,10 +260,11 @@ class AutoTaskScheduler:
 
             # Format start time for display
             try:
-                start_dt = datetime.fromisoformat(event.start_time)
-                start_time_str = start_dt.strftime('%H:%M')
+                start_dt = to_local_naive(event.start_time)
             except Exception:
                 start_time_str = event.start_time
+            else:
+                start_time_str = start_dt.strftime('%H:%M')
 
             title = self.i18n.t(
                 'auto_task.reminder.title',

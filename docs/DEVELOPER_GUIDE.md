@@ -355,6 +355,7 @@ For unresolved questions, open a GitHub issue or start a discussion thread so de
 - **OAuth 令牌过期计算更健壮**：刷新逻辑会在有时区信息时使用相同的时区基准计算 `expires_in`，规避天真地减法导致的 `TypeError` 并减少无谓的重试。【F:core/calendar/manager.py†L316-L348】
 - **时间线调度窗口可配置**：自动任务调度器以分钟维度定义前后窗口并转换为天数传递给时间线查询，移除硬编码常数，也新增了针对不同时区的秒数计算辅助方法。【F:core/timeline/auto_task_scheduler.py†L55-L198】【F:core/timeline/auto_task_scheduler.py†L641-L655】
 - **时间线接口类型修正**：`TimelineManager.get_timeline_events` 接受浮点天数并更新文档，明确允许使用细粒度窗口，提高调用方的可读性与类型一致性。【F:core/timeline/manager.py†L44-L106】
+- **提醒通知时间本地化**：`AutoTaskScheduler` 在提醒文案中通过 `to_local_naive` 统一转换事件开始时间，确保含时区字符串以本地时间展示，并补充了针对该场景的单元测试。【F:core/timeline/auto_task_scheduler.py†L240-L287】【F:tests/unit/test_auto_task_scheduler.py†L360-L545】
 
 ### 12.2 待跟进的重点事项
 - **实时与批量 UI 待完成交互**：批量转录暂停按钮、实时录制错误/成功提示仍为 TODO，建议补齐用户反馈与状态同步逻辑以避免功能缺失。【F:ui/batch_transcribe/widget.py†L655-L678】【F:ui/realtime_record/widget.py†L1052-L1079】【F:ui/realtime_record/widget.py†L1282-L1306】

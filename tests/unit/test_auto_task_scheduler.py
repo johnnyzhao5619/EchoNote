@@ -398,10 +398,11 @@ def test_scheduler_triggers_reminder_with_timezone(monkeypatch):
     assert title == expected_title
 
     try:
-        start_dt = datetime.fromisoformat(future_event.start_time)
-        expected_start_time = start_dt.strftime('%H:%M')
+        start_dt = to_local_naive(future_event.start_time)
     except Exception:  # noqa: BLE001
         expected_start_time = future_event.start_time
+    else:
+        expected_start_time = start_dt.strftime('%H:%M')
 
     tasks = [scheduler.i18n.t('auto_task.tasks.transcription')]
     separator = scheduler.i18n.t('auto_task.tasks.separator')
@@ -520,10 +521,11 @@ def test_scheduler_reminder_localized_en(monkeypatch):
     assert title == expected_title
 
     try:
-        start_dt = datetime.fromisoformat(future_event.start_time)
-        expected_start_time = start_dt.strftime('%H:%M')
+        start_dt = to_local_naive(future_event.start_time)
     except Exception:  # noqa: BLE001
         expected_start_time = future_event.start_time
+    else:
+        expected_start_time = start_dt.strftime('%H:%M')
 
     tasks = [
         i18n.t('auto_task.tasks.transcription'),
