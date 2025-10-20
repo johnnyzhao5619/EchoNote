@@ -506,6 +506,20 @@
     "sync_complete": "日历同步完成",
     "sync_failed": "日历同步失败"
   },
+  "auto_task": {
+    "reminder": {
+      "title": "{app_name} - 自动任务提醒",
+      "message": "{event_title}\n{start_time_label}：{start_time}\n{task_list_label}：{task_list}",
+      "start_time_label": "开始时间",
+      "task_list_label": "任务列表"
+    },
+    "tasks": {
+      "transcription": "实时转录",
+      "recording": "会议录音",
+      "separator": "、",
+      "none": "无任务"
+    }
+  },
   "wizard": {
     "title": "欢迎使用 EchoNote",
     "welcome": {
