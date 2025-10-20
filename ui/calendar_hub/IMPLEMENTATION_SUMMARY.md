@@ -120,7 +120,7 @@
 
 - ✅ 授权步骤说明 / Authorization step instructions
 - ✅ "开始授权"按钮（打开浏览器）/ "Start Authorization" button (opens browser)
-- ✅ 本地 HTTP 服务器接收回调 / Local HTTP server for callback (port 8080)
+- ✅ 本地 HTTP 服务器接收回调 / Local HTTP server for callback (configurable, default 8080)
 - ✅ 授权成功/失败的反馈对话框 / Success/failure feedback dialog
 - ✅ 授权进度显示 / Authorization progress display
 

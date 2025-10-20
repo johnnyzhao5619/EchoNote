@@ -5,6 +5,7 @@ import types
 from http.client import HTTPConnection
 from http.server import HTTPServer
 from pathlib import Path
+import socket
 
 
 if "PyQt6" not in sys.modules:
@@ -72,6 +73,12 @@ if "PyQt6" not in sys.modules:
         def setMaximumHeight(self, *_, **__):
             pass
 
+        def setSpacing(self, *_, **__):
+            pass
+
+        def setContentsMargins(self, *_, **__):
+            pass
+
         def clicked(self, *_, **__):
             return self
 
@@ -119,6 +126,10 @@ if "PyQt6" not in sys.modules:
         pass
 
     class _QPushButton(_Widget):  # pragma: no cover - test stub
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.clicked = _Signal()
+
         def setEnabled(self, *_, **__):
             pass
 
@@ -163,6 +174,14 @@ spec.loader.exec_module(oauth_dialog)
 
 
 OAuthCallbackHandler = oauth_dialog.OAuthCallbackHandler
+OAuthDialog = oauth_dialog.OAuthDialog
+
+
+class _I18nStub:
+    """Minimal stub for I18n manager used by the dialog."""
+
+    def t(self, key: str, *_, **__):  # pragma: no cover - deterministic stub
+        return key
 
 
 def test_oauth_callback_handler_error_response():
@@ -195,3 +214,54 @@ def test_oauth_callback_handler_error_response():
     assert "Authorization Failed" in body
     assert "access_denied" in body
     assert received == {"code": None, "error": "access_denied"}
+
+
+def test_oauth_dialog_resolves_port_from_redirect_uri():
+    i18n = _I18nStub()
+    dialog = OAuthDialog(
+        'google',
+        'https://example.com/auth?redirect_uri=http://localhost:9090/callback',
+        i18n
+    )
+
+    assert dialog.callback_host == 'localhost'
+    assert dialog.callback_port == 9090
+
+
+def test_oauth_dialog_invalid_callback_port_raises():
+    i18n = _I18nStub()
+
+    try:
+        OAuthDialog(
+            'google',
+            'https://example.com/auth?redirect_uri=http://localhost:8080/callback',
+            i18n,
+            callback_port='invalid'
+        )
+    except ValueError as exc:
+        assert "Invalid callback port" in str(exc)
+    else:  # pragma: no cover - defensive fallback
+        raise AssertionError("Expected ValueError for invalid port")
+
+
+def test_oauth_dialog_port_in_use_error():
+    i18n = _I18nStub()
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as blocker:
+        blocker.bind(('127.0.0.1', 0))
+        port = blocker.getsockname()[1]
+
+        dialog = OAuthDialog(
+            'google',
+            'https://example.com/auth?redirect_uri=http://127.0.0.1:8080/callback',
+            i18n,
+            callback_host='127.0.0.1',
+            callback_port=port
+        )
+
+        try:
+            dialog._start_callback_server()
+        except ValueError as exc:
+            assert str(port) in str(exc)
+        else:  # pragma: no cover - ensure failure surfaces
+            raise AssertionError("Expected ValueError when port is in use")

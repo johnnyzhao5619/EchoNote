@@ -13,7 +13,7 @@ A PyQt6 dialog that handles the OAuth 2.0 authorization flow:
 - **Features**:
 
   - Opens system browser for user authorization
-  - Runs local HTTP server on port 8080 to receive OAuth callback
+  - Runs local HTTP server on a configurable callback host/port (8080 by default)
   - Displays authorization status and progress
   - Handles authorization success and failure
   - Non-blocking UI using QThread for HTTP server
@@ -30,7 +30,9 @@ A PyQt6 dialog that handles the OAuth 2.0 authorization flow:
       provider='google',
       authorization_url=auth_url,
       i18n=i18n_manager,
-      parent=parent_widget
+      parent=parent_widget,
+      callback_host='localhost',  # optional; inferred from configuration if omitted
+      callback_port=8080          # optional; inferred from configuration if omitted
   )
 
   dialog.authorization_complete.connect(handle_success)
@@ -122,6 +124,8 @@ OAuth credentials are configured in `config/default_config.json`:
 }
 ```
 
+If you change `callback_port`, update the `redirect_uri` to use the same port and register the URI with the provider. The `CalendarHubWidget` forwards the configured host/port to `OAuthDialog`, keeping the UI and the local callback listener in sync.
+
 ### Obtaining OAuth Credentials
 
 #### Google Calendar
@@ -192,7 +196,7 @@ This opens a test window with buttons to test Google and Outlook OAuth flows.
 
 ## Limitations
 
-1. **Local Callback Server**: Requires port 8080 to be available
+1. **Local Callback Server**: Requires the configured callback port to be available
 2. **Browser Required**: System must have a default browser configured
 3. **Manual Configuration**: OAuth credentials must be manually configured
 4. **Single Account**: Only one account per provider supported
@@ -207,9 +211,9 @@ This opens a test window with buttons to test Google and Outlook OAuth flows.
 
 ## Troubleshooting
 
-### Port 8080 Already in Use
+### Callback Port Already in Use
 
-If port 8080 is already in use, you can change it in the configuration:
+If the configured callback port is unavailable, update the settings to use a free port:
 
 ```json
 {
@@ -222,7 +226,7 @@ If port 8080 is already in use, you can change it in the configuration:
 }
 ```
 
-Remember to update the redirect URI in your OAuth app configuration.
+Remember to update the redirect URI in your OAuth app configuration so that it matches the new port.
 
 ### Browser Doesn't Open
 

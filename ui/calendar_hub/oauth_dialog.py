@@ -7,9 +7,10 @@ calendar services.
 
 import logging
 import webbrowser
-from typing import Optional, Callable
+from typing import Optional, Tuple
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
+import errno
 import threading
 from html import escape
 
@@ -99,7 +100,9 @@ class OAuthDialog(QDialog):
         provider: str,
         authorization_url: str,
         i18n: I18nQtManager,
-        parent: Optional[QDialog] = None
+        parent: Optional[QDialog] = None,
+        callback_host: Optional[str] = None,
+        callback_port: Optional[int] = None
     ):
         """
         Initialize OAuth dialog.
@@ -109,13 +112,19 @@ class OAuthDialog(QDialog):
             authorization_url: OAuth authorization URL
             i18n: Internationalization manager
             parent: Parent widget
+            callback_host: Hostname for local callback server (optional)
+            callback_port: Port for local callback server (optional)
         """
         super().__init__(parent)
         
         self.provider = provider
         self.authorization_url = authorization_url
         self.i18n = i18n
-        
+        self.callback_host, self.callback_port = self._resolve_callback_endpoint(
+            callback_host,
+            callback_port
+        )
+
         # OAuth callback server
         self.callback_server: Optional[HTTPServer] = None
         self.callback_thread: Optional[threading.Thread] = None
@@ -243,10 +252,10 @@ class OAuthDialog(QDialog):
         try:
             # Set callback handler
             OAuthCallbackHandler.callback_received = self._on_callback_received
-            
+
             # Create server
             self.callback_server = HTTPServer(
-                ('localhost', 8080),
+                (self.callback_host, self.callback_port),
                 OAuthCallbackHandler
             )
             
@@ -257,11 +266,159 @@ class OAuthDialog(QDialog):
             )
             self.callback_thread.start()
             
-            logger.info("OAuth callback server started on port 8080")
-            
+            logger.info(
+                "OAuth callback server started on %s:%s",
+                self.callback_host,
+                self.callback_port
+            )
+
         except Exception as e:
-            logger.error(f"Error starting callback server: {e}")
+            if isinstance(e, OSError) and e.errno in {errno.EADDRINUSE, errno.EACCES}:
+                logger.error(
+                    "Callback server port unavailable (%s:%s): %s",
+                    self.callback_host,
+                    self.callback_port,
+                    e
+                )
+                raise ValueError(
+                    f"Callback port {self.callback_port} is not available."
+                ) from e
+
+            logger.error(
+                "Error starting callback server on %s:%s: %s",
+                self.callback_host,
+                self.callback_port,
+                e
+            )
             raise
+
+    def _resolve_callback_endpoint(
+        self,
+        host: Optional[str],
+        port: Optional[int]
+    ) -> Tuple[str, int]:
+        """Resolve callback server host and port with fallbacks."""
+
+        resolved_host = host
+        resolved_port: Optional[int] = self._normalize_port(port)
+
+        if resolved_host is None or resolved_port is None:
+            redirect_host, redirect_port = self._parse_redirect_from_authorization()
+            if resolved_host is None and redirect_host:
+                resolved_host = redirect_host
+            if resolved_port is None and redirect_port is not None:
+                resolved_port = redirect_port
+
+        if resolved_host is None or resolved_port is None:
+            config_host, config_port = self._load_configured_callback()
+            if resolved_host is None and config_host:
+                resolved_host = config_host
+            if resolved_port is None and config_port is not None:
+                resolved_port = config_port
+
+        resolved_host = resolved_host or 'localhost'
+        if resolved_port is None:
+            resolved_port = 8080
+
+        normalized_port = self._normalize_port(resolved_port)
+        if normalized_port is None:
+            message = (
+                f"Invalid callback port configured: {resolved_port}."
+            )
+            logger.error(message)
+            raise ValueError(message)
+
+        return resolved_host, normalized_port
+
+    def _normalize_port(self, port: Optional[int]) -> Optional[int]:
+        """Validate and normalize callback port."""
+        if port is None:
+            return None
+
+        try:
+            value = int(port)
+        except (TypeError, ValueError):
+            logger.error("Failed to parse callback port value: %s", port)
+            raise ValueError(f"Invalid callback port: {port}")
+
+        if not (1 <= value <= 65535):
+            logger.error("Callback port out of range: %s", value)
+            raise ValueError(f"Invalid callback port: {value}")
+
+        return value
+
+    def _parse_redirect_from_authorization(self) -> Tuple[Optional[str], Optional[int]]:
+        """Extract callback host/port from authorization URL redirect parameter."""
+        try:
+            parsed_auth = urlparse(self.authorization_url)
+            query_params = parse_qs(parsed_auth.query)
+            redirect_uri = query_params.get('redirect_uri', [None])[0]
+            if not redirect_uri:
+                return None, None
+
+            redirect_parsed = urlparse(redirect_uri)
+            host = redirect_parsed.hostname
+            port: Optional[int]
+            try:
+                port = redirect_parsed.port
+            except ValueError:
+                logger.error(
+                    "Invalid port detected in redirect URI: %s",
+                    redirect_uri
+                )
+                raise ValueError(
+                    "Invalid port specified in redirect URI."
+                )
+
+            return host, port
+
+        except ValueError as exc:
+            logger.error("Failed to parse authorization redirect URI: %s", exc)
+            raise ValueError("Failed to parse redirect URI for callback port.")
+
+        except Exception:
+            logger.exception("Unexpected error while parsing redirect URI")
+            return None, None
+
+    def _load_configured_callback(self) -> Tuple[Optional[str], Optional[int]]:
+        """Load callback host/port from application configuration."""
+        try:
+            from config.app_config import ConfigManager
+
+            config = ConfigManager()
+            redirect_uri = config.get('calendar.oauth.redirect_uri')
+            host = None
+            port = None
+
+            if redirect_uri:
+                redirect_parsed = urlparse(redirect_uri)
+                host = redirect_parsed.hostname
+                try:
+                    port = redirect_parsed.port
+                except ValueError:
+                    logger.error(
+                        "Invalid port in configured redirect URI: %s",
+                        redirect_uri
+                    )
+                    raise ValueError(
+                        "Invalid port specified in configured redirect URI."
+                    )
+
+            config_port = config.get('calendar.oauth.callback_port')
+            if config_port is not None:
+                port = self._normalize_port(config_port)
+
+            return host, port
+
+        except ValueError:
+            raise
+
+        except Exception as exc:
+            logger.warning(
+                "Unable to load callback configuration: %s",
+                exc
+            )
+            return None, None
     
     def _run_callback_server(self):
         """Run callback server (in separate thread)."""
