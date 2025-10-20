@@ -38,6 +38,7 @@
     "import_file": "导入文件",
     "import_folder": "导入文件夹",
     "clear_queue": "清空队列",
+    "confirm_clear_queue": "确定要清空所有任务吗？",
     "engine": "引擎",
     "model": "模型",
     "task_queue": "任务队列",
@@ -62,6 +63,7 @@
       "view": "查看",
       "export": "导出"
     },
+    "export_success": "已导出到：{path}",
     "feedback": {
       "paused": "批量转录已暂停。",
       "resumed": "批量转录已继续。"
