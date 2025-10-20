@@ -92,6 +92,214 @@ def _ensure_numpy_stub():
 
 _ensure_numpy_stub()
 
+
+def _ensure_soundfile_stub():
+    if "soundfile" in sys.modules:
+        return
+
+    soundfile_module = types.ModuleType("soundfile")
+
+    def _write_stub(*args, **kwargs):  # noqa: ARG002
+        return None
+
+    def _info_stub(*args, **kwargs):  # noqa: ARG002
+        return types.SimpleNamespace(format="")
+
+    def _read_stub(*args, **kwargs):  # noqa: ARG002
+        raise RuntimeError("soundfile stub does not provide read support")
+
+    class _SoundFileStub:
+        def __init__(self, *_args, **_kwargs):
+            self.samplerate = 16000
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):  # noqa: D401
+            return False
+
+    soundfile_module.write = _write_stub  # type: ignore[attr-defined]
+    soundfile_module.info = _info_stub  # type: ignore[attr-defined]
+    soundfile_module.read = _read_stub  # type: ignore[attr-defined]
+    soundfile_module.SoundFile = _SoundFileStub  # type: ignore[attr-defined]
+
+    sys.modules["soundfile"] = soundfile_module
+
+
+_ensure_soundfile_stub()
+
+
+def _ensure_pyqt_stub():
+    if "PyQt6" in sys.modules:
+        return
+
+    pyqt6_module = types.ModuleType("PyQt6")
+    qtwidgets_module = types.ModuleType("PyQt6.QtWidgets")
+    qtcore_module = types.ModuleType("PyQt6.QtCore")
+    qtgui_module = types.ModuleType("PyQt6.QtGui")
+
+    class _BaseWidget:
+        def __init__(self, *args, **kwargs):  # noqa: D401
+            pass
+
+    class _Layout:
+        def __init__(self, *args, **kwargs):  # noqa: D401
+            pass
+
+        def setContentsMargins(self, *args, **kwargs):  # noqa: D401, ARG002
+            return None
+
+        def setSpacing(self, *args, **kwargs):  # noqa: D401, ARG002
+            return None
+
+        def addWidget(self, *args, **kwargs):  # noqa: D401, ARG002
+            return None
+
+        def addLayout(self, *args, **kwargs):  # noqa: D401, ARG002
+            return None
+
+        def addStretch(self, *args, **kwargs):  # noqa: D401, ARG002
+            return None
+
+    class _Label(_BaseWidget):
+        def setAlignment(self, *args, **kwargs):  # noqa: D401, ARG002
+            return None
+
+        def setText(self, *args, **kwargs):  # noqa: D401, ARG002
+            return None
+
+        def setWordWrap(self, *args, **kwargs):  # noqa: D401, ARG002
+            return None
+
+        def setObjectName(self, *args, **kwargs):  # noqa: D401, ARG002
+            return None
+
+    class _ProgressBar(_BaseWidget):
+        def setMinimum(self, *args, **kwargs):  # noqa: D401, ARG002
+            return None
+
+        def setMaximum(self, *args, **kwargs):  # noqa: D401, ARG002
+            return None
+
+        def setValue(self, *args, **kwargs):  # noqa: D401, ARG002
+            return None
+
+        def setTextVisible(self, *args, **kwargs):  # noqa: D401, ARG002
+            return None
+
+    class _Signal:
+        def connect(self, *args, **kwargs):  # noqa: D401, ARG002
+            return None
+
+        def emit(self, *args, **kwargs):  # noqa: D401, ARG002
+            return None
+
+    class _QDialog(_BaseWidget):
+        def setWindowTitle(self, *args, **kwargs):  # noqa: D401, ARG002
+            return None
+
+        def setMinimumWidth(self, *args, **kwargs):  # noqa: D401, ARG002
+            return None
+
+        def setModal(self, *args, **kwargs):  # noqa: D401, ARG002
+            return None
+
+        def accept(self, *args, **kwargs):  # noqa: D401, ARG002
+            return None
+
+    class _QPushButton(_BaseWidget):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.clicked = _Signal()
+
+        def setText(self, *args, **kwargs):  # noqa: D401, ARG002
+            return None
+
+        def setDefault(self, *args, **kwargs):  # noqa: D401, ARG002
+            return None
+
+    class _QTextEdit(_BaseWidget):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self._visible = True
+
+        def setPlainText(self, *args, **kwargs):  # noqa: D401, ARG002
+            return None
+
+        def setReadOnly(self, *args, **kwargs):  # noqa: D401, ARG002
+            return None
+
+        def setMaximumHeight(self, *args, **kwargs):  # noqa: D401, ARG002
+            return None
+
+        def setObjectName(self, *args, **kwargs):  # noqa: D401, ARG002
+            return None
+
+        def hide(self):
+            self._visible = False
+
+        def show(self):
+            self._visible = True
+
+        def isVisible(self):  # noqa: D401
+            return self._visible
+
+    class _QClipboard:
+        def setText(self, *args, **kwargs):  # noqa: D401, ARG002
+            return None
+
+    class _QApplication:
+        _clipboard = _QClipboard()
+
+        @classmethod
+        def clipboard(cls):  # noqa: D401
+            return cls._clipboard
+
+    class _QTimer:
+        @staticmethod
+        def singleShot(*args, **kwargs):  # noqa: D401, ARG002
+            return None
+
+    class _QIcon:
+        def __init__(self, *args, **kwargs):  # noqa: D401, ARG002
+            pass
+
+    class _Qt:
+        class AlignmentFlag:
+            AlignRight = 0
+
+    def _pyqt_signal(*args, **kwargs):  # noqa: D401, ARG002
+        return _Signal()
+
+    qtwidgets_module.QWidget = _BaseWidget  # type: ignore[attr-defined]
+    qtwidgets_module.QVBoxLayout = _Layout  # type: ignore[attr-defined]
+    qtwidgets_module.QHBoxLayout = _Layout  # type: ignore[attr-defined]
+    qtwidgets_module.QLabel = _Label  # type: ignore[attr-defined]
+    qtwidgets_module.QProgressBar = _ProgressBar  # type: ignore[attr-defined]
+    qtwidgets_module.QDialog = _QDialog  # type: ignore[attr-defined]
+    qtwidgets_module.QPushButton = _QPushButton  # type: ignore[attr-defined]
+    qtwidgets_module.QTextEdit = _QTextEdit  # type: ignore[attr-defined]
+    qtwidgets_module.QApplication = _QApplication  # type: ignore[attr-defined]
+
+    qtcore_module.Qt = _Qt  # type: ignore[attr-defined]
+    qtcore_module.pyqtSignal = _pyqt_signal  # type: ignore[attr-defined]
+    qtcore_module.QTimer = _QTimer  # type: ignore[attr-defined]
+
+    qtgui_module.QIcon = _QIcon  # type: ignore[attr-defined]
+    qtgui_module.QClipboard = _QClipboard  # type: ignore[attr-defined]
+
+    pyqt6_module.QtWidgets = qtwidgets_module  # type: ignore[attr-defined]
+    pyqt6_module.QtCore = qtcore_module  # type: ignore[attr-defined]
+    pyqt6_module.QtGui = qtgui_module  # type: ignore[attr-defined]
+
+    sys.modules["PyQt6"] = pyqt6_module
+    sys.modules["PyQt6.QtWidgets"] = qtwidgets_module
+    sys.modules["PyQt6.QtCore"] = qtcore_module
+    sys.modules["PyQt6.QtGui"] = qtgui_module
+
+
+_ensure_pyqt_stub()
+
 from core.transcription.manager import TranscriptionManager
 from data.database.connection import DatabaseConnection
 from data.database.models import TranscriptionTask
@@ -338,3 +546,27 @@ def test_background_shutdown_logs_and_cleans_up(initialized_db, monkeypatch, cap
     assert any("Task queue stop attempt" in message for message in manager_logs)
     assert any("forced shutdown" in message for message in manager_logs)
     assert any("closed with prior shutdown errors" in message for message in manager_logs)
+
+
+def test_send_notification_handles_quotes(monkeypatch, manager):
+    import ui.common.notification as notification_module
+
+    monkeypatch.setattr(notification_module.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(notification_module, "_notification_manager", None)
+
+    captured = {}
+
+    def fake_run(cmd, capture_output, timeout, check):
+        captured["cmd"] = cmd
+        return types.SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+
+    message = 'Transcription completed: task "alpha"'
+    manager._send_notification(message, "success")
+
+    assert "cmd" in captured
+    script = captured["cmd"][2]
+    assert '\\"' in script
+
+    notification_module._notification_manager = None

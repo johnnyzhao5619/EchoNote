@@ -20,6 +20,7 @@ from engines.speech.base import SpeechEngine
 from core.transcription.task_queue import TaskQueue
 from core.transcription.format_converter import FormatConverter
 from config.app_config import get_app_dir
+from ui.common.notification import get_notification_manager
 
 
 logger = logging.getLogger('echonote.transcription.manager')
@@ -1080,66 +1081,41 @@ class TranscriptionManager:
     def _send_notification(self, message: str, notification_type: str):
         """
         Send desktop notification.
-        
+
         Args:
             message: Notification message
             notification_type: Type of notification (success/error/info)
         """
+        title = "EchoNote"
+
         try:
-            # Try to import and use desktop notification library
-            import platform
-            
-            system = platform.system()
-            
-            if system == "Darwin":  # macOS
-                # Use osascript for macOS notifications
-                import subprocess
-                script = f'display notification "{message}" with title "EchoNote"'
-                subprocess.run(
-                    ["osascript", "-e", script],
-                    capture_output=True,
-                    timeout=5
-                )
-                logger.info(f"Notification sent (macOS): {message}")
-                
-            elif system == "Windows":
-                # Use Windows toast notifications
-                try:
-                    from win10toast import ToastNotifier
-                    toaster = ToastNotifier()
-                    toaster.show_toast(
-                        "EchoNote",
-                        message,
-                        duration=5,
-                        threaded=True
-                    )
-                    logger.info(f"Notification sent (Windows): {message}")
-                except ImportError:
-                    logger.warning(
-                        "win10toast not installed, notification not sent"
-                    )
-                    logger.info(f"Notification ({notification_type}): {message}")
-                    
-            elif system == "Linux":
-                # Use notify-send for Linux
-                import subprocess
-                try:
-                    subprocess.run(
-                        ["notify-send", "EchoNote", message],
-                        capture_output=True,
-                        timeout=5
-                    )
-                    logger.info(f"Notification sent (Linux): {message}")
-                except FileNotFoundError:
-                    logger.warning(
-                        "notify-send not found, notification not sent"
-                    )
-                    logger.info(f"Notification ({notification_type}): {message}")
+            notification_manager = get_notification_manager()
+        except Exception as exc:
+            logger.error(f"Failed to acquire notification manager: {exc}")
+            logger.info(f"Notification ({notification_type}): {message}")
+            return
+
+        try:
+            send_methods = {
+                "success": notification_manager.send_success,
+                "error": notification_manager.send_error,
+                "warning": notification_manager.send_warning,
+                "info": notification_manager.send_info,
+            }
+
+            handler = send_methods.get(notification_type)
+
+            if handler:
+                handler(title, message)
             else:
-                logger.info(f"Notification ({notification_type}): {message}")
-                
-        except Exception as e:
-            logger.error(f"Error sending notification: {e}")
+                notification_manager.send_notification(
+                    title,
+                    message,
+                    notification_type,
+                )
+
+        except Exception as exc:
+            logger.error(f"Error sending notification: {exc}")
             logger.info(f"Notification ({notification_type}): {message}")
     
     def register_progress_callback(
