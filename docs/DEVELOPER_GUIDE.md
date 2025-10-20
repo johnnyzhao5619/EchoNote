@@ -216,7 +216,7 @@ Engine adapters isolate third-party APIs and hardware concerns.
 - **Calendar sync (`engines/calendar_sync/`)**
   - `base.py` standardizes methods such as `fetch_events`, `create_event`, `update_event`, `delete_event`.
   - `google_calendar.py` and `outlook_calendar.py` translate between provider APIs and local models, relying on credentials issued via the settings UI.
-  - Remote deletions now flow back into the local store: adapters surface cancelled or missing events through a `deleted` payload. `CalendarManager.sync_external_calendar` always removes the provider link, but only purges the event record and its attachments when the deleted provider originally created the event and no other links remain, preventing shared resources from being removed prematurely.
+- Remote deletions now flow back into the local store: adapters surface cancelled or missing events through a `deleted` payload. `CalendarManager.sync_external_calendar` first drops the relevant `calendar_event_links` row, then inspects the remaining providers via `CalendarEventLink.list_for_event`. Only when the removed provider matches `CalendarEvent.source` *and* no other providers are still linked do we cascade-delete the `CalendarEvent` and its `EventAttachment` rows. This guards multi-provider sync scenarios from losing shared resources while still clearing orphaned events.
 
 ### 6.4 UI Layer
 UI code under `ui/` follows Qt best practices:

@@ -189,7 +189,7 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 - Add Google/Outlook OAuth credentials inside Settings to enable sync.
 - Create, edit, and delete events with reminders and recurrence rules.
 - Sync status is persisted in the `calendar_sync_status` table and surfaced in the UI.
-- When an external calendar deletes an event, EchoNote keeps the local record unless that provider created the event and no other providers remain linked; attachments are only removed when the entire event is deleted.
+- When an external calendar deletes an event, EchoNote removes that provider’s link and checks whether other services still reference the entry. The local record stays intact unless the deleted provider originally created it and no other links remain, in which case the event and its attachments are purged together.
 
 <details>
 <summary>中文</summary>
@@ -197,7 +197,7 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 - 在设置中添加 Google/Outlook OAuth 凭据以启用同步。
 - 创建、编辑、删除事件并配置提醒与重复规则。
 - 同步状态写入 `calendar_sync_status` 表并在界面展示。
-- 当外部日历删除事件时，若事件仍与其他提供商关联或来源不是当前提供商，EchoNote 会保留本地记录，仅移除该提供商的链接；只有在事件来源与该提供商一致且无其他关联时才会连同附件一起删除。
+- 当外部日历删除事件时，系统会先移除该提供商的链接并检查是否仍有其他服务关联。若事件来源不是该提供商，或仍有其他链接存在，则保留本地记录；只有当事件来源与该提供商一致且再无其他关联时，才会连同附件一并清理。
 
 </details>
 
