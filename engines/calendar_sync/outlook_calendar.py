@@ -343,6 +343,65 @@ class OutlookCalendarAdapter(CalendarSyncAdapter):
             logger.error(f"Failed to push event: {e}")
             raise
 
+    def update_event(self, event: CalendarEvent, external_id: str) -> None:
+        """Update an existing Outlook calendar event."""
+        if not self.access_token:
+            raise ValueError("Not authenticated")
+        if not external_id:
+            raise ValueError("Missing external event identifier")
+
+        try:
+            outlook_event = self._convert_to_outlook_event(event)
+
+            with httpx.Client() as client:
+                response = client.patch(
+                    f"{self.API_BASE_URL}/me/events/{external_id}",
+                    json=outlook_event,
+                    headers={
+                        'Authorization': f'Bearer {self.access_token}',
+                        'Content-Type': 'application/json'
+                    },
+                    timeout=30.0
+                )
+                response.raise_for_status()
+
+            logger.info("Updated Outlook event: %s", external_id)
+
+        except Exception as e:
+            logger.error("Failed to update Outlook event %s: %s", external_id, e)
+            raise
+
+    def delete_event(self, event: CalendarEvent, external_id: str) -> None:
+        """Delete an Outlook calendar event."""
+        if not self.access_token:
+            raise ValueError("Not authenticated")
+        if not external_id:
+            raise ValueError("Missing external event identifier")
+
+        try:
+            with httpx.Client() as client:
+                response = client.delete(
+                    f"{self.API_BASE_URL}/me/events/{external_id}",
+                    headers={
+                        'Authorization': f'Bearer {self.access_token}',
+                    },
+                    timeout=30.0
+                )
+
+                if response.status_code == 404:
+                    logger.warning(
+                        "Outlook event %s already removed", external_id
+                    )
+                    return
+
+                response.raise_for_status()
+
+            logger.info("Deleted Outlook event: %s", external_id)
+
+        except Exception as e:
+            logger.error("Failed to delete Outlook event %s: %s", external_id, e)
+            raise
+
     def revoke_access(self):
         """
         Revoke OAuth access token.

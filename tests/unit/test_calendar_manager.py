@@ -1,5 +1,6 @@
 import sys
 import types
+import pytest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -57,7 +58,8 @@ _ensure_apscheduler_stub()
 
 from core.calendar.manager import CalendarManager
 from data.database.connection import DatabaseConnection
-from data.database.models import CalendarEvent
+from data.database.models import CalendarEvent, CalendarEventLink
+from unittest.mock import Mock
 
 
 def _create_db(tmp_path: Path) -> DatabaseConnection:
@@ -211,5 +213,120 @@ def test_update_event_accepts_datetime_objects(tmp_path):
     row = rows[0]
     assert row["start_time"] == update_data["start_time"]
     assert row["end_time"] == update_data["end_time"]
+
+    db.close_all()
+
+
+def test_update_event_triggers_external_sync(tmp_path):
+    db = _create_db(tmp_path)
+
+    existing = CalendarEvent(
+        title="Team Sync",
+        start_time="2024-05-01T09:00:00",
+        end_time="2024-05-01T10:00:00",
+    )
+    existing.save(db)
+
+    link = CalendarEventLink(
+        event_id=existing.id,
+        provider="google",
+        external_id="google-123",
+    )
+    link.save(db)
+
+    adapter = Mock()
+    manager = CalendarManager(db, sync_adapters={"google": adapter})
+
+    manager.update_event(existing.id, {"title": "Updated"})
+
+    assert adapter.update_event.call_count == 1
+    args, kwargs = adapter.update_event.call_args
+    assert not kwargs
+    synced_event, synced_external_id = args
+    assert synced_event.id == existing.id
+    assert synced_external_id == "google-123"
+
+    refreshed_link = CalendarEventLink.get_by_event_and_provider(
+        db,
+        existing.id,
+        "google",
+    )
+    assert refreshed_link is not None
+    assert refreshed_link.last_synced_at is not None
+
+    db.close_all()
+
+
+def test_delete_event_requires_external_cleanup(tmp_path):
+    db = _create_db(tmp_path)
+
+    existing = CalendarEvent(
+        title="Team Sync",
+        start_time="2024-05-01T09:00:00",
+        end_time="2024-05-01T10:00:00",
+    )
+    existing.save(db)
+
+    link = CalendarEventLink(
+        event_id=existing.id,
+        provider="google",
+        external_id="google-123",
+    )
+    link.save(db)
+
+    adapter = Mock()
+    manager = CalendarManager(db, sync_adapters={"google": adapter})
+
+    manager.delete_event(existing.id)
+
+    adapter.delete_event.assert_called_once()
+    args, kwargs = adapter.delete_event.call_args
+    assert not kwargs
+    deleted_event, external_id = args
+    assert deleted_event.id == existing.id
+    assert external_id == "google-123"
+
+    rows = db.execute(
+        "SELECT * FROM calendar_events WHERE id = ?",
+        (existing.id,),
+    )
+    assert not rows
+
+    link_rows = db.execute(
+        "SELECT * FROM calendar_event_links WHERE event_id = ?",
+        (existing.id,),
+    )
+    assert not link_rows
+
+    db.close_all()
+
+
+def test_delete_event_stops_when_external_deletion_fails(tmp_path):
+    db = _create_db(tmp_path)
+
+    existing = CalendarEvent(
+        title="Team Sync",
+        start_time="2024-05-01T09:00:00",
+        end_time="2024-05-01T10:00:00",
+    )
+    existing.save(db)
+
+    CalendarEventLink(
+        event_id=existing.id,
+        provider="google",
+        external_id="google-123",
+    ).save(db)
+
+    failing_adapter = Mock()
+    failing_adapter.delete_event.side_effect = RuntimeError("api down")
+
+    manager = CalendarManager(db, sync_adapters={"google": failing_adapter})
+
+    with pytest.raises(RuntimeError):
+        manager.delete_event(existing.id)
+
+    # Event should still exist locally
+    remaining = CalendarEvent.get_by_id(db, existing.id)
+    assert remaining is not None
 
     db.close_all()

@@ -701,58 +701,59 @@ Abstract base class for calendar sync adapters.
 
 ```python
 @abstractmethod
-async def authenticate(credentials: dict) -> dict
+def authenticate(credentials: dict) -> dict
 ```
 
-Perform OAuth authentication.
-
-**Returns:**
-
-- `dict`: OAuth tokens
-  - `access_token` (str)
-  - `refresh_token` (str)
-  - `expires_at` (datetime)
+Perform OAuth authentication and return token payloads.
 
 ##### fetch_events
 
 ```python
 @abstractmethod
-async def fetch_events(
-    start_date: datetime,
-    end_date: datetime,
-    last_sync_token: str = None
+def fetch_events(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    last_sync_token: Optional[str] = None,
 ) -> dict
 ```
 
-Fetch events from external calendar.
-
-**Returns:**
-
-- `dict`: Fetch result
-  - `events` (list): List of events
-  - `sync_token` (str): Token for incremental sync
+Fetch events from the external calendar provider. Implementations may support incremental sync via `last_sync_token`.
 
 ##### push_event
 
 ```python
 @abstractmethod
-async def push_event(event: CalendarEvent) -> str
+def push_event(event: CalendarEvent) -> str
 ```
 
-Push event to external calendar.
+Create a new event remotely and return the provider specific identifier.
 
-**Returns:**
+##### update_event
 
-- `str`: External event ID
+```python
+@abstractmethod
+def update_event(event: CalendarEvent, external_id: str) -> None
+```
+
+Persist local changes to an already linked remote event.
+
+##### delete_event
+
+```python
+@abstractmethod
+def delete_event(event: CalendarEvent, external_id: str) -> None
+```
+
+Remove the remote counterpart for a local event.
 
 ##### revoke_access
 
 ```python
 @abstractmethod
-async def revoke_access()
+def revoke_access() -> None
 ```
 
-Revoke OAuth access.
+Revoke OAuth access and clean up provider tokens.
 
 ---
 

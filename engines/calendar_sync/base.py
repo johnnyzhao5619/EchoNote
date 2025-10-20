@@ -99,6 +99,34 @@ class CalendarSyncAdapter(ABC):
         pass
 
     @abstractmethod
+    def update_event(self, event: CalendarEvent, external_id: str) -> None:
+        """
+        Update an existing event on the external calendar.
+
+        Args:
+            event: CalendarEvent instance with latest local data
+            external_id: Provider-specific identifier for the event
+
+        Raises:
+            Exception: If updating the external event fails
+        """
+        pass
+
+    @abstractmethod
+    def delete_event(self, event: CalendarEvent, external_id: str) -> None:
+        """
+        Delete an event from the external calendar.
+
+        Args:
+            event: CalendarEvent instance scheduled for deletion
+            external_id: Provider-specific identifier for the event
+
+        Raises:
+            Exception: If deleting the external event fails
+        """
+        pass
+
+    @abstractmethod
     def revoke_access(self):
         """
         Revoke access to the external calendar.

@@ -216,6 +216,52 @@ class CalendarManager:
             event.save(self.db)
             logger.info(f"Updated event: {event_id}")
 
+            links = CalendarEventLink.list_for_event(self.db, event_id)
+            sync_failures = []
+
+            for link in links:
+                adapter = self.sync_adapters.get(link.provider)
+                if not adapter:
+                    logger.warning(
+                        "Sync adapter for %s not found; skipping update for event %s",
+                        link.provider,
+                        event_id,
+                    )
+                    sync_failures.append(link.provider)
+                    continue
+
+                if not link.external_id:
+                    logger.warning(
+                        "Missing external_id for provider %s on event %s",
+                        link.provider,
+                        event_id,
+                    )
+                    sync_failures.append(link.provider)
+                    continue
+
+                try:
+                    adapter.update_event(event, link.external_id)
+                    self._upsert_event_link(
+                        event.id,
+                        link.provider,
+                        link.external_id,
+                        last_synced_at=event.updated_at,
+                    )
+                except Exception as exc:  # pragma: no cover - defensive
+                    logger.error(
+                        "Failed to update external event %s (%s): %s",
+                        event_id,
+                        link.provider,
+                        exc,
+                    )
+                    sync_failures.append(link.provider)
+
+            if sync_failures:
+                raise RuntimeError(
+                    "本地事件已更新，但以下提供商同步失败: "
+                    + ", ".join(sorted(set(sync_failures)))
+                )
+
         except Exception as e:
             logger.error(f"Failed to update event {event_id}: {e}")
             raise
@@ -238,6 +284,52 @@ class CalendarManager:
                     f"Cannot delete readonly event from {event.source}"
                 )
 
+            links = CalendarEventLink.list_for_event(self.db, event_id)
+            sync_failures = []
+
+            for link in links:
+                adapter = self.sync_adapters.get(link.provider)
+                if not adapter:
+                    logger.warning(
+                        "Sync adapter for %s not found; aborting deletion for event %s",
+                        link.provider,
+                        event_id,
+                    )
+                    sync_failures.append(link.provider)
+                    continue
+
+                if not link.external_id:
+                    logger.warning(
+                        "Missing external_id for provider %s on event %s",
+                        link.provider,
+                        event_id,
+                    )
+                    sync_failures.append(link.provider)
+                    continue
+
+                try:
+                    adapter.delete_event(event, link.external_id)
+                except Exception as exc:
+                    logger.error(
+                        "Failed to delete external event %s (%s): %s",
+                        event_id,
+                        link.provider,
+                        exc,
+                    )
+                    sync_failures.append(link.provider)
+
+            if sync_failures:
+                raise RuntimeError(
+                    "已阻止本地删除。请先处理以下提供商的同步失败: "
+                    + ", ".join(sorted(set(sync_failures)))
+                )
+
+            if links:
+                self.db.execute(
+                    "DELETE FROM calendar_event_links WHERE event_id = ?",
+                    (event_id,),
+                    commit=True,
+                )
             event.delete(self.db)
             logger.info(f"Deleted event: {event_id}")
 
