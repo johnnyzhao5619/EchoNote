@@ -504,6 +504,20 @@
     "sync_complete": "Synchronisation du calendrier terminée",
     "sync_failed": "Échec de la synchronisation du calendrier"
   },
+  "auto_task": {
+    "reminder": {
+      "title": "{app_name} - Rappel des tâches automatiques",
+      "message": "{event_title}\n{start_time_label} : {start_time}\n{task_list_label} : {task_list}",
+      "start_time_label": "Heure de début",
+      "task_list_label": "Liste des tâches"
+    },
+    "tasks": {
+      "transcription": "Transcription en direct",
+      "recording": "Enregistrement de réunion",
+      "separator": ", ",
+      "none": "Aucune tâche"
+    }
+  },
   "ffmpeg": {
     "dialog_title": "Installer FFmpeg ({platform})",
     "not_installed_title": "FFmpeg Non Installé ({platform})",

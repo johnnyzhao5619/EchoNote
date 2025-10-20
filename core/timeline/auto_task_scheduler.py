@@ -10,12 +10,13 @@ import asyncio
 import queue
 import threading
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from ui.common.notification import get_notification_manager
 from data.database.models import EventAttachment
 from core.timeline.manager import to_local_naive
+from utils.i18n import I18nQtManager
 
 
 logger = logging.getLogger('echonote.timeline.auto_task_scheduler')
@@ -40,7 +41,8 @@ class AutoTaskScheduler:
         db_connection,
         file_manager,
         reminder_minutes: int = 5,
-        settings_manager=None
+        settings_manager=None,
+        i18n_manager: Optional[I18nQtManager] = None
     ):
         """
         Initialize the auto task scheduler.
@@ -61,6 +63,7 @@ class AutoTaskScheduler:
         self.is_running = False
         self.reminder_minutes = reminder_minutes
         self.settings_manager = settings_manager
+        self.i18n = self._initialize_i18n(i18n_manager)
 
         # Default windows for timeline queries (in minutes)
         self._past_window_minutes = max(reminder_minutes, 5)
@@ -137,6 +140,30 @@ class AutoTaskScheduler:
         except Exception as e:
             logger.error(f"Failed to stop scheduler: {e}", exc_info=True)
             raise
+
+    def _initialize_i18n(
+        self,
+        i18n_manager: Optional[I18nQtManager]
+    ) -> I18nQtManager:
+        """Prepare the translation manager used for notifications."""
+        if i18n_manager is not None:
+            return i18n_manager
+
+        default_language = 'zh_CN'
+        if self.settings_manager and hasattr(self.settings_manager, 'get_language'):
+            try:
+                language = self.settings_manager.get_language()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "Failed to load language preference for auto tasks: %s",
+                    exc,
+                    exc_info=True
+                )
+            else:
+                if language:
+                    default_language = language
+
+        return I18nQtManager(default_language=default_language)
 
     def _check_upcoming_events(self):
         """
@@ -222,11 +249,14 @@ class AutoTaskScheduler:
             # Build notification message
             tasks = []
             if auto_tasks.get('enable_transcription'):
-                tasks.append('实时转录')
+                tasks.append(self.i18n.t('auto_task.tasks.transcription'))
             if auto_tasks.get('enable_recording'):
-                tasks.append('会议录音')
+                tasks.append(self.i18n.t('auto_task.tasks.recording'))
 
-            tasks_str = '、'.join(tasks)
+            separator = self.i18n.t('auto_task.tasks.separator')
+            if not isinstance(separator, str) or not separator:
+                separator = ', '
+            tasks_str = separator.join(tasks) if tasks else self.i18n.t('auto_task.tasks.none')
 
             # Format start time for display
             try:
@@ -235,11 +265,19 @@ class AutoTaskScheduler:
             except Exception:
                 start_time_str = event.start_time
 
-            title = 'EchoNote - 事件提醒'
-            message = (
-                f"{event.title}\n"
-                f"开始时间：{start_time_str}\n"
-                f"将自动启动：{tasks_str}"
+            title = self.i18n.t(
+                'auto_task.reminder.title',
+                app_name=self.i18n.t('app.name')
+            )
+            start_time_label = self.i18n.t('auto_task.reminder.start_time_label')
+            task_list_label = self.i18n.t('auto_task.reminder.task_list_label')
+            message = self.i18n.t(
+                'auto_task.reminder.message',
+                event_title=event.title,
+                start_time_label=start_time_label,
+                start_time=start_time_str,
+                task_list_label=task_list_label,
+                task_list=tasks_str
             )
 
             # Send desktop notification

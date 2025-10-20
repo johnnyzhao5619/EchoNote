@@ -508,6 +508,20 @@
     "sync_complete": "Calendar sync complete",
     "sync_failed": "Calendar sync failed"
   },
+  "auto_task": {
+    "reminder": {
+      "title": "{app_name} - Auto Task Reminder",
+      "message": "{event_title}\n{start_time_label}: {start_time}\n{task_list_label}: {task_list}",
+      "start_time_label": "Start Time",
+      "task_list_label": "Task List"
+    },
+    "tasks": {
+      "transcription": "Live Transcription",
+      "recording": "Meeting Recording",
+      "separator": ", ",
+      "none": "None"
+    }
+  },
   "ffmpeg": {
     "dialog_title": "Install FFmpeg ({platform})",
     "not_installed_title": "FFmpeg Not Installed ({platform})",
