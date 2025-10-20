@@ -152,7 +152,8 @@ class TimelineManager:
 
             # Separate past and future events
             past_events = []
-            future_events = []
+            future_event_ids: List[str] = []
+            future_event_items: List[CalendarEvent] = []
 
             for event in all_events:
                 event_start = to_local_naive(event.start_time)
@@ -165,18 +166,21 @@ class TimelineManager:
                         'artifacts': artifacts
                     })
                 else:
-                    # Future event - get auto-task config
-                    auto_tasks = self.get_auto_task(event.id)
-                    future_events.append({
-                        'event': event,
-                        'auto_tasks': auto_tasks or {
-                            'enable_transcription': False,
-                            'enable_recording': False,
-                            'transcription_language': None,
-                            'enable_translation': False,
-                            'translation_target_language': None
-                        }
-                    })
+                    # Future event - collect for batch auto-task lookup
+                    future_event_ids.append(event.id)
+                    future_event_items.append(event)
+
+            auto_task_map = self._get_auto_task_map(future_event_ids)
+
+            future_events = []
+            for event in future_event_items:
+                auto_tasks = auto_task_map.get(event.id)
+                if auto_tasks is None:
+                    auto_tasks = self._default_auto_task_config()
+                future_events.append({
+                    'event': event,
+                    'auto_tasks': auto_tasks
+                })
 
             # Sort events
             past_events.sort(
@@ -318,6 +322,16 @@ class TimelineManager:
             'transcription_language': config.transcription_language,
             'enable_translation': config.enable_translation,
             'translation_target_language': config.translation_target_language,
+        }
+
+    def _default_auto_task_config(self) -> Dict[str, Any]:
+        """Return the default auto-task configuration for events."""
+        return {
+            'enable_transcription': False,
+            'enable_recording': False,
+            'transcription_language': None,
+            'enable_translation': False,
+            'translation_target_language': None,
         }
 
     def _get_auto_task_map(

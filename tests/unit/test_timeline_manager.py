@@ -36,8 +36,11 @@ class TimelineManagerForTest(TimelineManager):
     def get_event_artifacts(self, event_id: str):  # noqa: D401
         return {'recording': None, 'transcript': None, 'attachments': []}
 
-    def get_auto_task(self, event_id: str):  # noqa: D401
-        return {'enable_transcription': True}
+    def _get_auto_task_map(self, event_ids):  # noqa: D401
+        return {
+            event_id: {'enable_transcription': True}
+            for event_id in event_ids
+        }
 
 
 class StubI18n:
@@ -306,6 +309,65 @@ def test_get_timeline_events_mixed_across_pages_without_future_duplicates():
     assert second_page['future_events'] == []
     assert second_page['future_total_count'] == 3
     assert not second_page['has_more']
+
+
+def test_get_timeline_events_batches_future_auto_tasks():
+    center_time = datetime(2024, 5, 20, 12, 0, tzinfo=timezone.utc)
+
+    future_events = []
+    for index in range(12):
+        start = center_time + timedelta(minutes=30 * (index + 1))
+        end = start + timedelta(minutes=25)
+        future_events.append(
+            CalendarEvent(
+                id=f'future-{index}',
+                title=f'Future #{index}',
+                start_time=iso_z(start),
+                end_time=iso_z(end),
+            )
+        )
+
+    class CountingManager(TimelineManagerForTest):
+        def __init__(self, *args, configured_ids=None, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.auto_task_calls = []
+            self._configured_ids = set(configured_ids or [])
+
+        def _get_auto_task_map(self, event_ids):  # noqa: D401
+            self.auto_task_calls.append(list(event_ids))
+            return {
+                event_id: {'enable_transcription': True}
+                for event_id in event_ids
+                if event_id in self._configured_ids
+            }
+
+    configured_ids = {f'future-{index}' for index in range(0, 12, 3)}
+    manager = CountingManager(
+        calendar_manager=DummyCalendarManager(future_events),
+        db_connection=None,
+        configured_ids=configured_ids,
+    )
+
+    result = manager.get_timeline_events(
+        center_time=center_time,
+        past_days=0,
+        future_days=3,
+    )
+
+    assert len(manager.auto_task_calls) == 1
+    assert manager.auto_task_calls[0] == [event.id for event in future_events]
+
+    default_config = manager._default_auto_task_config()
+    assert len(result['future_events']) == len(future_events)
+    for item in result['future_events']:
+        event_id = item['event'].id
+        auto_tasks = item['auto_tasks']
+        if event_id in configured_ids:
+            assert auto_tasks == {'enable_transcription': True}
+        else:
+            assert auto_tasks == default_config
+
+    assert result['future_total_count'] == len(future_events)
 
 
 def test_search_events_applies_timezone_filters(monkeypatch):
