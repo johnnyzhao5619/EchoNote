@@ -538,3 +538,72 @@ def test_get_search_snippet_missing_transcript_uses_translation(monkeypatch, tmp
     snippet = manager.get_search_snippet(event, 'notes')
 
     assert snippet == '转录文件缺失'
+
+
+class AutoTaskDbStub:
+    def __init__(self, rows):
+        self._rows = {row['event_id']: dict(row) for row in rows}
+        self.executed = []
+
+    def execute(self, query, params=None, commit=False):  # noqa: D401
+        self.executed.append((query, params))
+
+        if params is None:
+            return []
+
+        if ' IN (' in query:
+            event_ids = list(params)
+            return [
+                self._rows[event_id]
+                for event_id in event_ids
+                if event_id in self._rows
+            ]
+
+        if 'WHERE event_id = ?' in query:
+            event_id = params[0]
+            row = self._rows.get(event_id)
+            return [row] if row else []
+
+        return []
+
+
+def test_get_auto_task_map_matches_single_lookup():
+    config_row = {
+        'id': 'cfg-1',
+        'event_id': 'with-config',
+        'enable_transcription': 1,
+        'enable_recording': 0,
+        'transcription_language': 'en-US',
+        'enable_translation': 0,
+        'translation_target_language': None,
+        'created_at': '2024-03-01T00:00:00Z',
+    }
+
+    db = AutoTaskDbStub([config_row])
+    manager = TimelineManager(
+        calendar_manager=DummyCalendarManager([]),
+        db_connection=db,
+    )
+
+    single_lookup = manager.get_auto_task('with-config')
+    batched = manager._get_auto_task_map([
+        'with-config',
+        'missing',
+        'with-config',
+    ])
+
+    assert single_lookup == {
+        'enable_transcription': True,
+        'enable_recording': False,
+        'transcription_language': 'en-US',
+        'enable_translation': False,
+        'translation_target_language': None,
+    }
+    assert batched['with-config'] == single_lookup
+    assert 'missing' not in batched
+
+    # Verify the second query used the batched path with a single unique ID
+    assert len(db.executed) == 2
+    batched_query, params = db.executed[1]
+    assert ' IN (' in batched_query
+    assert params == ('with-config',)

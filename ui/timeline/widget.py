@@ -246,9 +246,10 @@ class TimelineWidget(QWidget):
                 )
                 
                 # Separate past and future
-                past_events = []
-                future_events = []
-                
+                past_events: List[Dict[str, Any]] = []
+                future_events_pending: List[Dict[str, Any]] = []
+                future_event_ids: List[str] = []
+
                 for result in results:
                     event = result['event']
                     event_start = to_local_naive(event.start_time)
@@ -256,12 +257,20 @@ class TimelineWidget(QWidget):
                     if event_start < center_time_local:
                         past_events.append(result)
                     else:
-                        future_events.append({
-                            'event': event,
-                            'auto_tasks': self.timeline_manager.get_auto_task(
-                                event.id
-                            ) or {}
-                        })
+                        future_events_pending.append(result)
+                        future_event_ids.append(event.id)
+
+                auto_task_map = self.timeline_manager._get_auto_task_map(
+                    future_event_ids
+                )
+
+                future_events = []
+                for result in future_events_pending:
+                    event = result['event']
+                    future_events.append({
+                        'event': event,
+                        'auto_tasks': auto_task_map.get(event.id, {})
+                    })
                 
                 data = {
                     'current_time': center_time_local.isoformat(),

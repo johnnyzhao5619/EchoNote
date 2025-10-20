@@ -307,6 +307,41 @@ class TimelineManager:
             )
             raise
 
+    def _serialize_auto_task_config(
+        self,
+        config: AutoTaskConfig
+    ) -> Dict[str, Any]:
+        """Convert an ``AutoTaskConfig`` instance to a serializable dict."""
+        return {
+            'enable_transcription': config.enable_transcription,
+            'enable_recording': config.enable_recording,
+            'transcription_language': config.transcription_language,
+            'enable_translation': config.enable_translation,
+            'translation_target_language': config.translation_target_language,
+        }
+
+    def _get_auto_task_map(
+        self,
+        event_ids: List[str]
+    ) -> Dict[str, Dict[str, Any]]:
+        """Fetch auto-task configurations for multiple events at once."""
+        try:
+            if not event_ids:
+                return {}
+
+            configs = AutoTaskConfig.get_by_event_ids(self.db, event_ids)
+            return {
+                config.event_id: self._serialize_auto_task_config(config)
+                for config in configs
+            }
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.error(
+                "Failed to get auto-task configs for events %s: %s",
+                event_ids,
+                exc,
+            )
+            return {}
+
     def get_auto_task(self, event_id: str) -> Optional[Dict[str, Any]]:
         """
         Get auto-task configuration for an event.
@@ -321,15 +356,7 @@ class TimelineManager:
             config = AutoTaskConfig.get_by_event_id(self.db, event_id)
 
             if config:
-                return {
-                    'enable_transcription': config.enable_transcription,
-                    'enable_recording': config.enable_recording,
-                    'transcription_language': config.transcription_language,
-                    'enable_translation': config.enable_translation,
-                    'translation_target_language': (
-                        config.translation_target_language
-                    )
-                }
+                return self._serialize_auto_task_config(config)
 
             return None
 
