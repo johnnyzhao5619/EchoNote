@@ -57,6 +57,21 @@ CREATE INDEX IF NOT EXISTS idx_events_source ON calendar_events (source);
 CREATE INDEX IF NOT EXISTS idx_events_external_id ON calendar_events (external_id);
 
 -- ============================================================================
+-- Calendar Event Links Table
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS calendar_event_links (
+    event_id TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    external_id TEXT NOT NULL,
+    last_synced_at TIMESTAMP,
+    PRIMARY KEY (provider, external_id),
+    UNIQUE (event_id, provider),
+    FOREIGN KEY (event_id) REFERENCES calendar_events (id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_event_links_event ON calendar_event_links (event_id);
+
+-- ============================================================================
 -- Event Attachments Table
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS event_attachments (

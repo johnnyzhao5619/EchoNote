@@ -201,11 +201,26 @@ class CalendarEvent:
         self.attendees = attendees_value
 
         query = """
-            INSERT OR REPLACE INTO calendar_events (
+            INSERT INTO calendar_events (
                 id, title, event_type, start_time, end_time, location,
                 attendees, description, reminder_minutes, recurrence_rule,
                 source, external_id, is_readonly, created_at, updated_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                title = excluded.title,
+                event_type = excluded.event_type,
+                start_time = excluded.start_time,
+                end_time = excluded.end_time,
+                location = excluded.location,
+                attendees = excluded.attendees,
+                description = excluded.description,
+                reminder_minutes = excluded.reminder_minutes,
+                recurrence_rule = excluded.recurrence_rule,
+                source = excluded.source,
+                external_id = excluded.external_id,
+                is_readonly = excluded.is_readonly,
+                created_at = calendar_events.created_at,
+                updated_at = excluded.updated_at
         """
         params = (
             self.id, self.title, self.event_type, self.start_time,
@@ -289,6 +304,96 @@ class CalendarEvent:
         query = "DELETE FROM calendar_events WHERE id = ?"
         db_connection.execute(query, (self.id,), commit=True)
         logger.debug(f"Deleted calendar event: {self.id}")
+
+
+@dataclass
+class CalendarEventLink:
+    """Mapping between local events and provider-specific identifiers."""
+
+    event_id: str
+    provider: str
+    external_id: str
+    last_synced_at: Optional[str] = None
+
+    @classmethod
+    def from_db_row(cls, row) -> 'CalendarEventLink':
+        """Create an instance from database row."""
+        return cls(
+            event_id=row['event_id'],
+            provider=row['provider'],
+            external_id=row['external_id'],
+            last_synced_at=row['last_synced_at']
+        )
+
+    def save(self, db_connection):
+        """Persist or update the link record."""
+
+        timestamp = self.last_synced_at
+        if isinstance(timestamp, datetime):
+            timestamp = timestamp.isoformat()
+
+        query = """
+            INSERT INTO calendar_event_links (
+                event_id, provider, external_id, last_synced_at
+            ) VALUES (?, ?, ?, ?)
+            ON CONFLICT(provider, external_id) DO UPDATE SET
+                event_id = excluded.event_id,
+                last_synced_at = excluded.last_synced_at
+        """
+        params = (
+            self.event_id,
+            self.provider,
+            self.external_id,
+            timestamp
+        )
+        db_connection.execute(query, params, commit=True)
+        logger.debug(
+            "Saved calendar event link: %s/%s", self.provider, self.external_id
+        )
+
+    @staticmethod
+    def get_by_provider_and_external_id(
+        db_connection,
+        provider: str,
+        external_id: str
+    ) -> Optional['CalendarEventLink']:
+        """Lookup a link by provider and external identifier."""
+        query = (
+            "SELECT * FROM calendar_event_links "
+            "WHERE provider = ? AND external_id = ?"
+        )
+        result = db_connection.execute(query, (provider, external_id))
+        if result:
+            return CalendarEventLink.from_db_row(result[0])
+        return None
+
+    @staticmethod
+    def get_by_event_and_provider(
+        db_connection,
+        event_id: str,
+        provider: str
+    ) -> Optional['CalendarEventLink']:
+        """Lookup an existing link for a provider and event."""
+        query = (
+            "SELECT * FROM calendar_event_links "
+            "WHERE event_id = ? AND provider = ?"
+        )
+        result = db_connection.execute(query, (event_id, provider))
+        if result:
+            return CalendarEventLink.from_db_row(result[0])
+        return None
+
+    @staticmethod
+    def list_for_event(
+        db_connection,
+        event_id: str
+    ) -> List['CalendarEventLink']:
+        """Return all provider links for a given event."""
+        query = (
+            "SELECT * FROM calendar_event_links WHERE event_id = ?"
+        )
+        rows = db_connection.execute(query, (event_id,))
+        return [CalendarEventLink.from_db_row(row) for row in rows]
 
 
 @dataclass
