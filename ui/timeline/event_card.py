@@ -90,6 +90,18 @@ class EventCard(QFrame):
     view_recording = pyqtSignal(str)  # file_path
     view_transcript = pyqtSignal(str)  # file_path
     
+    EVENT_TYPE_TRANSLATION_MAP = {
+        'event': 'timeline.filter_event',
+        'task': 'timeline.filter_task',
+        'appointment': 'timeline.filter_appointment',
+    }
+
+    SOURCE_TRANSLATION_MAP = {
+        'local': 'timeline.source_local',
+        'google': 'timeline.source_google',
+        'outlook': 'timeline.source_outlook',
+    }
+
     def __init__(
         self,
         event_data: Dict[str, Any],
@@ -113,11 +125,15 @@ class EventCard(QFrame):
         self.event = event_data['event']
         self.is_future = is_future
         self.i18n = i18n
-        
+
         # Lazy load artifacts
         self.artifacts_loaded = False
         self.artifacts = event_data.get('artifacts', {})
-        
+
+        # Badge label references for translation updates
+        self.type_badge_label = None
+        self.source_badge_label = None
+
         # Setup UI
         self.setup_ui()
         
@@ -202,7 +218,7 @@ class EventCard(QFrame):
         time_layout.addWidget(time_label)
         
         # Event type badge
-        type_badge = QLabel(self.event.event_type)
+        type_badge = QLabel(self._get_event_type_badge_text())
         type_badge.setObjectName("type_badge")
         type_badge.setStyleSheet("""
             QLabel#type_badge {
@@ -213,6 +229,7 @@ class EventCard(QFrame):
                 font-size: 10px;
             }
         """)
+        self.type_badge_label = type_badge
         time_layout.addWidget(type_badge)
         
         # Source badge - get colors from configuration
@@ -227,7 +244,7 @@ class EventCard(QFrame):
         source_colors = self.event_data.get('source_colors', default_colors)
         source_color = source_colors.get(self.event.source, '#666')
         
-        source_badge = QLabel(self.event.source.capitalize())
+        source_badge = QLabel(self._get_source_badge_text())
         source_badge.setObjectName("source_badge")
         source_badge.setStyleSheet(f"""
             QLabel#source_badge {{
@@ -238,6 +255,7 @@ class EventCard(QFrame):
                 font-size: 10px;
             }}
         """)
+        self.source_badge_label = source_badge
         time_layout.addWidget(source_badge)
         
         time_layout.addStretch()
@@ -413,6 +431,11 @@ class EventCard(QFrame):
     
     def update_translations(self):
         """Update UI text when language changes."""
+        if getattr(self, 'type_badge_label', None):
+            self.type_badge_label.setText(self._get_event_type_badge_text())
+        if getattr(self, 'source_badge_label', None):
+            self.source_badge_label.setText(self._get_source_badge_text())
+
         if self.is_future:
             # Update checkboxes
             if hasattr(self, 'transcription_checkbox'):
@@ -439,3 +462,19 @@ class EventCard(QFrame):
                 if child.objectName() == "no_artifacts_label":
                     child.setText(self.i18n.t('timeline.no_artifacts'))
                     break
+
+    def _get_event_type_badge_text(self) -> str:
+        """Return translated text for the event type badge."""
+        event_type = getattr(self.event, 'event_type', '') or ''
+        translation_key = self.EVENT_TYPE_TRANSLATION_MAP.get(event_type.lower())
+        if translation_key:
+            return self.i18n.t(translation_key)
+        return event_type
+
+    def _get_source_badge_text(self) -> str:
+        """Return translated text for the source badge."""
+        source = getattr(self.event, 'source', '') or ''
+        translation_key = self.SOURCE_TRANSLATION_MAP.get(source.lower())
+        if translation_key:
+            return self.i18n.t(translation_key)
+        return source.capitalize() if source else ''
