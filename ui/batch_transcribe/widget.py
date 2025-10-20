@@ -708,7 +708,7 @@ class BatchTranscribeWidget(QWidget):
             reply = QMessageBox.question(
                 self,
                 self.i18n.t('common.delete'),
-                "Are you sure you want to delete this task?",
+                self.i18n.t('batch_transcribe.confirm_delete_task'),
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No
             )
