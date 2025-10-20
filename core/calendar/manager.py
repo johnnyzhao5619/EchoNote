@@ -9,7 +9,11 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any, TYPE_CHECKING, Tuple, Union
 
-from data.database.models import CalendarEvent, CalendarSyncStatus
+from data.database.models import (
+    CalendarEvent,
+    CalendarEventLink,
+    CalendarSyncStatus,
+)
 
 
 logger = logging.getLogger('echonote.calendar.manager')
@@ -124,9 +128,11 @@ class CalendarManager:
                                 event, provider
                             )
                             if external_id:
-                                # Update event with external ID
-                                event.external_id = external_id
-                                event.save(self.db)
+                                self._upsert_event_link(
+                                    event.id,
+                                    provider,
+                                    external_id,
+                                )
                                 logger.info(
                                     f"Synced event {event.id} to "
                                     f"{provider}: {external_id}"
@@ -528,41 +534,52 @@ class CalendarManager:
         """
         try:
             # Check if event already exists
-            existing = None
-            if ext_event.get('id'):
-                # Try to find by external_id
-                query = (
-                    "SELECT * FROM calendar_events "
-                    "WHERE external_id = ? AND source = ?"
-                )
-                result = self.db.execute(
-                    query, (ext_event['id'], provider)
-                )
-                if result:
-                    existing = CalendarEvent.from_db_row(result[0])
+            event: Optional[CalendarEvent] = None
+            ext_identifier = ext_event.get('id')
 
-            if existing:
+            if ext_identifier:
+                link = CalendarEventLink.get_by_provider_and_external_id(
+                    self.db,
+                    provider,
+                    ext_identifier
+                )
+                if link:
+                    event = CalendarEvent.get_by_id(self.db, link.event_id)
+
+                if not event:
+                    # Fallback for legacy records relying on calendar_events.external_id
+                    query = (
+                        "SELECT * FROM calendar_events "
+                        "WHERE external_id = ? AND source = ?"
+                    )
+                    result = self.db.execute(
+                        query, (ext_identifier, provider)
+                    )
+                    if result:
+                        event = CalendarEvent.from_db_row(result[0])
+
+            if event:
                 # Update existing event
-                existing.title = ext_event.get(
-                    'title', existing.title
+                event.title = ext_event.get(
+                    'title', event.title
                 )
-                existing.start_time = ext_event.get(
-                    'start_time', existing.start_time
+                event.start_time = ext_event.get(
+                    'start_time', event.start_time
                 )
-                existing.end_time = ext_event.get(
-                    'end_time', existing.end_time
+                event.end_time = ext_event.get(
+                    'end_time', event.end_time
                 )
-                existing.location = ext_event.get(
-                    'location', existing.location
+                event.location = ext_event.get(
+                    'location', event.location
                 )
-                existing.attendees = ext_event.get(
-                    'attendees', existing.attendees
+                event.attendees = ext_event.get(
+                    'attendees', event.attendees
                 )
-                existing.description = ext_event.get(
-                    'description', existing.description
+                event.description = ext_event.get(
+                    'description', event.description
                 )
-                existing.save(self.db)
-                logger.debug(f"Updated external event: {existing.id}")
+                event.save(self.db)
+                logger.debug(f"Updated external event: {event.id}")
             else:
                 # Create new event
                 event = CalendarEvent(
@@ -576,14 +593,67 @@ class CalendarManager:
                     reminder_minutes=ext_event.get('reminder_minutes'),
                     recurrence_rule=ext_event.get('recurrence_rule'),
                     source=provider,
-                    external_id=ext_event.get('id'),
                     is_readonly=True  # External events are readonly
                 )
                 event.save(self.db)
                 logger.debug(f"Created external event: {event.id}")
 
+            if ext_identifier:
+                last_synced = (
+                    ext_event.get('last_synced_at')
+                    or ext_event.get('updated_at')
+                    or ext_event.get('last_modified')
+                )
+                self._upsert_event_link(
+                    event.id,
+                    provider,
+                    ext_identifier,
+                    last_synced_at=last_synced
+                )
+
         except Exception as e:
             logger.error(f"Failed to save external event: {e}")
+
+    def _upsert_event_link(
+        self,
+        event_id: str,
+        provider: str,
+        external_id: str,
+        last_synced_at: Optional[Any] = None
+    ) -> None:
+        """Persist or refresh the provider mapping for an event."""
+
+        if not external_id:
+            return
+
+        timestamp: Optional[str]
+        if isinstance(last_synced_at, datetime):
+            timestamp = last_synced_at.isoformat()
+        elif isinstance(last_synced_at, str) and last_synced_at.strip():
+            timestamp = last_synced_at
+        else:
+            timestamp = datetime.now(timezone.utc).isoformat()
+
+        existing_link = CalendarEventLink.get_by_event_and_provider(
+            self.db,
+            event_id,
+            provider,
+        )
+
+        if existing_link and existing_link.external_id != external_id:
+            delete_query = (
+                "DELETE FROM calendar_event_links "
+                "WHERE event_id = ? AND provider = ?"
+            )
+            self.db.execute(delete_query, (event_id, provider), commit=True)
+
+        link = CalendarEventLink(
+            event_id=event_id,
+            provider=provider,
+            external_id=external_id,
+            last_synced_at=timestamp,
+        )
+        link.save(self.db)
 
     @staticmethod
     def _normalize_event_window(

@@ -67,6 +67,14 @@ def _create_db(tmp_path: Path) -> DatabaseConnection:
     return db
 
 
+class DummySyncAdapter:
+    def __init__(self, provider: str):
+        self.provider = provider
+
+    def push_event(self, event: CalendarEvent) -> str:  # pragma: no cover - simple stub
+        return f"{self.provider}-{event.id}"
+
+
 def test_create_event_accepts_datetime_objects(tmp_path):
     db = _create_db(tmp_path)
     manager = CalendarManager(db)
@@ -94,6 +102,78 @@ def test_create_event_accepts_datetime_objects(tmp_path):
     row = rows[0]
     assert row["start_time"] == event_data["start_time"]
     assert row["end_time"] == event_data["end_time"]
+
+    db.close_all()
+
+
+def test_multi_provider_links_are_persisted_and_retrievable(tmp_path):
+    db = _create_db(tmp_path)
+
+    adapters = {
+        "google": DummySyncAdapter("google"),
+        "outlook": DummySyncAdapter("outlook"),
+    }
+
+    manager = CalendarManager(db, sync_adapters=adapters)
+
+    event_data = {
+        "title": "Team Sync",
+        "event_type": "Event",
+        "start_time": datetime(2024, 5, 1, 9, 0, tzinfo=timezone.utc),
+        "end_time": datetime(2024, 5, 1, 10, 0, tzinfo=timezone.utc),
+    }
+
+    event_id = manager.create_event(event_data, sync_to=["google", "outlook"])
+
+    link_rows = db.execute(
+        "SELECT provider, external_id, last_synced_at "
+        "FROM calendar_event_links WHERE event_id = ?",
+        (event_id,),
+    )
+    assert len(link_rows) == 2
+    providers = {row["provider"] for row in link_rows}
+    assert providers == {"google", "outlook"}
+    assert all(row["last_synced_at"] for row in link_rows)
+
+    event_rows = db.execute(
+        "SELECT external_id FROM calendar_events WHERE id = ?",
+        (event_id,),
+    )
+    assert event_rows
+    assert event_rows[0]["external_id"] is None
+
+    google_update = {
+        "id": f"google-{event_id}",
+        "title": "Team Sync (Google)",
+        "start_time": event_data["start_time"],
+        "end_time": event_data["end_time"],
+        "attendees": ["alice@example.com"],
+    }
+    manager._save_external_event(google_update, "google")
+
+    refreshed_event = CalendarEvent.get_by_id(db, event_id)
+    assert refreshed_event is not None
+    assert refreshed_event.title == "Team Sync (Google)"
+    assert refreshed_event.attendees == ["alice@example.com"]
+
+    outlook_update = {
+        "id": f"outlook-{event_id}",
+        "description": "Imported from Outlook",
+        "start_time": event_data["start_time"],
+        "end_time": event_data["end_time"],
+    }
+    manager._save_external_event(outlook_update, "outlook")
+
+    refreshed_event = CalendarEvent.get_by_id(db, event_id)
+    assert refreshed_event is not None
+    assert refreshed_event.description == "Imported from Outlook"
+
+    post_update_links = db.execute(
+        "SELECT provider, event_id FROM calendar_event_links WHERE event_id = ?",
+        (event_id,),
+    )
+    assert len(post_update_links) == 2
+    assert {row["provider"] for row in post_update_links} == {"google", "outlook"}
 
     db.close_all()
 

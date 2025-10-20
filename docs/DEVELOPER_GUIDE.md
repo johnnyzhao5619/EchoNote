@@ -184,6 +184,7 @@ Each subpackage inside `core/` houses a manager that encapsulates domain logic a
 
 - **Calendar (`core/calendar/`)**
   - `CalendarManager` exposes CRUD methods (`create_event`, `update_event`, `delete_event`, `get_event`, `get_events`) and synchronization entrypoints (`sync_external_calendar`).
+  - Provider-specific identifiers now live in `calendar_event_links`, allowing the same event to sync with multiple services. Migration `004_calendar_event_links.sql` copies legacy `calendar_events.external_id` values and tags ambiguous records with `provider='default'` so older data remains addressable.
   - `SyncScheduler` polls external providers on an interval, tracks sync tokens, and reconciles conflicts.
 
 - **Timeline (`core/timeline/`)**

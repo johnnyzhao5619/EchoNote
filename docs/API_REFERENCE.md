@@ -830,10 +830,33 @@ Represents a calendar event.
 - `reminder_minutes` (int): Reminder time
 - `recurrence_rule` (str): iCalendar RRULE
 - `source` (str): 'local', 'google', 'outlook'
-- `external_id` (str): External calendar event ID
+- `external_id` (str): **Deprecated** legacy column retained for backward compatibility.
+- Provider-specific identifiers are stored in `calendar_event_links` (see below).
 - `is_readonly` (bool): Whether event is read-only
 - `created_at` (datetime): Creation time
 - `updated_at` (datetime): Last update time
+
+---
+
+### CalendarEventLink
+
+**Location**: `data/database/models.py`
+
+Represents the mapping between a local calendar event and an external provider.
+
+#### Attributes
+
+- `event_id` (str): Linked calendar event ID
+- `provider` (str): Provider key (e.g., 'google', 'outlook', 'default')
+- `external_id` (str): Provider-specific identifier
+- `last_synced_at` (datetime): Timestamp of the latest successful sync for this mapping
+
+#### Methods
+
+- `save(db_connection)`: Create or update the link record.
+- `get_by_provider_and_external_id(db_connection, provider, external_id) -> CalendarEventLink | None`
+- `get_by_event_and_provider(db_connection, event_id, provider) -> CalendarEventLink | None`
+- `list_for_event(db_connection, event_id) -> list[CalendarEventLink]`
 
 ---
 
