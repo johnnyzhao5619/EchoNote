@@ -58,7 +58,7 @@ _ensure_apscheduler_stub()
 
 from core.calendar.manager import CalendarManager
 from data.database.connection import DatabaseConnection
-from data.database.models import CalendarEvent, CalendarEventLink
+from data.database.models import CalendarEvent, CalendarEventLink, EventAttachment
 from unittest.mock import Mock
 
 
@@ -328,5 +328,95 @@ def test_delete_event_stops_when_external_deletion_fails(tmp_path):
     # Event should still exist locally
     remaining = CalendarEvent.get_by_id(db, existing.id)
     assert remaining is not None
+
+    db.close_all()
+
+
+def test_remove_external_event_retains_shared_event(tmp_path):
+    db = _create_db(tmp_path)
+    manager = CalendarManager(db)
+
+    shared_event = CalendarEvent(
+        title="Cross Provider Sync",
+        start_time="2024-05-01T09:00:00",
+        end_time="2024-05-01T10:00:00",
+        source="google",
+        is_readonly=True,
+    )
+    shared_event.save(db)
+
+    attachment = EventAttachment(
+        event_id=shared_event.id,
+        attachment_type="recording",
+        file_path="/tmp/shared.wav",
+    )
+    attachment.save(db)
+
+    CalendarEventLink(
+        event_id=shared_event.id,
+        provider="google",
+        external_id="google-evt-1",
+    ).save(db)
+    CalendarEventLink(
+        event_id=shared_event.id,
+        provider="outlook",
+        external_id="outlook-evt-1",
+    ).save(db)
+
+    manager._remove_external_event(shared_event.id, "google", "google-evt-1")
+
+    # Event should still exist because another provider references it
+    persisted_event = CalendarEvent.get_by_id(db, shared_event.id)
+    assert persisted_event is not None
+
+    google_link = CalendarEventLink.get_by_event_and_provider(
+        db,
+        shared_event.id,
+        "google",
+    )
+    assert google_link is None
+
+    remaining_links = CalendarEventLink.list_for_event(db, shared_event.id)
+    assert len(remaining_links) == 1
+    assert remaining_links[0].provider == "outlook"
+
+    attachments = EventAttachment.get_by_event_id(db, shared_event.id)
+    assert len(attachments) == 1
+    assert attachments[0].id == attachment.id
+
+    db.close_all()
+
+
+def test_remove_external_event_cleans_single_provider_event(tmp_path):
+    db = _create_db(tmp_path)
+    manager = CalendarManager(db)
+
+    single_event = CalendarEvent(
+        title="Google Only",
+        start_time="2024-05-02T09:00:00",
+        end_time="2024-05-02T10:00:00",
+        source="google",
+        is_readonly=True,
+    )
+    single_event.save(db)
+
+    attachment = EventAttachment(
+        event_id=single_event.id,
+        attachment_type="transcript",
+        file_path="/tmp/single.txt",
+    )
+    attachment.save(db)
+
+    CalendarEventLink(
+        event_id=single_event.id,
+        provider="google",
+        external_id="google-evt-2",
+    ).save(db)
+
+    manager._remove_external_event(single_event.id, "google", "google-evt-2")
+
+    assert CalendarEvent.get_by_id(db, single_event.id) is None
+    assert not CalendarEventLink.list_for_event(db, single_event.id)
+    assert not EventAttachment.get_by_event_id(db, single_event.id)
 
     db.close_all()
