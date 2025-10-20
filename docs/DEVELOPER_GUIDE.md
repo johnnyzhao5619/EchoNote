@@ -187,6 +187,7 @@ Each subpackage inside `core/` houses a manager that encapsulates domain logic a
 
 - **Timeline (`core/timeline/`)**
   - `TimelineManager` aggregates events and artifacts (`get_timeline_events`, `search_events`, `get_event_artifacts`).
+  - `TimelineManager.get_search_snippet` records a warning when the transcript file referenced by an event attachment cannot be found and returns a user-facing "Transcript unavailable" message. Corrupted UTF-8 transcripts emit an error with the file path so you can locate and regenerate the artifact quickly.
   - `AutoTaskScheduler` observes upcoming events and can trigger `RealtimeRecorder` or transcription tasks automatically.
   - Auto task startup waits for explicit confirmation from the `RealtimeRecorder` thread. If microphone capture or other dependencies fail during startup, the scheduler clears any pending state and emits an error notification—ensure audio drivers and required binaries are ready before enabling automatic recording. 自动任务会在独立线程中运行新的 asyncio 事件循环；录制器会为每次会话重建队列，因此可以在 UI 事件循环与自动任务循环之间无缝切换。
 
