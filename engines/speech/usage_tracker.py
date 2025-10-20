@@ -20,7 +20,7 @@ class UsageTracker:
     PRICING = {
         'openai': Decimal('0.006'),      # $0.006 per minute
         'google': Decimal('0.006'),      # $0.006 per minute (前 60 分钟免费)
-        'azure': Decimal('0.001'),       # $1 per hour = $0.0167 per minute (标准版)
+        'azure': Decimal('0.0167'),      # Azure Speech 标准版（定价参考：Azure 官方定价页 $1.00/小时≈$0.0167/分钟）
     }
 
     def __init__(self, db_connection):
