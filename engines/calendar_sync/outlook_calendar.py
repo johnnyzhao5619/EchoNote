@@ -9,7 +9,7 @@ import logging
 from urllib.parse import urlencode
 
 import httpx
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from datetime import datetime
 
 from engines.calendar_sync.base import CalendarSyncAdapter
@@ -231,6 +231,7 @@ class OutlookCalendarAdapter(CalendarSyncAdapter):
 
         try:
             events = []
+            deleted_events: List[str] = []
             next_link = None
             new_delta_link = None
 
@@ -274,8 +275,16 @@ class OutlookCalendarAdapter(CalendarSyncAdapter):
                 # Convert Outlook events to internal format
                 for item in data.get('value', []):
                     event = self._convert_outlook_event(item)
-                    if event:
-                        events.append(event)
+                    if not event:
+                        continue
+
+                    if event.get('deleted'):
+                        event_id = event.get('id')
+                        if event_id:
+                            deleted_events.append(event_id)
+                        continue
+
+                    events.append(event)
 
                 # Check for pagination
                 next_link = data.get('@odata.nextLink')
@@ -289,6 +298,7 @@ class OutlookCalendarAdapter(CalendarSyncAdapter):
 
             return {
                 'events': events,
+                'deleted': deleted_events,
                 'sync_token': new_delta_link
             }
 
@@ -427,6 +437,19 @@ class OutlookCalendarAdapter(CalendarSyncAdapter):
             Internal event format or None if conversion fails
         """
         try:
+            show_as_value = outlook_event.get('showAs')
+            if isinstance(show_as_value, str) and show_as_value.lower() == 'cancelled':
+                event_id = outlook_event.get('id')
+                if event_id:
+                    return {'id': event_id, 'deleted': True}
+                return None
+
+            if outlook_event.get('isCancelled'):
+                event_id = outlook_event.get('id')
+                if event_id:
+                    return {'id': event_id, 'deleted': True}
+                return None
+
             # Extract start and end times
             start = outlook_event.get('start', {})
             end = outlook_event.get('end', {})

@@ -9,7 +9,7 @@ import logging
 from urllib.parse import urlencode
 
 import httpx
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from datetime import datetime
 
 from engines.calendar_sync.base import CalendarSyncAdapter
@@ -233,6 +233,7 @@ class GoogleCalendarAdapter(CalendarSyncAdapter):
 
         try:
             events = []
+            deleted_events: List[str] = []
             page_token = None
             new_sync_token = None
 
@@ -271,8 +272,16 @@ class GoogleCalendarAdapter(CalendarSyncAdapter):
                 # Convert Google events to internal format
                 for item in data.get('items', []):
                     event = self._convert_google_event(item)
-                    if event:
-                        events.append(event)
+                    if not event:
+                        continue
+
+                    if event.get('deleted'):
+                        event_id = event.get('id')
+                        if event_id:
+                            deleted_events.append(event_id)
+                        continue
+
+                    events.append(event)
 
                 # Check for pagination
                 page_token = data.get('nextPageToken')
@@ -284,6 +293,7 @@ class GoogleCalendarAdapter(CalendarSyncAdapter):
 
             return {
                 'events': events,
+                'deleted': deleted_events,
                 'sync_token': new_sync_token
             }
 
@@ -433,6 +443,13 @@ class GoogleCalendarAdapter(CalendarSyncAdapter):
         """
         try:
             # Extract start and end times
+            status_value = google_event.get('status')
+            if isinstance(status_value, str) and status_value.lower() == 'cancelled':
+                event_id = google_event.get('id')
+                if event_id:
+                    return {'id': event_id, 'deleted': True}
+                return None
+
             start = google_event.get('start', {})
             end = google_event.get('end', {})
 

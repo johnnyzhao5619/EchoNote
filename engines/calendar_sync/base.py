@@ -74,6 +74,7 @@ class CalendarSyncAdapter(ABC):
                     },
                     ...
                 ],
+                'deleted': List[str],  # External IDs removed or cancelled remotely
                 'sync_token': Optional[str]  # For next incremental sync
             }
 
