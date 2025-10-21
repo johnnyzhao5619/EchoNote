@@ -432,15 +432,20 @@ class TimelineManager:
                     if any(a in filter_attendees for a in e.attendees)
                 ]
 
+            attachments_map: Dict[str, List[EventAttachment]] = {}
+            if events:
+                attachments_map = EventAttachment.get_by_event_ids(
+                    self.db,
+                    [event.id for event in events]
+                )
+
             # Search in transcripts
             if query:
                 # Get all event attachments and search transcript content
                 events_with_transcript_match = []
 
                 for event in events:
-                    attachments = EventAttachment.get_by_event_id(
-                        self.db, event.id
-                    )
+                    attachments = attachments_map.get(event.id, [])
 
                     # Check if any transcript contains the query
                     transcript_match = False
@@ -471,16 +476,20 @@ class TimelineManager:
                     if event.id not in event_ids:
                         events.append(event)
                         event_ids.add(event.id)
+                        attachments_map.setdefault(event.id, [])
 
             # Build result with artifacts
             results = []
             for event in events:
-                artifacts = self.get_event_artifacts(event.id)
+                attachments = attachments_map.get(event.id, [])
+                artifacts = self._build_artifacts_from_attachments(attachments)
                 results.append({
                     'event': event,
                     'artifacts': artifacts,
                     'match_snippet': self.get_search_snippet(
-                        event, query
+                        event,
+                        query,
+                        attachments
                     )
                 })
 
@@ -511,29 +520,7 @@ class TimelineManager:
                 self.db, event_id
             )
 
-            recording = None
-            transcript = None
-
-            for attachment in attachments:
-                if attachment.attachment_type == 'recording':
-                    recording = attachment.file_path
-                elif attachment.attachment_type == 'transcript':
-                    transcript = attachment.file_path
-
-            return {
-                'recording': recording,
-                'transcript': transcript,
-                'attachments': [
-                    {
-                        'id': a.id,
-                        'type': a.attachment_type,
-                        'path': a.file_path,
-                        'size': a.file_size,
-                        'created_at': a.created_at
-                    }
-                    for a in attachments
-                ]
-            }
+            return self._build_artifacts_from_attachments(attachments)
 
         except Exception as e:
             logger.error(
@@ -545,10 +532,40 @@ class TimelineManager:
                 'attachments': []
             }
 
+    @staticmethod
+    def _build_artifacts_from_attachments(
+        attachments: List[EventAttachment]
+    ) -> Dict[str, Any]:
+        """Convert attachment objects to artifact dictionary."""
+        recording = None
+        transcript = None
+
+        for attachment in attachments:
+            if attachment.attachment_type == 'recording':
+                recording = attachment.file_path
+            elif attachment.attachment_type == 'transcript':
+                transcript = attachment.file_path
+
+        return {
+            'recording': recording,
+            'transcript': transcript,
+            'attachments': [
+                {
+                    'id': a.id,
+                    'type': a.attachment_type,
+                    'path': a.file_path,
+                    'size': a.file_size,
+                    'created_at': a.created_at
+                }
+                for a in attachments
+            ]
+        }
+
     def get_search_snippet(
         self,
         event: CalendarEvent,
-        query: str
+        query: str,
+        attachments: Optional[List[EventAttachment]] = None
     ) -> Optional[str]:
         """
         Get a snippet showing where the query matched.
@@ -556,6 +573,7 @@ class TimelineManager:
         Args:
             event: CalendarEvent instance
             query: Search query
+            attachments: Optional pre-fetched attachments for the event
 
         Returns:
             Snippet string or None
@@ -587,9 +605,14 @@ class TimelineManager:
             return f"{description_prefix}: ...{snippet}..."
 
         # Check transcripts
-        attachments = EventAttachment.get_by_event_id(self.db, event.id)
+        attachments_to_check = attachments
+        if attachments_to_check is None:
+            attachments_to_check = EventAttachment.get_by_event_id(
+                self.db,
+                event.id
+            )
         fallback_message: Optional[str] = None
-        for attachment in attachments:
+        for attachment in attachments_to_check:
             if attachment.attachment_type == 'transcript':
                 try:
                     with open(

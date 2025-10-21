@@ -439,6 +439,31 @@ class EventAttachment:
         query = "SELECT * FROM event_attachments WHERE event_id = ? ORDER BY created_at"
         result = db_connection.execute(query, (event_id,))
         return [EventAttachment.from_db_row(row) for row in result]
+
+    @staticmethod
+    def get_by_event_ids(
+        db_connection,
+        event_ids: List[str]
+    ) -> Dict[str, List['EventAttachment']]:
+        """Get attachments for multiple events in a single query."""
+        if not event_ids:
+            return {}
+
+        unique_ids = list(dict.fromkeys(event_ids))
+        placeholders = ', '.join(['?'] * len(unique_ids))
+        query = (
+            "SELECT * FROM event_attachments "
+            "WHERE event_id IN (" + placeholders + ") "
+            "ORDER BY created_at"
+        )
+        rows = db_connection.execute(query, tuple(unique_ids))
+
+        attachments_map: Dict[str, List['EventAttachment']] = {}
+        for row in rows:
+            attachment = EventAttachment.from_db_row(row)
+            attachments_map.setdefault(attachment.event_id, []).append(attachment)
+
+        return attachments_map
     
     def delete(self, db_connection):
         """Delete attachment from database."""
