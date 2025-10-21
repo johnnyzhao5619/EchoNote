@@ -3,6 +3,7 @@ import pytest
 PyQt6 = pytest.importorskip("PyQt6")
 from PyQt6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
+from ui.batch_transcribe.task_item import TaskItem
 from ui.batch_transcribe.widget import BatchTranscribeWidget
 from utils.i18n import I18nQtManager
 
@@ -128,4 +129,59 @@ def test_dialog_translations_follow_language(monkeypatch, tmp_path, qapp):
     finally:
         widget.refresh_timer.stop()
         widget.deleteLater()
+        qapp.processEvents()
+
+
+def test_task_item_metadata_rendering(qapp):
+    i18n = I18nQtManager(default_language="en_US")
+    task_data = {
+        "id": "task-1",
+        "file_name": "audio.wav",
+        "status": "failed",
+        "file_size": 5 * 1024 * 1024,
+        "audio_duration": 125,
+        "language": "English",
+        "error_message": "Network failure",
+    }
+
+    task_item = TaskItem(task_data, i18n)
+
+    try:
+        task_item.update_display()
+        task_item.update_translations()
+        qapp.processEvents()
+
+        expected_info_en = " | ".join([
+            i18n.t("batch_transcribe.info.size", size="5.0 MB"),
+            i18n.t("batch_transcribe.info.duration", duration="2:05"),
+            i18n.t("batch_transcribe.info.language", language="English"),
+        ])
+        expected_error_en = i18n.t(
+            "batch_transcribe.info.error", error="Network failure"
+        )
+
+        assert task_item.info_label.text() == expected_info_en
+        assert task_item.error_label.isVisible()
+        assert task_item.error_label.text() == expected_error_en
+
+        # Trigger translation refresh and ensure formatting remains correct
+        i18n.change_language("zh_CN")
+        qapp.processEvents()
+        task_item.update_translations()
+
+        expected_info_cn = " | ".join([
+            i18n.t("batch_transcribe.info.size", size="5.0 MB"),
+            i18n.t("batch_transcribe.info.duration", duration="2:05"),
+            i18n.t("batch_transcribe.info.language", language="English"),
+        ])
+        expected_error_cn = i18n.t(
+            "batch_transcribe.info.error", error="Network failure"
+        )
+
+        assert task_item.info_label.text() == expected_info_cn
+        assert task_item.error_label.isVisible()
+        assert task_item.error_label.text() == expected_error_cn
+
+    finally:
+        task_item.deleteLater()
         qapp.processEvents()
