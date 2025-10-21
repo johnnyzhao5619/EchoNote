@@ -185,6 +185,8 @@
     "enable_recording": "Enable Meeting Recording",
     "play_recording": "Play Recording",
     "view_transcript": "View Transcript",
+    "view_translation": "View Translation",
+    "translation_viewer_title": "Translation Viewer",
     "no_artifacts": "No artifacts",
     "audio_player_title": "Audio Player",
     "audio_player": {

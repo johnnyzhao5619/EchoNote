@@ -386,7 +386,9 @@ class TranscriptViewerDialog(QDialog):
         self,
         file_path: str,
         i18n: I18nQtManager,
-        parent: Optional[QWidget] = None
+        parent: Optional[QWidget] = None,
+        *,
+        title_key: Optional[str] = None
     ):
         """
         Initialize transcript viewer dialog.
@@ -399,9 +401,10 @@ class TranscriptViewerDialog(QDialog):
         super().__init__(parent)
         
         self.i18n = i18n
+        self._title_key = title_key or 'transcript.viewer_title'
         
         # Setup dialog
-        self.setWindowTitle(i18n.t('transcript.viewer_title'))
+        self.setWindowTitle(i18n.t(self._title_key))
         self.setMinimumSize(600, 500)
         self.setModal(False)
         
@@ -429,7 +432,7 @@ class TranscriptViewerDialog(QDialog):
     
     def update_translations(self):
         """Update UI text when language changes."""
-        self.setWindowTitle(self.i18n.t('transcript.viewer_title'))
+        self.setWindowTitle(self.i18n.t(self._title_key))
         self.close_button.setText(self.i18n.t('common.close'))
         
         # Update viewer translations

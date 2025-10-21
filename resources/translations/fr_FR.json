@@ -183,6 +183,8 @@
     "enable_recording": "Activer l'Enregistrement de Réunion",
     "play_recording": "Lire l'Enregistrement",
     "view_transcript": "Voir la Transcription",
+    "view_translation": "Voir la Traduction",
+    "translation_viewer_title": "Visionneuse de Traduction",
     "no_artifacts": "Aucun artefact",
     "audio_player_title": "Lecteur Audio",
     "audio_player": {

@@ -562,16 +562,20 @@ class TimelineManager:
         """Convert attachment objects to artifact dictionary."""
         recording = None
         transcript = None
+        translation = None
 
         for attachment in attachments:
             if attachment.attachment_type == 'recording':
                 recording = attachment.file_path
             elif attachment.attachment_type == 'transcript':
                 transcript = attachment.file_path
+            elif attachment.attachment_type == 'translation':
+                translation = attachment.file_path
 
         return {
             'recording': recording,
             'transcript': transcript,
+            'translation': translation,
             'attachments': [
                 {
                     'id': a.id,

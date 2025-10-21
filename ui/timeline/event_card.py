@@ -89,6 +89,7 @@ class EventCard(QFrame):
     auto_task_changed = pyqtSignal(str, dict)  # event_id, config
     view_recording = pyqtSignal(str)  # file_path
     view_transcript = pyqtSignal(str)  # file_path
+    view_translation = pyqtSignal(str)  # file_path
     
     EVENT_TYPE_TRANSLATION_MAP = {
         'event': 'timeline.filter_event',
@@ -133,6 +134,7 @@ class EventCard(QFrame):
         # Badge label references for translation updates
         self.type_badge_label = None
         self.source_badge_label = None
+        self.translation_btn = None
 
         # Setup UI
         self.setup_ui()
@@ -371,23 +373,33 @@ class EventCard(QFrame):
             self._load_artifacts()
         
         # Recording button
-        if self.artifacts.get('recording'):
+        has_recording = bool(self.artifacts.get('recording'))
+        has_transcript = bool(self.artifacts.get('transcript'))
+        has_translation = bool(self.artifacts.get('translation'))
+
+        if has_recording:
             self.recording_btn = QPushButton("🎵 " + self.i18n.t('timeline.play_recording'))
             self.recording_btn.clicked.connect(self._on_play_recording)
             self.recording_btn.setObjectName("recording_btn")
             # Styling is handled by theme files (dark.qss / light.qss)
             actions_layout.addWidget(self.recording_btn)
-        
+
         # Transcript button
-        if self.artifacts.get('transcript'):
+        if has_transcript:
             self.transcript_btn = QPushButton("📄 " + self.i18n.t('timeline.view_transcript'))
             self.transcript_btn.clicked.connect(self._on_view_transcript)
             self.transcript_btn.setObjectName("transcript_btn")
             # Styling is handled by theme files (dark.qss / light.qss)
             actions_layout.addWidget(self.transcript_btn)
-        
+
+        if has_translation:
+            self.translation_btn = QPushButton("🌐 " + self.i18n.t('timeline.view_translation'))
+            self.translation_btn.clicked.connect(self._on_view_translation)
+            self.translation_btn.setObjectName("translation_btn")
+            actions_layout.addWidget(self.translation_btn)
+
         # Show message if no artifacts
-        if not self.artifacts.get('recording') and not self.artifacts.get('transcript'):
+        if not (has_recording or has_transcript or has_translation):
             no_artifacts_label = QLabel(self.i18n.t('timeline.no_artifacts'))
             no_artifacts_label.setObjectName("no_artifacts_label")
             no_artifacts_label.setStyleSheet("font-style: italic;")
@@ -428,6 +440,13 @@ class EventCard(QFrame):
         if transcript_path:
             logger.info(f"Viewing transcript: {transcript_path}")
             self.view_transcript.emit(transcript_path)
+
+    def _on_view_translation(self):
+        """Handle view translation button click."""
+        translation_path = self.artifacts.get('translation')
+        if translation_path:
+            logger.info(f"Viewing translation: {translation_path}")
+            self.view_translation.emit(translation_path)
     
     def update_translations(self):
         """Update UI text when language changes."""
@@ -456,7 +475,11 @@ class EventCard(QFrame):
                 self.transcript_btn.setText(
                     "📄 " + self.i18n.t('timeline.view_transcript')
                 )
-            
+            if getattr(self, 'translation_btn', None):
+                self.translation_btn.setText(
+                    "🌐 " + self.i18n.t('timeline.view_translation')
+                )
+
             # Update no artifacts label
             for child in self.findChildren(QLabel):
                 if child.objectName() == "no_artifacts_label":
