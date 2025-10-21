@@ -19,6 +19,19 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+# Shared language options used by translation-aware widgets across the UI.
+# Each tuple contains the language code and the translation key for the
+# human-readable label. This keeps language pickers consistent and avoids
+# duplicating the option list in multiple widgets.
+LANGUAGE_OPTION_KEYS = [
+    ("zh", "realtime_record.available_languages.zh"),
+    ("en", "realtime_record.available_languages.en"),
+    ("fr", "realtime_record.available_languages.fr"),
+    ("ja", "realtime_record.available_languages.ja"),
+    ("ko", "realtime_record.available_languages.ko"),
+]
+
+
 class I18nManager:
     """Basic translation manager without Qt dependencies."""
 

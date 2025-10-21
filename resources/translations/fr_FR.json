@@ -181,6 +181,8 @@
     "current_time": "Heure Actuelle",
     "enable_transcription": "Activer la Transcription en Temps Réel",
     "enable_recording": "Activer l'Enregistrement de Réunion",
+    "enable_translation": "Activer la Traduction",
+    "translation_target_label": "Langue Cible :",
     "play_recording": "Lire l'Enregistrement",
     "view_transcript": "Voir la Transcription",
     "view_translation": "Voir la Traduction",

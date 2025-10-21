@@ -17,6 +17,7 @@ from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QObject, QThread
 import threading
 
 from ui.common.notification import get_notification_manager
+from utils.i18n import LANGUAGE_OPTION_KEYS
 
 logger = logging.getLogger(__name__)
 
@@ -58,13 +59,7 @@ class RealtimeRecorderSignals(QObject):
 class RealtimeRecordWidget(QWidget):
     """实时录制主界面"""
 
-    LANGUAGE_OPTIONS = [
-        ("zh", "realtime_record.available_languages.zh"),
-        ("en", "realtime_record.available_languages.en"),
-        ("fr", "realtime_record.available_languages.fr"),
-        ("ja", "realtime_record.available_languages.ja"),
-        ("ko", "realtime_record.available_languages.ko"),
-    ]
+    LANGUAGE_OPTIONS = LANGUAGE_OPTION_KEYS
 
     def __init__(
         self,

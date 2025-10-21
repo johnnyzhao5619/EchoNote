@@ -9,12 +9,12 @@ from typing import Optional, Dict, Any
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QFrame, QPushButton, QCheckBox, QSizePolicy
+    QFrame, QPushButton, QCheckBox, QComboBox
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QPalette, QColor
 
-from utils.i18n import I18nQtManager
+from utils.i18n import I18nQtManager, LANGUAGE_OPTION_KEYS
 from core.timeline.manager import to_local_naive
 
 
@@ -135,6 +135,9 @@ class EventCard(QFrame):
         self.type_badge_label = None
         self.source_badge_label = None
         self.translation_btn = None
+        self.translation_checkbox = None
+        self.translation_language_label = None
+        self.translation_language_combo = None
 
         # Setup UI
         self.setup_ui()
@@ -341,7 +344,7 @@ class EventCard(QFrame):
             self._on_auto_task_changed
         )
         actions_layout.addWidget(self.transcription_checkbox)
-        
+
         # Recording toggle
         self.recording_checkbox = QCheckBox(
             self.i18n.t('timeline.enable_recording')
@@ -353,9 +356,51 @@ class EventCard(QFrame):
             self._on_auto_task_changed
         )
         actions_layout.addWidget(self.recording_checkbox)
-        
+
+        # Translation toggle
+        self.translation_checkbox = QCheckBox(
+            self.i18n.t('timeline.enable_translation')
+        )
+        enable_translation = auto_tasks.get('enable_translation', False)
+        self.translation_checkbox.setChecked(enable_translation)
+        self.translation_checkbox.stateChanged.connect(
+            self._on_translation_toggled
+        )
+        actions_layout.addWidget(self.translation_checkbox)
+
+        # Translation target label and combo
+        self.translation_language_label = QLabel(
+            self.i18n.t('timeline.translation_target_label')
+        )
+        actions_layout.addWidget(self.translation_language_label)
+
+        self.translation_language_combo = QComboBox()
+        self.translation_language_combo.setMinimumWidth(120)
+        self.translation_language_combo.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToContents
+        )
+        self.translation_language_combo.blockSignals(True)
+        for code, label_key in LANGUAGE_OPTION_KEYS:
+            self.translation_language_combo.addItem(
+                self.i18n.t(label_key), code
+            )
+        target_language = auto_tasks.get('translation_target_language')
+        if target_language:
+            index = self.translation_language_combo.findData(target_language)
+        else:
+            index = self.translation_language_combo.findData('en')
+        if index != -1:
+            self.translation_language_combo.setCurrentIndex(index)
+        self.translation_language_combo.blockSignals(False)
+        self.translation_language_combo.currentIndexChanged.connect(
+            self._on_auto_task_changed
+        )
+        actions_layout.addWidget(self.translation_language_combo)
+
+        self._set_translation_controls_enabled(enable_translation)
+
         actions_layout.addStretch()
-        
+
         return actions_layout
     
     def create_past_actions(self) -> QHBoxLayout:
@@ -418,14 +463,38 @@ class EventCard(QFrame):
             logger.debug(f"Artifacts loaded for event: {self.event.id}")
     
     def _on_auto_task_changed(self):
-        """Handle auto-task checkbox change."""
+        """Handle auto-task configuration change."""
         config = {
             'enable_transcription': self.transcription_checkbox.isChecked(),
-            'enable_recording': self.recording_checkbox.isChecked()
+            'enable_recording': self.recording_checkbox.isChecked(),
+            'enable_translation': False,
+            'translation_target_language': None,
         }
-        
+
+        if self.translation_checkbox:
+            enable_translation = self.translation_checkbox.isChecked()
+            config['enable_translation'] = enable_translation
+
+            if enable_translation and self.translation_language_combo:
+                config['translation_target_language'] = (
+                    self.translation_language_combo.currentData()
+                )
+
         logger.debug(f"Auto-task changed for event {self.event.id}: {config}")
         self.auto_task_changed.emit(self.event.id, config)
+
+    def _on_translation_toggled(self):
+        """Handle enable translation toggle changes."""
+        enable_translation = self.translation_checkbox.isChecked()
+        self._set_translation_controls_enabled(enable_translation)
+        self._on_auto_task_changed()
+
+    def _set_translation_controls_enabled(self, enabled: bool):
+        """Enable or disable translation target controls."""
+        if self.translation_language_label:
+            self.translation_language_label.setEnabled(enabled)
+        if self.translation_language_combo:
+            self.translation_language_combo.setEnabled(enabled)
     
     def _on_play_recording(self):
         """Handle play recording button click."""
@@ -465,6 +534,29 @@ class EventCard(QFrame):
                 self.recording_checkbox.setText(
                     self.i18n.t('timeline.enable_recording')
                 )
+            if getattr(self, 'translation_checkbox', None):
+                self.translation_checkbox.setText(
+                    self.i18n.t('timeline.enable_translation')
+                )
+            if getattr(self, 'translation_language_label', None):
+                self.translation_language_label.setText(
+                    self.i18n.t('timeline.translation_target_label')
+                )
+            if getattr(self, 'translation_language_combo', None):
+                current_code = self.translation_language_combo.currentData()
+                self.translation_language_combo.blockSignals(True)
+                self.translation_language_combo.clear()
+                for code, label_key in LANGUAGE_OPTION_KEYS:
+                    self.translation_language_combo.addItem(
+                        self.i18n.t(label_key), code
+                    )
+                if current_code is not None:
+                    index = self.translation_language_combo.findData(
+                        current_code
+                    )
+                    if index != -1:
+                        self.translation_language_combo.setCurrentIndex(index)
+                self.translation_language_combo.blockSignals(False)
         else:
             # Update buttons
             if hasattr(self, 'recording_btn'):
