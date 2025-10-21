@@ -193,10 +193,17 @@ class TaskQueue:
                 # Process task
                 await self._process_task(task_id, worker_id)
             except asyncio.CancelledError:
-                logger.debug(
-                    f"Worker {worker_id} cancelled while handling task {task_id}"
+                if not self.running:
+                    logger.debug(
+                        f"Worker {worker_id} cancelled while handling task {task_id}"
+                    )
+                    raise
+
+                logger.info(
+                    "Task %s cancellation acknowledged by worker %s; continuing",
+                    task_id,
+                    worker_id
                 )
-                raise
             finally:
                 self.queue.task_done()
 
@@ -258,7 +265,6 @@ class TaskQueue:
             final_status: Optional[TaskStatus] = None
             final_result: Any = None
             final_error: Optional[str] = None
-            cancelled_exc: Optional[asyncio.CancelledError] = None
             while task_info['retry_count'] <= self.max_retries:
                 try:
                     # Execute task function
@@ -285,11 +291,10 @@ class TaskQueue:
                     # Success, break retry loop
                     break
 
-                except asyncio.CancelledError as exc:
+                except asyncio.CancelledError:
                     final_status = TaskStatus.CANCELLED
                     final_result = None
                     final_error = None
-                    cancelled_exc = exc
                     logger.info(f"Task {task_id} was cancelled during processing")
                     break
 
@@ -331,8 +336,12 @@ class TaskQueue:
                     error=final_error
                 )
 
-            if cancelled_exc is not None:
-                raise cancelled_exc
+            if final_status is TaskStatus.CANCELLED:
+                logger.debug(
+                    "Task %s finalised as cancelled by worker %s",
+                    task_id,
+                    worker_id
+                )
 
     def get_status(self, task_id: str) -> Optional[str]:
         """

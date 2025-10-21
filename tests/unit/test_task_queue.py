@@ -180,3 +180,56 @@ def test_running_task_cancelled_by_stop(caplog):
         "failed" in record.getMessage().lower()
         for record in task_logs
     ), "Failure log detected for cancelled task"
+
+
+def test_task_queue_cancellation_survives_worker():
+    async def _run():
+        queue = TaskQueue(max_concurrent=1, max_retries=0)
+
+        try:
+            await queue.start()
+            worker_refs = [id(worker) for worker in queue.worker_tasks]
+            assert len(worker_refs) == 1
+
+            for attempt in range(2):
+                task_started = asyncio.Event()
+                cancellation_noted = asyncio.Event()
+
+                async def cancellable_task(*, cancel_event, _started=task_started, _done=cancellation_noted):
+                    _started.set()
+                    await cancel_event.wait()
+                    _done.set()
+                    raise asyncio.CancelledError
+
+                task_id = f"cancel-{attempt}"
+                await queue.add_task(task_id, cancellable_task)
+
+                await asyncio.wait_for(task_started.wait(), timeout=1)
+                assert [id(worker) for worker in queue.worker_tasks] == worker_refs
+                assert all(not worker.done() for worker in queue.worker_tasks)
+
+                assert await queue.cancel_task(task_id) is True
+                await asyncio.wait_for(cancellation_noted.wait(), timeout=1)
+                await asyncio.wait_for(queue.wait_for_completion(), timeout=1)
+
+                assert [id(worker) for worker in queue.worker_tasks] == worker_refs
+                assert all(not worker.done() for worker in queue.worker_tasks)
+
+            task_completed = asyncio.Event()
+
+            async def successful_task(result, *, cancel_event):
+                task_completed.set()
+                return result
+
+            await queue.add_task("final-task", successful_task, "done")
+
+            await asyncio.wait_for(task_completed.wait(), timeout=1)
+            await asyncio.wait_for(queue.wait_for_completion(), timeout=1)
+
+            assert queue.get_status("final-task") is None
+            assert "final-task" not in queue.tasks
+            assert all(not worker.done() for worker in queue.worker_tasks)
+        finally:
+            await queue.stop()
+
+    asyncio.run(_run())
