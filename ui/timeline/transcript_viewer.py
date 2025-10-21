@@ -55,10 +55,18 @@ class TranscriptViewer(QWidget):
         self.file_path = file_path
         self.i18n = i18n
         self.transcript_text = ""
-        
+
         # Search state
         self.search_matches = []
         self.current_match_index = -1
+
+        # Language change handling
+        self._language_signal = getattr(self.i18n, 'language_changed', None)
+        self._language_signal_connected = False
+        if self._language_signal is not None:
+            self._language_signal.connect(self.update_translations)
+            self._language_signal_connected = True
+            self.destroyed.connect(self._disconnect_language_signal)
         
         # Setup UI
         self.setup_ui()
@@ -379,9 +387,25 @@ class TranscriptViewer(QWidget):
         )
 
 
+    def _disconnect_language_signal(self, *args):
+        """Disconnect language change signal if connected."""
+        if self._language_signal_connected and self._language_signal is not None:
+            try:
+                self._language_signal.disconnect(self.update_translations)
+            except (TypeError, RuntimeError):
+                pass
+            finally:
+                self._language_signal_connected = False
+
+    def closeEvent(self, event):
+        """Handle widget close to cleanup signal connections."""
+        self._disconnect_language_signal()
+        super().closeEvent(event)
+
+
 class TranscriptViewerDialog(QDialog):
     """Dialog wrapper for transcript viewer."""
-    
+
     def __init__(
         self,
         file_path: str,
@@ -409,7 +433,7 @@ class TranscriptViewerDialog(QDialog):
         self.setWindowModality(Qt.WindowModality.NonModal)
         self.setModal(False)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
-        
+
         # Layout
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -429,14 +453,37 @@ class TranscriptViewerDialog(QDialog):
         button_layout.addWidget(self.close_button)
         
         layout.addLayout(button_layout)
-        
+
         logger.info("Transcript viewer dialog initialized")
-    
+
+        # Language change handling
+        self._language_signal = getattr(self.i18n, 'language_changed', None)
+        self._language_signal_connected = False
+        if self._language_signal is not None:
+            self._language_signal.connect(self.update_translations)
+            self._language_signal_connected = True
+            self.destroyed.connect(self._disconnect_language_signal)
+
     def update_translations(self):
         """Update UI text when language changes."""
         self.setWindowTitle(self.i18n.t(self._title_key))
         self.close_button.setText(self.i18n.t('common.close'))
-        
+
         # Update viewer translations
         if hasattr(self, 'viewer'):
             self.viewer.update_translations()
+
+    def _disconnect_language_signal(self, *args):
+        """Disconnect language change signal if connected."""
+        if self._language_signal_connected and self._language_signal is not None:
+            try:
+                self._language_signal.disconnect(self.update_translations)
+            except (TypeError, RuntimeError):
+                pass
+            finally:
+                self._language_signal_connected = False
+
+    def closeEvent(self, event):
+        """Handle dialog close to cleanup signal connections."""
+        self._disconnect_language_signal()
+        super().closeEvent(event)
