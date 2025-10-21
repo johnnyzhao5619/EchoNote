@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QSlider, QDialog, QMessageBox
 )
-from PyQt6.QtCore import Qt, QUrl, pyqtSignal, QTimer
+from PyQt6.QtCore import Qt, QUrl, pyqtSignal
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 
 from utils.i18n import I18nQtManager
@@ -55,25 +55,28 @@ class AudioPlayer(QWidget):
         self.i18n = i18n
         
         # Media player
-        self.player = QMediaPlayer()
-        self.audio_output = QAudioOutput()
+        self.player = QMediaPlayer(self)
+        self.audio_output = QAudioOutput(self)
         self.player.setAudioOutput(self.audio_output)
-        
+
         # State
         self.is_seeking = False
-        
+        self._media_status = QMediaPlayer.MediaStatus.NoMedia
+
         # Setup UI
         self.setup_ui()
-        
+
         # Connect player signals
         self.player.positionChanged.connect(self._on_position_changed)
         self.player.durationChanged.connect(self._on_duration_changed)
         self.player.playbackStateChanged.connect(self._on_state_changed)
         self.player.errorOccurred.connect(self._on_error)
-        
+        self.player.mediaStatusChanged.connect(self._on_media_status_changed)
+
         # Load file
+        self._set_controls_enabled(False)
         self.load_file(file_path)
-        
+
         logger.info(f"Audio player initialized: {file_path}")
     
     def setup_ui(self):
@@ -91,6 +94,7 @@ class AudioPlayer(QWidget):
         # Progress slider
         self.progress_slider = QSlider(Qt.Orientation.Horizontal)
         self.progress_slider.setRange(0, 0)
+        self.progress_slider.setEnabled(False)
         self.progress_slider.sliderPressed.connect(self._on_slider_pressed)
         self.progress_slider.sliderReleased.connect(self._on_slider_released)
         self.progress_slider.sliderMoved.connect(self._on_slider_moved)
@@ -148,6 +152,7 @@ class AudioPlayer(QWidget):
         self.volume_slider.setValue(70)
         self.volume_slider.setMaximumWidth(100)
         self.volume_slider.valueChanged.connect(self._on_volume_changed)
+        self.volume_slider.setEnabled(False)
         controls_layout.addWidget(self.volume_slider)
         
         controls_layout.addStretch()
@@ -156,40 +161,49 @@ class AudioPlayer(QWidget):
         
         # Set initial volume
         self.audio_output.setVolume(0.7)
-    
+
     def load_file(self, file_path: str):
         """
         Load audio file.
-        
+
         Args:
             file_path: Path to audio file
         """
         try:
             # Check if file exists
-            if not Path(file_path).exists():
-                raise FileNotFoundError(f"Audio file not found: {file_path}")
-            
+            resolved_path = Path(file_path).expanduser().resolve(strict=True)
+
+            # Reset previous state before loading new source
+            self.player.stop()
+            self._reset_playback_state(reset_total=True)
+            self._set_controls_enabled(False)
+
+            # Update label with resolved path
+            self.file_path = str(resolved_path)
+            self.file_label.setText(resolved_path.name)
+
             # Load file
-            url = QUrl.fromLocalFile(file_path)
+            url = QUrl.fromLocalFile(self.file_path)
             self.player.setSource(url)
-            
+
             logger.info(f"Audio file loaded: {file_path}")
-            
+
         except Exception as e:
-            error_msg = self.i18n.t(
+            self._emit_playback_error(
                 'timeline.audio_player.load_failed',
                 error=str(e)
             )
-            logger.error(error_msg)
-            self.playback_error.emit(error_msg)
-    
+
     def toggle_playback(self):
         """Toggle play/pause."""
+        if not self.play_button.isEnabled():
+            return
+
         if self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
             self.player.pause()
         else:
             self.player.play()
-    
+
     def _on_position_changed(self, position: int):
         """
         Handle playback position change.
@@ -210,11 +224,13 @@ class AudioPlayer(QWidget):
         """
         self.progress_slider.setRange(0, duration)
         self.total_time_label.setText(self._format_time(duration))
-    
+        if duration > 0:
+            self._set_controls_enabled(True)
+
     def _on_state_changed(self, state: QMediaPlayer.PlaybackState):
         """
         Handle playback state change.
-        
+
         Args:
             state: New playback state
         """
@@ -226,7 +242,10 @@ class AudioPlayer(QWidget):
             self.play_button.setText(
                 self.i18n.t('timeline.audio_player.play_button_label')
             )
-    
+
+        if state == QMediaPlayer.PlaybackState.StoppedState:
+            self._reset_playback_state()
+
     def _on_error(self, error: QMediaPlayer.Error, error_string: str):
         """
         Handle playback error.
@@ -236,13 +255,12 @@ class AudioPlayer(QWidget):
             error_string: Error description
         """
         error_detail = error_string or getattr(error, 'name', str(error))
-        error_msg = self.i18n.t(
+        self._emit_playback_error(
             'timeline.audio_player.playback_error',
             error=error_detail
         )
-        logger.error(error_msg)
-        self.playback_error.emit(error_msg)
-    
+        self._set_controls_enabled(False)
+
     def _on_slider_pressed(self):
         """Handle slider press (start seeking)."""
         self.is_seeking = True
@@ -271,7 +289,7 @@ class AudioPlayer(QWidget):
         """
         volume = value / 100.0
         self.audio_output.setVolume(volume)
-    
+
     def _format_time(self, milliseconds: int) -> str:
         """
         Format time in milliseconds to MM:SS.
@@ -286,10 +304,60 @@ class AudioPlayer(QWidget):
         minutes = seconds // 60
         seconds = seconds % 60
         return f"{minutes:02d}:{seconds:02d}"
-    
+
+    def _reset_playback_state(self, *, reset_total: bool = False):
+        """Reset slider and current time label to the beginning of the media."""
+        self.is_seeking = False
+        self.progress_slider.blockSignals(True)
+        self.progress_slider.setValue(0)
+        self.progress_slider.blockSignals(False)
+        initial_time = self.i18n.t('timeline.audio_player.initial_time')
+        self.current_time_label.setText(initial_time)
+        if reset_total or self.progress_slider.maximum() == 0:
+            self.total_time_label.setText(initial_time)
+
+    def _set_controls_enabled(self, enabled: bool) -> None:
+        """Enable or disable interactive controls based on media readiness."""
+        self.play_button.setEnabled(enabled)
+        self.progress_slider.setEnabled(enabled)
+        self.volume_slider.setEnabled(enabled)
+
+    def _emit_playback_error(self, translation_key: str, **context):
+        """Emit a localized playback error message."""
+        error_msg = self.i18n.t(translation_key, **context)
+        logger.error(error_msg)
+        self.playback_error.emit(error_msg)
+
+    def _on_media_status_changed(self, status: QMediaPlayer.MediaStatus):
+        """React to media status updates to keep UI state in sync."""
+        self._media_status = status
+
+        if status == QMediaPlayer.MediaStatus.LoadedMedia:
+            self._set_controls_enabled(True)
+            # Ensure duration labels refresh when metadata arrives late
+            self._on_duration_changed(self.player.duration())
+        elif status in (
+            QMediaPlayer.MediaStatus.NoMedia,
+            QMediaPlayer.MediaStatus.UnknownMediaStatus,
+            QMediaPlayer.MediaStatus.LoadingMedia,
+        ):
+            # Keep controls disabled until we know media is playable
+            if self.player.duration() == 0:
+                self._set_controls_enabled(False)
+        elif status == QMediaPlayer.MediaStatus.InvalidMedia:
+            self._emit_playback_error(
+                'timeline.audio_player.playback_error',
+                error=self.i18n.t('timeline.audio_player.invalid_media')
+            )
+            self._set_controls_enabled(False)
+        elif status == QMediaPlayer.MediaStatus.EndOfMedia:
+            # Align UI with stopped state when playback naturally ends
+            self._reset_playback_state()
+
     def cleanup(self):
         """Clean up resources."""
         self.player.stop()
+        self.player.setSource(QUrl())
         logger.debug("Audio player cleaned up")
 
 

@@ -193,6 +193,7 @@
       "pause_button_label": "⏸",
       "load_failed": "Échec du chargement du fichier audio : {error}",
       "playback_error": "Erreur de lecture : {error}",
+      "invalid_media": "Le format du média n'est pas pris en charge ou le fichier est corrompu",
       "dialog_error_body": "{message}"
     },
     "snippet": {
