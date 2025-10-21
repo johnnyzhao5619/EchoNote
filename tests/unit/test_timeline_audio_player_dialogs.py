@@ -108,3 +108,35 @@ def test_audio_dialogs_remain_non_modal_and_cached(monkeypatch, qapp, tmp_path):
     finally:
         widget.deleteLater()
         qapp.processEvents()
+
+
+def test_transcript_dialogs_are_non_modal_and_cached(monkeypatch, qapp, tmp_path):
+    monkeypatch.setattr(
+        "ui.timeline.widget.QTimer.singleShot",
+        staticmethod(lambda *_: None),
+    )
+
+    i18n = I18nQtManager(default_language="en_US")
+    widget = TimelineWidget(DummyTimelineManager(), i18n)
+
+    try:
+        transcript_path = tmp_path / "transcript.txt"
+        transcript_path.write_text("sample transcript", encoding="utf-8")
+
+        widget._on_view_transcript(str(transcript_path))
+        dialog = widget._text_viewer_dialogs[str(transcript_path)]
+
+        assert dialog.windowModality() == Qt.WindowModality.NonModal
+        assert not dialog.isModal()
+        assert dialog.testAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+
+        widget._on_view_transcript(str(transcript_path))
+        assert widget._text_viewer_dialogs[str(transcript_path)] is dialog
+
+        dialog.close()
+        qapp.processEvents()
+
+        assert str(transcript_path) not in widget._text_viewer_dialogs
+    finally:
+        widget.deleteLater()
+        qapp.processEvents()

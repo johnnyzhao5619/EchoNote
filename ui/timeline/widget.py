@@ -63,6 +63,7 @@ class TimelineWidget(QWidget):
         self.has_more = True
         self.event_cards: List[QWidget] = []
         self._audio_player_dialogs: Dict[str, 'AudioPlayerDialog'] = {}
+        self._text_viewer_dialogs: Dict[str, 'TranscriptViewerDialog'] = {}
         
         # Current filters
         self.current_query = ""
@@ -484,13 +485,37 @@ class TimelineWidget(QWidget):
         from ui.timeline.transcript_viewer import TranscriptViewerDialog
 
         try:
+            cache_key = str(file_path)
+            existing_dialog = self._text_viewer_dialogs.get(cache_key)
+
+            if existing_dialog:
+                existing_dialog.show()
+                existing_dialog.raise_()
+                existing_dialog.activateWindow()
+                logger.info(f"Activated text viewer for {cache_key}")
+                return
+
             dialog = TranscriptViewerDialog(
-                file_path,
+                cache_key,
                 self.i18n,
                 self,
                 title_key=title_key
             )
-            dialog.exec()
+            self._text_viewer_dialogs[cache_key] = dialog
+
+            def _cleanup_dialog(*_):
+                tracked_dialog = self._text_viewer_dialogs.get(cache_key)
+                if tracked_dialog is dialog:
+                    self._text_viewer_dialogs.pop(cache_key, None)
+                    logger.debug(f"Closed text viewer for {cache_key}")
+
+            dialog.finished.connect(_cleanup_dialog)
+            dialog.destroyed.connect(_cleanup_dialog)
+
+            dialog.show()
+            dialog.raise_()
+            dialog.activateWindow()
+            logger.info(f"Opened text viewer for {cache_key}")
         except Exception as e:
             logger.error(f"Failed to open text viewer: {e}")
 
