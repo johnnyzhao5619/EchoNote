@@ -225,9 +225,20 @@ def test_future_event_order_keeps_nearest_next_to_indicator(monkeypatch, qapp):
 
         assert indicator_index > 0, "indicator should follow future events"
 
+        # The top of the future event stack should be the soonest meeting.
+        top_card = widget.event_cards[0]
+        assert getattr(top_card, "is_future", False)
+        assert top_card.event.id == soon_event.id
+
         nearest_card = widget.event_cards[indicator_index - 1]
         assert getattr(nearest_card, "is_future", False)
         assert nearest_card.event.id == soon_event.id
+
+        # Confirm indicator alignment inside the layout matches the list order.
+        layout_index = widget.timeline_layout.indexOf(
+            widget.event_cards[indicator_index]
+        )
+        assert layout_index == indicator_index
     finally:
         widget.deleteLater()
         qapp.processEvents()

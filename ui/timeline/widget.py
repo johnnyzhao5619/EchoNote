@@ -349,7 +349,7 @@ class TimelineWidget(QWidget):
             is_future: True if this is a future event
         """
         # Import here to avoid circular imports
-        from ui.timeline.event_card import EventCard
+        from ui.timeline.event_card import EventCard, CurrentTimeIndicator
         
         card = EventCard(
             event_data=event_data,
@@ -368,19 +368,63 @@ class TimelineWidget(QWidget):
         if is_future:
             # Future events stay grouped above the current time indicator.
             new_start = to_local_naive(card.event.start_time)
-            insert_pos = len(self.event_cards)
-            for i, existing_card in enumerate(self.event_cards):
-                if not getattr(existing_card, 'is_future', False):
-                    insert_pos = i
-                    break
 
+            indicator_index = next(
+                (
+                    i
+                    for i, existing_card in enumerate(self.event_cards)
+                    if isinstance(existing_card, CurrentTimeIndicator)
+                ),
+                None,
+            )
+
+            # Search within the future event group for the correct position.
+            search_limit = (
+                indicator_index
+                if indicator_index is not None
+                else len(self.event_cards)
+            )
+            insert_pos = search_limit
+            for i in range(search_limit):
+                existing_card = self.event_cards[i]
                 existing_start = to_local_naive(existing_card.event.start_time)
-                if existing_start <= new_start:
+                if existing_start > new_start:
                     insert_pos = i
                     break
 
             self.timeline_layout.insertWidget(insert_pos, card)
             self.event_cards.insert(insert_pos, card)
+
+            # Verify the indicator still follows the future event group.
+            if indicator_index is not None:
+                indicator_widget = next(
+                    (
+                        existing_card
+                        for existing_card in self.event_cards
+                        if isinstance(existing_card, CurrentTimeIndicator)
+                    ),
+                    None,
+                )
+
+                if indicator_widget is not None:
+                    layout_index = self.timeline_layout.indexOf(indicator_widget)
+                    list_index = self.event_cards.index(indicator_widget)
+                    if layout_index != list_index:
+                        logger.debug(
+                            "Current time indicator layout index mismatch: "
+                            f"layout={layout_index}, list={list_index}"
+                        )
+
+                    future_count = sum(
+                        1 for card_item in self.event_cards
+                        if getattr(card_item, 'is_future', False)
+                    )
+                    if list_index != future_count:
+                        logger.debug(
+                            "Current time indicator misaligned after future event "
+                            f"insert: indicator_index={list_index}, future_count="
+                            f"{future_count}"
+                        )
         else:
             # Past events go at the bottom (before stretch)
             insert_pos = len(self.event_cards)
