@@ -96,6 +96,15 @@ The timeline UI integrates with:
 2. **CalendarManager** - Event CRUD operations (via TimelineManager)
 3. **I18nQtManager** - Multi-language support
 
+### Data Contract
+
+- 搜索模式下，UI 通过调用 `TimelineManager.search_events(..., include_future_auto_tasks=True)`
+  获取结果。返回列表中的未来事件条目将额外携带 `auto_tasks` 字段，其结构与
+  `get_timeline_events()` 中未来事件一致。
+- `auto_tasks` 始终提供完整的自动任务配置（已保存的配置或 `_default_auto_task_config`
+  缺省值），UI 不再直接访问 `_get_auto_task_map()`。
+- 历史事件的返回结构保持不变，不包含 `auto_tasks` 字段。
+
 ## Translation Keys
 
 All UI text is internationalized using the following keys:
