@@ -52,8 +52,8 @@ Built-in audio player for recordings:
 - **Volume control**
 - **Time display** (current/total)
 - **Error handling** for missing or unsupported files
-- **Non-modal dialog windows** that allow multiple recordings to remain open
-  while continuing to browse the timeline
+- **Instant translation refresh** when the application language changes
+
 
 Uses PyQt6's QMediaPlayer and QAudioOutput.
 
@@ -98,6 +98,15 @@ The timeline UI integrates with:
 2. **CalendarManager** - Event CRUD operations (via TimelineManager)
 3. **I18nQtManager** - Multi-language support
 
+### Data Contract
+
+- 搜索模式下，UI 通过调用 `TimelineManager.search_events(..., include_future_auto_tasks=True)`
+  获取结果。返回列表中的未来事件条目将额外携带 `auto_tasks` 字段，其结构与
+  `get_timeline_events()` 中未来事件一致。
+- `auto_tasks` 始终提供完整的自动任务配置（已保存的配置或 `_default_auto_task_config`
+  缺省值），UI 不再直接访问 `_get_auto_task_map()`。
+- 历史事件的返回结构保持不变，不包含 `auto_tasks` 字段。
+
 ## Translation Keys
 
 All UI text is internationalized using the following keys:
@@ -113,6 +122,7 @@ All UI text is internationalized using the following keys:
 - `timeline.play_recording`, `view_transcript`
 - `timeline.no_artifacts`
 - `timeline.audio_player_title`
+- `timeline.audio_player.*` for button labels, tooltips, and volume indicator
 
 ### Transcript
 
