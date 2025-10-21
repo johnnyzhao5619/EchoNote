@@ -219,27 +219,33 @@ class TimelineWidget(QWidget):
         
         return header_layout
     
-    def load_timeline_events(self, reset: bool = True):
+    def load_timeline_events(self, reset: bool = True) -> bool:
         """
         Load timeline events from the manager.
-        
+
         Args:
             reset: If True, reset pagination and clear existing events
+
+        Returns:
+            True if events were refreshed successfully, otherwise False.
         """
         if self.is_loading:
-            return
-        
+            return False
+
+        previous_has_more = self.has_more
+        previous_page = (
+            self.current_page if reset else max(self.current_page - 1, 0)
+        )
+        page_to_load = 0 if reset else self.current_page
+        success = False
+
         try:
             self.is_loading = True
-            
-            if reset:
-                self.current_page = 0
-                self.clear_timeline()
-            
+
             # Get timeline data
             center_time = datetime.now().astimezone()
             center_time_local = to_local_naive(center_time)
-            
+
             if self.current_query:
                 # Search mode
                 results = self.timeline_manager.search_events(
@@ -280,22 +286,24 @@ class TimelineWidget(QWidget):
                     center_time=center_time_local,
                     past_days=30,
                     future_days=30,
-                    page=self.current_page,
+                    page=page_to_load,
                     page_size=self.page_size
                 )
-            
+
             # Update state
             self.has_more = data.get('has_more', False)
-            
-            # Add events to timeline
-            if reset and self.current_page == 0:
+
+            # Clear and rebuild timeline only after data retrieval succeeded
+            if reset and page_to_load == 0:
+                self.clear_timeline()
+
                 # Add future events first
                 for event_data in data['future_events']:
                     self._add_event_card(event_data, is_future=True)
-                
+
                 # Add current time indicator
                 self._add_current_time_indicator()
-                
+
                 # Add past events
                 for event_data in data['past_events']:
                     self._add_event_card(event_data, is_future=False)
@@ -303,16 +311,23 @@ class TimelineWidget(QWidget):
                 # Append more events (pagination)
                 for event_data in data['past_events']:
                     self._add_event_card(event_data, is_future=False)
-            
+
+            self.current_page = page_to_load
+
             logger.debug(
                 f"Loaded timeline events: page {self.current_page}, "
                 f"has_more={self.has_more}"
             )
-            
+
+            success = True
         except Exception as e:
             logger.error(f"Failed to load timeline events: {e}")
+            self.has_more = previous_has_more
+            self.current_page = previous_page
         finally:
             self.is_loading = False
+
+        return success
     
     def _add_current_time_indicator(self):
         """Add current time indicator line to timeline."""
