@@ -2,8 +2,10 @@ import asyncio
 import logging
 import sys
 import types
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
+from uuid import uuid4
 import time
 
 import pytest
@@ -301,6 +303,7 @@ def _ensure_pyqt_stub():
 
 _ensure_pyqt_stub()
 
+import config.app_config as app_config_module
 import core.transcription.manager as transcription_manager_module
 from core.transcription.manager import TranscriptionManager
 from data.database.connection import DatabaseConnection
@@ -536,6 +539,83 @@ def test_successful_process_uses_default_save_path(initialized_db, tmp_path):
 
     refreshed_task = TranscriptionTask.get_by_id(initialized_db, task.id)
     assert refreshed_task is not None
+    assert refreshed_task.output_path == str(expected_output)
+
+
+def test_legacy_task_without_output_format_uses_config_default(
+    initialized_db,
+    tmp_path,
+    monkeypatch,
+):
+    app_dir = tmp_path / "app-data"
+    monkeypatch.setattr(
+        transcription_manager_module,
+        "get_app_dir",
+        lambda: app_dir,
+    )
+    monkeypatch.setattr(
+        app_config_module,
+        "get_app_dir",
+        lambda: app_dir,
+    )
+
+    config_manager = app_config_module.ConfigManager()
+    config_manager.set("transcription.default_output_format", "md")
+    export_dir = tmp_path / "exports"
+    config_manager.set("transcription.default_save_path", str(export_dir))
+
+    engine = SuccessfulSpeechEngine()
+    manager = TranscriptionManager(
+        initialized_db,
+        engine,
+        config=config_manager.get("transcription"),
+    )
+
+    audio_file = tmp_path / "legacy.wav"
+    audio_file.write_bytes(b"legacy-audio")
+
+    task_id = str(uuid4())
+    created_at = datetime.now().isoformat()
+    initialized_db.execute(
+        """
+        INSERT INTO transcription_tasks (
+            id, file_path, file_name, file_size, audio_duration, status, progress,
+            language, engine, output_path, error_message, created_at, started_at, completed_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            task_id,
+            str(audio_file),
+            audio_file.name,
+            audio_file.stat().st_size,
+            None,
+            "pending",
+            0.0,
+            None,
+            engine.get_name(),
+            None,
+            None,
+            created_at,
+            None,
+            None,
+        ),
+        commit=True,
+    )
+
+    asyncio.run(
+        manager._process_task_async(task_id, cancel_event=asyncio.Event())
+    )
+
+    expected_output = (export_dir / f"{audio_file.stem}.md").resolve()
+    assert expected_output.exists()
+
+    with expected_output.open("r", encoding="utf-8") as exported:
+        content = exported.read()
+    assert "hello world" in content
+
+    refreshed_task = TranscriptionTask.get_by_id(initialized_db, task_id)
+    assert refreshed_task is not None
+    assert refreshed_task.output_format == "md"
     assert refreshed_task.output_path == str(expected_output)
 
 
