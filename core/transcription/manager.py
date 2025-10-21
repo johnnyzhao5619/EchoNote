@@ -725,7 +725,9 @@ class TranscriptionManager:
             # Automatically export to default format (TXT)
             # This ensures output_path is set for the viewer
             try:
-                default_format = task.output_format or 'txt'
+                default_format = self._default_output_format
+                if task.output_format:
+                    default_format = task.output_format
 
                 # Generate default output path if not set
                 if not task.output_path:
