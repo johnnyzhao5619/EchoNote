@@ -592,21 +592,39 @@ class TranscriptionManager:
         except Exception as e:
             logger.error(f"Error stopping all tasks: {e}")
     
-    async def _process_task_async(self, task_id: str):
+    async def _process_task_async(
+        self,
+        task_id: str,
+        *,
+        cancel_event: asyncio.Event
+    ):
         """
         Process a single transcription task (async wrapper).
-        
+
         Args:
             task_id: Task identifier
         """
         task: Optional[TranscriptionTask] = None
         try:
+            def ensure_not_cancelled(stage: str) -> None:
+                if cancel_event.is_set():
+                    logger.info(
+                        "Cancellation detected for task %s %s",
+                        task_id,
+                        stage,
+                    )
+                    raise asyncio.CancelledError()
+
+            ensure_not_cancelled("before loading task from database")
+
             # Load task from database
             task = TranscriptionTask.get_by_id(self.db, task_id)
             if not task:
                 logger.error(f"Task {task_id} not found in database")
                 return
-            
+
+            ensure_not_cancelled("after loading task from database")
+
             # Update status to processing
             task.status = "processing"
             task.started_at = datetime.now().isoformat()
@@ -641,58 +659,63 @@ class TranscriptionManager:
             
             # Call speech engine to transcribe with progress callback
             self._update_progress(task_id, 10.0, "Loading audio file")
-            
+
             # Also update database for 10% progress
             task.progress = 10.0
             task.save(self.db)
             logger.info(f"Task {task_id} progress set to 10%, starting transcription")
-            
+
             # Call transcribe_file and log the start
             logger.info(f"Calling speech_engine.transcribe_file for task {task_id}")
+            ensure_not_cancelled("before starting transcription")
             result = await self.speech_engine.transcribe_file(
                 task.file_path,
                 language=task.language,
                 progress_callback=progress_callback
             )
+            ensure_not_cancelled("after completing transcription")
             logger.info(f"Transcription completed for task {task_id}, processing results")
-            
+
             # Extract audio duration if available
             if 'duration' in result:
                 task.audio_duration = result['duration']
-            
+
             # Update progress: saving results
+            ensure_not_cancelled("before saving results")
             self._update_progress(task_id, 90.0, "Saving results")
-            
+
             # Save internal format to file system
             # Note: Storing in file system instead of database to avoid
             # storing large JSON blobs in the database
             internal_format_path = self._get_internal_format_path(task_id)
             internal_format_path_obj = Path(internal_format_path)
             internal_format_path_obj.parent.mkdir(parents=True, exist_ok=True)
-            
+
             # Write with secure permissions
+            ensure_not_cancelled("before writing internal transcript")
             with open(internal_format_path, 'w', encoding='utf-8') as f:
                 json.dump(result, f, ensure_ascii=False, indent=2)
-            
+
             # Set secure file permissions (owner read/write only)
             import os
             try:
                 os.chmod(internal_format_path, 0o600)
             except Exception as e:
                 logger.warning(f"Could not set file permissions: {e}")
-            
+
             # Update task status to completed FIRST
             # (export_result requires status to be "completed")
+            ensure_not_cancelled("before marking task as completed")
             task.status = "completed"
             task.completed_at = datetime.now().isoformat()
             task.progress = 100.0
             task.save(self.db)
-            
+
             # Automatically export to default format (TXT)
             # This ensures output_path is set for the viewer
             try:
                 default_format = task.output_format or 'txt'
-                
+
                 # Generate default output path if not set
                 if not task.output_path:
                     source_path = Path(task.file_path)
@@ -705,6 +728,7 @@ class TranscriptionManager:
                 else:
                     output_path = Path(task.output_path)
 
+                ensure_not_cancelled("before exporting results")
                 self.export_result(
                     task_id,
                     output_format=default_format,
@@ -717,18 +741,55 @@ class TranscriptionManager:
                     exc_info=True
                 )
                 # Continue anyway - the internal format is saved
-            
+
             # Notify progress: completed
             self._update_progress(task_id, 100.0, "Completed")
-            
+
             logger.info(f"Task {task_id} completed successfully")
-            
+
             # Send completion notification
+            ensure_not_cancelled("before sending completion notification")
             self._send_notification(
                 f"Transcription completed: {task.file_name}",
                 "success"
             )
-            
+
+        except asyncio.CancelledError:
+            logger.info(f"Task {task_id} cancellation acknowledged, rolling back state")
+
+            refreshed_task: Optional[TranscriptionTask] = None
+            try:
+                refreshed_task = TranscriptionTask.get_by_id(self.db, task_id)
+            except Exception as fetch_error:
+                logger.error(
+                    f"Failed to reload task {task_id} during cancellation handling: {fetch_error}",
+                    exc_info=True
+                )
+
+            task_for_update = refreshed_task or task
+            progress_value = (
+                task_for_update.progress
+                if task_for_update and task_for_update.progress is not None
+                else (task.progress if task and task.progress is not None else 0.0)
+            )
+
+            if task_for_update:
+                task_for_update.status = "cancelled"
+                task_for_update.completed_at = datetime.now().isoformat()
+                task_for_update.error_message = None
+                if task_for_update.progress is None:
+                    task_for_update.progress = progress_value
+                try:
+                    task_for_update.save(self.db)
+                except Exception as save_error:
+                    logger.error(
+                        f"Failed to record cancellation for task {task_id}: {save_error}",
+                        exc_info=True
+                    )
+
+            self._update_progress(task_id, progress_value, "Cancelled")
+
+            raise
         except Exception as e:
             logger.error(f"Task {task_id} failed: {e}", exc_info=True)
 

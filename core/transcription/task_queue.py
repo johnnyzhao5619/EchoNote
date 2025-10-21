@@ -264,6 +264,7 @@ class TaskQueue:
                     # Execute task function
                     result = await task_info['func'](
                         *task_info['args'],
+                        cancel_event=task_info['cancel_event'],
                         **task_info['kwargs']
                     )
 
