@@ -53,6 +53,8 @@ class AudioPlayer(QWidget):
         
         self.file_path = file_path
         self.i18n = i18n
+        self._initial_time_text = self.i18n.t('timeline.audio_player.initial_time')
+        self._playback_state = QMediaPlayer.PlaybackState.StoppedState
         
         # Media player
         self.player = QMediaPlayer(self)
@@ -65,6 +67,10 @@ class AudioPlayer(QWidget):
 
         # Setup UI
         self.setup_ui()
+
+        # React to language updates
+        self.i18n.language_changed.connect(self.update_translations)
+        self.update_translations()
 
         # Connect player signals
         self.player.positionChanged.connect(self._on_position_changed)
@@ -102,17 +108,13 @@ class AudioPlayer(QWidget):
         
         # Time labels
         time_layout = QHBoxLayout()
-        self.current_time_label = QLabel(
-            self.i18n.t('timeline.audio_player.initial_time')
-        )
+        self.current_time_label = QLabel(self._initial_time_text)
         self.current_time_label.setStyleSheet("color: #666;")
         time_layout.addWidget(self.current_time_label)
         
         time_layout.addStretch()
         
-        self.total_time_label = QLabel(
-            self.i18n.t('timeline.audio_player.initial_time')
-        )
+        self.total_time_label = QLabel(self._initial_time_text)
         self.total_time_label.setStyleSheet("color: #666;")
         time_layout.addWidget(self.total_time_label)
         
@@ -143,8 +145,10 @@ class AudioPlayer(QWidget):
         controls_layout.addWidget(self.play_button)
         
         # Volume label
-        volume_label = QLabel("🔊")
-        controls_layout.addWidget(volume_label)
+        self.volume_label = QLabel(
+            self.i18n.t('timeline.audio_player.volume_icon')
+        )
+        controls_layout.addWidget(self.volume_label)
         
         # Volume slider
         self.volume_slider = QSlider(Qt.Orientation.Horizontal)
@@ -234,17 +238,13 @@ class AudioPlayer(QWidget):
         Args:
             state: New playback state
         """
-        if state == QMediaPlayer.PlaybackState.PlayingState:
-            self.play_button.setText(
-                self.i18n.t('timeline.audio_player.pause_button_label')
-            )
-        else:
-            self.play_button.setText(
-                self.i18n.t('timeline.audio_player.play_button_label')
-            )
+        self._playback_state = state
 
         if state == QMediaPlayer.PlaybackState.StoppedState:
             self._reset_playback_state()
+
+        self.update_translations()
+
 
     def _on_error(self, error: QMediaPlayer.Error, error_string: str):
         """
@@ -311,16 +311,44 @@ class AudioPlayer(QWidget):
         self.progress_slider.blockSignals(True)
         self.progress_slider.setValue(0)
         self.progress_slider.blockSignals(False)
-        initial_time = self.i18n.t('timeline.audio_player.initial_time')
-        self.current_time_label.setText(initial_time)
+        self.current_time_label.setText(self._initial_time_text)
         if reset_total or self.progress_slider.maximum() == 0:
-            self.total_time_label.setText(initial_time)
+            self.total_time_label.setText(self._initial_time_text)
 
     def _set_controls_enabled(self, enabled: bool) -> None:
         """Enable or disable interactive controls based on media readiness."""
         self.play_button.setEnabled(enabled)
         self.progress_slider.setEnabled(enabled)
         self.volume_slider.setEnabled(enabled)
+
+    def update_translations(self):
+        """Refresh translated text and tooltips when the language changes."""
+        self._initial_time_text = self.i18n.t('timeline.audio_player.initial_time')
+
+        if self.progress_slider.value() == 0:
+            self.current_time_label.setText(self._initial_time_text)
+        if self.progress_slider.maximum() == 0:
+            self.total_time_label.setText(self._initial_time_text)
+
+        if self._playback_state == QMediaPlayer.PlaybackState.PlayingState:
+            button_label = self.i18n.t('timeline.audio_player.pause_button_label')
+            button_tooltip = self.i18n.t('timeline.audio_player.pause_tooltip')
+        else:
+            button_label = self.i18n.t('timeline.audio_player.play_button_label')
+            button_tooltip = self.i18n.t('timeline.audio_player.play_tooltip')
+
+        self.play_button.setText(button_label)
+        self.play_button.setToolTip(button_tooltip)
+
+        self.volume_label.setText(
+            self.i18n.t('timeline.audio_player.volume_icon')
+        )
+        self.volume_slider.setToolTip(
+            self.i18n.t('timeline.audio_player.volume_tooltip')
+        )
+        self.progress_slider.setToolTip(
+            self.i18n.t('timeline.audio_player.progress_tooltip')
+        )
 
     def _emit_playback_error(self, translation_key: str, **context):
         """Emit a localized playback error message."""
@@ -358,6 +386,10 @@ class AudioPlayer(QWidget):
         """Clean up resources."""
         self.player.stop()
         self.player.setSource(QUrl())
+        try:
+            self.i18n.language_changed.disconnect(self.update_translations)
+        except (TypeError, RuntimeError):
+            pass
         logger.debug("Audio player cleaned up")
 
 
@@ -400,12 +432,15 @@ class AudioPlayerDialog(QDialog):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
         
-        close_button = QPushButton(i18n.t('common.close'))
-        close_button.clicked.connect(self.close)
-        button_layout.addWidget(close_button)
-        
+        self.close_button = QPushButton(i18n.t('common.close'))
+        self.close_button.clicked.connect(self.close)
+        button_layout.addWidget(self.close_button)
+
         layout.addLayout(button_layout)
-        
+
+        self.i18n.language_changed.connect(self.update_translations)
+        self.update_translations()
+
         logger.info("Audio player dialog initialized")
     
     def _on_playback_error(self, error_msg: str):
@@ -428,3 +463,9 @@ class AudioPlayerDialog(QDialog):
         """Handle dialog close."""
         self.player.cleanup()
         event.accept()
+
+    def update_translations(self):
+        """Refresh dialog-level translations when the language changes."""
+        self.setWindowTitle(self.i18n.t('timeline.audio_player_title'))
+        self.close_button.setText(self.i18n.t('common.close'))
+        self.player.update_translations()

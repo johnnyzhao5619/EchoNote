@@ -52,6 +52,7 @@ Built-in audio player for recordings:
 - **Volume control**
 - **Time display** (current/total)
 - **Error handling** for missing or unsupported files
+- **Instant translation refresh** when the application language changes
 
 Uses PyQt6's QMediaPlayer and QAudioOutput.
 
@@ -120,6 +121,7 @@ All UI text is internationalized using the following keys:
 - `timeline.play_recording`, `view_transcript`
 - `timeline.no_artifacts`
 - `timeline.audio_player_title`
+- `timeline.audio_player.*` for button labels, tooltips, and volume indicator
 
 ### Transcript
 
