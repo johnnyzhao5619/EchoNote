@@ -195,6 +195,7 @@
       "pause_button_label": "⏸",
       "load_failed": "Failed to load audio file: {error}",
       "playback_error": "Playback error: {error}",
+      "invalid_media": "Media format is not supported or the file is corrupted",
       "dialog_error_body": "{message}"
     },
     "snippet": {
