@@ -15,6 +15,9 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 
+from utils.i18n import I18nManager
+
+
 try:
     import numpy as np  # type: ignore
     HAS_NUMPY = True
@@ -1196,3 +1199,150 @@ def test_exports_use_unique_filenames(monkeypatch, tmp_path):
     assert first_markers
     assert second_markers
     assert Path(first_markers).name != Path(second_markers).name
+
+
+def test_create_calendar_event_localized_fields(monkeypatch, tmp_path):
+    from core.realtime.recorder import RealtimeRecorder
+
+    i18n = I18nManager(default_language='fr_FR')
+    created_events = []
+
+    class DummyCalendarEvent:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+            self.id = 'evt-stub'
+            created_events.append(self)
+
+        def save(self, db):  # noqa: ARG002
+            return None
+
+    class DummyAttachment:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+
+        def save(self, db):  # noqa: ARG002
+            return None
+
+    monkeypatch.setattr('data.database.models.CalendarEvent', DummyCalendarEvent)
+    monkeypatch.setattr('data.database.models.EventAttachment', DummyAttachment)
+
+    recorder = RealtimeRecorder(
+        audio_capture=None,
+        speech_engine=DummySpeechEngine(),
+        translation_engine=None,
+        db_connection=object(),
+        file_manager=DummyFileManager(tmp_path),
+        i18n=i18n
+    )
+    recorder.recording_start_time = datetime(2024, 1, 2, 9, 30)
+
+    recording_result = {
+        'start_time': '2024-01-02T09:30:00',
+        'end_time': '2024-01-02T10:00:00',
+        'duration': 42.5,
+        'recording_path': None,
+        'transcript_path': None,
+        'translation_path': None,
+    }
+
+    event_id = asyncio.run(recorder._create_calendar_event(recording_result))
+
+    assert event_id == 'evt-stub'
+    assert created_events, "Calendar event should be created"
+
+    expected_timestamp = recorder.recording_start_time.strftime('%Y-%m-%d %H:%M')
+    expected_title = i18n.t(
+        'realtime_record.calendar_event.title',
+        timestamp=expected_timestamp
+    )
+    expected_description = i18n.t(
+        'realtime_record.calendar_event.description',
+        duration=f"{recording_result['duration']:.2f}"
+    )
+
+    event = created_events[0]
+    assert event.title == expected_title
+    assert event.description == expected_description
+
+
+def test_create_calendar_event_db_missing_warning_localized():
+    from core.realtime.recorder import RealtimeRecorder
+
+    i18n = I18nManager(default_language='en_US')
+    warnings = []
+
+    recorder = RealtimeRecorder(
+        audio_capture=None,
+        speech_engine=DummySpeechEngine(),
+        translation_engine=None,
+        db_connection=None,
+        file_manager=DummyFileManager(),
+        i18n=i18n
+    )
+    recorder.on_error = warnings.append
+    recorder.recording_start_time = datetime(2024, 1, 3, 8, 0)
+
+    recording_result = {
+        'start_time': '2024-01-03T08:00:00',
+        'end_time': '2024-01-03T08:30:00',
+        'duration': 30.0,
+    }
+
+    event_id = asyncio.run(recorder._create_calendar_event(recording_result))
+
+    assert event_id == ""
+    assert warnings
+    expected_warning = i18n.t('realtime_record.calendar_event.db_missing')
+    assert warnings[-1] == expected_warning
+
+
+def test_create_calendar_event_failure_error_localized(monkeypatch, tmp_path):
+    from core.realtime.recorder import RealtimeRecorder
+
+    i18n = I18nManager(default_language='zh_CN')
+    errors = []
+
+    class FailingCalendarEvent:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+            self.id = 'evt-fail'
+
+        def save(self, db):  # noqa: ARG002
+            raise RuntimeError('数据库不可用')
+
+    class DummyAttachment:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+
+        def save(self, db):  # noqa: ARG002
+            return None
+
+    monkeypatch.setattr('data.database.models.CalendarEvent', FailingCalendarEvent)
+    monkeypatch.setattr('data.database.models.EventAttachment', DummyAttachment)
+
+    recorder = RealtimeRecorder(
+        audio_capture=None,
+        speech_engine=DummySpeechEngine(),
+        translation_engine=None,
+        db_connection=object(),
+        file_manager=DummyFileManager(tmp_path),
+        i18n=i18n
+    )
+    recorder.on_error = errors.append
+    recorder.recording_start_time = datetime(2024, 1, 4, 10, 0)
+
+    recording_result = {
+        'start_time': '2024-01-04T10:00:00',
+        'end_time': '2024-01-04T10:45:00',
+        'duration': 45.0,
+    }
+
+    event_id = asyncio.run(recorder._create_calendar_event(recording_result))
+
+    assert event_id == ""
+    assert errors
+    expected_error = i18n.t(
+        'realtime_record.calendar_event.creation_failed',
+        error='数据库不可用'
+    )
+    assert errors[-1] == expected_error

@@ -130,7 +130,7 @@ Manages real-time audio recording, transcription, and translation.
 #### Constructor
 
 ```python
-RealtimeRecorder(audio_capture, speech_engine, translation_engine, db_connection, file_manager)
+RealtimeRecorder(audio_capture, speech_engine, translation_engine, db_connection, file_manager, i18n=None)
 ```
 
 **Parameters:**
@@ -142,6 +142,7 @@ RealtimeRecorder(audio_capture, speech_engine, translation_engine, db_connection
 - `translation_engine` (TranslationEngine, optional): Translation engine
 - `db_connection` (DatabaseConnection): Database connection
 - `file_manager` (FileManager): File manager instance
+- `i18n` (I18nManager, optional): Translation manager used to localize runtime messages
 
 #### Methods
 

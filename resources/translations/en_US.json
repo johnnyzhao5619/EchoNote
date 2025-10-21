@@ -124,6 +124,12 @@
       "success_prefix": "Recording saved",
       "success_detail": "Duration {duration}",
       "success_detail_with_path": "Duration {duration} • Saved to {path}"
+    },
+    "calendar_event": {
+      "title": "Recording session - {timestamp}",
+      "description": "Recording duration: {duration} seconds",
+      "db_missing": "Cannot create calendar event because no database connection is configured. Configure the database to enable calendar integrations.",
+      "creation_failed": "Failed to create calendar event: {error}"
     }
   },
   "calendar_hub": {

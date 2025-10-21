@@ -26,7 +26,7 @@ class RealtimeRecorder:
     """实时录制管理器"""
 
     def __init__(self, audio_capture, speech_engine, translation_engine,
-                 db_connection, file_manager):
+                 db_connection, file_manager, i18n=None):
         """
         初始化实时录制管理器
 
@@ -36,12 +36,14 @@ class RealtimeRecorder:
             translation_engine: TranslationEngine 实例（可选）
             db_connection: 数据库连接
             file_manager: FileManager 实例
+            i18n: 可选的国际化管理器，用于翻译提示文本
         """
         self.audio_capture = audio_capture
         self.speech_engine = speech_engine
         self.translation_engine = translation_engine
         self.db = db_connection
         self.file_manager = file_manager
+        self.i18n = i18n
 
         if self.audio_capture is None:
             logger.warning(
@@ -95,6 +97,22 @@ class RealtimeRecorder:
         self._event_loop = None
 
         logger.info("RealtimeRecorder initialized")
+
+    def _translate(self, key: str, default: str, **kwargs) -> str:
+        """Return localized text for the given key with graceful fallback."""
+        if self.i18n is not None:
+            try:
+                translated = self.i18n.t(key, **kwargs)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Translation lookup failed for %s: %s", key, exc)
+            else:
+                if translated and translated != key:
+                    return translated
+
+        try:
+            return default.format(**kwargs)
+        except Exception:  # noqa: BLE001
+            return default
 
     def audio_input_available(self) -> bool:
         """实时录音输入是否可用。"""
@@ -938,9 +956,12 @@ class RealtimeRecorder:
             str: 事件 ID
         """
         if self.db is None:
-            warning_message = (
-                "Cannot create calendar event because no database connection is configured. "
-                "Configure the database to enable calendar integrations."
+            warning_message = self._translate(
+                'realtime_record.calendar_event.db_missing',
+                (
+                    "Cannot create calendar event because no database connection is configured. "
+                    "Configure the database to enable calendar integrations."
+                ),
             )
             logger.warning(warning_message)
             if self.on_error:
@@ -958,13 +979,28 @@ class RealtimeRecorder:
             from data.database.models import CalendarEvent, EventAttachment
 
             # 创建事件
-            title_time = self.recording_start_time.strftime('%Y-%m-%d %H:%M')
+            start_reference = self.recording_start_time or datetime.now()
+            title_time = start_reference.strftime('%Y-%m-%d %H:%M')
+            duration_value = recording_result.get('duration', 0.0)
+            try:
+                duration_label = f"{float(duration_value):.2f}"
+            except (TypeError, ValueError):
+                duration_label = str(duration_value)
+
             event = CalendarEvent(
-                title=f"录音会话 - {title_time}",
+                title=self._translate(
+                    'realtime_record.calendar_event.title',
+                    '录音会话 - {timestamp}',
+                    timestamp=title_time,
+                ),
                 event_type='Event',
                 start_time=recording_result['start_time'],
                 end_time=recording_result['end_time'],
-                description=f"录制时长: {recording_result['duration']:.2f} 秒",
+                description=self._translate(
+                    'realtime_record.calendar_event.description',
+                    '录制时长: {duration} 秒',
+                    duration=duration_label,
+                ),
                 source='local'
             )
             event.save(self.db)
@@ -1008,9 +1044,14 @@ class RealtimeRecorder:
             return event.id
 
         except Exception as e:
-            logger.error(f"Failed to create calendar event: {e}")
+            error_message = self._translate(
+                'realtime_record.calendar_event.creation_failed',
+                'Failed to create calendar event: {error}',
+                error=str(e)
+            )
+            logger.error(error_message)
             if self.on_error:
-                self.on_error(f"Failed to create calendar event: {e}")
+                self.on_error(error_message)
             return ""
 
     async def get_transcription_stream(self) -> AsyncIterator[str]:
