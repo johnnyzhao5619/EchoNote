@@ -385,7 +385,8 @@ class AudioPlayerDialog(QDialog):
         # Setup dialog
         self.setWindowTitle(i18n.t('timeline.audio_player_title'))
         self.setMinimumWidth(400)
-        self.setModal(False)
+        self.setWindowModality(Qt.WindowModality.NonModal)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         
         # Layout
         layout = QVBoxLayout(self)

@@ -52,6 +52,8 @@ Built-in audio player for recordings:
 - **Volume control**
 - **Time display** (current/total)
 - **Error handling** for missing or unsupported files
+- **Non-modal dialog windows** that allow multiple recordings to remain open
+  while continuing to browse the timeline
 
 Uses PyQt6's QMediaPlayer and QAudioOutput.
 
