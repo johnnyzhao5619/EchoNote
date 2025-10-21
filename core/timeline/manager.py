@@ -17,6 +17,10 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 logger = logging.getLogger('echonote.timeline.manager')
 
 
+_DEFAULT_TRANSCRIPT_CANDIDATE_WINDOW_DAYS = 30
+_MAX_TRANSCRIPT_CANDIDATES = 200
+
+
 def to_local_naive(value: Union[datetime, str]) -> datetime:
     """Convert datetime/ISO string to local-time naive datetime."""
     if isinstance(value, str):
@@ -448,6 +452,8 @@ class TimelineManager:
         try:
             filters = filters or {}
 
+            query_lower = query.lower() if query else ''
+
             start_dt = (
                 to_local_naive(filters['start_date'])
                 if filters.get('start_date') else
@@ -520,26 +526,22 @@ class TimelineManager:
 
                 return False
 
-            should_expand_candidates = bool(
-                query and (
-                    filters.get('start_date') or
-                    filters.get('end_date') or
-                    filters.get('event_type') or
-                    filters.get('source') or
-                    filters.get('attendees')
-                )
-            )
-
-            if should_expand_candidates:
+            if query:
                 candidate_filters = {
                     key: filters[key]
                     for key in ('event_type', 'source')
                     if filters.get(key)
                 }
 
+                candidate_start_dt, candidate_end_dt = self._resolve_transcript_candidate_range(
+                    start_dt,
+                    end_dt,
+                    filters,
+                )
+
                 candidate_events = self.calendar_manager.get_events(
-                    start_iso,
-                    end_iso,
+                    candidate_start_dt.isoformat(),
+                    candidate_end_dt.isoformat(),
                     filters=candidate_filters or None
                 ) or []
 
@@ -550,6 +552,8 @@ class TimelineManager:
                     if not _passes_filters(candidate):
                         continue
                     additional_events.append(candidate)
+                    if len(additional_events) >= _MAX_TRANSCRIPT_CANDIDATES:
+                        break
 
                 if additional_events:
                     attachments_map = self._get_attachments_map(
@@ -557,7 +561,6 @@ class TimelineManager:
                         attachments_map,
                     )
 
-                    query_lower = query.lower()
                     for candidate in additional_events:
                         attachments = attachments_map.get(candidate.id, [])
                         if _attachments_contain_query(attachments, query_lower):
@@ -765,3 +768,33 @@ class TimelineManager:
     ) -> Optional[str]:
         """Compatibility wrapper for older callers."""
         return self.get_search_snippet(event, query)
+
+    def _resolve_transcript_candidate_range(
+        self,
+        start_dt: datetime,
+        end_dt: datetime,
+        filters: Dict[str, Any]
+    ) -> tuple[datetime, datetime]:
+        """Determine a bounded range for transcript candidate expansion."""
+        window = timedelta(days=_DEFAULT_TRANSCRIPT_CANDIDATE_WINDOW_DAYS)
+        has_start = bool(filters.get('start_date'))
+        has_end = bool(filters.get('end_date'))
+
+        if has_start and has_end:
+            candidate_start = start_dt
+            candidate_end = end_dt
+        elif has_start:
+            candidate_start = start_dt
+            candidate_end = start_dt + window
+        elif has_end:
+            candidate_end = end_dt
+            candidate_start = end_dt - window
+        else:
+            midpoint = datetime.now()
+            candidate_start = midpoint - window
+            candidate_end = midpoint + window
+
+        if candidate_end < candidate_start:
+            candidate_start, candidate_end = candidate_end, candidate_start
+
+        return candidate_start, candidate_end
