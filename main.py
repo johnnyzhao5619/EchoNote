@@ -488,7 +488,8 @@ def main():
             speech_engine=managers['speech_engine'],
             translation_engine=managers['translation_engine'],
             db_connection=db,
-            file_manager=file_manager
+            file_manager=file_manager,
+            i18n=i18n
         )
         managers['realtime_recorder'] = realtime_recorder
         logger.info("Realtime recorder initialized")

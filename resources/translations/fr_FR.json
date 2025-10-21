@@ -124,6 +124,12 @@
       "success_prefix": "Enregistrement sauvegardé",
       "success_detail": "Durée {duration}",
       "success_detail_with_path": "Durée {duration} • Enregistré dans {path}"
+    },
+    "calendar_event": {
+      "title": "Session d'enregistrement - {timestamp}",
+      "description": "Durée de l'enregistrement : {duration} secondes",
+      "db_missing": "Impossible de créer l'événement calendrier car aucune connexion à la base de données n'est configurée. Configurez la base de données pour activer l'intégration au calendrier.",
+      "creation_failed": "Échec de la création de l'événement calendrier : {error}"
     }
   },
   "calendar_hub": {

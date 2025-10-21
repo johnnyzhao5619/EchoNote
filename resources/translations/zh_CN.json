@@ -124,6 +124,12 @@
       "success_prefix": "录制完成",
       "success_detail": "时长 {duration}",
       "success_detail_with_path": "时长 {duration} • 保存至 {path}"
+    },
+    "calendar_event": {
+      "title": "录音会话 - {timestamp}",
+      "description": "录制时长: {duration} 秒",
+      "db_missing": "未配置数据库连接，无法创建日历事件。请配置数据库以启用日历集成功能。",
+      "creation_failed": "创建日历事件失败：{error}"
     }
   },
   "calendar_hub": {
