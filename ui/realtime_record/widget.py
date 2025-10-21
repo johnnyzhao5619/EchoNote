@@ -58,6 +58,14 @@ class RealtimeRecorderSignals(QObject):
 class RealtimeRecordWidget(QWidget):
     """实时录制主界面"""
 
+    LANGUAGE_OPTIONS = [
+        ("zh", "realtime_record.available_languages.zh"),
+        ("en", "realtime_record.available_languages.en"),
+        ("fr", "realtime_record.available_languages.fr"),
+        ("ja", "realtime_record.available_languages.ja"),
+        ("ko", "realtime_record.available_languages.ko"),
+    ]
+
     def __init__(
         self,
         recorder,
@@ -394,11 +402,8 @@ class RealtimeRecordWidget(QWidget):
         self.source_lang_combo = QComboBox()
         self.source_lang_combo.setMinimumWidth(120)
         self.source_lang_combo.setMaximumWidth(150)
-        self.source_lang_combo.addItem("中文", "zh")
-        self.source_lang_combo.addItem("English", "en")
-        self.source_lang_combo.addItem("Français", "fr")
-        self.source_lang_combo.addItem("日本語", "ja")
-        self.source_lang_combo.addItem("한국어", "ko")
+        for code, label_key in self.LANGUAGE_OPTIONS:
+            self.source_lang_combo.addItem(self.i18n.t(label_key), code)
         layout.addWidget(self.source_lang_combo)
 
         layout.addSpacing(20)
@@ -414,11 +419,11 @@ class RealtimeRecordWidget(QWidget):
         
         # 检查翻译引擎是否可用
         if not self.recorder.translation_engine:
+            tooltip = self.i18n.t("realtime_record.translation_disabled_tooltip")
             self.enable_translation_checkbox.setEnabled(False)
-            self.enable_translation_checkbox.setToolTip(
-                "Translation not available: No API key configured. "
-                "Please configure Google Translate API key in Settings."
-            )
+            self.enable_translation_checkbox.setToolTip(tooltip)
+        else:
+            self.enable_translation_checkbox.setToolTip("")
         
         layout.addWidget(self.enable_translation_checkbox)
 
@@ -433,19 +438,17 @@ class RealtimeRecordWidget(QWidget):
         self.target_lang_combo = QComboBox()
         self.target_lang_combo.setMinimumWidth(120)
         self.target_lang_combo.setMaximumWidth(150)
-        self.target_lang_combo.addItem("English", "en")
-        self.target_lang_combo.addItem("中文", "zh")
-        self.target_lang_combo.addItem("Français", "fr")
-        self.target_lang_combo.addItem("日本語", "ja")
-        self.target_lang_combo.addItem("한국어", "ko")
+        for code, label_key in self.LANGUAGE_OPTIONS:
+            self.target_lang_combo.addItem(self.i18n.t(label_key), code)
         # 默认禁用，只有勾选翻译复选框时才启用
         self.target_lang_combo.setEnabled(False)
-        
+
         # 如果翻译引擎不可用，也禁用目标语言选择
         if not self.recorder.translation_engine:
-            self.target_lang_combo.setToolTip(
-                "Translation not available: No API key configured"
-            )
+            tooltip = self.i18n.t("realtime_record.translation_disabled_tooltip")
+            self.target_lang_combo.setToolTip(tooltip)
+        else:
+            self.target_lang_combo.setToolTip("")
         
         layout.addWidget(self.target_lang_combo)
 
@@ -854,12 +857,40 @@ class RealtimeRecordWidget(QWidget):
                 self.i18n.t("realtime_record.target_language") + ":"
             )
 
+        if hasattr(self, 'source_lang_combo'):
+            for index, (_, label_key) in enumerate(self.LANGUAGE_OPTIONS):
+                if index < self.source_lang_combo.count():
+                    self.source_lang_combo.setItemText(
+                        index, self.i18n.t(label_key)
+                    )
+
+        if hasattr(self, 'target_lang_combo'):
+            for index, (_, label_key) in enumerate(self.LANGUAGE_OPTIONS):
+                if index < self.target_lang_combo.count():
+                    self.target_lang_combo.setItemText(
+                        index, self.i18n.t(label_key)
+                    )
+
         enable_translation_checkbox = self.findChild(
             QCheckBox, "enable_translation_checkbox"
         )
         if enable_translation_checkbox:
             text = self.i18n.t("realtime_record.enable_translation")
             enable_translation_checkbox.setText(text)
+            translation_tooltip = ""
+            if not self.recorder.translation_engine:
+                translation_tooltip = self.i18n.t(
+                    "realtime_record.translation_disabled_tooltip"
+                )
+            enable_translation_checkbox.setToolTip(translation_tooltip)
+
+        if hasattr(self, 'target_lang_combo'):
+            translation_tooltip = ""
+            if not self.recorder.translation_engine:
+                translation_tooltip = self.i18n.t(
+                    "realtime_record.translation_disabled_tooltip"
+                )
+            self.target_lang_combo.setToolTip(translation_tooltip)
 
         # 控制组
         control_group = self.findChild(QGroupBox, "control_group")
@@ -1234,8 +1265,9 @@ class RealtimeRecordWidget(QWidget):
         import asyncio
 
         if self._async_loop is None:
-            logger.error("Async event loop not initialized")
-            self.signals.error_occurred.emit("Async event loop not initialized")
+            message = self.i18n.t("realtime_record.async_loop_unavailable")
+            logger.error(message)
+            self.signals.error_occurred.emit(message)
             return
 
         # 在专用事件循环中调度任务
@@ -1355,8 +1387,11 @@ class RealtimeRecordWidget(QWidget):
             logger.info("Recording started")
 
         except Exception as e:
-            logger.error(f"Failed to start recording: {e}", exc_info=True)
-            self.signals.error_occurred.emit(f"Failed to start recording: {e}")
+            error_message = self.i18n.t(
+                "realtime_record.start_failed", error=str(e)
+            )
+            logger.error(error_message, exc_info=True)
+            self.signals.error_occurred.emit(error_message)
 
     async def _stop_recording(self):
         """停止录制"""
@@ -1372,8 +1407,11 @@ class RealtimeRecordWidget(QWidget):
             self.signals.recording_succeeded.emit(result or {})
 
         except Exception as e:
-            logger.error(f"Failed to stop recording: {e}", exc_info=True)
-            self.signals.error_occurred.emit(f"Failed to stop recording: {e}")
+            error_message = self.i18n.t(
+                "realtime_record.stop_failed", error=str(e)
+            )
+            logger.error(error_message, exc_info=True)
+            self.signals.error_occurred.emit(error_message)
 
     def _on_recording_succeeded(self, result: Dict):
         """录制成功后的反馈展示（主线程）。"""
@@ -1429,9 +1467,9 @@ class RealtimeRecordWidget(QWidget):
         # 打开文件保存对话框
         file_path, _ = QFileDialog.getSaveFileName(
             self,
-            "Export Transcription",
+            self.i18n.t("realtime_record.export_transcription_title"),
             "",
-            "Text Files (*.txt);;Markdown Files (*.md);;All Files (*)"
+            self.i18n.t("realtime_record.export_file_filter")
         )
 
         if file_path:
@@ -1441,7 +1479,9 @@ class RealtimeRecordWidget(QWidget):
                 logger.info(f"Transcription exported to {file_path}")
             except Exception as e:
                 logger.error(f"Failed to export transcription: {e}")
-                self._show_error(f"Failed to export: {e}")
+                self._show_error(
+                    self.i18n.t("realtime_record.export_failed", error=str(e))
+                )
 
     def _export_translation(self):
         """导出翻译文本"""
@@ -1457,9 +1497,9 @@ class RealtimeRecordWidget(QWidget):
         # 打开文件保存对话框
         file_path, _ = QFileDialog.getSaveFileName(
             self,
-            "Export Translation",
+            self.i18n.t("realtime_record.export_translation_title"),
             "",
-            "Text Files (*.txt);;Markdown Files (*.md);;All Files (*)"
+            self.i18n.t("realtime_record.export_file_filter")
         )
 
         if file_path:
@@ -1469,7 +1509,9 @@ class RealtimeRecordWidget(QWidget):
                 logger.info(f"Translation exported to {file_path}")
             except Exception as e:
                 logger.error(f"Failed to export translation: {e}")
-                self._show_error(f"Failed to export: {e}")
+                self._show_error(
+                    self.i18n.t("realtime_record.export_failed", error=str(e))
+                )
 
     def _save_recording(self):
         """保存录音"""
