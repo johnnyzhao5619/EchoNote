@@ -63,6 +63,13 @@
       "view": "View",
       "export": "Export"
     },
+    "info": {
+      "size": "Size: {size}",
+      "duration": "Duration: {duration}",
+      "language": "Language: {language}",
+      "unknown": "Unknown",
+      "error": "Error: {error}"
+    },
     "export_success": "Exported to: {path}",
     "feedback": {
       "paused": "Batch transcription paused.",
