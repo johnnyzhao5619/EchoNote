@@ -154,21 +154,29 @@ class TimelineManager:
             past_events = []
             future_event_ids: List[str] = []
             future_event_items: List[CalendarEvent] = []
+            past_event_ids: List[str] = []
+            past_event_items: List[CalendarEvent] = []
 
             for event in all_events:
                 event_start = to_local_naive(event.start_time)
 
                 if event_start < center_time_local:
-                    # Past event - get artifacts
-                    artifacts = self.get_event_artifacts(event.id)
-                    past_events.append({
-                        'event': event,
-                        'artifacts': artifacts
-                    })
+                    past_event_items.append(event)
+                    past_event_ids.append(event.id)
                 else:
                     # Future event - collect for batch auto-task lookup
                     future_event_ids.append(event.id)
                     future_event_items.append(event)
+
+            attachments_map = self._get_attachments_map(past_event_ids)
+
+            for event in past_event_items:
+                attachments = attachments_map.get(event.id, [])
+                artifacts = self._build_artifacts_from_attachments(attachments)
+                past_events.append({
+                    'event': event,
+                    'artifacts': artifacts
+                })
 
             auto_task_map = self._get_auto_task_map(future_event_ids)
 
@@ -334,6 +342,24 @@ class TimelineManager:
             'translation_target_language': None,
         }
 
+    def _get_attachments_map(
+        self,
+        event_ids: List[str]
+    ) -> Dict[str, List[EventAttachment]]:
+        """Fetch attachments for multiple events in a single query."""
+        try:
+            if not event_ids:
+                return {}
+
+            return EventAttachment.get_by_event_ids(self.db, event_ids)
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.error(
+                "Failed to get attachments for events %s: %s",
+                event_ids,
+                exc,
+            )
+            return {}
+
     def _get_auto_task_map(
         self,
         event_ids: List[str]
@@ -434,8 +460,7 @@ class TimelineManager:
 
             attachments_map: Dict[str, List[EventAttachment]] = {}
             if events:
-                attachments_map = EventAttachment.get_by_event_ids(
-                    self.db,
+                attachments_map = self._get_attachments_map(
                     [event.id for event in events]
                 )
 
@@ -516,10 +541,8 @@ class TimelineManager:
             - attachments: List of all attachments
         """
         try:
-            attachments = EventAttachment.get_by_event_id(
-                self.db, event_id
-            )
-
+            attachments_map = self._get_attachments_map([event_id])
+            attachments = attachments_map.get(event_id, [])
             return self._build_artifacts_from_attachments(attachments)
 
         except Exception as e:
