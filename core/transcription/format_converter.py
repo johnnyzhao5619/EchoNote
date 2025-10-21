@@ -103,21 +103,23 @@ class FormatConverter:
         """
         srt_blocks = []
         
-        for index, segment in enumerate(segments, start=1):
+        subtitle_index = 1
+        for segment in segments:
             text = segment.get('text', '').strip()
             if not text:
                 continue
-            
+
             start_time = segment.get('start', 0.0)
             end_time = segment.get('end', 0.0)
-            
+
             # Format timestamps
             start_ts = self._format_timestamp_srt(start_time)
             end_ts = self._format_timestamp_srt(end_time)
-            
+
             # Build SRT block
-            srt_block = f"{index}\n{start_ts} --> {end_ts}\n{text}\n"
+            srt_block = f"{subtitle_index}\n{start_ts} --> {end_ts}\n{text}\n"
             srt_blocks.append(srt_block)
+            subtitle_index += 1
         
         result = '\n'.join(srt_blocks)
         logger.debug(f"Converted to SRT format: {len(srt_blocks)} subtitles")
