@@ -347,7 +347,7 @@ class TaskItem(QWidget):
             info_parts.append(
                 self.i18n.t(
                     'batch_transcribe.info.size',
-                    {'size': f"{size_mb:.1f} MB"}
+                    size=f"{size_mb:.1f} MB"
                 )
             )
 
@@ -358,7 +358,7 @@ class TaskItem(QWidget):
             info_parts.append(
                 self.i18n.t(
                     'batch_transcribe.info.duration',
-                    {'duration': f"{minutes}:{seconds:02d}"}
+                    duration=f"{minutes}:{seconds:02d}"
                 )
             )
 
@@ -367,7 +367,7 @@ class TaskItem(QWidget):
             info_parts.append(
                 self.i18n.t(
                     'batch_transcribe.info.language',
-                    {'language': language}
+                    language=language
                 )
             )
 
@@ -381,7 +381,7 @@ class TaskItem(QWidget):
             self.error_label.setText(
                 self.i18n.t(
                     'batch_transcribe.info.error',
-                    {'error': error_msg}
+                    error=error_msg
                 )
             )
             self.error_label.setVisible(True)
