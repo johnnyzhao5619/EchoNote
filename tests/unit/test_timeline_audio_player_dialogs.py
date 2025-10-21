@@ -4,7 +4,7 @@ import pytest
 
 PyQt6 = pytest.importorskip("PyQt6")
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QApplication, QDialog
+from PyQt6.QtWidgets import QApplication, QDialog, QWidget
 
 from ui.timeline.widget import TimelineWidget
 from utils.i18n import I18nQtManager
@@ -41,6 +41,8 @@ def qapp():
 
 
 class _DummyAudioDialog(QDialog):
+    delete_on_close = True
+
     def __init__(self, file_path, _i18n, parent=None):
         super().__init__(parent)
         self.file_path = file_path
@@ -48,7 +50,10 @@ class _DummyAudioDialog(QDialog):
         self.raise_count = 0
         self.activate_count = 0
         self.setWindowModality(Qt.WindowModality.NonModal)
-        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
+        self.setAttribute(
+            Qt.WidgetAttribute.WA_DeleteOnClose,
+            self.delete_on_close,
+        )
 
     def show(self):
         self.show_count += 1
@@ -61,6 +66,20 @@ class _DummyAudioDialog(QDialog):
     def activateWindow(self):  # noqa: N802 - Qt API name
         self.activate_count += 1
         super().activateWindow()
+
+
+class _StubAudioPlayer(QWidget):
+    """Minimal QWidget replacement for the audio player used in dialog tests."""
+
+    def __init__(self, *_args, parent=None, **_kwargs):
+        super().__init__(parent)
+        self.cleanup_calls = 0
+
+    def cleanup(self):
+        self.cleanup_calls += 1
+
+    def update_translations(self):
+        return None
 
 
 def test_audio_dialogs_remain_non_modal_and_cached(monkeypatch, qapp, tmp_path):
@@ -138,5 +157,47 @@ def test_transcript_dialogs_are_non_modal_and_cached(monkeypatch, qapp, tmp_path
 
         assert str(transcript_path) not in widget._text_viewer_dialogs
     finally:
+        widget.deleteLater()
+        qapp.processEvents()
+
+
+def test_audio_dialog_cleanup_via_finished_signal(monkeypatch, qapp, tmp_path):
+    monkeypatch.setattr(
+        "ui.timeline.widget.QTimer.singleShot",
+        staticmethod(lambda *_: None),
+    )
+    monkeypatch.setattr(
+        "ui.timeline.audio_player.AudioPlayer",
+        _StubAudioPlayer,
+    )
+
+    i18n = I18nQtManager(default_language="en_US")
+    widget = TimelineWidget(DummyTimelineManager(), i18n)
+    dialog = None
+
+    try:
+        file_path = tmp_path / "recording.wav"
+        widget._on_view_recording(str(file_path))
+        dialog = widget._audio_player_dialogs[str(file_path)]
+
+        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
+        assert not dialog.testAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+
+        finished_results = []
+        destroyed_emissions = []
+
+        dialog.finished.connect(lambda result: finished_results.append(result))
+        dialog.destroyed.connect(lambda *_: destroyed_emissions.append(True))
+
+        dialog.close_button.click()
+        qapp.processEvents()
+
+        assert finished_results, "close button should emit finished()"
+        assert not destroyed_emissions, "cleanup should not rely on destroyed()"
+        assert dialog.player.cleanup_calls == 1
+        assert str(file_path) not in widget._audio_player_dialogs
+    finally:
+        if dialog is not None:
+            dialog.deleteLater()
         widget.deleteLater()
         qapp.processEvents()
