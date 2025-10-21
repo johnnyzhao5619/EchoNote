@@ -242,13 +242,13 @@ class TimelineWidget(QWidget):
                 # Search mode
                 results = self.timeline_manager.search_events(
                     self.current_query,
-                    self.current_filters
+                    self.current_filters,
+                    include_future_auto_tasks=True,
                 )
-                
+
                 # Separate past and future
                 past_events: List[Dict[str, Any]] = []
-                future_events_pending: List[Dict[str, Any]] = []
-                future_event_ids: List[str] = []
+                future_events: List[Dict[str, Any]] = []
 
                 for result in results:
                     event = result['event']
@@ -257,21 +257,11 @@ class TimelineWidget(QWidget):
                     if event_start < center_time_local:
                         past_events.append(result)
                     else:
-                        future_events_pending.append(result)
-                        future_event_ids.append(event.id)
+                        future_events.append({
+                            'event': event,
+                            'auto_tasks': result['auto_tasks']
+                        })
 
-                auto_task_map = self.timeline_manager._get_auto_task_map(
-                    future_event_ids
-                )
-
-                future_events = []
-                for result in future_events_pending:
-                    event = result['event']
-                    future_events.append({
-                        'event': event,
-                        'auto_tasks': auto_task_map.get(event.id, {})
-                    })
-                
                 data = {
                     'current_time': center_time_local.isoformat(),
                     'past_events': past_events,

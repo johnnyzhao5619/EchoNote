@@ -4,6 +4,7 @@ import logging
 import sys
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
+from typing import List
 
 import pytest
 from types import SimpleNamespace
@@ -659,6 +660,76 @@ def test_search_events_batches_attachment_lookup(monkeypatch, tmp_path):
     assert results_by_id[event_two.id]['artifacts']['transcript'] is None
     assert results_by_id[event_one.id]['match_snippet'] is not None
     assert 'notes' in results_by_id[event_one.id]['match_snippet'].lower()
+
+
+def test_search_events_future_auto_tasks(monkeypatch):
+    past_event = CalendarEvent(
+        id='past-event',
+        title='Weekly Recap',
+        start_time=iso_z(datetime(2024, 1, 5, 10, 0, tzinfo=timezone.utc)),
+        end_time=iso_z(datetime(2024, 1, 5, 11, 0, tzinfo=timezone.utc)),
+    )
+    configured_future = CalendarEvent(
+        id='configured-future',
+        title='Roadmap Review',
+        start_time='2099-03-15T09:00:00Z',
+        end_time='2099-03-15T10:00:00Z',
+    )
+    default_future = CalendarEvent(
+        id='default-future',
+        title='Planning Session',
+        start_time='2099-03-20T09:00:00Z',
+        end_time='2099-03-20T10:00:00Z',
+    )
+
+    events = [past_event, configured_future, default_future]
+
+    class AutoTaskAwareManager(TimelineManager):
+        def __init__(self, calendar_manager, db_connection):
+            super().__init__(calendar_manager, db_connection)
+            self.auto_task_calls: List[List[str]] = []
+
+        def _get_auto_task_map(self, event_ids):  # noqa: D401
+            self.auto_task_calls.append(list(event_ids))
+            return {
+                'configured-future': {'enable_transcription': True}
+            }
+
+    manager = AutoTaskAwareManager(
+        calendar_manager=DummyCalendarManager(events),
+        db_connection=NOOP_DB,
+    )
+
+    monkeypatch.setattr(
+        CalendarEvent,
+        'search',
+        staticmethod(lambda db, keyword=None, event_type=None, source=None: events),
+    )
+    monkeypatch.setattr(
+        EventAttachment,
+        'get_by_event_ids',
+        staticmethod(lambda db, event_ids: {}),
+    )
+
+    results = manager.search_events(
+        query='Review',
+        include_future_auto_tasks=True,
+    )
+
+    assert manager.auto_task_calls == [[
+        configured_future.id,
+        default_future.id,
+    ]]
+
+    results_by_id = {item['event'].id: item for item in results}
+
+    assert 'auto_tasks' not in results_by_id[past_event.id]
+    assert results_by_id[configured_future.id]['auto_tasks'] == {
+        'enable_transcription': True
+    }
+    assert results_by_id[default_future.id]['auto_tasks'] == (
+        manager._default_auto_task_config()
+    )
 
 
 def test_search_events_returns_transcript_only_hits(monkeypatch, tmp_path):

@@ -431,7 +431,9 @@ class TimelineManager:
     def search_events(
         self,
         query: str,
-        filters: Optional[Dict[str, Any]] = None
+        filters: Optional[Dict[str, Any]] = None,
+        *,
+        include_future_auto_tasks: bool = False,
     ) -> List[Dict[str, Any]]:
         """
         Search events by keyword and filters.
@@ -446,7 +448,10 @@ class TimelineManager:
                 - source: Event source filter
 
         Returns:
-            List of dictionaries containing event and artifacts
+            List of dictionaries containing event and artifacts. When
+            ``include_future_auto_tasks`` is ``True`` the dictionaries for
+            future events (relative to the current local time) also include an
+            ``auto_tasks`` key matching the ``get_timeline_events`` contract.
         """
         try:
             filters = filters or {}
@@ -565,11 +570,19 @@ class TimelineManager:
                             attachments_map.setdefault(candidate.id, attachments)
 
             # Build result with artifacts
+            future_reference_time = (
+                to_local_naive(datetime.now().astimezone())
+                if include_future_auto_tasks
+                else None
+            )
+            future_event_items: Dict[str, Dict[str, Any]] = {}
+            future_event_ids: List[str] = []
+
             results = []
             for event in events:
                 attachments = attachments_map.get(event.id, [])
                 artifacts = self._build_artifacts_from_attachments(attachments)
-                results.append({
+                result_item = {
                     'event': event,
                     'artifacts': artifacts,
                     'match_snippet': self.get_search_snippet(
@@ -577,7 +590,28 @@ class TimelineManager:
                         query,
                         attachments
                     )
-                })
+                }
+
+                if (
+                    include_future_auto_tasks
+                    and future_reference_time is not None
+                ):
+                    event_start = to_local_naive(event.start_time)
+                    if event_start >= future_reference_time:
+                        future_event_items[event.id] = result_item
+                        future_event_ids.append(event.id)
+
+                results.append(result_item)
+
+            if include_future_auto_tasks and future_event_ids:
+                auto_task_map = self._get_auto_task_map(future_event_ids)
+                for event_id in future_event_ids:
+                    config = auto_task_map.get(event_id)
+                    if config is None:
+                        config = self._default_auto_task_config()
+                    else:
+                        config = dict(config)
+                    future_event_items[event_id]['auto_tasks'] = config
 
             logger.debug(
                 f"Search found {len(results)} events for query: {query}"
