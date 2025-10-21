@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -6,6 +6,9 @@ PyQt6 = pytest.importorskip("PyQt6")
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication, QDialog, QWidget
 
+from data.database.models import CalendarEvent
+
+from ui.timeline.event_card import CurrentTimeIndicator
 from ui.timeline.widget import TimelineWidget
 from utils.i18n import I18nQtManager
 
@@ -80,6 +83,55 @@ class _StubAudioPlayer(QWidget):
 
     def update_translations(self):
         return None
+
+
+def test_future_event_order_keeps_nearest_next_to_indicator(monkeypatch, qapp):
+    monkeypatch.setattr(
+        "ui.timeline.widget.QTimer.singleShot",
+        staticmethod(lambda *_: None),
+    )
+
+    now = datetime.now().astimezone()
+    soon_event = CalendarEvent(
+        id="event-soon",
+        title="Soon meeting",
+        start_time=(now + timedelta(minutes=15)).isoformat(),
+        end_time=(now + timedelta(minutes=45)).isoformat(),
+    )
+    later_event = CalendarEvent(
+        id="event-later",
+        title="Later meeting",
+        start_time=(now + timedelta(minutes=90)).isoformat(),
+        end_time=(now + timedelta(minutes=120)).isoformat(),
+    )
+
+    class SearchTimelineManager(DummyTimelineManager):
+        def search_events(self, *_args, **_kwargs):
+            return [
+                {"event": later_event, "auto_tasks": {}},
+                {"event": soon_event, "auto_tasks": {}},
+            ]
+
+    i18n = I18nQtManager(default_language="en_US")
+    widget = TimelineWidget(SearchTimelineManager(), i18n)
+
+    try:
+        widget.current_query = "meeting"
+        widget.load_timeline_events(reset=True)
+
+        indicator_index = next(
+            i for i, card in enumerate(widget.event_cards)
+            if isinstance(card, CurrentTimeIndicator)
+        )
+
+        assert indicator_index > 0, "indicator should follow future events"
+
+        nearest_card = widget.event_cards[indicator_index - 1]
+        assert getattr(nearest_card, "is_future", False)
+        assert nearest_card.event.id == soon_event.id
+    finally:
+        widget.deleteLater()
+        qapp.processEvents()
 
 
 def test_audio_dialogs_remain_non_modal_and_cached(monkeypatch, qapp, tmp_path):

@@ -264,6 +264,10 @@ class TimelineWidget(QWidget):
                             'auto_tasks': result['auto_tasks']
                         })
 
+                future_events.sort(
+                    key=lambda item: to_local_naive(item['event'].start_time)
+                )
+
                 data = {
                     'current_time': center_time_local.isoformat(),
                     'past_events': past_events,
@@ -286,7 +290,7 @@ class TimelineWidget(QWidget):
             # Add events to timeline
             if reset and self.current_page == 0:
                 # Add future events first
-                for event_data in reversed(data['future_events']):
+                for event_data in data['future_events']:
                     self._add_event_card(event_data, is_future=True)
                 
                 # Add current time indicator
@@ -347,15 +351,19 @@ class TimelineWidget(QWidget):
         
         # Insert card at appropriate position
         if is_future:
-            # Future events go at the top
-            insert_pos = 0
+            # Future events stay grouped above the current time indicator.
+            new_start = to_local_naive(card.event.start_time)
+            insert_pos = len(self.event_cards)
             for i, existing_card in enumerate(self.event_cards):
                 if not getattr(existing_card, 'is_future', False):
                     insert_pos = i
                     break
-            else:
-                insert_pos = len(self.event_cards)
-            
+
+                existing_start = to_local_naive(existing_card.event.start_time)
+                if existing_start <= new_start:
+                    insert_pos = i
+                    break
+
             self.timeline_layout.insertWidget(insert_pos, card)
             self.event_cards.insert(insert_pos, card)
         else:
