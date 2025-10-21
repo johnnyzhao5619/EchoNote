@@ -63,6 +63,13 @@
       "view": "Voir",
       "export": "Exporter"
     },
+    "info": {
+      "size": "Taille : {size}",
+      "duration": "Durée : {duration}",
+      "language": "Langue : {language}",
+      "unknown": "Inconnu",
+      "error": "Erreur : {error}"
+    },
     "export_success": "Exporté vers : {path}",
     "feedback": {
       "paused": "Transcription par lots en pause.",

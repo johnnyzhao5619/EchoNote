@@ -249,8 +249,11 @@ class TaskItem(QWidget):
                 self.i18n.t('batch_transcribe.actions.retry')
             )
 
-            # Update status label
+            # Update textual elements that depend on translations
             self._update_status_label()
+            self._update_filename_label()
+            self._update_info_label()
+            self._update_error_label()
 
             logger.debug("Task item translations updated")
 
@@ -267,32 +270,10 @@ class TaskItem(QWidget):
         """Update display based on current task data."""
         try:
             # Update filename
-            self.filename_label.setText(
-                f"📄 {self.task_data.get('file_name', 'Unknown')}"
-            )
+            self._update_filename_label()
 
             # Update info
-            info_parts = []
-
-            # File size
-            file_size = self.task_data.get('file_size')
-            if file_size:
-                size_mb = file_size / (1024 * 1024)
-                info_parts.append(f"Size: {size_mb:.1f} MB")
-
-            # Duration
-            duration = self.task_data.get('audio_duration')
-            if duration:
-                minutes = int(duration // 60)
-                seconds = int(duration % 60)
-                info_parts.append(f"Duration: {minutes}:{seconds:02d}")
-
-            # Language
-            language = self.task_data.get('language')
-            if language:
-                info_parts.append(f"Language: {language}")
-
-            self.info_label.setText(" | ".join(info_parts))
+            self._update_info_label()
 
             # Update status
             self._update_status_label()
@@ -311,12 +292,7 @@ class TaskItem(QWidget):
                 self.progress_bar.setVisible(False)
 
             # Update error message
-            error_msg = self.task_data.get('error_message')
-            if error_msg and status == 'failed':
-                self.error_label.setText(f"Error: {error_msg}")
-                self.error_label.setVisible(True)
-            else:
-                self.error_label.setVisible(False)
+            self._update_error_label()
 
             # Update button visibility based on status
             self._update_button_visibility(status)
@@ -353,6 +329,64 @@ class TaskItem(QWidget):
 
         self.status_label.setText(f"{icon} {status_text}")
         self.status_label.setStyleSheet(style)
+
+    def _update_filename_label(self):
+        """Update filename label with fallback translation if needed."""
+        file_name = self.task_data.get('file_name')
+        if not file_name:
+            file_name = self.i18n.t('batch_transcribe.info.unknown')
+        self.filename_label.setText(f"📄 {file_name}")
+
+    def _update_info_label(self):
+        """Update informational label with translated text."""
+        info_parts = []
+
+        file_size = self.task_data.get('file_size')
+        if file_size:
+            size_mb = file_size / (1024 * 1024)
+            info_parts.append(
+                self.i18n.t(
+                    'batch_transcribe.info.size',
+                    {'size': f"{size_mb:.1f} MB"}
+                )
+            )
+
+        duration = self.task_data.get('audio_duration')
+        if duration:
+            minutes = int(duration // 60)
+            seconds = int(duration % 60)
+            info_parts.append(
+                self.i18n.t(
+                    'batch_transcribe.info.duration',
+                    {'duration': f"{minutes}:{seconds:02d}"}
+                )
+            )
+
+        language = self.task_data.get('language')
+        if language:
+            info_parts.append(
+                self.i18n.t(
+                    'batch_transcribe.info.language',
+                    {'language': language}
+                )
+            )
+
+        self.info_label.setText(" | ".join(info_parts))
+
+    def _update_error_label(self):
+        """Update error label text and visibility with translations."""
+        status = self.task_data.get('status', 'pending')
+        error_msg = self.task_data.get('error_message')
+        if error_msg and status == 'failed':
+            self.error_label.setText(
+                self.i18n.t(
+                    'batch_transcribe.info.error',
+                    {'error': error_msg}
+                )
+            )
+            self.error_label.setVisible(True)
+        else:
+            self.error_label.setVisible(False)
 
     def _update_button_visibility(self, status: str):
         """

@@ -63,6 +63,13 @@
       "view": "查看",
       "export": "导出"
     },
+    "info": {
+      "size": "大小：{size}",
+      "duration": "时长：{duration}",
+      "language": "语言：{language}",
+      "unknown": "未知",
+      "error": "错误：{error}"
+    },
     "export_success": "已导出到：{path}",
     "feedback": {
       "paused": "批量转录已暂停。",
