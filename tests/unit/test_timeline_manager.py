@@ -32,6 +32,23 @@ class DummyCalendarManager:
         return None
 
 
+class RangeAwareCalendarManager(DummyCalendarManager):
+    def get_events(self, start_date=None, end_date=None, filters=None):  # noqa: D401
+        start_dt = to_local_naive(start_date) if start_date else datetime.min
+        end_dt = to_local_naive(end_date) if end_date else datetime.max
+
+        matches = []
+        for event in self._events:
+            event_start = to_local_naive(event.start_time)
+            event_end_value = getattr(event, 'end_time', None) or event.start_time
+            event_end = to_local_naive(event_end_value)
+
+            if event_end >= start_dt and event_start <= end_dt:
+                matches.append(event)
+
+        return matches
+
+
 NOOP_DB = SimpleNamespace(execute=lambda *args, **kwargs: [])
 
 
@@ -750,6 +767,71 @@ def test_search_events_transcript_hits_without_filters(monkeypatch, tmp_path):
     results = manager.search_events(query='Roadmap')
 
     assert batch_calls == [(event.id,)]
+    assert [item['event'].id for item in results] == [event.id]
+
+    snippet = results[0]['match_snippet']
+    assert snippet is not None
+    assert 'transcript' in snippet.lower()
+
+
+def test_search_events_transcript_hits_beyond_default_window(monkeypatch, tmp_path):
+    past_time = datetime.now(timezone.utc) - timedelta(days=45)
+    event = CalendarEvent(
+        id='historic-transcript',
+        title='Historic Meeting',
+        start_time=iso_z(past_time),
+        end_time=iso_z(past_time + timedelta(hours=1)),
+        description='Legacy notes',
+    )
+
+    transcript_path = tmp_path / 'historic-transcript.txt'
+    transcript_path.write_text(
+        'Key alignment decisions captured in archival transcript.',
+        encoding='utf-8',
+    )
+
+    attachments = [
+        EventAttachment(
+            event_id=event.id,
+            attachment_type='transcript',
+            file_path=str(transcript_path),
+        )
+    ]
+
+    manager = TimelineManagerForTest(
+        calendar_manager=RangeAwareCalendarManager([event]),
+        db_connection=NOOP_DB,
+    )
+
+    monkeypatch.setattr(
+        CalendarEvent,
+        'search',
+        staticmethod(lambda db, keyword=None, event_type=None, source=None: []),
+    )
+    monkeypatch.setattr(
+        CalendarEvent,
+        'get_time_bounds',
+        staticmethod(
+            lambda db, event_type=None, source=None: (
+                event.start_time,
+                event.end_time,
+            )
+        ),
+    )
+
+    monkeypatch.setattr(
+        EventAttachment,
+        'get_by_event_ids',
+        staticmethod(lambda db, event_ids: {event.id: attachments}),
+    )
+    monkeypatch.setattr(
+        EventAttachment,
+        'get_by_event_id',
+        staticmethod(lambda db, event_id: attachments if event_id == event.id else []),
+    )
+
+    results = manager.search_events(query='alignment')
+
     assert [item['event'].id for item in results] == [event.id]
 
     snippet = results[0]['match_snippet']

@@ -836,9 +836,34 @@ class TimelineManager:
             candidate_end = end_dt
             candidate_start = end_dt - window
         else:
-            midpoint = datetime.now()
-            candidate_start = midpoint - window
-            candidate_end = midpoint + window
+            event_type = filters.get('event_type')
+            source = filters.get('source')
+
+            bounds = CalendarEvent.get_time_bounds(
+                self.db,
+                event_type=event_type,
+                source=source,
+            )
+
+            if bounds:
+                min_start, max_end = bounds
+                candidate_start = to_local_naive(min_start)
+                candidate_end = to_local_naive(max_end)
+            else:
+                attachment_bounds = EventAttachment.get_transcript_event_bounds(
+                    self.db,
+                    limit=_MAX_TRANSCRIPT_CANDIDATES,
+                    event_type=event_type,
+                    source=source,
+                )
+
+                if attachment_bounds:
+                    min_start, max_end = attachment_bounds
+                    candidate_start = to_local_naive(min_start)
+                    candidate_end = to_local_naive(max_end)
+                else:
+                    candidate_start = start_dt
+                    candidate_end = end_dt
 
         if candidate_end < candidate_start:
             candidate_start, candidate_end = candidate_end, candidate_start

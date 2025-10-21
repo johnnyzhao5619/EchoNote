@@ -9,7 +9,7 @@ import logging
 import uuid
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 
 from data.database.encryption_helper import (
     encrypt_sensitive_field,
@@ -295,9 +295,52 @@ class CalendarEvent:
             WHERE {where_clause}
             ORDER BY start_time DESC
         """
-        
+
         result = db_connection.execute(query, tuple(params))
         return [CalendarEvent.from_db_row(row) for row in result]
+
+    @staticmethod
+    def get_time_bounds(
+        db_connection,
+        event_type: Optional[str] = None,
+        source: Optional[str] = None,
+    ) -> Optional[Tuple[str, str]]:
+        """Return earliest start and latest end times for events."""
+
+        conditions = []
+        params: List[Any] = []
+
+        if event_type:
+            conditions.append("event_type = ?")
+            params.append(event_type)
+
+        if source:
+            conditions.append("source = ?")
+            params.append(source)
+
+        where_clause = " WHERE " + " AND ".join(conditions) if conditions else ""
+
+        query = (
+            "SELECT MIN(start_time) AS min_start, "
+            "MAX(COALESCE(end_time, start_time)) AS max_end "
+            "FROM calendar_events" + where_clause
+        )
+
+        result = db_connection.execute(query, tuple(params))
+        if not result:
+            return None
+
+        row = result[0]
+        if isinstance(row, dict):
+            min_start = row.get('min_start')
+            max_end = row.get('max_end')
+        else:
+            min_start, max_end = row[0], row[1]
+
+        if not min_start or not max_end:
+            return None
+
+        return min_start, max_end
     
     def delete(self, db_connection):
         """Delete event from database."""
@@ -464,6 +507,66 @@ class EventAttachment:
             attachments_map.setdefault(attachment.event_id, []).append(attachment)
 
         return attachments_map
+
+    @staticmethod
+    def get_transcript_event_bounds(
+        db_connection,
+        limit: Optional[int] = None,
+        event_type: Optional[str] = None,
+        source: Optional[str] = None,
+    ) -> Optional[Tuple[str, str]]:
+        """Return bounds for events that have transcript-like attachments."""
+
+        attachment_conditions = [
+            "attachment_type IN ('transcript', 'translation')"
+        ]
+        attachment_params: List[Any] = []
+
+        subquery = (
+            "SELECT DISTINCT event_id FROM event_attachments "
+            "WHERE " + " AND ".join(attachment_conditions)
+        )
+
+        if limit:
+            subquery += " ORDER BY created_at DESC LIMIT ?"
+            attachment_params.append(limit)
+
+        query = (
+            "SELECT MIN(e.start_time) AS min_start, "
+            "MAX(COALESCE(e.end_time, e.start_time)) AS max_end "
+            "FROM calendar_events AS e "
+            "JOIN (" + subquery + ") AS a ON e.id = a.event_id"
+        )
+
+        conditions = []
+        params: List[Any] = attachment_params.copy()
+
+        if event_type:
+            conditions.append("e.event_type = ?")
+            params.append(event_type)
+
+        if source:
+            conditions.append("e.source = ?")
+            params.append(source)
+
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+
+        result = db_connection.execute(query, tuple(params))
+        if not result:
+            return None
+
+        row = result[0]
+        if isinstance(row, dict):
+            min_start = row.get('min_start')
+            max_end = row.get('max_end')
+        else:
+            min_start, max_end = row[0], row[1]
+
+        if not min_start or not max_end:
+            return None
+
+        return min_start, max_end
     
     def delete(self, db_connection):
         """Delete attachment from database."""
