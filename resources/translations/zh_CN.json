@@ -209,6 +209,7 @@
       "title_prefix": "标题",
       "description_prefix": "描述",
       "transcript_prefix": "转录",
+      "translation_prefix": "翻译",
       "missing_transcript": "无法获取转录（文件缺失）",
       "unreadable_transcript": "无法获取转录（无法读取）",
       "generic_transcript": "无法获取转录"

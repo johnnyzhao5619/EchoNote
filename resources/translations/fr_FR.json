@@ -207,6 +207,7 @@
       "title_prefix": "Titre",
       "description_prefix": "Description",
       "transcript_prefix": "Transcription",
+      "translation_prefix": "Traduction",
       "missing_transcript": "Transcription indisponible (fichier introuvable)",
       "unreadable_transcript": "Transcription indisponible (lecture impossible)",
       "generic_transcript": "Transcription indisponible"

@@ -209,6 +209,7 @@
       "title_prefix": "Title",
       "description_prefix": "Description",
       "transcript_prefix": "Transcript",
+      "translation_prefix": "Translation",
       "missing_transcript": "Transcript unavailable (file missing)",
       "unreadable_transcript": "Transcript unavailable (cannot read transcript)",
       "generic_transcript": "Transcript unavailable"
