@@ -400,6 +400,11 @@ def test_search_events_applies_timezone_filters(monkeypatch):
         'get_by_event_id',
         staticmethod(lambda db, event_id: []),
     )
+    monkeypatch.setattr(
+        EventAttachment,
+        'get_by_event_ids',
+        staticmethod(lambda db, event_ids: {}),
+    )
 
     results = manager.search_events(
         query='Meeting',
@@ -463,6 +468,11 @@ def test_search_events_filters_attendees_without_errors(monkeypatch):
         'get_by_event_id',
         staticmethod(lambda db, event_id: []),
     )
+    monkeypatch.setattr(
+        EventAttachment,
+        'get_by_event_ids',
+        staticmethod(lambda db, event_ids: {}),
+    )
 
     filtered = manager.search_events(
         query='Team',
@@ -470,6 +480,79 @@ def test_search_events_filters_attendees_without_errors(monkeypatch):
     )
 
     assert [item['event'].id for item in filtered] == ['with-attendees']
+
+
+def test_search_events_batches_attachment_lookup(monkeypatch, tmp_path):
+    event_one = CalendarEvent(
+        id='event-one',
+        title='Project Update',
+        start_time=iso_z(datetime(2024, 3, 10, 9, 0, tzinfo=timezone.utc)),
+        end_time=iso_z(datetime(2024, 3, 10, 10, 0, tzinfo=timezone.utc)),
+    )
+    event_two = CalendarEvent(
+        id='event-two',
+        title='Sprint Planning',
+        start_time=iso_z(datetime(2024, 3, 11, 9, 0, tzinfo=timezone.utc)),
+        end_time=iso_z(datetime(2024, 3, 11, 10, 0, tzinfo=timezone.utc)),
+    )
+
+    events = [event_one, event_two]
+
+    transcript_path = tmp_path / 'event-one-transcript.txt'
+    transcript_path.write_text('Project notes and action items.', encoding='utf-8')
+
+    attachments_map = {
+        event_one.id: [
+            EventAttachment(
+                event_id=event_one.id,
+                attachment_type='transcript',
+                file_path=str(transcript_path),
+            )
+        ]
+    }
+
+    batch_calls = []
+
+    def fake_get_by_event_ids(db, event_ids):
+        batch_calls.append(tuple(event_ids))
+        return attachments_map
+
+    def fail_single_lookup(db, event_id):
+        raise AssertionError('single attachment lookup should not be used')
+
+    monkeypatch.setattr(
+        CalendarEvent,
+        'search',
+        staticmethod(lambda db, keyword=None, event_type=None, source=None: events),
+    )
+    monkeypatch.setattr(
+        EventAttachment,
+        'get_by_event_ids',
+        staticmethod(fake_get_by_event_ids),
+    )
+    monkeypatch.setattr(
+        EventAttachment,
+        'get_by_event_id',
+        staticmethod(fail_single_lookup),
+    )
+
+    manager = TimelineManagerForTest(
+        calendar_manager=DummyCalendarManager(events),
+        db_connection=None,
+    )
+
+    results = manager.search_events(query='notes')
+
+    assert len(batch_calls) == 1
+    assert set(batch_calls[0]) == {event_one.id, event_two.id}
+
+    results_by_id = {item['event'].id: item for item in results}
+    assert results_by_id[event_one.id]['artifacts']['transcript'] == str(
+        transcript_path
+    )
+    assert results_by_id[event_two.id]['artifacts']['transcript'] is None
+    assert results_by_id[event_one.id]['match_snippet'] is not None
+    assert 'notes' in results_by_id[event_one.id]['match_snippet'].lower()
 
 
 def test_get_search_snippet_uses_translated_prefix():
