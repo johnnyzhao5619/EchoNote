@@ -351,6 +351,7 @@ class TimelineWidget(QWidget):
         card.auto_task_changed.connect(self._on_auto_task_changed)
         card.view_recording.connect(self._on_view_recording)
         card.view_transcript.connect(self._on_view_transcript)
+        card.view_translation.connect(self._on_view_translation)
         
         # Insert card at appropriate position
         if is_future:
@@ -464,21 +465,28 @@ class TimelineWidget(QWidget):
         except Exception as e:
             logger.error(f"Failed to open audio player: {e}")
     
-    def _on_view_transcript(self, file_path: str):
-        """
-        Handle view transcript request.
-        
-        Args:
-            file_path: Path to transcript file
-        """
-        # Import here to avoid circular imports
+    def _open_text_viewer(self, file_path: str, title_key: str):
+        """Open a text viewer dialog for timeline artifacts."""
         from ui.timeline.transcript_viewer import TranscriptViewerDialog
-        
+
         try:
-            dialog = TranscriptViewerDialog(file_path, self.i18n, self)
+            dialog = TranscriptViewerDialog(
+                file_path,
+                self.i18n,
+                self,
+                title_key=title_key
+            )
             dialog.exec()
         except Exception as e:
-            logger.error(f"Failed to open transcript viewer: {e}")
+            logger.error(f"Failed to open text viewer: {e}")
+
+    def _on_view_transcript(self, file_path: str):
+        """Handle view transcript request."""
+        self._open_text_viewer(file_path, 'transcript.viewer_title')
+
+    def _on_view_translation(self, file_path: str):
+        """Handle view translation request."""
+        self._open_text_viewer(file_path, 'timeline.translation_viewer_title')
     
     def update_translations(self):
         """Update UI text when language changes."""

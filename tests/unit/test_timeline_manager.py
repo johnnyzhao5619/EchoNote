@@ -816,3 +816,60 @@ def test_get_auto_task_map_matches_single_lookup():
     batched_query, params = db.executed[1]
     assert ' IN (' in batched_query
     assert params == ('with-config',)
+
+
+def test_build_artifacts_includes_translation():
+    attachments = [
+        EventAttachment(
+            id='att-translation',
+            event_id='event-1',
+            attachment_type='translation',
+            file_path='/tmp/translation.txt',
+            file_size=64,
+            created_at='2024-06-01T12:00:00Z',
+        )
+    ]
+
+    artifacts = TimelineManager._build_artifacts_from_attachments(attachments)
+
+    assert artifacts['translation'] == '/tmp/translation.txt'
+    assert artifacts['attachments'][0]['type'] == 'translation'
+
+
+def test_get_timeline_events_include_translation_path(monkeypatch):
+    center_time = datetime(2024, 6, 1, 12, 0, tzinfo=timezone.utc)
+
+    event = CalendarEvent(
+        id='past-translation',
+        title='Past with Translation',
+        start_time=iso_z(center_time - timedelta(hours=1)),
+        end_time=iso_z(center_time - timedelta(minutes=30)),
+    )
+
+    translation_attachment = EventAttachment(
+        id='translation-att',
+        event_id=event.id,
+        attachment_type='translation',
+        file_path='/tmp/past-translation.txt',
+        file_size=1024,
+        created_at='2024-06-01T10:00:00Z',
+    )
+
+    monkeypatch.setattr(
+        EventAttachment,
+        'get_by_event_ids',
+        staticmethod(lambda db, ids: {event.id: [translation_attachment]}),
+    )
+
+    manager = _build_manager([event])
+
+    result = manager.get_timeline_events(
+        center_time=center_time,
+        past_days=1,
+        future_days=0,
+    )
+
+    assert len(result['past_events']) == 1
+    artifacts = result['past_events'][0]['artifacts']
+    assert artifacts['translation'] == '/tmp/past-translation.txt'
+    assert any(att['type'] == 'translation' for att in artifacts['attachments'])
