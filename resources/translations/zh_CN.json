@@ -67,6 +67,16 @@
     "feedback": {
       "paused": "批量转录已暂停。",
       "resumed": "批量转录已继续。"
+    },
+    "notifications": {
+      "success": {
+        "title": "{app_name}",
+        "message": "转录完成：{filename}"
+      },
+      "failure": {
+        "title": "{app_name}",
+        "message": "转录失败：{filename}\\n{error}"
+      }
     }
   },
   "realtime_record": {

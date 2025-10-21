@@ -375,11 +375,10 @@ def test_process_task_failure_after_task_removed(manager, initialized_db, monkey
     notifications = []
     progress_updates = []
 
-    monkeypatch.setattr(
-        manager,
-        "_send_notification",
-        lambda message, notification_type: notifications.append((message, notification_type)),
-    )
+    def capture_notification(key, notification_type, **kwargs):
+        notifications.append((key, notification_type, kwargs))
+
+    monkeypatch.setattr(manager, "_send_notification", capture_notification)
     monkeypatch.setattr(
         manager,
         "_update_progress",
@@ -404,7 +403,11 @@ def test_process_task_failure_after_task_removed(manager, initialized_db, monkey
         manager._process_task_async(task_id, cancel_event=asyncio.Event())
     )
 
-    assert notifications[-1] == (f"Transcription failed: {task.file_name}", "error")
+    key, notification_type, payload = notifications[-1]
+    assert key == "batch_transcribe.notifications.failure"
+    assert notification_type == "error"
+    assert payload["filename"] == task.file_name
+    assert payload["message_default"].startswith("Transcription failed")
     assert progress_updates[-1][0] == task_id
     assert progress_updates[-1][1] == pytest.approx(10.0)
 
@@ -422,11 +425,10 @@ def test_process_task_failure_when_lookup_raises(manager, initialized_db, monkey
     notifications = []
     progress_updates = []
 
-    monkeypatch.setattr(
-        manager,
-        "_send_notification",
-        lambda message, notification_type: notifications.append((message, notification_type)),
-    )
+    def capture_notification(key, notification_type, **kwargs):
+        notifications.append((key, notification_type, kwargs))
+
+    monkeypatch.setattr(manager, "_send_notification", capture_notification)
     monkeypatch.setattr(
         manager,
         "_update_progress",
@@ -448,7 +450,10 @@ def test_process_task_failure_when_lookup_raises(manager, initialized_db, monkey
         manager._process_task_async(task_id, cancel_event=asyncio.Event())
     )
 
-    assert notifications[-1] == (f"Transcription failed: {task_id}", "error")
+    key, notification_type, payload = notifications[-1]
+    assert key == "batch_transcribe.notifications.failure"
+    assert notification_type == "error"
+    assert payload["filename"] == task_id
     assert progress_updates[-1][0] == task_id
     assert progress_updates[-1][1] == pytest.approx(0.0)
 
@@ -551,13 +556,11 @@ def test_cancellation_prevents_exports_and_marks_cancelled(
     )
 
     notifications = []
-    monkeypatch.setattr(
-        manager,
-        "_send_notification",
-        lambda message, notification_type: notifications.append(
-            (message, notification_type)
-        ),
-    )
+
+    def capture_notification(key, notification_type, **kwargs):
+        notifications.append((key, notification_type, kwargs))
+
+    monkeypatch.setattr(manager, "_send_notification", capture_notification)
 
     progress_updates = []
 
@@ -677,11 +680,87 @@ def test_send_notification_handles_quotes(monkeypatch, manager):
 
     monkeypatch.setattr("subprocess.run", fake_run)
 
-    message = 'Transcription completed: task "alpha"'
-    manager._send_notification(message, "success")
+    manager._send_notification(
+        "batch_transcribe.notifications.success",
+        "success",
+        message_default="Transcription completed: {filename}",
+        filename='task "alpha"',
+    )
 
     assert "cmd" in captured
     script = captured["cmd"][2]
     assert '\\"' in script
 
     notification_module._notification_manager = None
+
+
+def test_send_notification_uses_translator(monkeypatch, initialized_db):
+    translations = {
+        "app.title": "EchoNote 测试",
+        "batch_transcribe.notifications.success.title": "{app_name} 成功",
+        "batch_transcribe.notifications.success.message": "任务 {filename} 已完成",
+        "batch_transcribe.notifications.failure.title": "{app_name} 失败",
+        "batch_transcribe.notifications.failure.message": "任务 {filename} 失败：{error}",
+    }
+
+    def fake_translate(key, **kwargs):
+        template = translations.get(key)
+        if template is None:
+            return key
+        return template.format(**kwargs)
+
+    manager = TranscriptionManager(
+        initialized_db,
+        StubSpeechEngine(),
+        config={},
+        translate=fake_translate,
+    )
+
+    class DummyNotificationManager:
+        def __init__(self):
+            self.sent = []
+
+        def send_success(self, title, message):
+            self.sent.append(("success", title, message))
+
+        def send_error(self, title, message):
+            self.sent.append(("error", title, message))
+
+        def send_warning(self, title, message):  # pragma: no cover - not used
+            self.sent.append(("warning", title, message))
+
+        def send_info(self, title, message):  # pragma: no cover - not used
+            self.sent.append(("info", title, message))
+
+    stub_manager = DummyNotificationManager()
+    monkeypatch.setattr(
+        transcription_manager_module,
+        "get_notification_manager",
+        lambda: stub_manager,
+    )
+
+    manager._send_notification(
+        "batch_transcribe.notifications.success",
+        "success",
+        message_default="Transcription completed: {filename}",
+        filename="demo.wav",
+    )
+
+    manager._send_notification(
+        "batch_transcribe.notifications.failure",
+        "error",
+        message_default="Transcription failed: {filename}",
+        filename="demo.wav",
+        error="boom",
+    )
+
+    assert stub_manager.sent[0] == (
+        "success",
+        "EchoNote 测试 成功",
+        "任务 demo.wav 已完成",
+    )
+    assert stub_manager.sent[1] == (
+        "error",
+        "EchoNote 测试 失败",
+        "任务 demo.wav 失败：boom",
+    )

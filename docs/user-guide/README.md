@@ -102,6 +102,7 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 - Set per-task model, output format, and translation language as needed.
 - The queue supports pause/resume/cancel/retry, and history is searchable inside the same view.
 - Confirmation and export dialogs honor the selected language for prompts.
+- Desktop completion and failure notifications follow the selected language.
 
 > **Quick path:** `Batch Transcribe → Import File/Folder → Pick model → Start → View/Export`
 
@@ -112,6 +113,7 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 - 可为每个任务指定模型、输出格式、翻译语言。
 - 队列支持暂停、继续、取消、重试；历史记录可在同一视图检索。
 - 清空确认与导出提示会随界面语言实时更新。
+- 批量任务完成或失败时的系统通知会使用当前界面语言。
 
 > **快捷路径：** `批量转录 → 导入文件/文件夹 → 选择模型 → 开始 → 查看/导出`
 
@@ -124,6 +126,7 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 - Définissez modèle, format de sortie et langue de traduction par tâche.
 - La file gère pause/reprise/annulation/réessai et l’historique est consultable dans la même vue.
 - Les boîtes de dialogue de confirmation et d’export respectent la langue sélectionnée.
+- Les notifications système de fin ou d’échec suivent la langue choisie.
 
 > **Chemin rapide :** `Batch Transcribe → Importer fichier/dossier → Choisir modèle → Démarrer → Consulter/Exporter`
 

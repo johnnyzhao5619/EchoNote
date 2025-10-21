@@ -45,7 +45,10 @@ class TranscriptionManager:
         self,
         db_connection: DatabaseConnection,
         speech_engine: SpeechEngine,
-        config: Optional[Dict[str, Any]] = None
+        config: Optional[Dict[str, Any]] = None,
+        *,
+        i18n: Optional[Any] = None,
+        translate: Optional[Callable[..., str]] = None,
     ):
         """
         Initialize transcription manager.
@@ -58,6 +61,14 @@ class TranscriptionManager:
         self.db = db_connection
         self.speech_engine = speech_engine
         self.config = config or {}
+
+        self._translator: Optional[Callable[..., str]] = None
+        if translate and callable(translate):
+            self._translator = translate
+        elif i18n is not None:
+            translate_method = getattr(i18n, "t", None)
+            if callable(translate_method):
+                self._translator = translate_method
 
         self._default_save_path: Optional[str] = None
         raw_default_path = self.config.get('default_save_path')
@@ -750,8 +761,10 @@ class TranscriptionManager:
             # Send completion notification
             ensure_not_cancelled("before sending completion notification")
             self._send_notification(
-                f"Transcription completed: {task.file_name}",
-                "success"
+                "batch_transcribe.notifications.success",
+                "success",
+                message_default="Transcription completed: {filename}",
+                filename=task.file_name,
             )
 
         except asyncio.CancelledError:
@@ -833,8 +846,11 @@ class TranscriptionManager:
 
             # Send failure notification
             self._send_notification(
-                f"Transcription failed: {file_name}",
-                "error"
+                "batch_transcribe.notifications.failure",
+                "error",
+                message_default="Transcription failed: {filename}\n{error}",
+                filename=file_name,
+                error=str(e),
             )
 
     def get_task_status(self, task_id: str) -> Optional[Dict[str, Any]]:
@@ -1136,18 +1152,84 @@ class TranscriptionManager:
                 logger.error(
                     f"Error calling progress callback for task {task_id}: {e}"
                 )
-        
+
         logger.debug(f"Task {task_id} progress: {progress:.1f}% - {message}")
-    
-    def _send_notification(self, message: str, notification_type: str):
+
+    def _translate(self, key: str, default: Optional[str] = None, **kwargs) -> str:
+        """Translate a key using the configured translator."""
+        translator = self._translator
+
+        if translator:
+            try:
+                value = translator(key, **kwargs)
+            except TypeError:
+                value = translator(key)
+            except Exception as exc:
+                logger.warning(
+                    "Translator raised error for key %s: %s",
+                    key,
+                    exc,
+                )
+                value = None
+
+            if value is not None:
+                translated = str(value)
+                if default is not None and translated == key:
+                    try:
+                        return default.format(**kwargs)
+                    except Exception:
+                        return default
+                return translated
+
+        if default is None:
+            if not kwargs:
+                return key
+            try:
+                return key.format(**kwargs)
+            except Exception:
+                return key
+
+        try:
+            return default.format(**kwargs)
+        except Exception:
+            return default
+
+    def _send_notification(
+        self,
+        base_key: str,
+        notification_type: str,
+        *,
+        title_default: str = "EchoNote",
+        message_default: str = "",
+        **kwargs,
+    ):
         """
         Send desktop notification.
 
         Args:
-            message: Notification message
+            base_key: Translation key prefix (expects ``.title`` and ``.message``)
             notification_type: Type of notification (success/error/info)
+            title_default: Fallback title when translation unavailable
+            message_default: Fallback message when translation unavailable
+            **kwargs: Parameters for translation formatting
         """
-        title = "EchoNote"
+        context = dict(kwargs) if kwargs else {}
+        app_name = self._translate("app.title", default="EchoNote")
+        context.setdefault("app_name", app_name)
+
+        title = self._translate(
+            f"{base_key}.title",
+            default=title_default,
+            **context,
+        )
+        message = self._translate(
+            f"{base_key}.message",
+            default=message_default,
+            **context,
+        )
+
+        title = title.replace("\\n", "\n")
+        message = message.replace("\\n", "\n")
 
         try:
             notification_manager = get_notification_manager()
