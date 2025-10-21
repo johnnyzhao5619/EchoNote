@@ -306,6 +306,7 @@ _ensure_pyqt_stub()
 import config.app_config as app_config_module
 import core.transcription.manager as transcription_manager_module
 from core.transcription.manager import TranscriptionManager
+from core.transcription.task_queue import TaskStatus
 from data.database.connection import DatabaseConnection
 from data.database.models import TranscriptionTask
 
@@ -465,6 +466,64 @@ def test_process_task_failure_when_lookup_raises(manager, initialized_db, monkey
         (task_id,),
     )
     assert rows == []
+
+
+def test_queue_marks_missing_task_as_failed(manager, initialized_db, monkeypatch):
+    notifications = []
+
+    def capture_notification(key, notification_type, **kwargs):
+        notifications.append((key, notification_type, kwargs))
+
+    monkeypatch.setattr(manager, "_send_notification", capture_notification)
+
+    finalize_status = {}
+    original_finalize = manager.task_queue._finalize_task
+
+    def capture_finalize(task_id, *, status, result=None, error=None):
+        finalize_status[task_id] = status
+        return original_finalize(
+            task_id,
+            status=status,
+            result=result,
+            error=error,
+        )
+
+    monkeypatch.setattr(manager.task_queue, "_finalize_task", capture_finalize)
+    manager.task_queue.max_retries = 0
+
+    task = TranscriptionTask(
+        file_path=str(Path("/tmp/orphan.wav")),
+        file_name="orphan.wav",
+        status="pending",
+    )
+    task.save(initialized_db)
+    task_id = task.id
+
+    initialized_db.execute(
+        "DELETE FROM transcription_tasks WHERE id = ?",
+        (task_id,),
+        commit=True,
+    )
+
+    async def run_queue():
+        await manager.task_queue.add_task(
+            task_id,
+            manager._process_task_async,
+            task_id,
+        )
+        await manager.task_queue.start()
+        await manager.task_queue.queue.join()
+        await asyncio.sleep(0)
+        await manager.task_queue.stop()
+
+    asyncio.run(run_queue())
+
+    assert finalize_status[task_id] is TaskStatus.FAILED
+    assert notifications, "Expected failure notification to be sent"
+    key, notification_type, payload = notifications[-1]
+    assert key == "batch_transcribe.notifications.failure"
+    assert notification_type == "error"
+    assert payload["filename"] == task_id
 
 
 def test_task_queue_configuration_overrides(initialized_db):

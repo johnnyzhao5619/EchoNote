@@ -33,6 +33,10 @@ SUPPORTED_FORMATS = {
 }
 
 
+class TaskNotFoundError(Exception):
+    """Raised when a transcription task cannot be found."""
+
+
 class TranscriptionManager:
     """
     Manages transcription tasks and coordinates speech engine processing.
@@ -631,8 +635,7 @@ class TranscriptionManager:
             # Load task from database
             task = TranscriptionTask.get_by_id(self.db, task_id)
             if not task:
-                logger.error(f"Task {task_id} not found in database")
-                return
+                raise TaskNotFoundError(f"Task {task_id} not found in database")
 
             ensure_not_cancelled("after loading task from database")
 
@@ -854,6 +857,9 @@ class TranscriptionManager:
                 filename=file_name,
                 error=str(e),
             )
+
+            if isinstance(e, TaskNotFoundError):
+                raise
 
     def get_task_status(self, task_id: str) -> Optional[Dict[str, Any]]:
         """
