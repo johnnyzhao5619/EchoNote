@@ -692,6 +692,71 @@ def test_search_events_returns_transcript_only_hits(monkeypatch, tmp_path):
     assert 'transcript' in snippet.lower()
 
 
+def test_search_events_transcript_hits_without_filters(monkeypatch, tmp_path):
+    now = datetime.now(timezone.utc)
+    event = CalendarEvent(
+        id='transcript-window',
+        title='Weekly Wrap',
+        start_time=iso_z(now - timedelta(minutes=30)),
+        end_time=iso_z(now - timedelta(minutes=5)),
+        description='General notes',
+    )
+
+    transcript_path = tmp_path / 'transcript-window.txt'
+    transcript_path.write_text(
+        'Action items include roadmap alignment and customer outreach.',
+        encoding='utf-8',
+    )
+
+    attachments = [
+        EventAttachment(
+            event_id=event.id,
+            attachment_type='transcript',
+            file_path=str(transcript_path),
+        )
+    ]
+
+    manager = TimelineManagerForTest(
+        calendar_manager=DummyCalendarManager([event]),
+        db_connection=NOOP_DB,
+    )
+
+    monkeypatch.setattr(
+        CalendarEvent,
+        'search',
+        staticmethod(lambda db, keyword=None, event_type=None, source=None: []),
+    )
+
+    batch_calls = []
+
+    def fake_get_by_event_ids(db, event_ids):
+        batch_calls.append(tuple(event_ids))
+        return {event.id: attachments}
+
+    def fail_single_lookup(db, event_id):
+        raise AssertionError('single attachment lookup should not be used')
+
+    monkeypatch.setattr(
+        EventAttachment,
+        'get_by_event_ids',
+        staticmethod(fake_get_by_event_ids),
+    )
+    monkeypatch.setattr(
+        EventAttachment,
+        'get_by_event_id',
+        staticmethod(fail_single_lookup),
+    )
+
+    results = manager.search_events(query='Roadmap')
+
+    assert batch_calls == [(event.id,)]
+    assert [item['event'].id for item in results] == [event.id]
+
+    snippet = results[0]['match_snippet']
+    assert snippet is not None
+    assert 'transcript' in snippet.lower()
+
+
 def test_get_search_snippet_uses_translated_prefix():
     event = CalendarEvent(
         id='prefixed-title',

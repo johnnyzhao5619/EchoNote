@@ -427,7 +427,7 @@ Persist user preferences for auto-recording/transcription and retrieve them when
 def search_events(query: str, filters: dict | None = None) -> list[dict]
 ```
 
-Search titles, descriptions, attendee lists, and transcript contents for the supplied keyword. Optional filters include `start_date`, `end_date`, `attendees`, `event_type`, and `source`.
+Search titles, descriptions, attendee lists, and transcript contents for the supplied keyword. Optional filters include `start_date`, `end_date`, `attendees`, `event_type`, and `source`. When metadata matches are absent, the manager inspects transcript attachments within a rolling ±30 day window to surface keyword hits without re-querying attachments one-by-one.
 
 ##### get_event_artifacts
 
