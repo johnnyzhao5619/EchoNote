@@ -1,7 +1,7 @@
 """Timeline Manager for EchoNote."""
 
 import logging
-from typing import Optional, List, Dict, Any, Union, Callable, TYPE_CHECKING
+from typing import Optional, List, Dict, Any, Union, Callable, TYPE_CHECKING, Iterable
 from datetime import datetime, timedelta
 
 from data.database.models import (
@@ -344,21 +344,40 @@ class TimelineManager:
 
     def _get_attachments_map(
         self,
-        event_ids: List[str]
+        event_ids: Iterable[str],
+        base_map: Optional[Dict[str, List[EventAttachment]]] = None
     ) -> Dict[str, List[EventAttachment]]:
         """Fetch attachments for multiple events in a single query."""
-        try:
-            if not event_ids:
-                return {}
+        attachments_map: Dict[str, List[EventAttachment]] = (
+            base_map if base_map is not None else {}
+        )
 
-            return EventAttachment.get_by_event_ids(self.db, event_ids)
+        try:
+            event_ids_list = list(event_ids)
+
+            unique_ids: List[str] = []
+            for event_id in event_ids_list:
+                if event_id not in attachments_map and event_id not in unique_ids:
+                    unique_ids.append(event_id)
+                else:
+                    attachments_map.setdefault(event_id, [])
+
+            if not unique_ids:
+                return attachments_map
+
+            fetched = EventAttachment.get_by_event_ids(self.db, unique_ids) or {}
+
+            for event_id in unique_ids:
+                attachments_map[event_id] = fetched.get(event_id, [])
+
+            return attachments_map
         except Exception as exc:  # pragma: no cover - defensive logging
             logger.error(
                 "Failed to get attachments for events %s: %s",
-                event_ids,
+                event_ids_list,
                 exc,
             )
-            return {}
+            return attachments_map
 
     def _get_auto_task_map(
         self,
@@ -429,6 +448,35 @@ class TimelineManager:
         try:
             filters = filters or {}
 
+            start_dt = (
+                to_local_naive(filters['start_date'])
+                if filters.get('start_date') else
+                datetime(1970, 1, 1)
+            )
+            end_dt = (
+                to_local_naive(filters['end_date'])
+                if filters.get('end_date') else
+                datetime(2099, 12, 31, 23, 59, 59)
+            )
+            start_iso = start_dt.isoformat()
+            end_iso = end_dt.isoformat()
+            has_date_filter = bool(filters.get('start_date') or filters.get('end_date'))
+
+            filter_attendees = (
+                set(filters['attendees']) if filters.get('attendees') else None
+            )
+
+            def _passes_filters(event: CalendarEvent) -> bool:
+                if has_date_filter:
+                    event_start = to_local_naive(event.start_time)
+                    if not (start_dt <= event_start <= end_dt):
+                        return False
+                if filter_attendees:
+                    attendees = getattr(event, 'attendees', []) or []
+                    if not any(attendee in filter_attendees for attendee in attendees):
+                        return False
+                return True
+
             # Get events by keyword
             events = CalendarEvent.search(
                 self.db,
@@ -437,71 +485,85 @@ class TimelineManager:
                 source=filters.get('source')
             )
 
-            # Apply date range filter
-            if filters.get('start_date') or filters.get('end_date'):
-                start_date_value = filters.get('start_date', '1970-01-01')
-                end_date_value = filters.get('end_date', '2099-12-31')
+            events = [event for event in events if _passes_filters(event)]
 
-                start_dt = to_local_naive(start_date_value)
-                end_dt = to_local_naive(end_date_value)
-
-                events = [
-                    e for e in events
-                    if start_dt <= to_local_naive(e.start_time) <= end_dt
-                ]
-
-            # Apply attendees filter
-            if filters.get('attendees'):
-                filter_attendees = set(filters['attendees'])
-                events = [
-                    e for e in events
-                    if any(a in filter_attendees for a in e.attendees)
-                ]
+            event_ids = {event.id for event in events}
 
             attachments_map: Dict[str, List[EventAttachment]] = {}
-            if events:
-                attachments_map = self._get_attachments_map(
-                    [event.id for event in events]
+            if event_ids:
+                attachments_map = self._get_attachments_map(event_ids)
+
+            def _attachments_contain_query(
+                attachments: List[EventAttachment],
+                keyword_lower: str
+            ) -> bool:
+                for attachment in attachments:
+                    if attachment.attachment_type != 'transcript':
+                        continue
+                    try:
+                        with open(
+                            attachment.file_path,
+                            'r',
+                            encoding='utf-8'
+                        ) as file_obj:
+                            content = file_obj.read()
+                    except Exception as exc:  # pragma: no cover - defensive logging
+                        logger.warning(
+                            "Failed to read transcript %s: %s",
+                            attachment.file_path,
+                            exc,
+                        )
+                        continue
+
+                    if keyword_lower in content.lower():
+                        return True
+
+                return False
+
+            should_expand_candidates = bool(
+                query and (
+                    filters.get('start_date') or
+                    filters.get('end_date') or
+                    filters.get('event_type') or
+                    filters.get('source') or
+                    filters.get('attendees')
                 )
+            )
 
-            # Search in transcripts
-            if query:
-                # Get all event attachments and search transcript content
-                events_with_transcript_match = []
+            if should_expand_candidates:
+                candidate_filters = {
+                    key: filters[key]
+                    for key in ('event_type', 'source')
+                    if filters.get(key)
+                }
 
-                for event in events:
-                    attachments = attachments_map.get(event.id, [])
+                candidate_events = self.calendar_manager.get_events(
+                    start_iso,
+                    end_iso,
+                    filters=candidate_filters or None
+                ) or []
 
-                    # Check if any transcript contains the query
-                    transcript_match = False
-                    for attachment in attachments:
-                        if attachment.attachment_type == 'transcript':
-                            try:
-                                with open(
-                                    attachment.file_path,
-                                    'r',
-                                    encoding='utf-8'
-                                ) as f:
-                                    content = f.read()
-                                    if query.lower() in content.lower():
-                                        transcript_match = True
-                                        break
-                            except Exception as e:
-                                logger.warning(
-                                    f"Failed to read transcript "
-                                    f"{attachment.file_path}: {e}"
-                                )
+                additional_events: List[CalendarEvent] = []
+                for candidate in candidate_events:
+                    if candidate.id in event_ids:
+                        continue
+                    if not _passes_filters(candidate):
+                        continue
+                    additional_events.append(candidate)
 
-                    if transcript_match:
-                        events_with_transcript_match.append(event)
+                if additional_events:
+                    attachments_map = self._get_attachments_map(
+                        [event.id for event in additional_events],
+                        attachments_map,
+                    )
 
-                # Combine events (remove duplicates)
-                event_ids = {e.id for e in events}
-                for event in events_with_transcript_match:
-                    if event.id not in event_ids:
-                        events.append(event)
-                        event_ids.add(event.id)
-                        attachments_map.setdefault(event.id, [])
+                    query_lower = query.lower()
+                    for candidate in additional_events:
+                        attachments = attachments_map.get(candidate.id, [])
+                        if _attachments_contain_query(attachments, query_lower):
+                            events.append(candidate)
+                            event_ids.add(candidate.id)
+                            attachments_map.setdefault(candidate.id, attachments)
 
             # Build result with artifacts
             results = []

@@ -22,7 +22,7 @@ class DummyCalendarManager:
     def __init__(self, events):
         self._events = list(events)
 
-    def get_events(self, start_date=None, end_date=None):
+    def get_events(self, start_date=None, end_date=None, filters=None):
         return list(self._events)
 
     def get_event(self, event_id):
@@ -617,6 +617,79 @@ def test_search_events_batches_attachment_lookup(monkeypatch, tmp_path):
     assert results_by_id[event_two.id]['artifacts']['transcript'] is None
     assert results_by_id[event_one.id]['match_snippet'] is not None
     assert 'notes' in results_by_id[event_one.id]['match_snippet'].lower()
+
+
+def test_search_events_returns_transcript_only_hits(monkeypatch, tmp_path):
+    event = CalendarEvent(
+        id='transcript-only',
+        title='Quarterly Briefing',
+        start_time=iso_z(datetime(2024, 3, 12, 9, 0, tzinfo=timezone.utc)),
+        end_time=iso_z(datetime(2024, 3, 12, 10, 0, tzinfo=timezone.utc)),
+        description='General updates',
+    )
+
+    transcript_path = tmp_path / 'transcript-only.txt'
+    transcript_path.write_text(
+        'Discussed product synergy and follow-ups.',
+        encoding='utf-8',
+    )
+
+    attachments = [
+        EventAttachment(
+            event_id=event.id,
+            attachment_type='transcript',
+            file_path=str(transcript_path),
+        )
+    ]
+
+    manager = TimelineManagerForTest(
+        calendar_manager=DummyCalendarManager([event]),
+        db_connection=NOOP_DB,
+    )
+
+    monkeypatch.setattr(
+        CalendarEvent,
+        'search',
+        staticmethod(lambda db, keyword=None, event_type=None, source=None: []),
+    )
+
+    batch_calls = []
+
+    def fake_get_by_event_ids(db, event_ids):
+        batch_calls.append(tuple(event_ids))
+        return {event.id: attachments}
+
+    def fail_single_lookup(db, event_id):
+        raise AssertionError('single attachment lookup should not be used')
+
+    monkeypatch.setattr(
+        EventAttachment,
+        'get_by_event_ids',
+        staticmethod(fake_get_by_event_ids),
+    )
+    monkeypatch.setattr(
+        EventAttachment,
+        'get_by_event_id',
+        staticmethod(fail_single_lookup),
+    )
+
+    results = manager.search_events(
+        query='Synergy',
+        filters={
+            'start_date': iso_z(datetime(2024, 3, 12, 8, 0, tzinfo=timezone.utc)),
+            'end_date': iso_z(datetime(2024, 3, 12, 12, 0, tzinfo=timezone.utc)),
+        },
+    )
+
+    assert batch_calls == [(event.id,)]
+    assert [item['event'].id for item in results] == [event.id]
+
+    artifact = results[0]['artifacts']['transcript']
+    assert artifact == str(transcript_path)
+
+    snippet = results[0]['match_snippet']
+    assert snippet is not None
+    assert 'transcript' in snippet.lower()
 
 
 def test_get_search_snippet_uses_translated_prefix():
