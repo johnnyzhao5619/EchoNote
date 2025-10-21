@@ -1015,12 +1015,51 @@ def test_get_search_snippet_uses_translated_prefix():
         i18n=StubI18n({
             'timeline.snippet.title_prefix': '标题',
             'timeline.snippet.description_prefix': '描述',
+            'timeline.snippet.translation_prefix': '翻译',
         }),
     )
 
     snippet = manager.get_search_snippet(event, 'weekly')
 
     assert snippet == '标题: ...Weekly Sync...'
+
+
+def test_get_search_snippet_uses_translated_translation_prefix(tmp_path):
+    event = CalendarEvent(
+        id='prefixed-translation',
+        title='Weekly Sync',
+        start_time=iso_z(datetime(2024, 3, 5, 9, 0, tzinfo=timezone.utc)),
+        end_time=iso_z(datetime(2024, 3, 5, 10, 0, tzinfo=timezone.utc)),
+        description='Discuss weekly action items',
+    )
+
+    translation_path = tmp_path / 'translation.txt'
+    translation_path.write_text(
+        'Localized summary for global alignment.',
+        encoding='utf-8',
+    )
+
+    attachments = [
+        EventAttachment(
+            event_id=event.id,
+            attachment_type='translation',
+            file_path=str(translation_path),
+        )
+    ]
+
+    manager = TimelineManagerForTest(
+        calendar_manager=DummyCalendarManager([event]),
+        db_connection=NOOP_DB,
+        i18n=StubI18n({
+            'timeline.snippet.translation_prefix': '翻译',
+        }),
+    )
+
+    snippet = manager.get_search_snippet(event, 'localized', attachments=attachments)
+
+    assert snippet is not None
+    assert snippet.startswith('翻译: ...')
+    assert 'localized' in snippet.lower()
 
 
 def test_get_search_snippet_returns_missing_message(monkeypatch, caplog, tmp_path):
