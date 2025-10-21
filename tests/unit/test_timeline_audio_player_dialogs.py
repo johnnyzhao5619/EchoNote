@@ -282,3 +282,54 @@ def test_audio_dialog_cleanup_via_finished_signal(monkeypatch, qapp, tmp_path):
             dialog.deleteLater()
         widget.deleteLater()
         qapp.processEvents()
+
+
+def test_pagination_failure_restores_state(monkeypatch, qapp):
+    monkeypatch.setattr(
+        "ui.timeline.widget.QTimer.singleShot",
+        staticmethod(lambda *_: None),
+    )
+
+    class FailingPaginationManager(DummyTimelineManager):
+        def __init__(self):
+            self.calls = 0
+
+        def get_timeline_events(self, **_kwargs):
+            self.calls += 1
+            if self.calls == 1:
+                current = datetime.now().isoformat()
+                return {
+                    "current_time": current,
+                    "past_events": [],
+                    "future_events": [],
+                    "has_more": True,
+                }
+
+            raise RuntimeError("pagination failed")
+
+    i18n = I18nQtManager(default_language="en_US")
+    manager = FailingPaginationManager()
+    widget = TimelineWidget(manager, i18n)
+
+    class _StubScrollBar:
+        def maximum(self):
+            return 100
+
+    try:
+        assert widget.load_timeline_events(reset=True)
+        original_page = widget.current_page
+        original_has_more = widget.has_more
+        monkeypatch.setattr(
+            widget.scroll_area,
+            "verticalScrollBar",
+            lambda: _StubScrollBar(),
+        )
+
+        widget._on_scroll(90)
+
+        assert manager.calls == 2
+        assert widget.current_page == original_page
+        assert widget.has_more == original_has_more
+    finally:
+        widget.deleteLater()
+        qapp.processEvents()

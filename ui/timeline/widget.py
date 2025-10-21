@@ -219,19 +219,25 @@ class TimelineWidget(QWidget):
         
         return header_layout
     
-    def load_timeline_events(self, reset: bool = True):
+    def load_timeline_events(self, reset: bool = True) -> bool:
         """
         Load timeline events from the manager.
-        
+
         Args:
             reset: If True, reset pagination and clear existing events
+
+        Returns:
+            bool: ``True`` if events were loaded successfully, ``False`` otherwise.
         """
         if self.is_loading:
-            return
-        
+            return False
+
+        previous_page = self.current_page
+        previous_has_more = self.has_more
+
         try:
             self.is_loading = True
-            
+
             if reset:
                 self.current_page = 0
                 self.clear_timeline()
@@ -308,12 +314,17 @@ class TimelineWidget(QWidget):
                 f"Loaded timeline events: page {self.current_page}, "
                 f"has_more={self.has_more}"
             )
-            
+
+            return True
+
         except Exception as e:
             logger.error(f"Failed to load timeline events: {e}")
+            self.current_page = previous_page
+            self.has_more = previous_has_more
+            return False
         finally:
             self.is_loading = False
-    
+
     def _add_current_time_indicator(self):
         """Add current time indicator line to timeline."""
         # Import here to avoid circular imports
@@ -398,8 +409,11 @@ class TimelineWidget(QWidget):
             
             if value >= threshold and self.has_more and not self.is_loading:
                 logger.debug("Loading more events (pagination)")
-                self.current_page += 1
-                self.load_timeline_events(reset=False)
+                previous_page = self.current_page
+                target_page = self.current_page + 1
+                self.current_page = target_page
+                if not self.load_timeline_events(reset=False):
+                    self.current_page = previous_page
     
     def _on_search(self):
         """Handle search button click."""
