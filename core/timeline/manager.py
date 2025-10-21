@@ -501,27 +501,20 @@ class TimelineManager:
 
             def _attachments_contain_query(
                 attachments: List[EventAttachment],
-                keyword_lower: str
+                keyword_lower: str,
+                event_id: str,
             ) -> bool:
                 for attachment in attachments:
-                    if attachment.attachment_type != 'transcript':
-                        continue
-                    try:
-                        with open(
-                            attachment.file_path,
-                            'r',
-                            encoding='utf-8'
-                        ) as file_obj:
-                            content = file_obj.read()
-                    except Exception as exc:  # pragma: no cover - defensive logging
-                        logger.warning(
-                            "Failed to read transcript %s: %s",
-                            attachment.file_path,
-                            exc,
-                        )
+                    if attachment.attachment_type not in {'transcript', 'translation'}:
                         continue
 
-                    if keyword_lower in content.lower():
+                    content, _ = self._read_attachment_text(
+                        attachment,
+                        getattr(attachment, 'event_id', event_id),
+                        collect_fallback=False,
+                    )
+
+                    if content and keyword_lower in content.lower():
                         return True
 
                 return False
@@ -563,7 +556,11 @@ class TimelineManager:
 
                     for candidate in additional_events:
                         attachments = attachments_map.get(candidate.id, [])
-                        if _attachments_contain_query(attachments, query_lower):
+                        if _attachments_contain_query(
+                            attachments,
+                            query_lower,
+                            candidate.id,
+                        ):
                             events.append(candidate)
                             event_ids.add(candidate.id)
                             attachments_map.setdefault(candidate.id, attachments)
@@ -653,6 +650,76 @@ class TimelineManager:
             ]
         }
 
+    def _read_attachment_text(
+        self,
+        attachment: EventAttachment,
+        event_id: str,
+        collect_fallback: bool = True,
+    ) -> tuple[Optional[str], Optional[str]]:
+        """Read textual content from transcript/translation attachments."""
+
+        if attachment.attachment_type not in {'transcript', 'translation'}:
+            return None, None
+
+        fallback_message: Optional[str] = None
+        try:
+            with open(attachment.file_path, 'r', encoding='utf-8') as file_obj:
+                return file_obj.read(), None
+        except FileNotFoundError:
+            if attachment.attachment_type == 'translation':
+                logger.warning(
+                    "Translation file not found for event %s: %s",
+                    event_id,
+                    attachment.file_path,
+                )
+            else:
+                logger.warning(
+                    "Transcript file not found for event %s: %s",
+                    event_id,
+                    attachment.file_path,
+                )
+            if collect_fallback:
+                fallback_message = self._translate(
+                    'timeline.snippet.missing_transcript',
+                    'Transcript unavailable (file missing)',
+                )
+        except UnicodeDecodeError:
+            log_message = (
+                "Failed to decode translation for event %s: %s"
+                if attachment.attachment_type == 'translation'
+                else "Failed to decode transcript for event %s: %s"
+            )
+            logger.error(
+                log_message,
+                event_id,
+                attachment.file_path,
+                exc_info=True,
+            )
+            if collect_fallback:
+                fallback_message = self._translate(
+                    'timeline.snippet.unreadable_transcript',
+                    'Transcript unavailable (cannot read transcript)',
+                )
+        except Exception as exc:  # pragma: no cover - defensive logging
+            log_message = (
+                "Failed to read translation %s for event %s: %s"
+                if attachment.attachment_type == 'translation'
+                else "Failed to read transcript %s for event %s: %s"
+            )
+            logger.warning(
+                log_message,
+                attachment.file_path,
+                event_id,
+                exc,
+            )
+            if collect_fallback:
+                fallback_message = self._translate(
+                    'timeline.snippet.generic_transcript',
+                    'Transcript unavailable',
+                )
+
+        return None, fallback_message
+
     def get_search_snippet(
         self,
         event: CalendarEvent,
@@ -705,59 +772,38 @@ class TimelineManager:
             )
         fallback_message: Optional[str] = None
         for attachment in attachments_to_check:
-            if attachment.attachment_type == 'transcript':
-                try:
-                    with open(
-                        attachment.file_path, 'r', encoding='utf-8'
-                    ) as f:
-                        content = f.read()
-                        if query_lower in content.lower():
-                            pos = content.lower().find(query_lower)
-                            start = max(0, pos - 30)
-                            end = min(
-                                len(content), pos + len(query) + 30
-                            )
-                            snippet = content[start:end]
-                            transcript_prefix = self._translate(
-                                'timeline.snippet.transcript_prefix',
-                                'Transcript'
-                            )
-                            return f"{transcript_prefix}: ...{snippet}..."
-                except FileNotFoundError:
-                    logger.warning(
-                        "Transcript file not found for event %s: %s",
-                        event.id,
-                        attachment.file_path,
-                    )
-                    if fallback_message is None:
-                        fallback_message = self._translate(
-                            'timeline.snippet.missing_transcript',
-                            'Transcript unavailable (file missing)'
-                        )
-                except UnicodeDecodeError:
-                    logger.error(
-                        "Failed to decode transcript for event %s: %s",
-                        event.id,
-                        attachment.file_path,
-                        exc_info=True,
-                    )
-                    if fallback_message is None:
-                        fallback_message = self._translate(
-                            'timeline.snippet.unreadable_transcript',
-                            'Transcript unavailable (cannot read transcript)'
-                        )
-                except Exception as exc:
-                    logger.warning(
-                        "Failed to read transcript %s for event %s: %s",
-                        attachment.file_path,
-                        event.id,
-                        exc,
-                    )
-                    if fallback_message is None:
-                        fallback_message = self._translate(
-                            'timeline.snippet.generic_transcript',
-                            'Transcript unavailable'
-                        )
+            if attachment.attachment_type not in {'transcript', 'translation'}:
+                continue
+
+            content, attachment_fallback = self._read_attachment_text(
+                attachment,
+                event.id,
+            )
+
+            if attachment_fallback and fallback_message is None:
+                fallback_message = attachment_fallback
+
+            if not content:
+                continue
+
+            content_lower = content.lower()
+            if query_lower in content_lower:
+                pos = content_lower.find(query_lower)
+                start = max(0, pos - 30)
+                end = min(len(content), pos + len(query) + 30)
+                snippet = content[start:end]
+
+                prefix_key = 'timeline.snippet.transcript_prefix'
+                default_prefix = 'Transcript'
+                if attachment.attachment_type == 'translation':
+                    prefix_key = 'timeline.snippet.translation_prefix'
+                    default_prefix = 'Translation'
+
+                transcript_prefix = self._translate(
+                    prefix_key,
+                    default_prefix,
+                )
+                return f"{transcript_prefix}: ...{snippet}..."
 
         return fallback_message
 

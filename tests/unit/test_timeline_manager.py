@@ -757,6 +757,71 @@ def test_search_events_transcript_hits_without_filters(monkeypatch, tmp_path):
     assert 'transcript' in snippet.lower()
 
 
+def test_search_events_translation_hits(monkeypatch, tmp_path):
+    now = datetime.now(timezone.utc)
+    event = CalendarEvent(
+        id='translation-window',
+        title='Weekly Wrap Translation',
+        start_time=iso_z(now - timedelta(minutes=30)),
+        end_time=iso_z(now - timedelta(minutes=5)),
+        description='General notes',
+    )
+
+    translation_path = tmp_path / 'translation-window.txt'
+    translation_path.write_text(
+        'Localized roadmap alignment for international teams.',
+        encoding='utf-8',
+    )
+
+    attachments = [
+        EventAttachment(
+            event_id=event.id,
+            attachment_type='translation',
+            file_path=str(translation_path),
+        )
+    ]
+
+    manager = TimelineManagerForTest(
+        calendar_manager=DummyCalendarManager([event]),
+        db_connection=NOOP_DB,
+    )
+
+    monkeypatch.setattr(
+        CalendarEvent,
+        'search',
+        staticmethod(lambda db, keyword=None, event_type=None, source=None: []),
+    )
+
+    batch_calls = []
+
+    def fake_get_by_event_ids(db, event_ids):
+        batch_calls.append(tuple(event_ids))
+        return {event.id: attachments}
+
+    def fail_single_lookup(db, event_id):
+        raise AssertionError('single attachment lookup should not be used')
+
+    monkeypatch.setattr(
+        EventAttachment,
+        'get_by_event_ids',
+        staticmethod(fake_get_by_event_ids),
+    )
+    monkeypatch.setattr(
+        EventAttachment,
+        'get_by_event_id',
+        staticmethod(fail_single_lookup),
+    )
+
+    results = manager.search_events(query='localized')
+
+    assert batch_calls == [(event.id,)]
+    assert [item['event'].id for item in results] == [event.id]
+
+    snippet = results[0]['match_snippet']
+    assert snippet is not None
+    assert 'translation' in snippet.lower()
+
+
 def test_get_search_snippet_uses_translated_prefix():
     event = CalendarEvent(
         id='prefixed-title',
@@ -885,6 +950,53 @@ def test_get_search_snippet_missing_transcript_uses_translation(monkeypatch, tmp
     snippet = manager.get_search_snippet(event, 'notes')
 
     assert snippet == '转录文件缺失'
+
+
+def test_get_search_snippet_translation_fallbacks(monkeypatch, caplog, tmp_path):
+    event = CalendarEvent(
+        id='translation-fallback',
+        title='Translation Missing',
+        start_time=iso_z(datetime(2024, 4, 5, 9, 0, tzinfo=timezone.utc)),
+        end_time=iso_z(datetime(2024, 4, 5, 10, 0, tzinfo=timezone.utc)),
+    )
+
+    missing_path = tmp_path / 'missing-translation.txt'
+    corrupt_path = tmp_path / 'corrupt-translation.txt'
+    corrupt_path.write_bytes(b'\xff\xfe\xfd')
+
+    manager = TimelineManagerForTest(
+        calendar_manager=DummyCalendarManager([event]),
+        db_connection=NOOP_DB,
+    )
+
+    def _run_snippet(attachment_path):
+        monkeypatch.setattr(
+            EventAttachment,
+            'get_by_event_id',
+            staticmethod(
+                lambda db, event_id: [
+                    SimpleNamespace(
+                        attachment_type='translation',
+                        file_path=attachment_path,
+                    )
+                ]
+            ),
+        )
+        return manager.get_search_snippet(event, 'notes')
+
+    with caplog.at_level(logging.WARNING, logger='echonote.timeline.manager'):
+        missing_result = _run_snippet(str(missing_path))
+
+    assert missing_result == 'Transcript unavailable (file missing)'
+    assert 'Translation file not found' in caplog.text
+
+    caplog.clear()
+
+    with caplog.at_level(logging.ERROR, logger='echonote.timeline.manager'):
+        unreadable_result = _run_snippet(str(corrupt_path))
+
+    assert unreadable_result == 'Transcript unavailable (cannot read transcript)'
+    assert 'Failed to decode translation' in caplog.text
 
 
 class AutoTaskDbStub:
