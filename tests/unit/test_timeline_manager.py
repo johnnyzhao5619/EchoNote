@@ -320,8 +320,15 @@ def test_get_timeline_events_batches_past_attachments(monkeypatch):
         page_size=10,
     )
 
+    expected_sorted = sorted(
+        past_events,
+        key=lambda evt: to_local_naive(evt.start_time),
+        reverse=True,
+    )
+    first_page_expected = [event.id for event in expected_sorted[:10]]
+
     assert len(attachment_calls) == 1
-    assert set(attachment_calls[0]) == {event.id for event in past_events}
+    assert attachment_calls[0] == tuple(first_page_expected)
 
     assert len(result['past_events']) == 10
     assert result['total_count'] == len(past_events)
@@ -329,6 +336,24 @@ def test_get_timeline_events_batches_past_attachments(monkeypatch):
         'future-0', 'future-1', 'future-2'
     ]
     assert result['future_total_count'] == len(future_events)
+
+    second_page = manager.get_timeline_events(
+        center_time=center_time,
+        past_days=2,
+        future_days=1,
+        page_size=10,
+        page=1,
+    )
+
+    second_page_expected = [event.id for event in expected_sorted[10:20]]
+
+    assert len(attachment_calls) == 2
+    assert attachment_calls[1] == tuple(second_page_expected)
+
+    assert [item['event'].id for item in second_page['past_events']] == (
+        second_page_expected
+    )
+    assert second_page['future_events'] == []
 
 
 def test_get_timeline_events_mixed_across_pages_without_future_duplicates():

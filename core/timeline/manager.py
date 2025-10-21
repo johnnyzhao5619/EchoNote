@@ -155,10 +155,9 @@ class TimelineManager:
             )
 
             # Separate past and future events
-            past_events = []
+            past_events: List[Dict[str, Any]] = []
             future_event_ids: List[str] = []
             future_event_items: List[CalendarEvent] = []
-            past_event_ids: List[str] = []
             past_event_items: List[CalendarEvent] = []
 
             for event in all_events:
@@ -166,15 +165,26 @@ class TimelineManager:
 
                 if event_start < center_time_local:
                     past_event_items.append(event)
-                    past_event_ids.append(event.id)
                 else:
                     # Future event - collect for batch auto-task lookup
                     future_event_ids.append(event.id)
                     future_event_items.append(event)
 
-            attachments_map = self._get_attachments_map(past_event_ids)
+            past_event_items.sort(
+                key=lambda evt: to_local_naive(evt.start_time),
+                reverse=True
+            )
 
-            for event in past_event_items:
+            total_past_count = len(past_event_items)
+            start_idx = max(page, 0) * page_size
+            end_idx = start_idx + page_size
+
+            current_page_items = past_event_items[start_idx:end_idx]
+            page_event_ids = [event.id for event in current_page_items]
+
+            attachments_map = self._get_attachments_map(page_event_ids)
+
+            for event in current_page_items:
                 attachments = attachments_map.get(event.id, [])
                 artifacts = self._build_artifacts_from_attachments(attachments)
                 past_events.append({
@@ -195,22 +205,11 @@ class TimelineManager:
                 })
 
             # Sort events
-            past_events.sort(
-                key=lambda x: to_local_naive(x['event'].start_time),
-                reverse=True  # Most recent first
-            )
             future_events.sort(
                 key=lambda x: to_local_naive(x['event'].start_time)
             )
 
-            # Apply pagination for past events only
-            total_past = len(past_events)
             total_future = len(future_events)
-
-            start_idx = max(page, 0) * page_size
-            end_idx = start_idx + page_size
-
-            past_page = past_events[start_idx:end_idx]
 
             # Future events always returned on the first page to avoid being
             # paged out by the historical window. Subsequent pages omit them.
@@ -221,13 +220,13 @@ class TimelineManager:
 
             result = {
                 'current_time': center_time_local.isoformat(),
-                'past_events': past_page,
+                'past_events': past_events,
                 'future_events': future_page,
-                'total_count': total_past,
+                'total_count': total_past_count,
                 'future_total_count': total_future,
                 'page': page,
                 'page_size': page_size,
-                'has_more': end_idx < total_past
+                'has_more': end_idx < total_past_count
             }
 
             logger.debug(
