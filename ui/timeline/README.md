@@ -104,6 +104,8 @@ The timeline UI integrates with:
 - 搜索模式下，UI 通过调用 `TimelineManager.search_events(..., include_future_auto_tasks=True)`
   获取结果。返回列表中的未来事件条目将额外携带 `auto_tasks` 字段，其结构与
   `get_timeline_events()` 中未来事件一致。
+- 未来事件在时间线上会按照开始时间从最近到最远的顺序排列，搜索模式与常规模式
+  保持一致，最靠近当前时间指示器的卡片对应即将开始的事件。
 - `auto_tasks` 始终提供完整的自动任务配置（已保存的配置或 `_default_auto_task_config`
   缺省值），UI 不再直接访问 `_get_auto_task_map()`。
 - 历史事件的返回结构保持不变，不包含 `auto_tasks` 字段。
