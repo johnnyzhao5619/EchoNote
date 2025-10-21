@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from types import MethodType
 
 import pytest
 
@@ -83,6 +84,34 @@ class _StubAudioPlayer(QWidget):
 
     def update_translations(self):
         return None
+
+
+def test_search_always_refreshes_timeline(monkeypatch, qapp):
+    monkeypatch.setattr(
+        "ui.timeline.widget.QTimer.singleShot",
+        staticmethod(lambda *_: None),
+    )
+
+    i18n = I18nQtManager(default_language="en_US")
+    widget = TimelineWidget(DummyTimelineManager(), i18n)
+
+    try:
+        load_calls = []
+
+        def _counted_load(self, reset=True):
+            load_calls.append(reset)
+
+        widget.load_timeline_events = MethodType(_counted_load, widget)
+
+        widget.search_input.setText("meeting")
+        widget._on_search()
+        widget._on_search()
+
+        assert load_calls == [True, True]
+        assert widget.current_query == "meeting"
+    finally:
+        widget.deleteLater()
+        qapp.processEvents()
 
 
 def test_future_event_order_keeps_nearest_next_to_indicator(monkeypatch, qapp):

@@ -12,6 +12,7 @@ Main timeline interface with the following features:
 
 - **Vertical scrolling timeline** with current time indicator
 - **Search functionality** to find events by keyword
+  - 点击搜索按钮或在搜索框中按下回车都会刷新时间线，即使关键字未变化，可作为手动刷新手段
 - **Filter controls** for event type and source
 - **Lazy loading** with pagination (50 events per page)
 - **Virtual scrolling** for smooth performance with large datasets
