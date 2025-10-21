@@ -227,7 +227,7 @@ class TimelineWidget(QWidget):
             reset: If True, reset pagination and clear existing events
 
         Returns:
-            True if events were refreshed successfully, otherwise False.
+            bool: ``True`` if events were loaded successfully, ``False`` otherwise.
         """
         if self.is_loading:
             return False
@@ -413,8 +413,11 @@ class TimelineWidget(QWidget):
             
             if value >= threshold and self.has_more and not self.is_loading:
                 logger.debug("Loading more events (pagination)")
-                self.current_page += 1
-                self.load_timeline_events(reset=False)
+                previous_page = self.current_page
+                target_page = self.current_page + 1
+                self.current_page = target_page
+                if not self.load_timeline_events(reset=False):
+                    self.current_page = previous_page
     
     def _on_search(self):
         """Handle search button click."""
