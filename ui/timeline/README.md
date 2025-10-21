@@ -66,6 +66,7 @@ Transcript text viewer with:
 - **Copy to clipboard**
 - **Export to file** (txt, md)
 - **Error handling** for missing files
+- **即时语言切换**：通过监听 `I18nQtManager.language_changed` 信号，自动刷新标题、按钮和提示文案
 
 ## Integration
 
