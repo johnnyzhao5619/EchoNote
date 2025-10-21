@@ -164,6 +164,14 @@
     "view_transcript": "View Transcript",
     "no_artifacts": "No artifacts",
     "audio_player_title": "Audio Player",
+    "audio_player": {
+      "initial_time": "00:00",
+      "play_button_label": "▶",
+      "pause_button_label": "⏸",
+      "load_failed": "Failed to load audio file: {error}",
+      "playback_error": "Playback error: {error}",
+      "dialog_error_body": "{message}"
+    },
     "snippet": {
       "title_prefix": "Title",
       "description_prefix": "Description",

@@ -164,6 +164,14 @@
     "view_transcript": "查看转录",
     "no_artifacts": "无附件",
     "audio_player_title": "音频播放器",
+    "audio_player": {
+      "initial_time": "00:00",
+      "play_button_label": "▶",
+      "pause_button_label": "⏸",
+      "load_failed": "音频文件加载失败：{error}",
+      "playback_error": "播放出错：{error}",
+      "dialog_error_body": "{message}"
+    },
     "snippet": {
       "title_prefix": "标题",
       "description_prefix": "描述",

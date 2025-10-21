@@ -162,6 +162,14 @@
     "view_transcript": "Voir la Transcription",
     "no_artifacts": "Aucun artefact",
     "audio_player_title": "Lecteur Audio",
+    "audio_player": {
+      "initial_time": "00:00",
+      "play_button_label": "▶",
+      "pause_button_label": "⏸",
+      "load_failed": "Échec du chargement du fichier audio : {error}",
+      "playback_error": "Erreur de lecture : {error}",
+      "dialog_error_body": "{message}"
+    },
     "snippet": {
       "title_prefix": "Titre",
       "description_prefix": "Description",
