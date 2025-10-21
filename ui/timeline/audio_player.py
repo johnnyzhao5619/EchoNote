@@ -98,13 +98,17 @@ class AudioPlayer(QWidget):
         
         # Time labels
         time_layout = QHBoxLayout()
-        self.current_time_label = QLabel("00:00")
+        self.current_time_label = QLabel(
+            self.i18n.t('timeline.audio_player.initial_time')
+        )
         self.current_time_label.setStyleSheet("color: #666;")
         time_layout.addWidget(self.current_time_label)
         
         time_layout.addStretch()
         
-        self.total_time_label = QLabel("00:00")
+        self.total_time_label = QLabel(
+            self.i18n.t('timeline.audio_player.initial_time')
+        )
         self.total_time_label.setStyleSheet("color: #666;")
         time_layout.addWidget(self.total_time_label)
         
@@ -115,7 +119,9 @@ class AudioPlayer(QWidget):
         controls_layout.setSpacing(10)
         
         # Play/Pause button
-        self.play_button = QPushButton("▶")
+        self.play_button = QPushButton(
+            self.i18n.t('timeline.audio_player.play_button_label')
+        )
         self.play_button.setFixedSize(40, 40)
         self.play_button.clicked.connect(self.toggle_playback)
         self.play_button.setStyleSheet("""
@@ -170,7 +176,10 @@ class AudioPlayer(QWidget):
             logger.info(f"Audio file loaded: {file_path}")
             
         except Exception as e:
-            error_msg = f"Failed to load audio file: {e}"
+            error_msg = self.i18n.t(
+                'timeline.audio_player.load_failed',
+                error=str(e)
+            )
             logger.error(error_msg)
             self.playback_error.emit(error_msg)
     
@@ -210,9 +219,13 @@ class AudioPlayer(QWidget):
             state: New playback state
         """
         if state == QMediaPlayer.PlaybackState.PlayingState:
-            self.play_button.setText("⏸")
+            self.play_button.setText(
+                self.i18n.t('timeline.audio_player.pause_button_label')
+            )
         else:
-            self.play_button.setText("▶")
+            self.play_button.setText(
+                self.i18n.t('timeline.audio_player.play_button_label')
+            )
     
     def _on_error(self, error: QMediaPlayer.Error, error_string: str):
         """
@@ -222,7 +235,11 @@ class AudioPlayer(QWidget):
             error: Error code
             error_string: Error description
         """
-        error_msg = f"Playback error: {error_string}"
+        error_detail = error_string or getattr(error, 'name', str(error))
+        error_msg = self.i18n.t(
+            'timeline.audio_player.playback_error',
+            error=error_detail
+        )
         logger.error(error_msg)
         self.playback_error.emit(error_msg)
     
@@ -333,7 +350,10 @@ class AudioPlayerDialog(QDialog):
         QMessageBox.critical(
             self,
             self.i18n.t('common.error'),
-            error_msg
+            self.i18n.t(
+                'timeline.audio_player.dialog_error_body',
+                message=error_msg
+            )
         )
     
     def closeEvent(self, event):
