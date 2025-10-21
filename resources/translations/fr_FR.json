@@ -67,6 +67,16 @@
     "feedback": {
       "paused": "Transcription par lots en pause.",
       "resumed": "Transcription par lots reprise."
+    },
+    "notifications": {
+      "success": {
+        "title": "{app_name}",
+        "message": "Transcription terminée : {filename}"
+      },
+      "failure": {
+        "title": "{app_name}",
+        "message": "Échec de la transcription : {filename}\\n{error}"
+      }
     }
   },
   "realtime_record": {

@@ -67,6 +67,16 @@
     "feedback": {
       "paused": "Batch transcription paused.",
       "resumed": "Batch transcription resumed."
+    },
+    "notifications": {
+      "success": {
+        "title": "{app_name}",
+        "message": "Transcription complete: {filename}"
+      },
+      "failure": {
+        "title": "{app_name}",
+        "message": "Transcription failed: {filename}\\n{error}"
+      }
     }
   },
   "realtime_record": {
