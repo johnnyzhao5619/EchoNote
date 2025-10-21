@@ -350,128 +350,140 @@ class RealtimeRecorder:
         audio_chunks_received = 0
         transcription_attempts = 0
         last_transcription = ""  # 记录上一次转录结果，用于去重
+        translation_queue = self.translation_queue
 
-        while self.is_recording:
+        async def _process_buffered_audio(force: bool = False) -> None:
+            nonlocal last_transcription, transcription_attempts
+
+            pending_duration = audio_buffer.get_duration()
+            if pending_duration <= 0:
+                return
+
+            if not force and pending_duration < min_audio_duration:
+                return
+
+            logger.info(
+                "Processing accumulated audio: %.2fs%s",
+                pending_duration,
+                " (forced)" if force else ""
+            )
+
+            window_audio = audio_buffer.get_latest(pending_duration)
+            if len(window_audio) == 0:
+                audio_buffer.clear()
+                return
+
+            logger.debug(f"Window audio size: {len(window_audio)} samples")
+
+            speech_audio = window_audio
+            if vad is not None:
+                try:
+                    speech_timestamps = vad.detect_speech(window_audio, sample_rate)
+                    logger.debug(f"VAD detected {len(speech_timestamps)} speech segments")
+
+                    if speech_timestamps:
+                        speech_audio = vad.extract_speech(
+                            window_audio,
+                            speech_timestamps,
+                            sample_rate=sample_rate
+                        )
+                    else:
+                        logger.debug("No speech detected by VAD, skipping transcription")
+                        audio_buffer.clear()
+                        return
+                except Exception as e:
+                    logger.warning(f"VAD detection failed: {e}, processing all audio")
+                    speech_audio = window_audio
+
             try:
-                # 从队列获取音频块（超时 0.5 秒）
-                audio_chunk = await asyncio.wait_for(
-                    queue.get(),
-                    timeout=0.5
-                )
-                
-                audio_chunks_received += 1
-                logger.debug(f"Received audio chunk #{audio_chunks_received}, size: {len(audio_chunk)}")
+                transcription_attempts += 1
+                logger.info(f"Transcription attempt #{transcription_attempts}")
 
-                # 添加到音频缓冲区
+                language = self.current_options.get('language')
+                text = await self.speech_engine.transcribe_stream(
+                    speech_audio,
+                    language=language,
+                    sample_rate=self.sample_rate
+                )
+
+                logger.info(f"Transcription result: '{text}'")
+
+                if text.strip():
+                    if self._is_duplicate_transcription(text, last_transcription):
+                        logger.debug(f"Duplicate transcription detected, skipping: {text[:50]}...")
+                    else:
+                        self.accumulated_transcription.append(text)
+                        await stream_queue.put(text)
+
+                        if self.on_transcription_update:
+                            try:
+                                self.on_transcription_update(text)
+                                logger.debug("UI callback invoked successfully")
+                            except Exception as e:
+                                logger.error(f"Error in transcription callback: {e}")
+
+                        enable_trans = self.current_options.get('enable_translation', False)
+                        if enable_trans and translation_queue is not None:
+                            await translation_queue.put(text)
+
+                        logger.info(f"Transcribed successfully: {text[:50]}...")
+                        last_transcription = text
+                else:
+                    logger.debug("Transcription returned empty text")
+            except Exception as e:
+                logger.error(f"Transcription failed: {e}", exc_info=True)
+                if self.on_error:
+                    self.on_error(f"Transcription error: {e}")
+            finally:
+                audio_buffer.clear()
+
+        try:
+            while self.is_recording or not queue.empty():
+                try:
+                    audio_chunk = await asyncio.wait_for(
+                        queue.get(),
+                        timeout=0.5
+                    )
+                except asyncio.TimeoutError:
+                    if not self.is_recording:
+                        break
+                    continue
+
+                audio_chunks_received += 1
+                logger.debug(
+                    f"Received audio chunk #{audio_chunks_received}, size: {len(audio_chunk)}"
+                )
+
                 audio_buffer.append(audio_chunk)
 
-                # 计算待处理音频的总时长
-                pending_duration = audio_buffer.get_duration()
-
-                # 检查是否有足够的音频需要处理
-                if pending_duration >= min_audio_duration:
-                    logger.info(f"Processing accumulated audio: {pending_duration:.2f}s")
-
-                    # 获取满足最小时长的音频窗口
-                    window_audio = audio_buffer.get_latest(pending_duration)
-
-                    if len(window_audio) > 0:
-                        logger.debug(f"Window audio size: {len(window_audio)} samples")
-                        
-                        # 如果有 VAD，使用 VAD 检测
-                        if vad is not None:
-                            try:
-                                speech_timestamps = vad.detect_speech(
-                                    window_audio, sample_rate
-                                )
-                                logger.debug(f"VAD detected {len(speech_timestamps)} speech segments")
-
-                                if speech_timestamps:
-                                    # 提取语音段落
-                                    speech_audio = vad.extract_speech(
-                                        window_audio, speech_timestamps, sample_rate=sample_rate
-                                    )
-                                else:
-                                    logger.debug("No speech detected by VAD, skipping transcription")
-                                    # 清空待处理缓冲区，继续等待新的音频
-                                    audio_buffer.clear()
-                                    continue
-                            except Exception as e:
-                                logger.warning(f"VAD detection failed: {e}, processing all audio")
-                                speech_audio = window_audio
-                        else:
-                            # 没有 VAD，处理所有音频
-                            speech_audio = window_audio
-
-                        # 转录
-                        try:
-                            transcription_attempts += 1
-                            logger.info(f"Transcription attempt #{transcription_attempts}")
-                            
-                            language = self.current_options.get('language')
-                            text = await self.speech_engine.transcribe_stream(
-                                speech_audio,
-                                language=language,
-                                sample_rate=self.sample_rate
-                            )
-
-                            logger.info(f"Transcription result: '{text}'")
-
-                            if text.strip():
-                                # 去重检查：如果与上一次转录完全相同或高度相似，跳过
-                                if self._is_duplicate_transcription(text, last_transcription):
-                                    logger.debug(f"Duplicate transcription detected, skipping: {text[:50]}...")
-                                else:
-                                    # 累积转录文本
-                                    self.accumulated_transcription.append(text)
-
-                                    # 推送到实时转录流
-                                    await stream_queue.put(text)
-
-                                    # 通知 UI 更新
-                                    if self.on_transcription_update:
-                                        try:
-                                            self.on_transcription_update(text)
-                                            logger.debug("UI callback invoked successfully")
-                                        except Exception as e:
-                                            logger.error(f"Error in transcription callback: {e}")
-
-                                    # 将转录文本放入翻译队列
-                                    enable_trans = self.current_options.get(
-                                        'enable_translation', False
-                                    )
-                                    if enable_trans:
-                                        translation_queue = self.translation_queue
-                                        if translation_queue is not None:
-                                            await translation_queue.put(text)
-
-                                    logger.info(f"Transcribed successfully: {text[:50]}...")
-                                    
-                                    # 更新上一次转录结果
-                                    last_transcription = text
-                            else:
-                                logger.debug("Transcription returned empty text")
-                        except Exception as e:
-                            logger.error(f"Transcription failed: {e}", exc_info=True)
-                            if self.on_error:
-                                self.on_error(f"Transcription error: {e}")
-
-                    # 清空待处理缓冲区（已处理完成）
-                    audio_buffer.clear()
-
-            except asyncio.TimeoutError:
-                # 超时，继续等待
-                continue
+                try:
+                    await _process_buffered_audio(force=False)
+                except Exception as e:
+                    logger.error(f"Error in audio stream processing: {e}", exc_info=True)
+                    if self.on_error:
+                        self.on_error(f"Processing error: {e}")
+                    if not self.is_recording and queue.empty():
+                        break
+        except asyncio.CancelledError:
+            logger.info("Audio stream processing cancelled")
+            raise
+        except Exception as e:
+            logger.error(f"Error in audio stream processing loop: {e}", exc_info=True)
+            if self.on_error:
+                self.on_error(f"Processing error: {e}")
+        finally:
+            try:
+                await _process_buffered_audio(force=True)
             except Exception as e:
-                logger.error(f"Error in audio stream processing: {e}", exc_info=True)
+                logger.error(f"Failed to flush audio buffer: {e}", exc_info=True)
                 if self.on_error:
                     self.on_error(f"Processing error: {e}")
-                if self.is_recording:
-                    continue
-                else:
-                    break
 
-        logger.info(f"Audio stream processing stopped. Total chunks: {audio_chunks_received}, Transcription attempts: {transcription_attempts}")
+            logger.info(
+                "Audio stream processing stopped. Total chunks: %s, Transcription attempts: %s",
+                audio_chunks_received,
+                transcription_attempts
+            )
 
     async def _process_translation_stream(self):
         """处理翻译流的异步任务"""

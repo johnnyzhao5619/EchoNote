@@ -886,6 +886,60 @@ def test_transcription_stream_emits_segments(monkeypatch):
     assert results == ["transcription-1"]
 
 
+def test_short_recording_produces_transcription(monkeypatch):
+    if not HAS_NUMPY:
+        pytest.skip("numpy is required for streaming tests")
+
+    from core.realtime.recorder import RealtimeRecorder
+
+    monkeypatch.setattr("engines.audio.vad.VADDetector", AlwaysSpeechVAD)
+
+    audio_capture = DummyAudioCapture(sample_rate=16000)
+    speech_engine = DummyStreamingSpeechEngine()
+    recorder = RealtimeRecorder(
+        audio_capture=audio_capture,
+        speech_engine=speech_engine,
+        translation_engine=None,
+        db_connection=None,
+        file_manager=DummyFileManager(),
+    )
+
+    options = {
+        'save_recording': False,
+        'save_transcript': False,
+        'create_calendar_event': False,
+        'enable_translation': False,
+    }
+
+    results: list[str] = []
+
+    async def _run():
+        loop = asyncio.get_running_loop()
+        await recorder.start_recording(options=options, event_loop=loop)
+        assert audio_capture.callback is not None
+
+        ready = asyncio.Event()
+
+        async def _consume_stream():
+            async for text in recorder.get_transcription_stream():
+                results.append(text)
+                ready.set()
+
+        consumer_task = asyncio.create_task(_consume_stream())
+
+        chunk = np.full(recorder.sample_rate, 0.05, dtype=np.float32)
+        audio_capture.callback(chunk.copy())
+        await asyncio.sleep(0.05)
+
+        await recorder.stop_recording()
+        await asyncio.wait_for(ready.wait(), timeout=2.0)
+        await consumer_task
+
+    asyncio.run(_run())
+
+    assert results == ["transcription-1"]
+
+
 def test_translation_stream_emits_segments(monkeypatch):
     if not HAS_NUMPY:
         pytest.skip("numpy is required for streaming tests")
@@ -938,6 +992,65 @@ def test_translation_stream_emits_segments(monkeypatch):
         await asyncio.wait_for(ready.wait(), timeout=2.0)
 
         await recorder.stop_recording()
+        await translation_task
+
+    asyncio.run(_run())
+
+    assert translations == ["transcription-1-to-en"]
+    assert translation_engine.calls == 1
+    assert translation_engine.arguments[-1][1] == options.get('language', 'auto')
+    assert translation_engine.arguments[-1][2] == 'en'
+
+
+def test_short_recording_produces_translation(monkeypatch):
+    if not HAS_NUMPY:
+        pytest.skip("numpy is required for streaming tests")
+
+    from core.realtime.recorder import RealtimeRecorder
+
+    monkeypatch.setattr("engines.audio.vad.VADDetector", AlwaysSpeechVAD)
+
+    audio_capture = DummyAudioCapture(sample_rate=16000)
+    speech_engine = DummyStreamingSpeechEngine()
+    translation_engine = DummyTranslationEngine()
+    recorder = RealtimeRecorder(
+        audio_capture=audio_capture,
+        speech_engine=speech_engine,
+        translation_engine=translation_engine,
+        db_connection=None,
+        file_manager=DummyFileManager(),
+    )
+
+    options = {
+        'save_recording': False,
+        'save_transcript': False,
+        'create_calendar_event': False,
+        'enable_translation': True,
+        'target_language': 'en',
+    }
+
+    translations: list[str] = []
+
+    async def _run():
+        loop = asyncio.get_running_loop()
+        await recorder.start_recording(options=options, event_loop=loop)
+        assert audio_capture.callback is not None
+
+        ready = asyncio.Event()
+
+        async def _consume_translation():
+            async for text in recorder.get_translation_stream():
+                translations.append(text)
+                ready.set()
+
+        translation_task = asyncio.create_task(_consume_translation())
+
+        chunk = np.full(recorder.sample_rate, 0.05, dtype=np.float32)
+        audio_capture.callback(chunk.copy())
+        await asyncio.sleep(0.05)
+
+        await recorder.stop_recording()
+        await asyncio.wait_for(ready.wait(), timeout=2.0)
         await translation_task
 
     asyncio.run(_run())
