@@ -183,6 +183,8 @@
     "current_time": "当前时间",
     "enable_transcription": "启用实时转录",
     "enable_recording": "启用会议录音",
+    "enable_translation": "启用翻译",
+    "translation_target_label": "翻译目标语言：",
     "play_recording": "播放录音",
     "view_transcript": "查看转录",
     "view_translation": "查看翻译",

@@ -183,6 +183,8 @@
     "current_time": "Current Time",
     "enable_transcription": "Enable Real-time Transcription",
     "enable_recording": "Enable Meeting Recording",
+    "enable_translation": "Enable Translation",
+    "translation_target_label": "Target Language:",
     "play_recording": "Play Recording",
     "view_transcript": "View Transcript",
     "view_translation": "View Translation",

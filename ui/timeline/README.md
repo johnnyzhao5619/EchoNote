@@ -30,7 +30,7 @@ Event card component with different layouts for past and future events:
 **Future Events:**
 
 - Event information (title, time, location, attendees)
-- Auto-task toggles (enable transcription, enable recording)
+- Auto-task toggles (enable transcription, enable recording, enable translation with target language selection)
 - Saves configuration to TimelineManager
 
 **Past Events:**
@@ -119,7 +119,8 @@ All UI text is internationalized using the following keys:
 - `timeline.filter_all`, `filter_event`, `filter_task`, `filter_appointment`
 - `timeline.source_all`, `source_local`, `source_google`, `source_outlook`
 - `timeline.current_time`
-- `timeline.enable_transcription`, `enable_recording`
+- `timeline.enable_transcription`, `enable_recording`, `enable_translation`
+- `timeline.translation_target_label`
 - `timeline.play_recording`, `view_transcript`
 - `timeline.no_artifacts`
 - `timeline.audio_player_title`

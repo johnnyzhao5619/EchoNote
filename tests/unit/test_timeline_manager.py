@@ -16,7 +16,7 @@ from core.timeline.manager import (
     TimelineManager,
     to_local_naive,
 )
-from data.database.models import CalendarEvent, EventAttachment
+from data.database.models import AutoTaskConfig, CalendarEvent, EventAttachment
 
 
 class DummyCalendarManager:
@@ -1244,6 +1244,58 @@ def test_get_auto_task_map_matches_single_lookup():
     batched_query, params = db.executed[1]
     assert ' IN (' in batched_query
     assert params == ('with-config',)
+
+
+def test_set_auto_task_persists_translation(monkeypatch):
+    event = CalendarEvent(
+        id='future-1',
+        title='Future Meeting',
+        start_time='2024-08-01T09:00:00Z',
+        end_time='2024-08-01T10:00:00Z',
+    )
+
+    manager = TimelineManager(
+        calendar_manager=DummyCalendarManager([event]),
+        db_connection=NOOP_DB,
+    )
+
+    stored_configs = {}
+
+    def fake_get_by_event_id(cls, db, event_id):
+        return stored_configs.get(event_id)
+
+    def fake_save(self, db):
+        stored_configs[self.event_id] = self
+
+    monkeypatch.setattr(
+        AutoTaskConfig,
+        'get_by_event_id',
+        classmethod(fake_get_by_event_id),
+    )
+    monkeypatch.setattr(AutoTaskConfig, 'save', fake_save)
+
+    manager.set_auto_task(
+        event.id,
+        {
+            'enable_transcription': True,
+            'enable_recording': False,
+            'enable_translation': True,
+            'translation_target_language': 'fr',
+        }
+    )
+
+    saved = stored_configs[event.id]
+    assert saved.enable_translation is True
+    assert saved.translation_target_language == 'fr'
+
+    restored = manager.get_auto_task(event.id)
+    assert restored == {
+        'enable_transcription': True,
+        'enable_recording': False,
+        'transcription_language': None,
+        'enable_translation': True,
+        'translation_target_language': 'fr',
+    }
 
 
 def test_build_artifacts_includes_translation():
