@@ -6,7 +6,7 @@ synchronization.
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any, TYPE_CHECKING, Tuple, Union
 
 from data.database.models import (
@@ -15,13 +15,14 @@ from data.database.models import (
     CalendarSyncStatus,
     EventAttachment,
 )
-
-
 logger = logging.getLogger('echonote.calendar.manager')
 
 
 if TYPE_CHECKING:
     from data.security.oauth_manager import OAuthManager
+
+
+_MIN_EXTERNAL_EVENT_DURATION = timedelta(minutes=1)
 
 
 class CalendarManager:
@@ -702,37 +703,126 @@ class CalendarManager:
                     if result:
                         event = CalendarEvent.from_db_row(result[0])
 
+            start_value = ext_event.get('start_time')
+            end_value = ext_event.get('end_time')
+
+            def _clean_time_value(value: Optional[Any]) -> Optional[Union[str, datetime]]:
+                if isinstance(value, datetime):
+                    return value
+                if isinstance(value, str):
+                    text = value.strip()
+                    if text:
+                        return text
+                    return None
+                return value
+
+            start_value = _clean_time_value(start_value)
+            end_value = _clean_time_value(end_value)
+
+            base_start: Optional[Union[str, datetime]]
+            if start_value is not None:
+                base_start = start_value
+            elif event and event.start_time:
+                base_start = event.start_time
+            else:
+                base_start = None
+
+            if end_value is not None:
+                base_end: Optional[Union[str, datetime]] = end_value
+            elif event and event.end_time:
+                base_end = event.end_time
+            else:
+                base_end = None
+
+            normalized_start: Optional[str] = None
+            normalized_end: Optional[str] = None
+
+            if base_start is not None:
+                comparison_end = base_end if base_end is not None else base_start
+                try:
+                    start_dt, end_dt = self._normalize_event_window(
+                        base_start,
+                        comparison_end,
+                    )
+                except ValueError as exc:
+                    logger.warning(
+                        "Skipping external event %s due to invalid time window: %s",
+                        ext_identifier or ext_event.get('title'),
+                        exc,
+                    )
+                    if not event:
+                        return
+                else:
+                    if end_dt <= start_dt:
+                        end_dt = start_dt + _MIN_EXTERNAL_EVENT_DURATION
+                    normalized_start = start_dt.isoformat()
+                    normalized_end = end_dt.isoformat()
+            else:
+                logger.warning(
+                    "Skipping external event %s without a valid start_time",
+                    ext_identifier or ext_event.get('title'),
+                )
+                if not event:
+                    return
+
+            def _normalize_attendees(value: Any) -> List[str]:
+                if value is None:
+                    return []
+                if isinstance(value, list):
+                    return value
+                if isinstance(value, (set, tuple)):
+                    return list(value)
+                return [value]
+
             if event:
-                # Update existing event
-                event.title = ext_event.get(
-                    'title', event.title
-                )
-                event.start_time = ext_event.get(
-                    'start_time', event.start_time
-                )
-                event.end_time = ext_event.get(
-                    'end_time', event.end_time
-                )
-                event.location = ext_event.get(
-                    'location', event.location
-                )
-                event.attendees = ext_event.get(
-                    'attendees', event.attendees
-                )
-                event.description = ext_event.get(
-                    'description', event.description
-                )
+                if 'title' in ext_event:
+                    event.title = ext_event.get('title', event.title)
+
+                if normalized_start and (start_value is not None or not event.start_time):
+                    event.start_time = normalized_start
+
+                update_end = False
+                if normalized_end:
+                    if end_value is not None or not event.end_time:
+                        update_end = True
+                    elif start_value is not None and normalized_start:
+                        try:
+                            new_start_dt = datetime.fromisoformat(normalized_start)
+                            existing_end_dt = datetime.fromisoformat(event.end_time)
+                        except ValueError:
+                            update_end = True
+                        else:
+                            if existing_end_dt <= new_start_dt:
+                                update_end = True
+                    if update_end:
+                        event.end_time = normalized_end
+
+                if 'location' in ext_event:
+                    event.location = ext_event.get('location', event.location)
+
+                if 'attendees' in ext_event:
+                    event.attendees = _normalize_attendees(ext_event.get('attendees'))
+
+                if 'description' in ext_event:
+                    event.description = ext_event.get('description', event.description)
+
                 event.save(self.db)
                 logger.debug(f"Updated external event: {event.id}")
             else:
-                # Create new event
+                if not (normalized_start and normalized_end):
+                    logger.warning(
+                        "Skipping external event %s due to missing normalized times",
+                        ext_identifier or ext_event.get('title'),
+                    )
+                    return
+
                 event = CalendarEvent(
                     title=ext_event.get('title', ''),
                     event_type=ext_event.get('event_type', 'Event'),
-                    start_time=ext_event.get('start_time', ''),
-                    end_time=ext_event.get('end_time', ''),
+                    start_time=normalized_start,
+                    end_time=normalized_end,
                     location=ext_event.get('location'),
-                    attendees=ext_event.get('attendees', []),
+                    attendees=_normalize_attendees(ext_event.get('attendees')),
                     description=ext_event.get('description'),
                     reminder_minutes=ext_event.get('reminder_minutes'),
                     recurrence_rule=ext_event.get('recurrence_rule'),

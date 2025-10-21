@@ -73,6 +73,8 @@ _ensure_apscheduler_stub()
 
 
 from core.calendar.manager import CalendarManager
+from core.timeline.manager import TimelineManager
+from core.timeline.auto_task_scheduler import AutoTaskScheduler
 from data.database.connection import DatabaseConnection
 from data.database.models import CalendarEvent, CalendarEventLink, EventAttachment
 from unittest.mock import Mock
@@ -192,6 +194,111 @@ def test_multi_provider_links_are_persisted_and_retrievable(tmp_path):
     )
     assert len(post_update_links) == 2
     assert {row["provider"] for row in post_update_links} == {"google", "outlook"}
+
+    db.close_all()
+
+
+def test_external_event_without_end_time_is_normalized(tmp_path, monkeypatch):
+    db = _create_db(tmp_path)
+    manager = CalendarManager(db)
+
+    start_dt = datetime(2024, 6, 1, 9, 0, tzinfo=timezone.utc)
+    ext_event = {
+        "id": "google-missing-end",
+        "title": "External Without End",
+        "start_time": start_dt.isoformat(),
+        # end_time intentionally omitted
+        "attendees": {"alice@example.com"},
+    }
+
+    manager._save_external_event(ext_event, "google")
+
+    link = CalendarEventLink.get_by_provider_and_external_id(
+        db,
+        "google",
+        "google-missing-end",
+    )
+    assert link is not None
+
+    event = CalendarEvent.get_by_id(db, link.event_id)
+    assert event is not None
+    assert event.end_time
+
+    start_value = datetime.fromisoformat(event.start_time)
+    end_value = datetime.fromisoformat(event.end_time)
+    assert end_value >= start_value
+
+    timeline_manager = TimelineManager(manager, db)
+    timeline_data = timeline_manager.get_timeline_events(
+        center_time=start_dt - timedelta(hours=1),
+        past_days=1,
+        future_days=1,
+    )
+    future_ids = [item['event'].id for item in timeline_data['future_events']]
+    assert event.id in future_ids
+
+    class DummyNotificationManager:
+        def send_info(self, *args, **kwargs):  # noqa: D401
+            return None
+
+        def send_warning(self, *args, **kwargs):  # noqa: D401
+            return None
+
+        def send_success(self, *args, **kwargs):  # noqa: D401
+            return None
+
+        def send_error(self, *args, **kwargs):  # noqa: D401
+            return None
+
+    monkeypatch.setattr(
+        'core.timeline.auto_task_scheduler.get_notification_manager',
+        lambda: DummyNotificationManager(),
+    )
+
+    class DummyRecorder:
+        async def start_recording(self, *args, **kwargs):  # noqa: D401
+            return None
+
+        async def stop_recording(self):  # noqa: D401
+            return {}
+
+    scheduler = AutoTaskScheduler(
+        timeline_manager=timeline_manager,
+        realtime_recorder=DummyRecorder(),
+        db_connection=db,
+        file_manager=None,
+        reminder_minutes=5,
+    )
+
+    from datetime import datetime as real_datetime
+
+    current_time = {
+        'value': (start_dt - timedelta(minutes=10)).astimezone(timezone.utc)
+    }
+
+    class FlexibleDateTime(real_datetime):
+        @classmethod
+        def now(cls, tz=None):  # noqa: D401
+            current = current_time['value']
+            if tz is None:
+                return current
+            return current.astimezone(tz)
+
+        @classmethod
+        def fromisoformat(cls, date_string):  # noqa: D401
+            return real_datetime.fromisoformat(date_string)
+
+    monkeypatch.setattr(
+        'core.timeline.auto_task_scheduler.datetime',
+        FlexibleDateTime,
+    )
+
+    scheduler._check_upcoming_events()
+
+    scheduler.active_recordings[event.id] = {}
+    current_time['value'] = (start_dt + timedelta(minutes=2)).astimezone(timezone.utc)
+
+    scheduler._check_upcoming_events()
 
     db.close_all()
 
