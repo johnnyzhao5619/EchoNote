@@ -405,10 +405,14 @@ class TimelineWidget(QWidget):
         """Handle search button click."""
         query = self.search_input.text().strip()
         
-        if query != self.current_query:
-            self.current_query = query
+        self.current_query = query
+
+        if query:
             logger.info(f"Searching timeline: {query}")
-            self.load_timeline_events(reset=True)
+        else:
+            logger.info("Refreshing timeline without query filter")
+
+        self._refresh_timeline(reset=True)
     
     def _on_filter_changed(self):
         """Handle filter change."""
@@ -432,7 +436,11 @@ class TimelineWidget(QWidget):
         self.current_filters['end_date'] = end_date
         
         logger.info(f"Timeline filters changed: {self.current_filters}")
-        self.load_timeline_events(reset=True)
+        self._refresh_timeline(reset=True)
+
+    def _refresh_timeline(self, reset: bool = True):
+        """Trigger a timeline refresh respecting the loading guard."""
+        self.load_timeline_events(reset=reset)
     
     def _on_auto_task_changed(self, event_id: str, config: Dict[str, Any]):
         """
