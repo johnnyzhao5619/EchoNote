@@ -23,7 +23,22 @@ class DummyCalendarManager:
         self._events = list(events)
 
     def get_events(self, start_date=None, end_date=None, filters=None):
-        return list(self._events)
+        start_bound = to_local_naive(start_date) if start_date else None
+        end_bound = to_local_naive(end_date) if end_date else None
+
+        results = []
+        for event in self._events:
+            event_start = to_local_naive(event.start_time)
+            event_end = to_local_naive(event.end_time) if event.end_time else event_start
+
+            if start_bound and event_end < start_bound:
+                continue
+            if end_bound and event_start > end_bound:
+                continue
+
+            results.append(event)
+
+        return results
 
     def get_event(self, event_id):
         for event in self._events:
@@ -756,6 +771,73 @@ def test_search_events_transcript_hits_without_filters(monkeypatch, tmp_path):
     assert snippet is not None
     assert 'transcript' in snippet.lower()
 
+
+def test_search_events_transcript_hits_for_old_events(monkeypatch, tmp_path):
+    old_start = datetime.now(timezone.utc) - timedelta(days=120)
+    old_end = old_start + timedelta(hours=1)
+    event = CalendarEvent(
+        id='transcript-legacy',
+        title='Quarterly Retrospective',
+        start_time=iso_z(old_start),
+        end_time=iso_z(old_end),
+        description='Long-term planning session',
+    )
+
+    transcript_path = tmp_path / 'retrospective.txt'
+    transcript_path.write_text(
+        'Detailed Retrospective Outcomes and Retrospective Notes.',
+        encoding='utf-8',
+    )
+
+    attachments = [
+        EventAttachment(
+            event_id=event.id,
+            attachment_type='transcript',
+            file_path=str(transcript_path),
+        )
+    ]
+
+    manager = TimelineManagerForTest(
+        calendar_manager=DummyCalendarManager([event]),
+        db_connection=NOOP_DB,
+    )
+
+    monkeypatch.setattr(
+        CalendarEvent,
+        'search',
+        staticmethod(lambda db, keyword=None, event_type=None, source=None: []),
+    )
+    monkeypatch.setattr(
+        CalendarEvent,
+        'get_time_bounds',
+        staticmethod(lambda db: (event.start_time, event.end_time)),
+    )
+
+    batch_calls = []
+
+    def fake_get_by_event_ids(db, event_ids):
+        batch_calls.append(tuple(event_ids))
+        return {event.id: attachments}
+
+    monkeypatch.setattr(
+        EventAttachment,
+        'get_by_event_ids',
+        staticmethod(fake_get_by_event_ids),
+    )
+    monkeypatch.setattr(
+        EventAttachment,
+        'get_by_event_id',
+        staticmethod(lambda db, event_id: []),
+    )
+
+    results = manager.search_events(query='Retrospective')
+
+    assert batch_calls == [(event.id,)]
+    assert [item['event'].id for item in results] == [event.id]
+
+    snippet = results[0]['match_snippet']
+    assert snippet is not None
+    assert 'transcript' in snippet.lower()
 
 def test_get_search_snippet_uses_translated_prefix():
     event = CalendarEvent(

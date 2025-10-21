@@ -790,9 +790,34 @@ class TimelineManager:
             candidate_end = end_dt
             candidate_start = end_dt - window
         else:
-            midpoint = datetime.now()
-            candidate_start = midpoint - window
-            candidate_end = midpoint + window
+            def _safe_to_local(value: Optional[Union[datetime, str]]) -> Optional[datetime]:
+                if value is None:
+                    return None
+                try:
+                    return to_local_naive(value)
+                except Exception as exc:  # pragma: no cover - defensive
+                    logger.debug(
+                        "Failed to convert candidate bound %r to datetime: %s",
+                        value,
+                        exc,
+                    )
+                    return None
+
+            bound_start_raw, bound_end_raw = CalendarEvent.get_time_bounds(self.db)
+            if not bound_start_raw and not bound_end_raw:
+                bound_start_raw, bound_end_raw = EventAttachment.get_linked_event_bounds(self.db)
+
+            candidate_start = _safe_to_local(bound_start_raw)
+            candidate_end = _safe_to_local(bound_end_raw)
+
+            if candidate_start is None and candidate_end is None:
+                midpoint = datetime.now()
+                candidate_start = midpoint - window
+                candidate_end = midpoint + window
+            elif candidate_start is None:
+                candidate_start = candidate_end - window
+            elif candidate_end is None:
+                candidate_end = candidate_start + window
 
         if candidate_end < candidate_start:
             candidate_start, candidate_end = candidate_end, candidate_start

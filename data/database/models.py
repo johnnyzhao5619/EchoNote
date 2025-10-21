@@ -9,7 +9,7 @@ import logging
 import uuid
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 
 from data.database.encryption_helper import (
     encrypt_sensitive_field,
@@ -395,6 +395,22 @@ class CalendarEventLink:
         rows = db_connection.execute(query, (event_id,))
         return [CalendarEventLink.from_db_row(row) for row in rows]
 
+    @staticmethod
+    def get_time_bounds(
+        db_connection
+    ) -> Tuple[Optional[str], Optional[str]]:
+        """Return earliest start and latest end timestamps for stored events."""
+        query = (
+            "SELECT MIN(start_time) AS min_start, "
+            "MAX(end_time) AS max_end FROM calendar_events"
+        )
+        rows = db_connection.execute(query)
+        if not rows:
+            return None, None
+
+        row = rows[0]
+        return row['min_start'], row['max_end']
+
 
 @dataclass
 class EventAttachment:
@@ -464,12 +480,29 @@ class EventAttachment:
             attachments_map.setdefault(attachment.event_id, []).append(attachment)
 
         return attachments_map
-    
+
     def delete(self, db_connection):
         """Delete attachment from database."""
         query = "DELETE FROM event_attachments WHERE id = ?"
         db_connection.execute(query, (self.id,), commit=True)
         logger.debug(f"Deleted event attachment: {self.id}")
+
+    @staticmethod
+    def get_linked_event_bounds(
+        db_connection
+    ) -> Tuple[Optional[str], Optional[str]]:
+        """Return event time bounds for events that have attachments."""
+        query = (
+            "SELECT MIN(e.start_time) AS min_start, MAX(e.end_time) AS max_end "
+            "FROM event_attachments AS a "
+            "JOIN calendar_events AS e ON e.id = a.event_id"
+        )
+        rows = db_connection.execute(query)
+        if not rows:
+            return None, None
+
+        row = rows[0]
+        return row['min_start'], row['max_end']
 
 
 @dataclass
