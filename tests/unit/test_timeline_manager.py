@@ -32,10 +32,10 @@ class DummyCalendarManager:
         return None
 
 
-class TimelineManagerForTest(TimelineManager):
-    def get_event_artifacts(self, event_id: str):  # noqa: D401
-        return {'recording': None, 'transcript': None, 'attachments': []}
+NOOP_DB = SimpleNamespace(execute=lambda *args, **kwargs: [])
 
+
+class TimelineManagerForTest(TimelineManager):
     def _get_auto_task_map(self, event_ids):  # noqa: D401
         return {
             event_id: {'enable_transcription': True}
@@ -81,7 +81,7 @@ def test_get_timeline_events_handles_mixed_timezones():
 
     manager = TimelineManagerForTest(
         calendar_manager=DummyCalendarManager(events),
-        db_connection=None,
+        db_connection=NOOP_DB,
     )
 
     result = manager.get_timeline_events(
@@ -101,7 +101,7 @@ def test_get_timeline_events_handles_mixed_timezones():
 def _build_manager(events):
     return TimelineManagerForTest(
         calendar_manager=DummyCalendarManager(events),
-        db_connection=None,
+        db_connection=NOOP_DB,
     )
 
 
@@ -250,6 +250,70 @@ def test_get_timeline_events_future_preserved_on_first_page():
     assert result['has_more']
 
 
+def test_get_timeline_events_batches_past_attachments(monkeypatch):
+    center_time = datetime(2024, 6, 1, 12, 0, tzinfo=timezone.utc)
+
+    past_events = []
+    for index in range(25):
+        start = center_time - timedelta(hours=2 + index)
+        end = start + timedelta(minutes=45)
+        past_events.append(
+            CalendarEvent(
+                id=f'past-{index}',
+                title=f'Past #{index}',
+                start_time=iso_z(start),
+                end_time=iso_z(end),
+            )
+        )
+
+    future_events = []
+    for index in range(3):
+        start = center_time + timedelta(hours=1 + index)
+        end = start + timedelta(minutes=30)
+        future_events.append(
+            CalendarEvent(
+                id=f'future-{index}',
+                title=f'Future #{index}',
+                start_time=iso_z(start),
+                end_time=iso_z(end),
+            )
+        )
+
+    attachment_calls = []
+
+    def fake_get_by_event_ids(db, event_ids):
+        attachment_calls.append(tuple(event_ids))
+        return {event_id: [] for event_id in event_ids}
+
+    monkeypatch.setattr(
+        EventAttachment,
+        'get_by_event_ids',
+        staticmethod(fake_get_by_event_ids),
+    )
+
+    manager = TimelineManagerForTest(
+        calendar_manager=DummyCalendarManager(past_events + future_events),
+        db_connection=NOOP_DB,
+    )
+
+    result = manager.get_timeline_events(
+        center_time=center_time,
+        past_days=2,
+        future_days=1,
+        page_size=10,
+    )
+
+    assert len(attachment_calls) == 1
+    assert set(attachment_calls[0]) == {event.id for event in past_events}
+
+    assert len(result['past_events']) == 10
+    assert result['total_count'] == len(past_events)
+    assert [item['event'].id for item in result['future_events']] == [
+        'future-0', 'future-1', 'future-2'
+    ]
+    assert result['future_total_count'] == len(future_events)
+
+
 def test_get_timeline_events_mixed_across_pages_without_future_duplicates():
     center_time = datetime(2024, 5, 20, 12, 0, tzinfo=timezone.utc)
 
@@ -344,7 +408,7 @@ def test_get_timeline_events_batches_future_auto_tasks():
     configured_ids = {f'future-{index}' for index in range(0, 12, 3)}
     manager = CountingManager(
         calendar_manager=DummyCalendarManager(future_events),
-        db_connection=None,
+        db_connection=NOOP_DB,
         configured_ids=configured_ids,
     )
 
@@ -387,7 +451,7 @@ def test_search_events_applies_timezone_filters(monkeypatch):
     events = [in_range, out_of_range]
     manager = TimelineManagerForTest(
         calendar_manager=DummyCalendarManager(events),
-        db_connection=None,
+        db_connection=NOOP_DB,
     )
 
     monkeypatch.setattr(
@@ -455,7 +519,7 @@ def test_search_events_filters_attendees_without_errors(monkeypatch):
 
     manager = TimelineManagerForTest(
         calendar_manager=DummyCalendarManager(events),
-        db_connection=None,
+        db_connection=NOOP_DB,
     )
 
     monkeypatch.setattr(
@@ -538,7 +602,7 @@ def test_search_events_batches_attachment_lookup(monkeypatch, tmp_path):
 
     manager = TimelineManagerForTest(
         calendar_manager=DummyCalendarManager(events),
-        db_connection=None,
+        db_connection=NOOP_DB,
     )
 
     results = manager.search_events(query='notes')
@@ -566,7 +630,7 @@ def test_get_search_snippet_uses_translated_prefix():
 
     manager = TimelineManagerForTest(
         calendar_manager=DummyCalendarManager([event]),
-        db_connection=None,
+        db_connection=NOOP_DB,
         i18n=StubI18n({
             'timeline.snippet.title_prefix': '标题',
             'timeline.snippet.description_prefix': '描述',
@@ -590,7 +654,7 @@ def test_get_search_snippet_returns_missing_message(monkeypatch, caplog, tmp_pat
 
     manager = TimelineManagerForTest(
         calendar_manager=DummyCalendarManager([event]),
-        db_connection=None,
+        db_connection=NOOP_DB,
     )
 
     monkeypatch.setattr(
@@ -626,7 +690,7 @@ def test_get_search_snippet_returns_unreadable_message(monkeypatch, caplog, tmp_
 
     manager = TimelineManagerForTest(
         calendar_manager=DummyCalendarManager([event]),
-        db_connection=None,
+        db_connection=NOOP_DB,
     )
 
     monkeypatch.setattr(
@@ -661,7 +725,7 @@ def test_get_search_snippet_missing_transcript_uses_translation(monkeypatch, tmp
 
     manager = TimelineManagerForTest(
         calendar_manager=DummyCalendarManager([event]),
-        db_connection=None,
+        db_connection=NOOP_DB,
         i18n=StubI18n({
             'timeline.snippet.missing_transcript': '转录文件缺失',
         }),
