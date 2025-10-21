@@ -36,6 +36,28 @@ class DummyTimelineManager:
         return None
 
 
+class FlakyTimelineManager(DummyTimelineManager):
+    """Timeline manager that can simulate failures after a successful load."""
+
+    def __init__(self, event):
+        self._event = event
+        self.fail_requests = False
+
+    def get_timeline_events(self, **_):
+        if self.fail_requests:
+            raise RuntimeError("timeline fetch failed")
+
+        current = datetime.now().isoformat()
+        return {
+            "current_time": current,
+            "past_events": [
+                {"event": self._event, "artifacts": {}},
+            ],
+            "future_events": [],
+            "has_more": False,
+        }
+
+
 @pytest.fixture(scope="module")
 def qapp():
     app = QApplication.instance()
@@ -109,6 +131,54 @@ def test_search_always_refreshes_timeline(monkeypatch, qapp):
 
         assert load_calls == [True, True]
         assert widget.current_query == "meeting"
+    finally:
+        widget.deleteLater()
+        qapp.processEvents()
+
+
+def test_refresh_failure_keeps_existing_cards(monkeypatch, qapp):
+    monkeypatch.setattr(
+        "ui.timeline.widget.QTimer.singleShot",
+        staticmethod(lambda *_: None),
+    )
+
+    past_start = datetime.now() - timedelta(hours=2)
+    past_end = past_start + timedelta(hours=1)
+    event = CalendarEvent(
+        id="event-past",
+        title="Completed meeting",
+        start_time=past_start.isoformat(),
+        end_time=past_end.isoformat(),
+    )
+
+    manager = FlakyTimelineManager(event)
+    i18n = I18nQtManager(default_language="en_US")
+    widget = TimelineWidget(manager, i18n)
+
+    try:
+        assert widget.load_timeline_events(reset=True)
+        qapp.processEvents()
+
+        original_cards = list(widget.event_cards)
+        original_event_ids = [
+            card.event.id for card in original_cards if hasattr(card, "event")
+        ]
+
+        assert original_event_ids, "Expected at least one event card after load"
+
+        manager.fail_requests = True
+
+        assert not widget.load_timeline_events(reset=True)
+        qapp.processEvents()
+
+        remaining_event_ids = [
+            card.event.id for card in widget.event_cards if hasattr(card, "event")
+        ]
+
+        assert remaining_event_ids == original_event_ids
+        assert any(
+            isinstance(card, CurrentTimeIndicator) for card in widget.event_cards
+        )
     finally:
         widget.deleteLater()
         qapp.processEvents()
