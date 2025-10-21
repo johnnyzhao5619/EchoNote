@@ -3,6 +3,7 @@ import logging
 import sys
 import types
 from pathlib import Path
+from typing import Optional
 import time
 
 import pytest
@@ -300,6 +301,7 @@ def _ensure_pyqt_stub():
 
 _ensure_pyqt_stub()
 
+import core.transcription.manager as transcription_manager_module
 from core.transcription.manager import TranscriptionManager
 from data.database.connection import DatabaseConnection
 from data.database.models import TranscriptionTask
@@ -329,6 +331,27 @@ class SuccessfulSpeechEngine:
             "duration": 1.2,
             "segments": [
                 {"start": 0.0, "end": 1.0, "text": "hello world"},
+            ],
+        }
+
+
+class SlowCancellableSpeechEngine:
+    def __init__(self):
+        self.start_signal: Optional[asyncio.Event] = None
+
+    def get_name(self) -> str:
+        return "slow-cancellable-engine"
+
+    async def transcribe_file(self, file_path, language=None, progress_callback=None):
+        if self.start_signal:
+            self.start_signal.set()
+        await asyncio.sleep(0.2)
+        if progress_callback:
+            progress_callback(25.0)
+        return {
+            "duration": 2.0,
+            "segments": [
+                {"start": 0.0, "end": 1.0, "text": "delayed"},
             ],
         }
 
@@ -377,7 +400,9 @@ def test_process_task_failure_after_task_removed(manager, initialized_db, monkey
 
     manager.speech_engine.failure_hook = remove_task_record
 
-    asyncio.run(manager._process_task_async(task_id))
+    asyncio.run(
+        manager._process_task_async(task_id, cancel_event=asyncio.Event())
+    )
 
     assert notifications[-1] == (f"Transcription failed: {task.file_name}", "error")
     assert progress_updates[-1][0] == task_id
@@ -419,7 +444,9 @@ def test_process_task_failure_when_lookup_raises(manager, initialized_db, monkey
         staticmethod(failing_get_by_id),
     )
 
-    asyncio.run(manager._process_task_async(task_id))
+    asyncio.run(
+        manager._process_task_async(task_id, cancel_event=asyncio.Event())
+    )
 
     assert notifications[-1] == (f"Transcription failed: {task_id}", "error")
     assert progress_updates[-1][0] == task_id
@@ -491,7 +518,9 @@ def test_successful_process_uses_default_save_path(initialized_db, tmp_path):
     )
     task.save(initialized_db)
 
-    asyncio.run(manager._process_task_async(task.id))
+    asyncio.run(
+        manager._process_task_async(task.id, cancel_event=asyncio.Event())
+    )
 
     expected_output = (default_dir / f"{audio_file.stem}.txt").resolve()
     assert expected_output.exists()
@@ -503,6 +532,92 @@ def test_successful_process_uses_default_save_path(initialized_db, tmp_path):
     refreshed_task = TranscriptionTask.get_by_id(initialized_db, task.id)
     assert refreshed_task is not None
     assert refreshed_task.output_path == str(expected_output)
+
+
+def test_cancellation_prevents_exports_and_marks_cancelled(
+    initialized_db,
+    tmp_path,
+    monkeypatch,
+):
+    export_dir = tmp_path / "exports"
+    engine = SlowCancellableSpeechEngine()
+    manager = TranscriptionManager(
+        initialized_db,
+        engine,
+        config={
+            "default_save_path": str(export_dir),
+            "default_output_format": "txt",
+        },
+    )
+
+    notifications = []
+    monkeypatch.setattr(
+        manager,
+        "_send_notification",
+        lambda message, notification_type: notifications.append(
+            (message, notification_type)
+        ),
+    )
+
+    progress_updates = []
+
+    def record_progress(task_id, progress, message):
+        progress_updates.append((task_id, progress, message))
+
+    monkeypatch.setattr(manager, "_update_progress", record_progress)
+
+    app_dir = tmp_path / "app-data"
+    monkeypatch.setattr(
+        transcription_manager_module,
+        "get_app_dir",
+        lambda: app_dir,
+    )
+
+    audio_file = tmp_path / "sample.wav"
+    audio_file.write_bytes(b"fake-audio")
+
+    task = TranscriptionTask(
+        file_path=str(audio_file),
+        file_name=audio_file.name,
+        file_size=audio_file.stat().st_size,
+        status="pending",
+        output_format="txt",
+    )
+    task.save(initialized_db)
+
+    async def _run():
+        cancel_event = asyncio.Event()
+        engine.start_signal = asyncio.Event()
+        task_future = asyncio.create_task(
+            manager._process_task_async(task.id, cancel_event=cancel_event)
+        )
+
+        await engine.start_signal.wait()
+        cancel_event.set()
+
+        with pytest.raises(asyncio.CancelledError):
+            await task_future
+
+    asyncio.run(_run())
+
+    refreshed_task = TranscriptionTask.get_by_id(initialized_db, task.id)
+    assert refreshed_task is not None
+    assert refreshed_task.status == "cancelled"
+    assert refreshed_task.output_path is None
+
+    internal_path = Path(manager._get_internal_format_path(task.id))
+    assert not internal_path.exists()
+
+    default_output_path = (export_dir / f"{audio_file.stem}.txt").resolve()
+    assert not default_output_path.exists()
+
+    assert notifications == []
+    assert progress_updates, "Expected at least one progress update"
+    last_update = progress_updates[-1]
+    assert last_update[0] == task.id
+    assert last_update[2] == "Cancelled"
+    expected_progress = refreshed_task.progress or 0.0
+    assert last_update[1] == pytest.approx(expected_progress)
 
 
 def test_background_shutdown_logs_and_cleans_up(initialized_db, monkeypatch, caplog):

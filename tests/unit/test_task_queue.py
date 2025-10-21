@@ -14,7 +14,7 @@ def test_completed_task_removed_after_processing():
     async def _run():
         queue = TaskQueue(max_concurrent=1, max_retries=0)
 
-        async def successful_task(value):
+        async def successful_task(value, *, cancel_event):
             await asyncio.sleep(0)
             return value
 
@@ -36,7 +36,7 @@ def test_cancelled_task_removed_after_processing():
     async def _run():
         queue = TaskQueue(max_concurrent=1, max_retries=0)
 
-        async def long_running_task():
+        async def long_running_task(*, cancel_event):
             await asyncio.sleep(0.1)
 
         try:
@@ -59,7 +59,7 @@ def test_duplicate_task_does_not_expand_tasks():
     async def _run():
         queue = TaskQueue(max_concurrent=1, max_retries=0)
 
-        async def noop_task():
+        async def noop_task(*, cancel_event):
             await asyncio.sleep(0)
 
         try:
@@ -83,7 +83,7 @@ def test_failed_task_removed_after_retries():
     async def _run():
         queue = TaskQueue(max_concurrent=1, max_retries=1, retry_delay=0)
 
-        async def failing_task():
+        async def failing_task(*, cancel_event):
             raise RuntimeError("boom")
 
         try:
@@ -105,7 +105,7 @@ def test_pause_after_dequeue_allows_completion():
 
         task_started = asyncio.Event()
 
-        async def sample_task():
+        async def sample_task(*, cancel_event):
             task_started.set()
             await asyncio.sleep(0)
 
@@ -139,7 +139,7 @@ def test_running_task_cancelled_by_stop(caplog):
 
         task_started = asyncio.Event()
 
-        async def long_running_task():
+        async def long_running_task(*, cancel_event):
             task_started.set()
             await asyncio.sleep(10)
 
