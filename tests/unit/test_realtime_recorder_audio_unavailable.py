@@ -170,6 +170,20 @@ class DummyTranslationEngine:
         return f"{text}-to-{target_lang}"
 
 
+class SlowTranslationEngine(DummyTranslationEngine):
+    """Translation engine stub that introduces artificial delay."""
+
+    def __init__(self, delay: float = 0.2):
+        super().__init__()
+        self.delay = delay
+        self.started = asyncio.Event()
+
+    async def translate(self, text, source_lang='auto', target_lang='en'):
+        self.started.set()
+        await asyncio.sleep(self.delay)
+        return await super().translate(text, source_lang=source_lang, target_lang=target_lang)
+
+
 class StubNotificationManager:
     def __init__(self):
         self.success_messages = []
@@ -983,6 +997,72 @@ def test_stop_recording_persists_translation_file(monkeypatch, tmp_path):
     assert saved_path.exists()
     content = saved_path.read_text(encoding='utf-8').strip()
     assert "transcription-1-to-en" in content
+
+
+def test_stop_recording_waits_for_translation_shutdown(monkeypatch, tmp_path):
+    if not HAS_NUMPY:
+        pytest.skip("numpy is required for streaming tests")
+
+    from core.realtime.recorder import RealtimeRecorder
+
+    monkeypatch.setattr("engines.audio.vad.VADDetector", AlwaysSpeechVAD)
+
+    audio_capture = DummyAudioCapture(sample_rate=16000)
+    speech_engine = DummyStreamingSpeechEngine()
+    translation_engine = SlowTranslationEngine(delay=0.2)
+    file_manager = DummyFileManager(base_dir=tmp_path)
+
+    recorder = RealtimeRecorder(
+        audio_capture=audio_capture,
+        speech_engine=speech_engine,
+        translation_engine=translation_engine,
+        db_connection=None,
+        file_manager=file_manager,
+    )
+
+    recorder.TRANSLATION_TASK_TIMEOUT = 0.05
+    recorder.TRANSLATION_TASK_SHUTDOWN_TIMEOUT = 0.3
+
+    options = {
+        'save_recording': False,
+        'save_transcript': False,
+        'create_calendar_event': False,
+        'enable_translation': True,
+        'target_language': 'en',
+    }
+
+    async def _run():
+        loop = asyncio.get_running_loop()
+        await recorder.start_recording(options=options, event_loop=loop)
+        assert audio_capture.callback is not None
+
+        chunk = np.full(recorder.sample_rate, 0.05, dtype=np.float32)
+        for _ in range(3):
+            audio_capture.callback(chunk.copy())
+            await asyncio.sleep(0.01)
+
+        await asyncio.wait_for(translation_engine.started.wait(), timeout=1.0)
+
+        result = await recorder.stop_recording()
+
+        assert recorder.translation_task is None
+        assert recorder.translation_queue is None
+        assert recorder._translation_stream_queue is None
+
+        return result
+
+    result = asyncio.run(_run())
+
+    translation_path = result.get('translation_path')
+    assert translation_path, "Expected translation_path in stop_recording result"
+
+    saved_path = Path(translation_path)
+    assert saved_path.exists()
+    content = saved_path.read_text(encoding='utf-8').strip()
+
+    assert content == "\n".join(recorder.accumulated_translation).strip()
+    assert "transcription-1-to-en" in content
+    assert translation_engine.calls == 1
 
 
 def test_save_recording_mp3_with_ffmpeg(monkeypatch, tmp_path):

@@ -25,6 +25,9 @@ logger = logging.getLogger(__name__)
 class RealtimeRecorder:
     """实时录制管理器"""
 
+    TRANSLATION_TASK_TIMEOUT = 5.0
+    TRANSLATION_TASK_SHUTDOWN_TIMEOUT = 2.0
+
     def __init__(self, audio_capture, speech_engine, translation_engine,
                  db_connection, file_manager, i18n=None):
         """
@@ -487,49 +490,57 @@ class RealtimeRecorder:
             logger.error("Translation queues are not initialized; aborting translation stream processing")
             return
 
-        while self.is_recording or not queue.empty():
-            try:
-                # 从队列获取转录文本（超时 0.5 秒）
-                text = await asyncio.wait_for(
-                    queue.get(),
-                    timeout=0.5
-                )
+        try:
+            while self.is_recording or not queue.empty():
+                try:
+                    # 从队列获取转录文本（超时 0.5 秒）
+                    text = await asyncio.wait_for(
+                        queue.get(),
+                        timeout=0.5
+                    )
 
-                # 翻译
-                source_lang = self.current_options.get('language', 'auto')
-                target_lang = self.current_options.get('target_language', 'en')
+                    if text is None:
+                        logger.debug("Received translation shutdown signal")
+                        break
 
-                # 翻译引擎已在函数开始时检查
-                translated_text = await self.translation_engine.translate(
-                    text,
-                    source_lang=source_lang,
-                    target_lang=target_lang
-                )
+                    # 翻译
+                    source_lang = self.current_options.get('language', 'auto')
+                    target_lang = self.current_options.get('target_language', 'en')
 
-                if translated_text.strip():
-                    # 累积翻译文本
-                    self.accumulated_translation.append(translated_text)
+                    # 翻译引擎已在函数开始时检查
+                    translated_text = await self.translation_engine.translate(
+                        text,
+                        source_lang=source_lang,
+                        target_lang=target_lang
+                    )
 
-                    # 推送到实时翻译流
-                    await stream_queue.put(translated_text)
+                    if translated_text.strip():
+                        # 累积翻译文本
+                        self.accumulated_translation.append(translated_text)
 
-                    # 通知 UI 更新
-                    if self.on_translation_update:
-                        self.on_translation_update(translated_text)
+                        # 推送到实时翻译流
+                        await stream_queue.put(translated_text)
 
-                    logger.debug(f"Translated: {translated_text}")
+                        # 通知 UI 更新
+                        if self.on_translation_update:
+                            self.on_translation_update(translated_text)
 
-            except asyncio.TimeoutError:
-                # 超时，继续等待
-                continue
-            except Exception as e:
-                logger.error(f"Error in translation stream processing: {e}")
-                if self.on_error:
-                    self.on_error(f"Translation error: {e}")
-                if self.is_recording:
+                        logger.debug(f"Translated: {translated_text}")
+
+                except asyncio.TimeoutError:
+                    # 超时，继续等待
                     continue
-                else:
-                    break
+                except Exception as e:
+                    logger.error(f"Error in translation stream processing: {e}")
+                    if self.on_error:
+                        self.on_error(f"Translation error: {e}")
+                    if self.is_recording:
+                        continue
+                    else:
+                        break
+        except asyncio.CancelledError:
+            logger.info("Translation stream processing cancelled")
+            raise
 
         logger.info("Translation stream processing stopped")
 
@@ -570,12 +581,11 @@ class RealtimeRecorder:
                 await asyncio.wait_for(self.processing_task, timeout=5.0)
             except asyncio.TimeoutError:
                 logger.warning("Processing task timeout")
+            finally:
+                self.processing_task = None
 
         if self.translation_task:
-            try:
-                await asyncio.wait_for(self.translation_task, timeout=5.0)
-            except asyncio.TimeoutError:
-                logger.warning("Translation task timeout")
+            await self._ensure_translation_task_stopped()
 
         # 标记流式队列完成，确保生成器退出
         transcription_stream_queue = self._transcription_stream_queue
@@ -640,6 +650,51 @@ class RealtimeRecorder:
         self._release_session_queues()
 
         return result
+
+    async def _ensure_translation_task_stopped(self) -> None:
+        """确保翻译任务在停止录音前已完全退出。"""
+        task = self.translation_task
+        if task is None:
+            return
+
+        try:
+            await asyncio.wait_for(
+                task,
+                timeout=self.TRANSLATION_TASK_TIMEOUT
+            )
+        except asyncio.TimeoutError:
+            logger.warning("Translation task timeout; requesting graceful shutdown")
+            await self._request_translation_shutdown(task)
+        finally:
+            self.translation_task = None
+
+    async def _request_translation_shutdown(self, task: asyncio.Task) -> None:
+        """向翻译协程发送终止信号并确保其退出。"""
+        queue = self.translation_queue
+        stream_queue = self._translation_stream_queue
+
+        if queue is not None:
+            try:
+                queue.put_nowait(None)
+            except asyncio.QueueFull:  # pragma: no cover - 默认队列无限大
+                logger.warning("Translation queue full when sending shutdown signal")
+
+        if stream_queue is not None:
+            self._signal_stream_completion(stream_queue)
+
+        try:
+            await asyncio.wait_for(
+                task,
+                timeout=self.TRANSLATION_TASK_SHUTDOWN_TIMEOUT
+            )
+        except asyncio.TimeoutError:
+            logger.error("Translation task did not stop after shutdown request; cancelling")
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+        finally:
+            self._drain_queue(queue)
+            self._drain_queue(stream_queue)
 
     async def _save_recording(self) -> str:
         """
