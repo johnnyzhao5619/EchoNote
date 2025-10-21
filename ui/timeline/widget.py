@@ -62,6 +62,7 @@ class TimelineWidget(QWidget):
         self.is_loading = False
         self.has_more = True
         self.event_cards: List[QWidget] = []
+        self._audio_player_dialogs: Dict[str, 'AudioPlayerDialog'] = {}
         
         # Current filters
         self.current_query = ""
@@ -450,8 +451,31 @@ class TimelineWidget(QWidget):
         from ui.timeline.audio_player import AudioPlayerDialog
         
         try:
+            existing_dialog = self._audio_player_dialogs.get(file_path)
+
+            if existing_dialog:
+                existing_dialog.show()
+                existing_dialog.raise_()
+                existing_dialog.activateWindow()
+                logger.info(f"Activated existing audio player for {file_path}")
+                return
+
             dialog = AudioPlayerDialog(file_path, self.i18n, self)
-            dialog.exec()
+            self._audio_player_dialogs[file_path] = dialog
+
+            def _cleanup_dialog(*_):
+                tracked_dialog = self._audio_player_dialogs.get(file_path)
+                if tracked_dialog is dialog:
+                    self._audio_player_dialogs.pop(file_path, None)
+                    logger.debug(f"Closed audio player for {file_path}")
+
+            dialog.finished.connect(_cleanup_dialog)
+            dialog.destroyed.connect(_cleanup_dialog)
+
+            dialog.show()
+            dialog.raise_()
+            dialog.activateWindow()
+            logger.info(f"Opened audio player for {file_path}")
         except Exception as e:
             logger.error(f"Failed to open audio player: {e}")
     

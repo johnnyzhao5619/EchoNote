@@ -54,6 +54,7 @@ Built-in audio player for recordings:
 - **Error handling** for missing or unsupported files
 - **Instant translation refresh** when the application language changes
 
+
 Uses PyQt6's QMediaPlayer and QAudioOutput.
 
 ### 4. TranscriptViewer (`transcript_viewer.py`)
