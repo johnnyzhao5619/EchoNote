@@ -463,7 +463,7 @@ class AudioPlayerDialog(QDialog):
     def closeEvent(self, event):
         """Handle dialog close."""
         self.player.cleanup()
-        event.accept()
+        super().closeEvent(event)
 
     def update_translations(self):
         """Refresh dialog-level translations when the language changes."""
