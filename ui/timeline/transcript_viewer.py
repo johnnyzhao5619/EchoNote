@@ -399,14 +399,16 @@ class TranscriptViewerDialog(QDialog):
             parent: Parent widget
         """
         super().__init__(parent)
-        
+
         self.i18n = i18n
         self._title_key = title_key or 'transcript.viewer_title'
-        
+
         # Setup dialog
         self.setWindowTitle(i18n.t(self._title_key))
         self.setMinimumSize(600, 500)
+        self.setWindowModality(Qt.WindowModality.NonModal)
         self.setModal(False)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         
         # Layout
         layout = QVBoxLayout(self)

@@ -66,6 +66,7 @@ Transcript text viewer with:
 - **Copy to clipboard**
 - **Export to file** (txt, md)
 - **Error handling** for missing files
+- **Non-modal dialog reuse** so opening the same artifact reactivates the existing window and releases resources when closed
 
 ## Integration
 
