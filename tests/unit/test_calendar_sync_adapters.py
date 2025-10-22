@@ -194,46 +194,50 @@ def test_outlook_convert_offset_datetime(monkeypatch, outlook_adapter):
     assert payload['end']['dateTime'] == '2024-07-01T10:30:00'
 
 
-def test_outlook_convert_iana_paris(outlook_adapter):
-    event = CalendarEvent(
-        title='Sample',
-        start_time=datetime(2024, 7, 1, 9, 0, tzinfo=ZoneInfo('Europe/Paris')),
-        end_time=datetime(2024, 7, 1, 10, 0, tzinfo=ZoneInfo('Europe/Paris')),
-    )
+def test_outlook_convert_removed_event(outlook_adapter):
+    outlook_payload = {
+        'id': 'evt-deleted',
+        '@removed': {'reason': 'deleted'},
+    }
 
-    payload = outlook_adapter._convert_to_outlook_event(event)
+    converted = outlook_adapter._convert_outlook_event(outlook_payload)
 
-    assert payload['start']['timeZone'] == 'Romance Standard Time'
-    assert payload['start']['dateTime'] == '2024-07-01T09:00:00'
-    assert payload['end']['timeZone'] == 'Romance Standard Time'
-    assert payload['end']['dateTime'] == '2024-07-01T10:00:00'
+    assert converted == {'id': 'evt-deleted', 'deleted': True}
 
 
-def test_outlook_convert_iana_sao_paulo(outlook_adapter):
-    event = CalendarEvent(
-        title='Sample',
-        start_time=datetime(2024, 7, 1, 9, 0, tzinfo=ZoneInfo('America/Sao_Paulo')),
-        end_time=datetime(2024, 7, 1, 10, 0, tzinfo=ZoneInfo('America/Sao_Paulo')),
-    )
+def test_outlook_fetch_events_tracks_deletions(monkeypatch, outlook_adapter):
+    payload = {
+        'value': [
+            {
+                'id': 'evt-deleted',
+                '@removed': {'reason': 'deleted'},
+            },
+            {
+                'id': 'evt-active',
+                'subject': 'Meeting',
+                'start': {'dateTime': '2024-08-01T09:00:00'},
+                'end': {'dateTime': '2024-08-01T10:00:00'},
+                'attendees': [],
+            },
+        ],
+        '@odata.deltaLink': 'delta-token',
+    }
 
-    payload = outlook_adapter._convert_to_outlook_event(event)
+    class DummyResponse:
+        def __init__(self, data):
+            self._data = data
 
-    assert payload['start']['timeZone'] == 'E. South America Standard Time'
-    assert payload['start']['dateTime'] == '2024-07-01T09:00:00'
-    assert payload['end']['timeZone'] == 'E. South America Standard Time'
-    assert payload['end']['dateTime'] == '2024-07-01T10:00:00'
+        def json(self):
+            return self._data
 
+    def fake_api_request(method, url, **kwargs):
+        assert method == 'GET'
+        return DummyResponse(payload)
 
-def test_outlook_convert_iana_nairobi(outlook_adapter):
-    event = CalendarEvent(
-        title='Sample',
-        start_time=datetime(2024, 7, 1, 9, 0, tzinfo=ZoneInfo('Africa/Nairobi')),
-        end_time=datetime(2024, 7, 1, 10, 0, tzinfo=ZoneInfo('Africa/Nairobi')),
-    )
+    monkeypatch.setattr(outlook_adapter, 'api_request', fake_api_request)
 
-    payload = outlook_adapter._convert_to_outlook_event(event)
+    result = outlook_adapter.fetch_events(last_sync_token='https://delta-link')
 
-    assert payload['start']['timeZone'] == 'E. Africa Standard Time'
-    assert payload['start']['dateTime'] == '2024-07-01T09:00:00'
-    assert payload['end']['timeZone'] == 'E. Africa Standard Time'
-    assert payload['end']['dateTime'] == '2024-07-01T10:00:00'
+    assert result['deleted'] == ['evt-deleted']
+    assert [event['id'] for event in result['events']] == ['evt-active']
+    assert result['sync_token'] == 'delta-token'

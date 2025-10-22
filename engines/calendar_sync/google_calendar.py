@@ -308,6 +308,19 @@ class GoogleCalendarAdapter(OAuthCalendarAdapter):
             Google event format
         """
         local_tz = self._get_local_timezone()
+
+        def _is_date_only(value: Any) -> bool:
+            return isinstance(value, str) and 'T' not in value and len(value.strip()) == 10
+
+        is_all_day = False
+        if hasattr(event, 'is_all_day_event'):
+            try:
+                is_all_day = event.is_all_day_event()
+            except Exception:  # pragma: no cover - defensive guard
+                is_all_day = False
+        if not is_all_day:
+            is_all_day = _is_date_only(event.start_time) and _is_date_only(event.end_time)
+
         start_dt = self._parse_event_datetime(event.start_time, local_tz)
         end_dt = self._parse_event_datetime(event.end_time, local_tz)
 
@@ -320,10 +333,31 @@ class GoogleCalendarAdapter(OAuthCalendarAdapter):
                 payload['timeZone'] = identifier
             return payload
 
+        def _format_google_date(dt_value, original_value):
+            if isinstance(original_value, str):
+                text_value = original_value.strip()
+                if _is_date_only(text_value):
+                    return text_value
+
+            dt_local = dt_value
+            if dt_local.tzinfo and local_tz:
+                dt_local = dt_local.astimezone(local_tz)
+            elif local_tz and dt_local.tzinfo is None:
+                dt_local = dt_local.replace(tzinfo=local_tz)
+            return dt_local.date().isoformat()
+
         google_event = {
             'summary': event.title,
-            'start': _format_google_datetime(start_dt),
-            'end': _format_google_datetime(end_dt)
+            'start': (
+                {'date': _format_google_date(start_dt, event.start_time)}
+                if is_all_day
+                else _format_google_datetime(start_dt)
+            ),
+            'end': (
+                {'date': _format_google_date(end_dt, event.end_time)}
+                if is_all_day
+                else _format_google_datetime(end_dt)
+            )
         }
 
         if event.location:
