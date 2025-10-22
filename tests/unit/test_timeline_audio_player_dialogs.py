@@ -5,7 +5,7 @@ from types import MethodType
 import pytest
 
 PyQt6 = pytest.importorskip("PyQt6")
-from PyQt6.QtCore import Qt, QDate
+from PyQt6.QtCore import Qt, QDate, QDateTime, QTime
 from PyQt6.QtWidgets import QApplication, QDialog, QWidget
 
 from data.database.models import CalendarEvent
@@ -67,14 +67,43 @@ class SlowTimelineManager(DummyTimelineManager):
         return super().get_timeline_events(**kwargs)
 
 
+class _Signal:
+    """Minimal Qt-like signal used to observe settings updates in tests."""
+
+    def __init__(self):
+        self._callbacks = []
+
+    def connect(self, callback):
+        if callback not in self._callbacks:
+            self._callbacks.append(callback)
+
+    def disconnect(self, callback):
+        try:
+            self._callbacks.remove(callback)
+        except ValueError:
+            pass
+
+    def emit(self, *args, **kwargs):
+        for callback in list(self._callbacks):
+            callback(*args, **kwargs)
+
+
 class _StubSettingsManager:
     """Minimal settings facade exposing timeline preferences."""
 
-    def __init__(self, values):
+    def __init__(self, values, *, with_signal: bool = False):
         self._values = dict(values)
+        self._signal = _Signal() if with_signal else None
+        if with_signal:
+            self.setting_changed = self._signal
 
     def get_setting(self, key):
         return self._values.get(key)
+
+    def update(self, key, value):
+        self._values[key] = value
+        if self._signal:
+            self._signal.emit(key, value)
 
 
 class FlakyTimelineManager(DummyTimelineManager):
@@ -219,6 +248,81 @@ def test_timeline_uses_settings_preferences(monkeypatch, qapp):
         assert call_kwargs["future_days"] == 5
         assert call_kwargs["page_size"] == 12
     finally:
+        widget.deleteLater()
+
+
+def test_timeline_refreshes_after_preference_update(monkeypatch, qapp):
+    monkeypatch.setattr(
+        "ui.timeline.widget.QTimer.singleShot",
+        staticmethod(lambda *_: None),
+    )
+
+    manager = RecordingTimelineManager()
+    i18n = I18nQtManager(default_language="en_US")
+    settings = _StubSettingsManager(
+        {
+            "timeline.past_days": 3,
+            "timeline.future_days": 4,
+            "timeline.page_size": 10,
+        },
+        with_signal=True,
+    )
+
+    widget = TimelineWidget(
+        manager,
+        i18n,
+        settings_manager=settings,
+    )
+
+    try:
+        widget.load_timeline_events()
+        manager.calls.clear()
+
+        settings.update("timeline.past_days", 9)
+
+        assert widget.past_days == 9
+        today = QDate.currentDate()
+        assert widget.start_date_edit.date() == today.addDays(-9)
+        assert widget.end_date_edit.date() == today.addDays(4)
+
+        expected_start = QDateTime(
+            today.addDays(-9), QTime(0, 0, 0)
+        ).toString(Qt.DateFormat.ISODate)
+        expected_end = QDateTime(
+            today.addDays(4), QTime(23, 59, 59)
+        ).toString(Qt.DateFormat.ISODate)
+
+        assert widget.current_filters["start_date"] == expected_start
+        assert widget.current_filters["end_date"] == expected_end
+
+        assert manager.calls, "Expected a timeline reload after preference change"
+        call_kwargs = manager.calls[-1]
+        assert call_kwargs["past_days"] == 9
+        assert call_kwargs["future_days"] == 4
+        assert call_kwargs["page_size"] == 10
+
+        manager.calls.clear()
+        widget.current_page = 3
+        settings.update("timeline.page_size", 25)
+
+        assert widget.page_size == 25
+        assert widget.current_page == 0
+        assert manager.calls, "Expected page size change to reload timeline"
+        size_kwargs = manager.calls[-1]
+        assert size_kwargs["page_size"] == 25
+        assert size_kwargs["page"] == 0
+
+        manager.calls.clear()
+        widget.is_loading = True
+        widget._pending_refresh = None
+        settings.update("timeline.page_size", 30)
+
+        assert widget.page_size == 30
+        assert widget._pending_refresh is True
+        assert manager.calls == []
+    finally:
+        widget.is_loading = False
+        widget._pending_refresh = None
         widget.deleteLater()
 
 

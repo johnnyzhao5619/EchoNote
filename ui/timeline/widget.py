@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QScrollArea,
     QLineEdit, QComboBox, QLabel, QFrame, QPushButton, QMessageBox, QDateEdit
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QDateTime, QTime
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QDateTime, QTime, QDate
 from PyQt6.QtGui import QPalette
 
 from utils.i18n import I18nQtManager
@@ -62,6 +62,7 @@ class TimelineWidget(QWidget):
         self.timeline_manager = timeline_manager
         self.i18n = i18n
         self.settings_manager = settings_manager
+        self._settings_signal_connected = False
 
         # State
         self.current_page = 0
@@ -92,6 +93,9 @@ class TimelineWidget(QWidget):
         # Connect language change
         self.i18n.language_changed.connect(self.update_translations)
         
+        # Connect settings change notifications when available
+        self._connect_settings_manager()
+
         # Load initial data
         QTimer.singleShot(100, self.load_timeline_events)
         
@@ -472,6 +476,126 @@ class TimelineWidget(QWidget):
             "Using default for %s due to invalid value: %r", key, value
         )
         return default
+
+    def _connect_settings_manager(self) -> None:
+        """Subscribe to settings changes when the manager exposes a signal."""
+        manager = self.settings_manager
+        if not manager:
+            return
+
+        signal = getattr(manager, "setting_changed", None)
+        if signal is None or not hasattr(signal, "connect"):
+            return
+
+        try:
+            signal.connect(self._on_settings_changed)
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.warning(
+                "Failed to connect to settings_manager.setting_changed: %s",
+                exc,
+            )
+        else:
+            self._settings_signal_connected = True
+
+    def _disconnect_settings_manager(self) -> None:
+        """Detach from settings change notifications when cleaning up."""
+        if not getattr(self, "_settings_signal_connected", False):
+            return
+
+        manager = getattr(self, "settings_manager", None)
+        signal = getattr(manager, "setting_changed", None) if manager else None
+
+        if signal is None or not hasattr(signal, "disconnect"):
+            self._settings_signal_connected = False
+            return
+
+        try:
+            signal.disconnect(self._on_settings_changed)
+        except (TypeError, RuntimeError, AttributeError):
+            pass
+        finally:
+            self._settings_signal_connected = False
+
+    def _update_current_filter_dates(self) -> None:
+        """Ensure ``current_filters`` stores the date range from the widgets."""
+        if not hasattr(self, 'start_date_edit') or not hasattr(self, 'end_date_edit'):
+            return
+
+        if not isinstance(getattr(self, 'current_filters', None), dict):
+            self.current_filters = {}
+
+        start_qdate = self.start_date_edit.date()
+        end_qdate = self.end_date_edit.date()
+
+        start_dt = QDateTime(start_qdate, QTime(0, 0, 0))
+        end_dt = QDateTime(end_qdate, QTime(23, 59, 59))
+
+        self.current_filters['start_date'] = start_dt.toString(Qt.DateFormat.ISODate)
+        self.current_filters['end_date'] = end_dt.toString(Qt.DateFormat.ISODate)
+
+    def _on_settings_changed(self, key: str, _value: Any) -> None:
+        """React to preference changes that impact the timeline view."""
+        preference_map = {
+            'timeline.past_days': (
+                'past_days',
+                lambda: self._get_timeline_setting(
+                    'timeline.past_days',
+                    default=self.past_days,
+                ),
+                True,
+            ),
+            'timeline.future_days': (
+                'future_days',
+                lambda: self._get_timeline_setting(
+                    'timeline.future_days',
+                    default=self.future_days,
+                ),
+                True,
+            ),
+            'timeline.page_size': (
+                'page_size',
+                lambda: self._get_timeline_setting(
+                    'timeline.page_size',
+                    default=self.page_size,
+                    minimum=1,
+                ),
+                False,
+            ),
+        }
+
+        if not isinstance(getattr(self, 'current_filters', None), dict):
+            self.current_filters = {}
+
+        entry = preference_map.get(key)
+        if not entry:
+            return
+
+        attr_name, loader, should_sync_dates = entry
+        new_value = loader()
+        if getattr(self, attr_name) == new_value:
+            return
+
+        setattr(self, attr_name, new_value)
+
+        if attr_name == 'page_size':
+            self.current_page = 0
+
+        if should_sync_dates:
+            preserved_event_type = self.current_filters.get('event_type')
+            preserved_source = self.current_filters.get('source')
+
+            self.sync_date_filters_with_preferences()
+
+            self.current_filters = {}
+            if preserved_event_type:
+                self.current_filters['event_type'] = preserved_event_type
+            if preserved_source:
+                self.current_filters['source'] = preserved_source
+
+            self._update_current_filter_dates()
+
+        logger.info("Timeline preference %s updated to %s", key, new_value)
+        self.load_timeline_events(reset=True)
     
     def _add_current_time_indicator(self):
         """Add current time indicator line to timeline."""
@@ -638,14 +762,11 @@ class TimelineWidget(QWidget):
         # Get current filter values
         event_type = self.type_filter.currentData()
         source = self.source_filter.currentData()
-        
-        # Get date range with inclusive bounds
+
         start_qdate = self.start_date_edit.date()
         end_qdate = self.end_date_edit.date()
-        start_dt = QDateTime(start_qdate, QTime(0, 0, 0))
-        end_dt = QDateTime(end_qdate, QTime(23, 59, 59))
 
-        if start_dt > end_dt:
+        if start_qdate > end_qdate:
             logger.warning(
                 "Start date %s is after end date %s; swapping values for timeline filter.",
                 start_qdate.toString(Qt.DateFormat.ISODate),
@@ -662,28 +783,21 @@ class TimelineWidget(QWidget):
                 self.end_date_edit.blockSignals(prev_end_blocked)
 
             start_qdate, end_qdate = end_qdate, start_qdate
-            start_dt = QDateTime(start_qdate, QTime(0, 0, 0))
-            end_dt = QDateTime(end_qdate, QTime(23, 59, 59))
             logger.info(
                 "Timeline date range corrected to %s → %s.",
                 start_qdate.toString(Qt.DateFormat.ISODate),
                 end_qdate.toString(Qt.DateFormat.ISODate),
             )
 
-        start_date = start_dt.toString(Qt.DateFormat.ISODate)
-        end_date = end_dt.toString(Qt.DateFormat.ISODate)
-        
         # Update filters
         self.current_filters = {}
         if event_type:
             self.current_filters['event_type'] = event_type
         if source:
             self.current_filters['source'] = source
-        
-        # Add date range to filters
-        self.current_filters['start_date'] = start_date
-        self.current_filters['end_date'] = end_date
-        
+
+        self._update_current_filter_dates()
+
         logger.info(f"Timeline filters changed: {self.current_filters}")
         self._refresh_timeline(reset=True)
 
@@ -905,5 +1019,17 @@ class TimelineWidget(QWidget):
         for card in self.event_cards:
             if hasattr(card, 'update_translations'):
                 card.update_translations()
-        
+
         logger.debug("Timeline translations updated")
+
+    def deleteLater(self):  # noqa: D401
+        """Ensure external signals are disconnected before deletion."""
+        self._disconnect_settings_manager()
+        super().deleteLater()
+
+    def __del__(self):
+        """Best-effort cleanup when the widget is garbage collected."""
+        try:
+            self._disconnect_settings_manager()
+        except Exception:  # pragma: no cover - guard against PyQt teardown
+            pass

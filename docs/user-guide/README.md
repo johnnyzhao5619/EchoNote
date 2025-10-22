@@ -222,6 +222,7 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 - Date filters are inclusive; the selected end date covers the entire day.
 - If the chosen start date is later than the end date, EchoNote automatically swaps them and notes the correction.
 - When a chosen range exceeds your saved window, the timeline automatically expands its fetch span so those events remain visible.
+- Timeline preferences update instantly; adjusting the saved day span or page size in Settings refreshes results without closing the view.
 - Past events display linked recordings, transcripts, and notes for download or preview.
 - Future events allow auto-tasks: auto-record, auto-transcribe, preset languages, and translation targets.
 
@@ -232,6 +233,7 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 - 日期筛选为包含式区间，终止日期会覆盖当日全部事件。
 - 如果起始日期晚于结束日期，EchoNote 会自动对调并记录校正，避免出现反向区间。
 - 当选择的日期范围超过偏好设置时，时间线会自动扩大查询窗口，无需手动调整即可覆盖所选日期。
+- 修改设置中的时间线天数或分页大小后会即时刷新，无需重新打开页面。
 - 历史事件会列出录音、转录、笔记，可预览或下载。
 - 未来事件可配置自动录音、自动转录、默认语言与翻译目标。
 
@@ -242,6 +244,7 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 
 - Naviguez entre les périodes via les sélecteurs de dates ; la recherche par mot-clé couvre les titres, descriptions et transcriptions.
 - Si la plage choisie dépasse vos préférences, la timeline agrandit automatiquement la fenêtre de recherche pour inclure ces événements.
+- Les préférences de timeline se répercutent immédiatement : modifier l'étendue de jours ou la taille de page dans Paramètres recharge la vue sans la rouvrir.
 - Les événements passés affichent enregistrements, transcriptions et notes associés pour prévisualisation ou téléchargement.
 - Les événements futurs proposent des tâches automatiques : enregistrement, transcription, langues préconfigurées et cibles de traduction.
 
