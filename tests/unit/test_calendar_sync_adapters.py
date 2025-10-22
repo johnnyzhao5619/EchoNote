@@ -529,7 +529,14 @@ def test_outlook_fetch_events_initial_sync_uses_delta_endpoint(monkeypatch, outl
         captured['method'] = method
         captured['url'] = url
         return DummyResponse({
-            'value': [],
+            'value': [
+                {
+                    'id': 'evt-1',
+                    'subject': 'Kick-off',
+                    'start': {'dateTime': '2024-08-01T09:00:00'},
+                    'end': {'dateTime': '2024-08-01T10:00:00'},
+                },
+            ],
             '@odata.deltaLink': 'https://graph.microsoft.com/v1.0/me/calendar/events/delta?$deltatoken=abc',
         })
 
@@ -541,8 +548,9 @@ def test_outlook_fetch_events_initial_sync_uses_delta_endpoint(monkeypatch, outl
     assert captured['url'].startswith(
         f"{outlook_adapter.API_BASE_URL}/me/calendar/events/delta"
     )
-    assert '$deltatoken=latest' in captured['url']
+    assert 'deltatoken=latest' not in captured['url']
     assert result['sync_token'] == 'https://graph.microsoft.com/v1.0/me/calendar/events/delta?$deltatoken=abc'
+    assert [event['id'] for event in result['events']] == ['evt-1']
 
 
 def test_outlook_fetch_events_tracks_deletions(monkeypatch, outlook_adapter):
