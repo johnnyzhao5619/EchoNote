@@ -5,18 +5,21 @@ Displays a vertical timeline of past and future events with search and filtering
 """
 
 import logging
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, TYPE_CHECKING, cast
 from datetime import datetime
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QScrollArea,
-    QLineEdit, QComboBox, QLabel, QFrame, QPushButton
+    QLineEdit, QComboBox, QLabel, QFrame, QPushButton, QMessageBox
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtGui import QPalette
 
 from utils.i18n import I18nQtManager
 from core.timeline.manager import to_local_naive
+
+if TYPE_CHECKING:  # pragma: no cover - imported for type checking only
+    from ui.timeline.event_card import EventCard
 
 
 logger = logging.getLogger('echonote.ui.timeline.widget')
@@ -64,6 +67,7 @@ class TimelineWidget(QWidget):
         self.event_cards: List[QWidget] = []
         self._audio_player_dialogs: Dict[str, 'AudioPlayerDialog'] = {}
         self._text_viewer_dialogs: Dict[str, 'TranscriptViewerDialog'] = {}
+        self._auto_task_state_cache: Dict[str, Dict[str, Any]] = {}
         
         # Current filters
         self.current_query = ""
@@ -430,6 +434,19 @@ class TimelineWidget(QWidget):
             insert_pos = len(self.event_cards)
             self.timeline_layout.insertWidget(insert_pos, card)
             self.event_cards.append(card)
+
+        if is_future:
+            auto_tasks = event_data.get('auto_tasks') or {}
+            self._auto_task_state_cache[card.event.id] = dict(auto_tasks)
+
+    def get_event_card_by_id(self, event_id: str) -> Optional['EventCard']:
+        """Return the event card associated with the given event id."""
+        for card in self.event_cards:
+            if not hasattr(card, 'event'):
+                continue
+            if getattr(card.event, 'id', None) == event_id:
+                return cast('EventCard', card)
+        return None
     
     def clear_timeline(self):
         """Clear all event cards from timeline."""
@@ -507,17 +524,58 @@ class TimelineWidget(QWidget):
     def _on_auto_task_changed(self, event_id: str, config: Dict[str, Any]):
         """
         Handle auto-task configuration change.
-        
+
         Args:
             event_id: Event ID
             config: Auto-task configuration
         """
+        card = self.get_event_card_by_id(event_id)
+        if card:
+            self._auto_task_state_cache[event_id] = dict(config)
+
         try:
             self.timeline_manager.set_auto_task(event_id, config)
             logger.info(f"Auto-task config updated for event: {event_id}")
+            if card:
+                card.event_data['auto_tasks'] = dict(config)
             self.auto_task_changed.emit(event_id, config)
-        except Exception as e:
-            logger.error(f"Failed to update auto-task config: {e}")
+        except Exception as exc:
+            logger.exception(
+                "Failed to update auto-task config for %s", event_id
+            )
+
+            persisted_config: Optional[Dict[str, Any]] = None
+            try:
+                persisted_config = self.timeline_manager.get_auto_task(event_id)
+            except Exception as fetch_error:  # pragma: no cover - defensive log
+                logger.error(
+                    "Failed to retrieve persisted auto-task config for %s: %s",
+                    event_id,
+                    fetch_error,
+                )
+
+            if persisted_config is None:
+                try:
+                    persisted_config = (
+                        self.timeline_manager._default_auto_task_config()
+                    )
+                except Exception as default_error:  # pragma: no cover
+                    logger.error(
+                        "Failed to obtain default auto-task config: %s",
+                        default_error,
+                    )
+                    persisted_config = {}
+
+            if card:
+                card.apply_auto_task_config(persisted_config)
+
+            self._auto_task_state_cache[event_id] = dict(persisted_config)
+
+            title = self.i18n.t('timeline.auto_task_save_failed_title')
+            message = self.i18n.t('timeline.auto_task_save_failed_message').format(
+                error=str(exc)
+            )
+            QMessageBox.warning(self, title, message)
     
     def _on_view_recording(self, file_path: str):
         """

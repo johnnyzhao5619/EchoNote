@@ -184,6 +184,8 @@
     "enable_transcription": "启用实时转录",
     "enable_recording": "启用会议录音",
     "enable_translation": "启用翻译",
+    "auto_task_save_failed_title": "自动任务设置保存失败",
+    "auto_task_save_failed_message": "无法保存您的自动任务偏好，已恢复为之前的配置。\n错误信息：{error}",
     "translation_target_label": "翻译目标语言：",
     "play_recording": "播放录音",
     "view_transcript": "查看转录",

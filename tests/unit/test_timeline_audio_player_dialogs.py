@@ -58,6 +58,48 @@ class FlakyTimelineManager(DummyTimelineManager):
         }
 
 
+class AutoTaskFailureTimelineManager(DummyTimelineManager):
+    """Timeline manager that simulates auto-task persistence failures."""
+
+    def __init__(self, event, persisted_config=None):
+        self._event = event
+        self.persisted_config = persisted_config or {
+            "enable_transcription": False,
+            "enable_recording": False,
+            "transcription_language": None,
+            "enable_translation": False,
+            "translation_target_language": None,
+        }
+        self.get_auto_task_calls = []
+
+    def get_timeline_events(self, **_):
+        current = datetime.now().isoformat()
+        return {
+            "current_time": current,
+            "past_events": [],
+            "future_events": [
+                {"event": self._event, "auto_tasks": dict(self.persisted_config)},
+            ],
+            "has_more": False,
+        }
+
+    def set_auto_task(self, *_):
+        raise RuntimeError("save failed")
+
+    def get_auto_task(self, event_id):
+        self.get_auto_task_calls.append(event_id)
+        return dict(self.persisted_config)
+
+    def _default_auto_task_config(self):
+        return {
+            "enable_transcription": False,
+            "enable_recording": False,
+            "transcription_language": None,
+            "enable_translation": False,
+            "translation_target_language": None,
+        }
+
+
 @pytest.fixture(scope="module")
 def qapp():
     app = QApplication.instance()
@@ -239,6 +281,62 @@ def test_future_event_order_keeps_nearest_next_to_indicator(monkeypatch, qapp):
             widget.event_cards[indicator_index]
         )
         assert layout_index == indicator_index
+    finally:
+        widget.deleteLater()
+        qapp.processEvents()
+
+
+def test_auto_task_failure_restores_ui(monkeypatch, qapp):
+    monkeypatch.setattr(
+        "ui.timeline.widget.QTimer.singleShot",
+        staticmethod(lambda *_: None),
+    )
+
+    now = datetime.now().astimezone()
+    future_event = CalendarEvent(
+        id="event-future",
+        title="Upcoming meeting",
+        start_time=(now + timedelta(hours=1)).isoformat(),
+        end_time=(now + timedelta(hours=2)).isoformat(),
+    )
+
+    manager = AutoTaskFailureTimelineManager(future_event)
+    i18n = I18nQtManager(default_language="en_US")
+    widget = TimelineWidget(manager, i18n)
+
+    try:
+        assert widget.load_timeline_events(reset=True)
+        qapp.processEvents()
+
+        card = widget.get_event_card_by_id(future_event.id)
+        assert card is not None, "Expected future event card to be created"
+        assert not card.transcription_checkbox.isChecked()
+
+        warnings = []
+
+        def fake_warning(parent, title, message):
+            warnings.append((parent, title, message))
+            return None
+
+        monkeypatch.setattr(
+            "ui.timeline.widget.QMessageBox.warning",
+            staticmethod(fake_warning),
+        )
+
+        card.transcription_checkbox.setChecked(True)
+        qapp.processEvents()
+
+        assert not card.transcription_checkbox.isChecked()
+        assert not card.recording_checkbox.isChecked()
+        assert not card.translation_checkbox.isChecked()
+        assert manager.get_auto_task_calls == [future_event.id]
+
+        assert warnings, "Expected user-facing warning when saving fails"
+        _, title, message = warnings[0]
+        assert title == i18n.t("timeline.auto_task_save_failed_title")
+        expected_prefix = i18n.t("timeline.auto_task_save_failed_message").split("\n")[0]
+        assert expected_prefix in message
+        assert "save failed" in message
     finally:
         widget.deleteLater()
         qapp.processEvents()
