@@ -24,16 +24,23 @@ logger = logging.getLogger('echonote.ui.timeline.audio_player')
 class AudioPlayer(QWidget):
     """
     Audio player widget with playback controls.
-    
+
     Features:
     - Play/pause control
     - Progress slider with seek
     - Volume control
     - Time display
     """
-    
+
     # Signals
     playback_error = pyqtSignal(str)  # error_message
+
+    _ERROR_TRANSLATIONS = {
+        QMediaPlayer.Error.ServiceMissingError:
+            'timeline.audio_player.errors.service_missing',
+        QMediaPlayer.Error.FormatError:
+            'timeline.audio_player.errors.format_error',
+    }
     
     def __init__(
         self,
@@ -253,16 +260,26 @@ class AudioPlayer(QWidget):
     def _on_error(self, error: QMediaPlayer.Error, error_string: str):
         """
         Handle playback error.
-        
+
         Args:
             error: Error code
             error_string: Error description
         """
-        error_detail = error_string or getattr(error, 'name', str(error))
-        self._emit_playback_error(
-            'timeline.audio_player.playback_error',
-            error=error_detail
-        )
+        try:
+            error_enum = QMediaPlayer.Error(error)
+        except ValueError:
+            error_enum = error
+
+        error_detail = error_string or getattr(error_enum, 'name', str(error_enum))
+        translation_key = self._ERROR_TRANSLATIONS.get(error_enum)
+
+        if translation_key:
+            self._emit_playback_error(translation_key, details=error_detail)
+        else:
+            self._emit_playback_error(
+                'timeline.audio_player.playback_error',
+                error=error_detail
+            )
         self._set_controls_enabled(False)
 
     def _on_slider_pressed(self):

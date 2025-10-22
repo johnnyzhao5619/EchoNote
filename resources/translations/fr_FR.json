@@ -205,7 +205,11 @@
       "load_failed": "Échec du chargement du fichier audio : {error}",
       "playback_error": "Erreur de lecture : {error}",
       "invalid_media": "Le format du média n'est pas pris en charge ou le fichier est corrompu",
-      "dialog_error_body": "{message}"
+      "dialog_error_body": "{message}",
+      "errors": {
+        "service_missing": "Lecture impossible : le service multimédia Qt est absent. Installez le backend Qt Multimedia de votre plateforme puis redémarrez EchoNote.",
+        "format_error": "Lecture impossible : le format du média n'est pas pris en charge. Ré-encodez l'enregistrement en WAV ou MP3, ou installez les codecs requis. Détails : {details}"
+      }
     },
     "snippet": {
       "title_prefix": "Titre",
