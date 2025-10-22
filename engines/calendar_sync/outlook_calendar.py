@@ -460,6 +460,13 @@ class OutlookCalendarAdapter(OAuthCalendarAdapter):
                 )
 
             def _extract_description() -> Optional[str]:
+                def _normalise_plain_text(value: str) -> str:
+                    text_value = value.replace('\r\n', '\n').replace('\r', '\n')
+                    text_value = text_value.replace('\xa0', ' ')
+                    text_value = re.sub(r'\s+\n', '\n', text_value)
+                    text_value = re.sub(r'\n{3,}', '\n\n', text_value)
+                    return text_value.strip()
+
                 body_payload = outlook_event.get('body')
                 if isinstance(body_payload, dict):
                     content = body_payload.get('content')
@@ -486,19 +493,14 @@ class OutlookCalendarAdapter(OAuthCalendarAdapter):
                                 flags=re.IGNORECASE,
                             )
                             text = re.sub(r'<[^>]+>', '', text)
-                            text = unescape(text)
-                        if isinstance(text, str):
-                            text = text.replace('\r\n', '\n')
-                            text = text.replace('\r', '\n')
-                            text = re.sub(r'\s+\n', '\n', text)
-                            text = re.sub(r'\n{3,}', '\n\n', text)
-                            cleaned = text.strip()
-                            if cleaned:
-                                return cleaned
+                        text = unescape(text)
+                        cleaned = _normalise_plain_text(text)
+                        if cleaned:
+                            return cleaned
 
                 preview = outlook_event.get('bodyPreview')
                 if isinstance(preview, str):
-                    cleaned_preview = preview.strip()
+                    cleaned_preview = _normalise_plain_text(unescape(preview))
                     if cleaned_preview:
                         return cleaned_preview
 

@@ -387,7 +387,7 @@ def test_outlook_convert_event_prefers_body_content(outlook_adapter):
 
     converted = outlook_adapter._convert_outlook_event(outlook_payload)
 
-    assert converted['description'] == 'Hello team\nThanks & regards'
+    assert converted['description'] == 'Hello team\nThanks & regards'
 
 
 def test_outlook_convert_event_falls_back_to_preview(outlook_adapter):
