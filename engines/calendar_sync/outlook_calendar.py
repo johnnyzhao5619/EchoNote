@@ -131,6 +131,13 @@ class OutlookCalendarAdapter(OAuthCalendarAdapter):
 
                 # Convert Outlook events to internal format
                 for item in data.get('value', []):
+                    removed_payload = item.get('@removed')
+                    if removed_payload is not None:
+                        event_id = item.get('id')
+                        if event_id:
+                            deleted_events.append(event_id)
+                        continue
+
                     event = self._convert_outlook_event(item)
                     if not event:
                         continue
@@ -266,6 +273,14 @@ class OutlookCalendarAdapter(OAuthCalendarAdapter):
             Internal event format or None if conversion fails
         """
         try:
+            removed_payload = outlook_event.get('@removed')
+            if removed_payload is not None:
+                event_id = outlook_event.get('id')
+                if event_id and (
+                    not outlook_event.get('start') or not outlook_event.get('end')
+                ):
+                    return {'id': event_id, 'deleted': True}
+
             show_as_value = outlook_event.get('showAs')
             if isinstance(show_as_value, str) and show_as_value.lower() == 'cancelled':
                 event_id = outlook_event.get('id')

@@ -179,3 +179,52 @@ def test_outlook_convert_offset_datetime(monkeypatch, outlook_adapter):
     assert payload['start']['dateTime'] == '2024-07-01T09:00:00'
     assert payload['end']['timeZone'] == 'UTC+02'
     assert payload['end']['dateTime'] == '2024-07-01T10:30:00'
+
+
+def test_outlook_convert_removed_event(outlook_adapter):
+    outlook_payload = {
+        'id': 'evt-deleted',
+        '@removed': {'reason': 'deleted'},
+    }
+
+    converted = outlook_adapter._convert_outlook_event(outlook_payload)
+
+    assert converted == {'id': 'evt-deleted', 'deleted': True}
+
+
+def test_outlook_fetch_events_tracks_deletions(monkeypatch, outlook_adapter):
+    payload = {
+        'value': [
+            {
+                'id': 'evt-deleted',
+                '@removed': {'reason': 'deleted'},
+            },
+            {
+                'id': 'evt-active',
+                'subject': 'Meeting',
+                'start': {'dateTime': '2024-08-01T09:00:00'},
+                'end': {'dateTime': '2024-08-01T10:00:00'},
+                'attendees': [],
+            },
+        ],
+        '@odata.deltaLink': 'delta-token',
+    }
+
+    class DummyResponse:
+        def __init__(self, data):
+            self._data = data
+
+        def json(self):
+            return self._data
+
+    def fake_api_request(method, url, **kwargs):
+        assert method == 'GET'
+        return DummyResponse(payload)
+
+    monkeypatch.setattr(outlook_adapter, 'api_request', fake_api_request)
+
+    result = outlook_adapter.fetch_events(last_sync_token='https://delta-link')
+
+    assert result['deleted'] == ['evt-deleted']
+    assert [event['id'] for event in result['events']] == ['evt-active']
+    assert result['sync_token'] == 'delta-token'
