@@ -39,6 +39,7 @@ class RetryableHttpClient:
         max_retries: int = 3,
         timeout: float = 30.0,
         base_delay: float = 1.0,
+        max_retry_after: Optional[float] = 60.0,
         **client_kwargs
     ):
         """
@@ -48,11 +49,13 @@ class RetryableHttpClient:
             max_retries: 最大重试次数（默认 3）
             timeout: 请求超时时间（秒，默认 30）
             base_delay: 基础延迟时间（秒，默认 1）
+            max_retry_after: 429 响应允许的最大 Retry-After 秒数，None 表示不限制
             **client_kwargs: 传递给 httpx.Client 的其他参数
         """
         self.max_retries = max_retries
         self.timeout = timeout
         self.base_delay = base_delay
+        self.max_retry_after = max_retry_after
         
         # 设置默认超时
         if 'timeout' not in client_kwargs:
@@ -211,11 +214,14 @@ class RetryableHttpClient:
                 if response.status_code == 429:
                     retry_after = self._get_retry_after(response)
                     if retry_after:
-                        # 限制最大等待时间为 60 秒
-                        if retry_after > 60:
+                        if (
+                            self.max_retry_after is not None
+                            and retry_after > self.max_retry_after
+                        ):
                             logger.error(
-                                f"Rate limit retry time too long "
-                                f"({retry_after}s > 60s), not retrying"
+                                "Rate limit retry time too long (%ss > %ss), not retrying",
+                                retry_after,
+                                self.max_retry_after,
                             )
                             raise
                         delay = retry_after
@@ -303,6 +309,7 @@ class AsyncRetryableHttpClient:
         max_retries: int = 3,
         timeout: float = 30.0,
         base_delay: float = 1.0,
+        max_retry_after: Optional[float] = 60.0,
         **client_kwargs
     ):
         """
@@ -312,11 +319,13 @@ class AsyncRetryableHttpClient:
             max_retries: 最大重试次数（默认 3）
             timeout: 请求超时时间（秒，默认 30）
             base_delay: 基础延迟时间（秒，默认 1）
+            max_retry_after: 429 响应允许的最大 Retry-After 秒数，None 表示不限制
             **client_kwargs: 传递给 httpx.AsyncClient 的其他参数
         """
         self.max_retries = max_retries
         self.timeout = timeout
         self.base_delay = base_delay
+        self.max_retry_after = max_retry_after
         
         # 设置默认超时
         if 'timeout' not in client_kwargs:
@@ -449,11 +458,14 @@ class AsyncRetryableHttpClient:
                 if response.status_code == 429:
                     retry_after = self._get_retry_after(response)
                     if retry_after:
-                        # 限制最大等待时间为 60 秒
-                        if retry_after > 60:
+                        if (
+                            self.max_retry_after is not None
+                            and retry_after > self.max_retry_after
+                        ):
                             logger.error(
-                                f"Rate limit retry time too long "
-                                f"({retry_after}s > 60s), not retrying"
+                                "Rate limit retry time too long (%ss > %ss), not retrying",
+                                retry_after,
+                                self.max_retry_after,
                             )
                             raise
                         delay = retry_after

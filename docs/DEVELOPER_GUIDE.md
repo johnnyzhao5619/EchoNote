@@ -216,8 +216,8 @@ Engine adapters isolate third-party APIs and hardware concerns.
   - `base.py` defines the translator interface; `google_translate.py` implements it through Google Translate APIs.
 
 - **Calendar sync (`engines/calendar_sync/`)**
-  - `base.py` standardizes methods such as `fetch_events`, `create_event`, `update_event`, `delete_event`.
-  - `google_calendar.py` and `outlook_calendar.py` translate between provider APIs and local models, relying on credentials issued via the settings UI.
+  - `base.py` standardizes methods such as `fetch_events`, `create_event`, `update_event`, `delete_event`, and now ships `OAuthCalendarAdapter` plus `OAuthEndpoints` to share OAuth flows, token refresh, and HTTP retry behavior.
+  - `google_calendar.py` and `outlook_calendar.py` translate between provider APIs and local models, extending the OAuth base to supply provider-specific scopes, endpoints, and event field mapping.
 - Remote deletions now flow back into the local store: adapters surface cancelled or missing events through a `deleted` payload. `CalendarManager.sync_external_calendar` first drops the relevant `calendar_event_links` row, then inspects the remaining providers via `CalendarEventLink.list_for_event`. Only when the removed provider matches `CalendarEvent.source` *and* no other providers are still linked do we cascade-delete the `CalendarEvent` and its `EventAttachment` rows. This guards multi-provider sync scenarios from losing shared resources while still clearing orphaned events.
 
 ### 6.4 UI Layer
@@ -240,7 +240,7 @@ Reusable helpers live under `utils/`:
 - `first_run_setup.py` provisions configuration, database schema, and sample folders.
 - `qt_async.py` bridges asyncio tasks with Qt's event loop.
 - `error_handler.py` and `network_error_handler.py` normalize error reporting for UI dialogs.
-- `http_client.py` wraps shared HTTP session settings, including retries and timeouts.
+- `http_client.py` wraps shared HTTP session settings, including retries and timeouts, and exposes `max_retry_after` so long-poll calendar calls can opt in to extended back-off windows when needed.
 
 ---
 
