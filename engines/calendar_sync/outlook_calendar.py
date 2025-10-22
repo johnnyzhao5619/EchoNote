@@ -2,7 +2,7 @@
 
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 
 import httpx
@@ -34,7 +34,11 @@ DEFAULT_IANA_TO_WINDOWS_MAP = {
     'Australia/Sydney': 'AUS Eastern Standard Time',
 }
 
-WINDOWS_TO_IANA_MAP = {value: key for key, value in IANA_TO_WINDOWS_MAP.items()}
+IANA_TO_WINDOWS_MAP = DEFAULT_IANA_TO_WINDOWS_MAP
+
+WINDOWS_TO_IANA_MAP = {
+    value: key for key, value in DEFAULT_IANA_TO_WINDOWS_MAP.items()
+}
 
 
 class OutlookCalendarAdapter(OAuthCalendarAdapter):
