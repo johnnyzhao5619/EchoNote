@@ -129,7 +129,7 @@ The timeline UI integrates with:
 
 当 `TimelineWidget` 接收到 `SettingsManager` 或底层 `ConfigManager` 时，会在初始化期间读取这些设置，并在调用 `load_timeline_events()` 时应用。若设置不存在或值非法，将回退到默认配置，确保时间线功能稳定。
 
-加载流程在最新版本中进一步增强：当 `TimelineWidget` 正在等待时间线数据返回时，用户触发的刷新请求会记录下来。当前加载完成后，这些请求会立即通过 `QTimer.singleShot(0, ...)` 重新调度，从新的调用栈发起最新一次刷新，避免重复工作和潜在的递归调用。
+加载流程在最新版本中进一步增强：当 `TimelineWidget` 正在等待时间线数据返回时，用户触发的刷新请求会记录下来。当前加载完成后，这些请求会立即通过 `QTimer.singleShot(0, ...)` 重新调度，从新的调用栈发起最新一次刷新，避免重复工作和潜在的递归调用；若期间既有分页加载又有需要重置的刷新请求，系统会优先保留重置指令，确保最新的过滤条件和设置立即生效。
 
 ## Translation Keys
 
