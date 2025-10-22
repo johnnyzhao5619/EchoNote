@@ -4,6 +4,8 @@ import logging
 from datetime import timezone
 from typing import Dict, Any, Optional, List
 
+from datetime import datetime
+
 import httpx
 
 from engines.calendar_sync.base import OAuthCalendarAdapter, OAuthEndpoints
