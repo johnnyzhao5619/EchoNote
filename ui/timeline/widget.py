@@ -331,10 +331,45 @@ class TimelineWidget(QWidget):
                 }
             else:
                 # Normal timeline mode
+                effective_past_days = self.past_days
+                effective_future_days = self.future_days
+                seconds_per_day = 24 * 60 * 60
+
+                if self.current_filters:
+                    start_filter = self.current_filters.get('start_date')
+                    if start_filter:
+                        start_dt = to_local_naive(start_filter)
+                        if start_dt < center_time_local:
+                            delta_seconds = (
+                                center_time_local - start_dt
+                            ).total_seconds()
+                            if delta_seconds > 0:
+                                required_days = math.ceil(
+                                    delta_seconds / seconds_per_day
+                                )
+                                effective_past_days = max(
+                                    effective_past_days, required_days
+                                )
+
+                    end_filter = self.current_filters.get('end_date')
+                    if end_filter:
+                        end_dt = to_local_naive(end_filter)
+                        if end_dt > center_time_local:
+                            delta_seconds = (
+                                end_dt - center_time_local
+                            ).total_seconds()
+                            if delta_seconds > 0:
+                                required_days = math.ceil(
+                                    delta_seconds / seconds_per_day
+                                )
+                                effective_future_days = max(
+                                    effective_future_days, required_days
+                                )
+
                 data = self.timeline_manager.get_timeline_events(
                     center_time=center_time_local,
-                    past_days=self.past_days,
-                    future_days=self.future_days,
+                    past_days=effective_past_days,
+                    future_days=effective_future_days,
                     page=page_to_load,
                     page_size=self.page_size,
                     filters=self.current_filters or None

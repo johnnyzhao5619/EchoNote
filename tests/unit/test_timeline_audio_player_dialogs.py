@@ -1,3 +1,4 @@
+import math
 from datetime import datetime, timedelta
 from types import MethodType
 
@@ -13,6 +14,7 @@ from ui.timeline.audio_player import AudioPlayerDialog
 from ui.timeline.event_card import CurrentTimeIndicator
 from ui.timeline.widget import TimelineWidget
 from utils.i18n import I18nQtManager
+from core.timeline.manager import to_local_naive
 
 
 class DummyTimelineManager:
@@ -35,6 +37,17 @@ class DummyTimelineManager:
 
     def set_auto_task(self, *_):
         return None
+
+
+class RecordingTimelineManager(DummyTimelineManager):
+    """Timeline manager that records pagination arguments for assertions."""
+
+    def __init__(self):
+        self.calls = []
+
+    def get_timeline_events(self, **kwargs):
+        self.calls.append(kwargs)
+        return super().get_timeline_events(**kwargs)
 
 
 class _StubSettingsManager:
@@ -148,15 +161,7 @@ def test_timeline_uses_settings_preferences(monkeypatch, qapp):
         staticmethod(lambda *_: None),
     )
 
-    class CapturingTimelineManager(DummyTimelineManager):
-        def __init__(self):
-            self.calls = []
-
-        def get_timeline_events(self, **kwargs):
-            self.calls.append(kwargs)
-            return super().get_timeline_events(**kwargs)
-
-    manager = CapturingTimelineManager()
+    manager = RecordingTimelineManager()
     i18n = I18nQtManager(default_language="en_US")
     settings = _StubSettingsManager(
         {
@@ -196,6 +201,72 @@ def test_timeline_uses_settings_preferences(monkeypatch, qapp):
         assert call_kwargs["past_days"] == 7
         assert call_kwargs["future_days"] == 5
         assert call_kwargs["page_size"] == 12
+    finally:
+        widget.deleteLater()
+
+
+def test_date_filters_expand_query_window(monkeypatch, qapp):
+    monkeypatch.setattr(
+        "ui.timeline.widget.QTimer.singleShot",
+        staticmethod(lambda *_: None),
+    )
+
+    manager = RecordingTimelineManager()
+    i18n = I18nQtManager(default_language="en_US")
+    settings = _StubSettingsManager(
+        {
+            "timeline.past_days": 7,
+            "timeline.future_days": 5,
+            "timeline.page_size": 20,
+        }
+    )
+
+    widget = TimelineWidget(
+        manager,
+        i18n,
+        settings_manager=settings,
+    )
+
+    try:
+        # Initial load respects preferences
+        widget.load_timeline_events()
+        assert manager.calls, "Expected an initial load"
+        baseline = manager.calls[-1]
+        assert baseline["past_days"] == 7
+        assert baseline["future_days"] == 5
+
+        today = QDate.currentDate()
+        extended_start = today.addDays(-60)
+        extended_end = today.addDays(45)
+
+        prev_start_block = widget.start_date_edit.blockSignals(True)
+        prev_end_block = widget.end_date_edit.blockSignals(True)
+        try:
+            widget.start_date_edit.setDate(extended_start)
+            widget.end_date_edit.setDate(extended_end)
+        finally:
+            widget.start_date_edit.blockSignals(prev_start_block)
+            widget.end_date_edit.blockSignals(prev_end_block)
+
+        widget._on_filter_changed()
+
+        assert len(manager.calls) >= 2, "Expected filter change to reload timeline"
+        expanded = manager.calls[-1]
+        center_time = expanded["center_time"]
+
+        start_dt = to_local_naive(widget.current_filters["start_date"])
+        end_dt = to_local_naive(widget.current_filters["end_date"])
+
+        seconds_per_day = 24 * 60 * 60
+        required_past = math.ceil(
+            max(0.0, (center_time - start_dt).total_seconds()) / seconds_per_day
+        )
+        required_future = math.ceil(
+            max(0.0, (end_dt - center_time).total_seconds()) / seconds_per_day
+        )
+
+        assert expanded["past_days"] == max(widget.past_days, required_past)
+        assert expanded["future_days"] == max(widget.future_days, required_future)
     finally:
         widget.deleteLater()
 
