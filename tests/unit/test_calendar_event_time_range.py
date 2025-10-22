@@ -85,3 +85,41 @@ def test_get_by_time_range_respects_source_filter(tmp_path):
     assert returned_ids == {local_event.id}
 
     db.close_all()
+
+
+def test_calendar_event_persists_reminder_flags(tmp_path):
+    db = _create_db(tmp_path)
+
+    default_event = CalendarEvent(
+        title="Default reminder",
+        start_time="2024-02-01T09:00:00",
+        end_time="2024-02-01T10:00:00",
+        reminder_use_default=True,
+    )
+    default_event.save(db)
+
+    custom_event = CalendarEvent(
+        title="Custom reminder",
+        start_time="2024-02-01T11:00:00",
+        end_time="2024-02-01T12:00:00",
+        reminder_minutes=25,
+        reminder_use_default=False,
+    )
+    custom_event.save(db)
+
+    unset_event = CalendarEvent(
+        title="Unset reminder",
+        start_time="2024-02-02T09:00:00",
+        end_time="2024-02-02T10:00:00",
+    )
+    unset_event.save(db)
+
+    reloaded_default = CalendarEvent.get_by_id(db, default_event.id)
+    reloaded_custom = CalendarEvent.get_by_id(db, custom_event.id)
+    reloaded_unset = CalendarEvent.get_by_id(db, unset_event.id)
+
+    assert reloaded_default.reminder_use_default is True
+    assert reloaded_custom.reminder_use_default is False
+    assert reloaded_unset.reminder_use_default is None
+
+    db.close_all()

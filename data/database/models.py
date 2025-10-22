@@ -211,12 +211,20 @@ class CalendarEvent:
 
         self.attendees = attendees_value
 
+        reminder_use_default_value = (
+            None
+            if self.reminder_use_default is None
+            else int(self.reminder_use_default)
+        )
+        attendees_json = json.dumps(self.attendees)
+
         query = """
             INSERT INTO calendar_events (
                 id, title, event_type, start_time, end_time, location,
-                attendees, description, reminder_minutes, recurrence_rule,
-                source, external_id, is_readonly, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                attendees, description, reminder_minutes, reminder_use_default,
+                recurrence_rule, source, external_id, is_readonly,
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 title = excluded.title,
                 event_type = excluded.event_type,
@@ -226,6 +234,7 @@ class CalendarEvent:
                 attendees = excluded.attendees,
                 description = excluded.description,
                 reminder_minutes = excluded.reminder_minutes,
+                reminder_use_default = excluded.reminder_use_default,
                 recurrence_rule = excluded.recurrence_rule,
                 source = excluded.source,
                 external_id = excluded.external_id,
@@ -234,11 +243,22 @@ class CalendarEvent:
                 updated_at = excluded.updated_at
         """
         params = (
-            self.id, self.title, self.event_type, self.start_time,
-            self.end_time, self.location, json.dumps(self.attendees),
-            self.description, self.reminder_minutes, self.recurrence_rule,
-            self.source, self.external_id, int(self.is_readonly),
-            self.created_at, self.updated_at
+            self.id,
+            self.title,
+            self.event_type,
+            self.start_time,
+            self.end_time,
+            self.location,
+            attendees_json,
+            self.description,
+            self.reminder_minutes,
+            reminder_use_default_value,
+            self.recurrence_rule,
+            self.source,
+            self.external_id,
+            int(self.is_readonly),
+            self.created_at,
+            self.updated_at,
         )
         db_connection.execute(query, params, commit=True)
         logger.debug(f"Saved calendar event: {self.id}")
