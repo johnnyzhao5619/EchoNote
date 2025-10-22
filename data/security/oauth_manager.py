@@ -116,24 +116,40 @@ class OAuthManager:
             scope: Token scope (optional)
             **extra_data: Additional provider-specific data
         """
-        # Calculate expiration time
+        # Calculate expiration time and record storage timestamp
+        now = datetime.now()
         expires_at = None
         if expires_in:
-            expires_at = (datetime.now() + timedelta(seconds=expires_in)).isoformat()
-        
-        # Store token data
-        token_data = {
-            'access_token': access_token,
-            'refresh_token': refresh_token,
-            'token_type': token_type,
-            'expires_at': expires_at,
-            'expires_in': expires_in,
-            'scope': scope,
-            'stored_at': datetime.now().isoformat(),
-            **extra_data
-        }
+            expires_at = (now + timedelta(seconds=expires_in)).isoformat()
 
-        self._tokens_cache[provider] = token_data
+        existing_data = self._tokens_cache.get(provider, {})
+        merged_data = dict(existing_data)
+
+        # Preserve refresh token unless a new non-empty value is provided
+        if refresh_token:
+            merged_data['refresh_token'] = refresh_token
+
+        # Update optional metadata only when explicitly provided to avoid dropping
+        # previously stored values.
+        if scope is not None:
+            merged_data['scope'] = scope
+
+        if token_type is not None:
+            merged_data['token_type'] = token_type
+        elif 'token_type' not in merged_data:
+            merged_data['token_type'] = 'Bearer'
+
+        for key, value in extra_data.items():
+            if value is not None or key not in merged_data:
+                merged_data[key] = value
+
+        # Required fields are always refreshed
+        merged_data['access_token'] = access_token
+        merged_data['expires_in'] = expires_in
+        merged_data['expires_at'] = expires_at
+        merged_data['stored_at'] = now.isoformat()
+
+        self._tokens_cache[provider] = merged_data
         self._save_tokens()
 
         logger.info(f"Stored OAuth token for provider: {provider}")
