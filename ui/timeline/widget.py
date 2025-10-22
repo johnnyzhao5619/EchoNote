@@ -284,7 +284,12 @@ class TimelineWidget(QWidget):
             bool: ``True`` if events were loaded successfully, ``False`` otherwise.
         """
         if self.is_loading:
-            self._pending_refresh = bool(reset)
+            pending_request = bool(reset)
+            if self._pending_refresh is None:
+                self._pending_refresh = pending_request
+            else:
+                # Preserve any queued reset request so pagination doesn't override it.
+                self._pending_refresh = self._pending_refresh or pending_request
             return False
 
         previous_has_more = self.has_more
