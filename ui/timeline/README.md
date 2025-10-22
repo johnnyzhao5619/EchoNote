@@ -59,6 +59,10 @@ Built-in audio player for recordings:
 
 Uses PyQt6's QMediaPlayer and QAudioOutput.
 
+> ℹ️ If QtMultimedia components are unavailable (e.g., package not installed),
+> the timeline continues to load events, but playback controls are disabled and
+> the user sees a localized warning explaining the limitation.
+
 ### 4. TranscriptViewer (`transcript_viewer.py`)
 
 Transcript text viewer with:

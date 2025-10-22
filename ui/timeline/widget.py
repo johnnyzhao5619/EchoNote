@@ -4,6 +4,7 @@ Timeline widget for EchoNote.
 Displays a vertical timeline of past and future events with search and filtering.
 """
 
+import importlib
 import logging
 from typing import Optional, Dict, Any, List, TYPE_CHECKING, cast
 from datetime import datetime
@@ -577,7 +578,13 @@ class TimelineWidget(QWidget):
     def _refresh_timeline(self, reset: bool = True):
         """Trigger a timeline refresh respecting the loading guard."""
         self.load_timeline_events(reset=reset)
-    
+
+    def _show_audio_unavailable_message(self):
+        """Inform the user that audio playback components are unavailable."""
+        title = self.i18n.t('timeline.audio_player_unavailable_title')
+        message = self.i18n.t('timeline.audio_player_unavailable_message')
+        QMessageBox.warning(self, title, message)
+
     def _on_auto_task_changed(self, event_id: str, config: Dict[str, Any]):
         """
         Handle auto-task configuration change.
@@ -637,13 +644,28 @@ class TimelineWidget(QWidget):
     def _on_view_recording(self, file_path: str):
         """
         Handle view recording request.
-        
+
         Args:
             file_path: Path to recording file
         """
-        # Import here to avoid circular imports
-        from ui.timeline.audio_player import AudioPlayerDialog
-        
+        try:
+            audio_module = importlib.import_module('ui.timeline.audio_player')
+        except ImportError as exc:
+            logger.warning(
+                "Failed to import audio playback components: %s", exc
+            )
+            self._show_audio_unavailable_message()
+            return
+
+        AudioPlayerDialog = getattr(audio_module, 'AudioPlayerDialog', None)
+        if AudioPlayerDialog is None:
+            logger.warning(
+                "Audio playback dialog is unavailable; skipping playback for %s",
+                file_path,
+            )
+            self._show_audio_unavailable_message()
+            return
+
         try:
             existing_dialog = self._audio_player_dialogs.get(file_path)
 

@@ -515,6 +515,47 @@ def test_audio_dialogs_remain_non_modal_and_cached(monkeypatch, qapp, tmp_path):
         qapp.processEvents()
 
 
+def test_view_recording_warns_when_audio_unavailable(monkeypatch, qapp, tmp_path):
+    monkeypatch.setattr(
+        "ui.timeline.widget.QTimer.singleShot",
+        staticmethod(lambda *_: None),
+    )
+
+    def _raise_import_error(_name):
+        raise ImportError("QtMultimedia is missing")
+
+    monkeypatch.setattr(
+        "ui.timeline.widget.importlib.import_module",
+        _raise_import_error,
+    )
+
+    captured = []
+
+    def _capture_warning(parent, title, message):
+        captured.append((parent, title, message))
+
+    monkeypatch.setattr(
+        "ui.timeline.widget.QMessageBox.warning",
+        _capture_warning,
+    )
+
+    i18n = I18nQtManager(default_language="en_US")
+    widget = TimelineWidget(DummyTimelineManager(), i18n)
+
+    try:
+        file_path = tmp_path / "recording.wav"
+        widget._on_view_recording(str(file_path))
+
+        assert not widget._audio_player_dialogs
+        assert captured, "Expected a warning dialog when audio is unavailable"
+        _, title, message = captured[0]
+        assert title == i18n.t('timeline.audio_player_unavailable_title')
+        assert message == i18n.t('timeline.audio_player_unavailable_message')
+    finally:
+        widget.deleteLater()
+        qapp.processEvents()
+
+
 def test_transcript_dialogs_are_non_modal_and_cached(monkeypatch, qapp, tmp_path):
     monkeypatch.setattr(
         "ui.timeline.widget.QTimer.singleShot",
