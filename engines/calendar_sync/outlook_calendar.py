@@ -653,23 +653,23 @@ class OutlookCalendarAdapter(OAuthCalendarAdapter):
         start_dt = self._parse_event_datetime(event.start_time, local_tz)
         end_dt = self._parse_event_datetime(event.end_time, local_tz)
 
-        is_all_day = False
-        if hasattr(event, 'is_all_day_event'):
-            try:
-                is_all_day = bool(event.is_all_day_event())
-            except Exception:  # pragma: no cover - defensive guard
-                is_all_day = False
+        try:
+            is_all_day = bool(event.is_all_day_event())
+        except AttributeError:
+            is_all_day = False
+        except Exception:  # pragma: no cover - defensive guard
+            is_all_day = False
 
         if is_all_day:
-            start_local = start_dt
+            target_tz = local_tz or start_dt.tzinfo or timezone.utc
 
-            if local_tz and start_dt.tzinfo:
-                start_local = start_dt.astimezone(local_tz)
-            elif local_tz and start_dt.tzinfo is None:
-                start_local = start_dt.replace(tzinfo=local_tz)
+            def _to_target_timezone(dt_value: datetime) -> datetime:
+                if dt_value.tzinfo:
+                    return dt_value.astimezone(target_tz)
+                return dt_value.replace(tzinfo=target_tz)
 
-            duration_seconds = max((end_dt - start_dt).total_seconds(), 0)
-            duration_days = max(1, int(round(duration_seconds / 86400)))
+            start_local = _to_target_timezone(start_dt)
+            end_local = _to_target_timezone(end_dt)
 
             normalized_start = start_local.replace(
                 hour=0,
@@ -677,7 +677,12 @@ class OutlookCalendarAdapter(OAuthCalendarAdapter):
                 second=0,
                 microsecond=0,
             )
-            normalized_end = normalized_start + timedelta(days=duration_days)
+
+            day_span = (end_local.date() - start_local.date()).days
+            if day_span <= 0:
+                day_span = 1
+
+            normalized_end = normalized_start + timedelta(days=day_span)
 
             start_dt = normalized_start
             end_dt = normalized_end

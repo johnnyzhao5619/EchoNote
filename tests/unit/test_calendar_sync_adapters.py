@@ -330,6 +330,36 @@ def test_outlook_convert_all_day_event(monkeypatch, outlook_adapter):
     assert payload['end']['timeZone'] == 'China Standard Time'
 
 
+def test_outlook_convert_all_day_event_roundtrip(monkeypatch, outlook_adapter):
+    monkeypatch.setenv('ECHONOTE_LOCAL_TIMEZONE', 'Europe/Paris')
+    event = CalendarEvent(
+        title='Conference day',
+        start_time='2024-08-01T00:00:00Z',
+        end_time='2024-08-02T00:00:00Z',
+    )
+
+    payload = outlook_adapter._convert_to_outlook_event(event)
+
+    assert payload['isAllDay'] is True
+    assert payload['start']['dateTime'] == '2024-08-01T00:00:00'
+    assert payload['end']['dateTime'] == '2024-08-02T00:00:00'
+    assert payload['start']['timeZone'] == 'Romance Standard Time'
+    assert payload['end']['timeZone'] == 'Romance Standard Time'
+
+    roundtrip_payload = {
+        'id': 'evt-roundtrip',
+        'subject': payload['subject'],
+        'start': payload['start'],
+        'end': payload['end'],
+        'isAllDay': payload['isAllDay'],
+    }
+
+    converted = outlook_adapter._convert_outlook_event(roundtrip_payload)
+
+    assert converted['start_time'] == '2024-08-01'
+    assert converted['end_time'] == '2024-08-02'
+
+
 def test_outlook_convert_recurrence_with_interval(monkeypatch, outlook_adapter):
     monkeypatch.setenv('ECHONOTE_LOCAL_TIMEZONE', 'UTC')
     event = CalendarEvent(
@@ -346,6 +376,24 @@ def test_outlook_convert_recurrence_with_interval(monkeypatch, outlook_adapter):
     assert recurrence['pattern']['interval'] == 2
     assert recurrence['pattern']['daysOfWeek'] == ['monday', 'wednesday']
     assert recurrence['range']['startDate'] == '2024-07-01'
+
+
+def test_outlook_convert_recurrence_interval_and_byday(monkeypatch, outlook_adapter):
+    monkeypatch.setenv('ECHONOTE_LOCAL_TIMEZONE', 'UTC')
+    event = CalendarEvent(
+        title='Training rotation',
+        start_time='2024-07-02T09:00:00Z',
+        end_time='2024-07-02T10:00:00Z',
+        recurrence_rule='FREQ=WEEKLY;INTERVAL=3;BYDAY=TU,TH',
+    )
+
+    payload = outlook_adapter._convert_to_outlook_event(event)
+
+    recurrence = payload['recurrence']
+    assert recurrence['pattern']['type'] == 'weekly'
+    assert recurrence['pattern']['interval'] == 3
+    assert recurrence['pattern']['daysOfWeek'] == ['tuesday', 'thursday']
+    assert recurrence['range']['startDate'] == '2024-07-02'
 
 
 def test_outlook_convert_removed_event(outlook_adapter):
