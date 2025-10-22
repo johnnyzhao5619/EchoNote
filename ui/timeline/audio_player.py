@@ -39,7 +39,9 @@ class AudioPlayer(QWidget):
         self,
         file_path: str,
         i18n: I18nQtManager,
-        parent: Optional[QWidget] = None
+        parent: Optional[QWidget] = None,
+        *,
+        auto_load: bool = True,
     ):
         """
         Initialize audio player.
@@ -48,6 +50,7 @@ class AudioPlayer(QWidget):
             file_path: Path to audio file
             i18n: Internationalization manager
             parent: Parent widget
+            auto_load: Whether to immediately load the audio file.
         """
         super().__init__(parent)
         
@@ -79,9 +82,10 @@ class AudioPlayer(QWidget):
         self.player.errorOccurred.connect(self._on_error)
         self.player.mediaStatusChanged.connect(self._on_media_status_changed)
 
-        # Load file
+        # Load file when requested so callers can attach error handlers first.
         self._set_controls_enabled(False)
-        self.load_file(file_path)
+        if auto_load:
+            self.load_file(file_path)
 
         logger.info(f"Audio player initialized: {file_path}")
     
@@ -425,9 +429,17 @@ class AudioPlayerDialog(QDialog):
         layout.setContentsMargins(0, 0, 0, 0)
         
         # Audio player
-        self.player = AudioPlayer(file_path, i18n, self)
+        self.player = AudioPlayer(
+            file_path,
+            i18n,
+            self,
+            auto_load=False,
+        )
         self.player.playback_error.connect(self._on_playback_error)
         layout.addWidget(self.player)
+
+        # Explicitly load after signals are connected so initialization errors propagate.
+        self.player.load_file(file_path)
         
         # Close button
         button_layout = QHBoxLayout()
