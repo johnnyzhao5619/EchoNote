@@ -119,7 +119,7 @@ class OAuthManager:
         # Calculate expiration time and record storage timestamp
         now = datetime.now()
         expires_at = None
-        if expires_in:
+        if expires_in is not None:
             expires_at = (now + timedelta(seconds=expires_in)).isoformat()
 
         existing_data = self._tokens_cache.get(provider, {})
@@ -127,27 +127,27 @@ class OAuthManager:
 
         # Preserve refresh token unless a new non-empty value is provided
         if refresh_token:
-            merged_data['refresh_token'] = refresh_token
+            merged_data["refresh_token"] = refresh_token
 
         # Update optional metadata only when explicitly provided to avoid dropping
         # previously stored values.
         if scope is not None:
-            merged_data['scope'] = scope
+            merged_data["scope"] = scope
 
         if token_type is not None:
-            merged_data['token_type'] = token_type
-        elif 'token_type' not in merged_data:
-            merged_data['token_type'] = 'Bearer'
+            merged_data["token_type"] = token_type
+        elif "token_type" not in merged_data:
+            merged_data["token_type"] = "Bearer"
 
         for key, value in extra_data.items():
             if value is not None or key not in merged_data:
                 merged_data[key] = value
 
         # Required fields are always refreshed
-        merged_data['access_token'] = access_token
-        merged_data['expires_in'] = expires_in
-        merged_data['expires_at'] = expires_at
-        merged_data['stored_at'] = now.isoformat()
+        merged_data["access_token"] = access_token
+        merged_data["expires_in"] = expires_in
+        merged_data["expires_at"] = expires_at
+        merged_data["stored_at"] = now.isoformat()
 
         self._tokens_cache[provider] = merged_data
         self._save_tokens()
