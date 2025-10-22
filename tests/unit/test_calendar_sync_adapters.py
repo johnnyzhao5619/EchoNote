@@ -337,6 +337,38 @@ def test_outlook_convert_removed_event_without_times(outlook_adapter):
     assert converted == {'id': 'evt-no-times', 'deleted': True}
 
 
+def test_outlook_convert_event_prefers_body_content(outlook_adapter):
+    outlook_payload = {
+        'id': 'evt-body',
+        'subject': 'Team Sync',
+        'start': {'dateTime': '2024-08-01T09:00:00'},
+        'end': {'dateTime': '2024-08-01T10:00:00'},
+        'body': {
+            'contentType': 'HTML',
+            'content': '<p>Hello&nbsp;team<br>Thanks &amp; regards</p>',
+        },
+        'bodyPreview': 'Preview should not be used',
+    }
+
+    converted = outlook_adapter._convert_outlook_event(outlook_payload)
+
+    assert converted['description'] == 'Hello team\nThanks & regards'
+
+
+def test_outlook_convert_event_falls_back_to_preview(outlook_adapter):
+    outlook_payload = {
+        'id': 'evt-preview',
+        'subject': 'Team Sync',
+        'start': {'dateTime': '2024-08-01T09:00:00'},
+        'end': {'dateTime': '2024-08-01T10:00:00'},
+        'bodyPreview': 'Preview content only',
+    }
+
+    converted = outlook_adapter._convert_outlook_event(outlook_payload)
+
+    assert converted['description'] == 'Preview content only'
+
+
 def test_outlook_fetch_events_tracks_deletions(monkeypatch, outlook_adapter):
     payload = {
         'value': [
