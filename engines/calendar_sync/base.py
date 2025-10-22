@@ -479,7 +479,7 @@ class OAuthHttpClient:
         self.state.token_type = self._normalize_token_type(token_data.get('token_type'))
 
         raw_expires_in = token_data.get('expires_in')
-        expires_in = raw_expires_in if raw_expires_in is not None else 3600
+        expires_in = self._normalize_expires_in(raw_expires_in)
         expires_at_ts = datetime.now().timestamp() + expires_in
         expires_at = datetime.fromtimestamp(expires_at_ts).isoformat()
         self.state.expires_at = expires_at
@@ -487,7 +487,7 @@ class OAuthHttpClient:
         return {
             'access_token': access_token,
             'refresh_token': self.state.refresh_token,
-            'expires_in': raw_expires_in if raw_expires_in is not None else expires_in,
+            'expires_in': expires_in,
             'expires_at': expires_at,
             'token_type': self.state.token_type,
         }
@@ -499,6 +499,18 @@ class OAuthHttpClient:
         if normalized.lower() == 'bearer':
             return 'Bearer'
         return normalized
+
+    def _normalize_expires_in(self, expires_in: Any) -> int:
+        default = 3600
+        if expires_in is None:
+            return default
+        try:
+            return int(expires_in)
+        except (TypeError, ValueError):
+            self.logger.warning(
+                "Invalid expires_in value %r; defaulting to %s", expires_in, default
+            )
+            return default
 
 
 class OAuthCalendarAdapter(CalendarSyncAdapter):
