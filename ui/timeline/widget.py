@@ -908,8 +908,20 @@ class TimelineWidget(QWidget):
                 return
 
             dialog = AudioPlayerDialog(file_path, self.i18n, self)
-            self._audio_player_dialogs[file_path] = dialog
+        except Exception as exc:
+            logger.exception(
+                "Failed to create audio player dialog for %s", file_path
+            )
+            title = self.i18n.t('timeline.audio_player_open_failed_title')
+            message = self.i18n.t(
+                'timeline.audio_player_open_failed_message'
+            ).format(error=str(exc))
+            QMessageBox.critical(self, title, message)
+            return
 
+        self._audio_player_dialogs[file_path] = dialog
+
+        try:
             def _cleanup_dialog(*_):
                 tracked_dialog = self._audio_player_dialogs.get(file_path)
                 if tracked_dialog is dialog:
@@ -923,8 +935,16 @@ class TimelineWidget(QWidget):
             dialog.raise_()
             dialog.activateWindow()
             logger.info(f"Opened audio player for {file_path}")
-        except Exception as e:
-            logger.error(f"Failed to open audio player: {e}")
+        except Exception as exc:
+            self._audio_player_dialogs.pop(file_path, None)
+            logger.exception(
+                "Failed to display audio player dialog for %s", file_path
+            )
+            title = self.i18n.t('timeline.audio_player_open_failed_title')
+            message = self.i18n.t(
+                'timeline.audio_player_open_failed_message'
+            ).format(error=str(exc))
+            QMessageBox.critical(self, title, message)
     
     def _open_text_viewer(self, file_path: str, title_key: str):
         """Open a text viewer dialog for timeline artifacts."""
