@@ -313,6 +313,41 @@ def test_outlook_convert_offset_datetime(monkeypatch, outlook_adapter):
     assert payload['end']['dateTime'] == '2024-07-01T10:30:00'
 
 
+def test_outlook_convert_all_day_event(monkeypatch, outlook_adapter):
+    monkeypatch.setenv('ECHONOTE_LOCAL_TIMEZONE', 'Asia/Shanghai')
+    event = CalendarEvent(
+        title='All-day workshop',
+        start_time='2024-08-01',
+        end_time='2024-08-02',
+    )
+
+    payload = outlook_adapter._convert_to_outlook_event(event)
+
+    assert payload['isAllDay'] is True
+    assert payload['start']['dateTime'] == '2024-08-01T00:00:00'
+    assert payload['end']['dateTime'] == '2024-08-02T00:00:00'
+    assert payload['start']['timeZone'] == 'China Standard Time'
+    assert payload['end']['timeZone'] == 'China Standard Time'
+
+
+def test_outlook_convert_recurrence_with_interval(monkeypatch, outlook_adapter):
+    monkeypatch.setenv('ECHONOTE_LOCAL_TIMEZONE', 'UTC')
+    event = CalendarEvent(
+        title='Bi-weekly sync',
+        start_time='2024-07-01T09:00:00Z',
+        end_time='2024-07-01T10:00:00Z',
+        recurrence_rule='FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE',
+    )
+
+    payload = outlook_adapter._convert_to_outlook_event(event)
+
+    recurrence = payload['recurrence']
+    assert recurrence['pattern']['type'] == 'weekly'
+    assert recurrence['pattern']['interval'] == 2
+    assert recurrence['pattern']['daysOfWeek'] == ['monday', 'wednesday']
+    assert recurrence['range']['startDate'] == '2024-07-01'
+
+
 def test_outlook_convert_removed_event(outlook_adapter):
     outlook_payload = {
         'id': 'evt-deleted',
