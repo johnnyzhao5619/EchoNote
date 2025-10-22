@@ -265,14 +265,23 @@ class GoogleCalendarAdapter(OAuthCalendarAdapter):
 
             # Extract reminder
             reminder_minutes = None
+            reminder_use_default: Optional[bool] = None
             reminders = google_event.get('reminders', {})
-            if reminders.get('useDefault'):
-                reminder_minutes = 10  # Default
-            elif reminders.get('overrides'):
-                # Use first reminder
-                reminder_minutes = reminders['overrides'][0].get(
-                    'minutes'
-                )
+            if isinstance(reminders, dict):
+                if reminders.get('useDefault'):
+                    reminder_use_default = True
+                overrides = reminders.get('overrides')
+                if overrides:
+                    override = next(
+                        (
+                            item for item in overrides
+                            if isinstance(item, dict) and 'minutes' in item
+                        ),
+                        None
+                    )
+                    if override is not None:
+                        reminder_minutes = override.get('minutes')
+                        reminder_use_default = False
 
             return {
                 'id': google_event['id'],
@@ -284,6 +293,7 @@ class GoogleCalendarAdapter(OAuthCalendarAdapter):
                 'attendees': attendees,
                 'description': google_event.get('description'),
                 'reminder_minutes': reminder_minutes,
+                'reminder_use_default': reminder_use_default,
                 'recurrence_rule': (
                     google_event.get('recurrence', [None])[0]
                     if google_event.get('recurrence') else None
@@ -371,7 +381,10 @@ class GoogleCalendarAdapter(OAuthCalendarAdapter):
                 {'email': email} for email in event.attendees
             ]
 
-        if event.reminder_minutes is not None:
+        use_default_reminder = getattr(event, 'reminder_use_default', None)
+        if use_default_reminder:
+            google_event['reminders'] = {'useDefault': True}
+        elif event.reminder_minutes is not None:
             google_event['reminders'] = {
                 'useDefault': False,
                 'overrides': [

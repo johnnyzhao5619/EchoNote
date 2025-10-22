@@ -806,6 +806,9 @@ class CalendarManager:
                 if 'description' in ext_event:
                     event.description = ext_event.get('description', event.description)
 
+                if 'reminder_use_default' in ext_event:
+                    event.reminder_use_default = ext_event.get('reminder_use_default')
+
                 event.save(self.db)
                 logger.debug(f"Updated external event: {event.id}")
             else:
@@ -825,6 +828,7 @@ class CalendarManager:
                     attendees=_normalize_attendees(ext_event.get('attendees')),
                     description=ext_event.get('description'),
                     reminder_minutes=ext_event.get('reminder_minutes'),
+                    reminder_use_default=ext_event.get('reminder_use_default'),
                     recurrence_rule=ext_event.get('recurrence_rule'),
                     source=provider,
                     is_readonly=True  # External events are readonly
