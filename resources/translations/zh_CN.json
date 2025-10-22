@@ -193,6 +193,8 @@
     "translation_viewer_title": "翻译查看",
     "no_artifacts": "无附件",
     "audio_player_title": "音频播放器",
+    "audio_player_unavailable_title": "无法播放音频",
+    "audio_player_unavailable_message": "缺少 Qt Multimedia 组件，无法播放录音，但时间线仍可正常查看。",
     "audio_player": {
       "initial_time": "00:00",
       "play_button_label": "▶",

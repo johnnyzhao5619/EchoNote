@@ -36,6 +36,16 @@ class DummyTimelineManager:
         return None
 
 
+class _StubSettingsManager:
+    """Minimal settings facade exposing timeline preferences."""
+
+    def __init__(self, values):
+        self._values = dict(values)
+
+    def get_setting(self, key):
+        return self._values.get(key)
+
+
 class FlakyTimelineManager(DummyTimelineManager):
     """Timeline manager that can simulate failures after a successful load."""
 
@@ -129,6 +139,52 @@ def qapp():
     if app is None:
         app = QApplication([])
     yield app
+
+
+def test_timeline_uses_settings_preferences(monkeypatch, qapp):
+    monkeypatch.setattr(
+        "ui.timeline.widget.QTimer.singleShot",
+        staticmethod(lambda *_: None),
+    )
+
+    class CapturingTimelineManager(DummyTimelineManager):
+        def __init__(self):
+            self.calls = []
+
+        def get_timeline_events(self, **kwargs):
+            self.calls.append(kwargs)
+            return super().get_timeline_events(**kwargs)
+
+    manager = CapturingTimelineManager()
+    i18n = I18nQtManager(default_language="en_US")
+    settings = _StubSettingsManager(
+        {
+            "timeline.past_days": 7,
+            "timeline.future_days": 5,
+            "timeline.page_size": 12,
+        }
+    )
+
+    widget = TimelineWidget(
+        manager,
+        i18n,
+        settings_manager=settings,
+    )
+
+    try:
+        assert widget.past_days == 7
+        assert widget.future_days == 5
+        assert widget.page_size == 12
+
+        widget.load_timeline_events()
+
+        assert manager.calls, "Expected timeline manager to be invoked"
+        call_kwargs = manager.calls[-1]
+        assert call_kwargs["past_days"] == 7
+        assert call_kwargs["future_days"] == 5
+        assert call_kwargs["page_size"] == 12
+    finally:
+        widget.deleteLater()
 
 
 class _DummyAudioDialog(QDialog):
@@ -454,6 +510,47 @@ def test_audio_dialogs_remain_non_modal_and_cached(monkeypatch, qapp, tmp_path):
 
         assert str(file_one) not in widget._audio_player_dialogs
         assert str(file_two) in widget._audio_player_dialogs
+    finally:
+        widget.deleteLater()
+        qapp.processEvents()
+
+
+def test_view_recording_warns_when_audio_unavailable(monkeypatch, qapp, tmp_path):
+    monkeypatch.setattr(
+        "ui.timeline.widget.QTimer.singleShot",
+        staticmethod(lambda *_: None),
+    )
+
+    def _raise_import_error(_name):
+        raise ImportError("QtMultimedia is missing")
+
+    monkeypatch.setattr(
+        "ui.timeline.widget.importlib.import_module",
+        _raise_import_error,
+    )
+
+    captured = []
+
+    def _capture_warning(parent, title, message):
+        captured.append((parent, title, message))
+
+    monkeypatch.setattr(
+        "ui.timeline.widget.QMessageBox.warning",
+        _capture_warning,
+    )
+
+    i18n = I18nQtManager(default_language="en_US")
+    widget = TimelineWidget(DummyTimelineManager(), i18n)
+
+    try:
+        file_path = tmp_path / "recording.wav"
+        widget._on_view_recording(str(file_path))
+
+        assert not widget._audio_player_dialogs
+        assert captured, "Expected a warning dialog when audio is unavailable"
+        _, title, message = captured[0]
+        assert title == i18n.t('timeline.audio_player_unavailable_title')
+        assert message == i18n.t('timeline.audio_player_unavailable_message')
     finally:
         widget.deleteLater()
         qapp.processEvents()

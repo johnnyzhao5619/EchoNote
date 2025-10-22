@@ -191,6 +191,8 @@
     "translation_viewer_title": "Visionneuse de Traduction",
     "no_artifacts": "Aucun artefact",
     "audio_player_title": "Lecteur Audio",
+    "audio_player_unavailable_title": "Lecture audio indisponible",
+    "audio_player_unavailable_message": "Les composants Qt Multimedia ne sont pas disponibles, la lecture des enregistrements est désactivée mais la chronologie reste accessible.",
     "audio_player": {
       "initial_time": "00:00",
       "play_button_label": "▶",
