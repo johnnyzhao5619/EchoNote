@@ -1,11 +1,14 @@
 """Unit tests for calendar synchronization adapters time handling."""
 
 import sys
+from datetime import datetime
 from pathlib import Path
 import types
 
 import pytest
 from typing import Optional
+
+from zoneinfo import ZoneInfo
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -92,7 +95,17 @@ def google_adapter():
 
 @pytest.fixture
 def outlook_adapter():
-    return OutlookCalendarAdapter('id', 'secret')
+    adapter = OutlookCalendarAdapter('id', 'secret')
+    adapter._iana_to_windows_map = {
+        'UTC': 'UTC',
+        'Etc/UTC': 'UTC',
+        'Asia/Shanghai': 'China Standard Time',
+        'Europe/Paris': 'Romance Standard Time',
+        'America/Sao_Paulo': 'E. South America Standard Time',
+        'Africa/Nairobi': 'E. Africa Standard Time',
+    }
+    adapter._timezone_map_loaded = True
+    return adapter
 
 
 def _build_event(start: str, end: str) -> CalendarEvent:
@@ -175,9 +188,9 @@ def test_outlook_convert_offset_datetime(monkeypatch, outlook_adapter):
 
     payload = outlook_adapter._convert_to_outlook_event(event)
 
-    assert payload['start']['timeZone'] == 'UTC+02'
+    assert payload['start']['timeZone'] == 'UTC+02:00'
     assert payload['start']['dateTime'] == '2024-07-01T09:00:00'
-    assert payload['end']['timeZone'] == 'UTC+02'
+    assert payload['end']['timeZone'] == 'UTC+02:00'
     assert payload['end']['dateTime'] == '2024-07-01T10:30:00'
 
 
