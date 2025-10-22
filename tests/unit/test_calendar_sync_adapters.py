@@ -515,6 +515,36 @@ def test_outlook_convert_event_falls_back_to_preview(outlook_adapter):
     assert converted['description'] == 'Preview content only'
 
 
+def test_outlook_fetch_events_initial_sync_uses_delta_endpoint(monkeypatch, outlook_adapter):
+    captured = {}
+
+    class DummyResponse:
+        def __init__(self, data):
+            self._data = data
+
+        def json(self):
+            return self._data
+
+    def fake_api_request(method, url, **kwargs):
+        captured['method'] = method
+        captured['url'] = url
+        return DummyResponse({
+            'value': [],
+            '@odata.deltaLink': 'https://graph.microsoft.com/v1.0/me/calendar/events/delta?$deltatoken=abc',
+        })
+
+    monkeypatch.setattr(outlook_adapter, 'api_request', fake_api_request)
+
+    result = outlook_adapter.fetch_events()
+
+    assert captured['method'] == 'GET'
+    assert captured['url'].startswith(
+        f"{outlook_adapter.API_BASE_URL}/me/calendar/events/delta"
+    )
+    assert '$deltatoken=latest' in captured['url']
+    assert result['sync_token'] == 'https://graph.microsoft.com/v1.0/me/calendar/events/delta?$deltatoken=abc'
+
+
 def test_outlook_fetch_events_tracks_deletions(monkeypatch, outlook_adapter):
     payload = {
         'value': [

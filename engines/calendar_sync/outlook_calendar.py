@@ -130,21 +130,23 @@ class OutlookCalendarAdapter(OAuthCalendarAdapter):
             if last_sync_token:
                 url = last_sync_token
             else:
-                url = f"{self.API_BASE_URL}/me/calendar/events"
-                params = []
+                base_url = f"{self.API_BASE_URL}/me/calendar/events/delta"
+                filters = []
 
                 if start_date:
-                    params.append(
+                    filters.append(
                         f"start/dateTime ge '{start_date}'"
                     )
                 if end_date:
-                    params.append(
+                    filters.append(
                         f"end/dateTime le '{end_date}'"
                     )
 
-                if params:
-                    filter_str = ' and '.join(params)
-                    url += f"?$filter={filter_str}"
+                if filters:
+                    filter_str = ' and '.join(filters)
+                    url = f"{base_url}?$filter={filter_str}"
+                else:
+                    url = base_url
 
                 # Request delta link for next sync
                 url += ('&' if '?' in url else '?') + '$deltatoken=latest'
