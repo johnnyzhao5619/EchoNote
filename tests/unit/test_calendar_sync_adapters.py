@@ -249,6 +249,19 @@ def test_outlook_convert_removed_event(outlook_adapter):
     assert converted == {'id': 'evt-deleted', 'deleted': True}
 
 
+def test_outlook_convert_removed_event_without_times(outlook_adapter):
+    outlook_payload = {
+        'id': 'evt-no-times',
+        '@removed': {'reason': 'deleted'},
+        'start': None,
+        'end': None,
+    }
+
+    converted = outlook_adapter._convert_outlook_event(outlook_payload)
+
+    assert converted == {'id': 'evt-no-times', 'deleted': True}
+
+
 def test_outlook_fetch_events_tracks_deletions(monkeypatch, outlook_adapter):
     payload = {
         'value': [
