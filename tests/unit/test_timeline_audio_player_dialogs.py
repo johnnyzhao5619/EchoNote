@@ -6,11 +6,12 @@ import pytest
 
 PyQt6 = pytest.importorskip("PyQt6")
 from PyQt6.QtCore import Qt, QDate, QDateTime, QTime
+from PyQt6.QtMultimedia import QMediaPlayer
 from PyQt6.QtWidgets import QApplication, QDialog, QWidget
 
 from data.database.models import CalendarEvent
 
-from ui.timeline.audio_player import AudioPlayerDialog
+from ui.timeline.audio_player import AudioPlayerDialog, AudioPlayer
 from ui.timeline.event_card import CurrentTimeIndicator
 from ui.timeline.widget import TimelineWidget
 from utils.i18n import I18nQtManager
@@ -1022,6 +1023,36 @@ def test_audio_player_dialog_surfaces_missing_file_error(monkeypatch, qapp, tmp_
     finally:
         dialog.close()
         dialog.deleteLater()
+        qapp.processEvents()
+
+
+@pytest.mark.parametrize(
+    "error_enum, translation_key",
+    [
+        (
+            QMediaPlayer.Error.ServiceMissingError,
+            "timeline.audio_player.errors.service_missing",
+        ),
+        (
+            QMediaPlayer.Error.FormatError,
+            "timeline.audio_player.errors.format_error",
+        ),
+    ],
+)
+def test_audio_player_emits_localized_qt_errors(qapp, tmp_path, error_enum, translation_key):
+    detail = "mock detail"
+    i18n = I18nQtManager(default_language="en_US")
+    player = AudioPlayer(str(tmp_path / "dummy.wav"), i18n, auto_load=False)
+
+    messages = []
+    player.playback_error.connect(messages.append)
+
+    try:
+        player._on_error(error_enum, detail)
+        assert messages, "Expected localized error message to be emitted"
+        assert messages[-1] == i18n.t(translation_key, details=detail)
+    finally:
+        player.deleteLater()
         qapp.processEvents()
 
 

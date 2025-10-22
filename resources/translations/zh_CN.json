@@ -209,7 +209,11 @@
       "load_failed": "音频文件加载失败：{error}",
       "playback_error": "播放出错：{error}",
       "invalid_media": "媒体文件格式不受支持或文件损坏",
-      "dialog_error_body": "{message}"
+      "dialog_error_body": "{message}",
+      "errors": {
+        "service_missing": "播放失败：缺少 Qt 多媒体服务。请安装操作系统对应的 Qt Multimedia 组件后重启 EchoNote。",
+        "format_error": "播放失败：音频格式不受支持。请将录音重新编码为 WAV 或 MP3，或安装缺失的编解码器。详情：{details}"
+      }
     },
     "snippet": {
       "title_prefix": "标题",

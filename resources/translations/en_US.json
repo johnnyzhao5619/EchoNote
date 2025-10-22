@@ -209,7 +209,11 @@
       "load_failed": "Failed to load audio file: {error}",
       "playback_error": "Playback error: {error}",
       "invalid_media": "Media format is not supported or the file is corrupted",
-      "dialog_error_body": "{message}"
+      "dialog_error_body": "{message}",
+      "errors": {
+        "service_missing": "Playback unavailable: the Qt multimedia service is missing. Install the Qt Multimedia backend for your platform and restart EchoNote.",
+        "format_error": "Playback failed: the media format is not supported. Re-encode the recording to WAV or MP3, or install the required codecs. Details: {details}"
+      }
     },
     "snippet": {
       "title_prefix": "Title",
