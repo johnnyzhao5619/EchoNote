@@ -245,6 +245,24 @@ def test_google_convert_event_with_custom_reminder(google_adapter):
     assert converted['reminder_use_default'] is False
 
 
+def test_google_convert_event_with_disabled_reminder(google_adapter):
+    google_event = {
+        'id': 'evt-disabled',
+        'summary': 'Heads-down time',
+        'start': {'dateTime': '2024-08-01T09:00:00Z'},
+        'end': {'dateTime': '2024-08-01T11:00:00Z'},
+        'reminders': {
+            'useDefault': False,
+            'overrides': [],
+        },
+    }
+
+    converted = google_adapter._convert_google_event(google_event)
+
+    assert converted['reminder_minutes'] is None
+    assert converted['reminder_use_default'] is False
+
+
 def test_google_convert_to_event_uses_default_reminder(google_adapter):
     event = CalendarEvent(
         title='Default reminder',
@@ -272,6 +290,51 @@ def test_google_convert_to_event_custom_reminder(google_adapter):
     assert payload['reminders']['overrides'] == [
         {'method': 'popup', 'minutes': 20}
     ]
+
+
+def test_google_convert_to_event_disables_reminders(google_adapter):
+    event = CalendarEvent(
+        title='No reminder',
+        start_time='2024-08-01T09:00:00Z',
+        end_time='2024-08-01T10:00:00Z',
+        reminder_use_default=False,
+    )
+
+    payload = google_adapter._convert_to_google_event(event)
+
+    assert payload['reminders'] == {
+        'useDefault': False,
+        'overrides': [],
+    }
+
+
+def test_google_disabled_reminder_roundtrip(google_adapter):
+    remote_payload = {
+        'id': 'evt-roundtrip-disabled',
+        'summary': 'Focus block',
+        'start': {'dateTime': '2024-08-01T09:00:00Z'},
+        'end': {'dateTime': '2024-08-01T10:30:00Z'},
+        'reminders': {
+            'useDefault': False,
+            'overrides': [],
+        },
+    }
+
+    converted = google_adapter._convert_google_event(remote_payload)
+    local_event = CalendarEvent(
+        title=converted['title'],
+        start_time=converted['start_time'],
+        end_time=converted['end_time'],
+        reminder_minutes=converted['reminder_minutes'],
+        reminder_use_default=converted['reminder_use_default'],
+    )
+
+    payload = google_adapter._convert_to_google_event(local_event)
+
+    assert payload['reminders'] == {
+        'useDefault': False,
+        'overrides': [],
+    }
 
 
 def test_outlook_convert_naive_datetime(monkeypatch, outlook_adapter):
