@@ -220,6 +220,7 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 ### 3.4 Timeline
 - Jump across periods using date pickers; pagination and keyword search cover titles, descriptions, and transcripts.
 - Date filters are inclusive; the selected end date covers the entire day.
+- When a chosen range exceeds your saved window, the timeline automatically expands its fetch span so those events remain visible.
 - Past events display linked recordings, transcripts, and notes for download or preview.
 - Future events allow auto-tasks: auto-record, auto-transcribe, preset languages, and translation targets.
 
@@ -228,6 +229,7 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 
 - 通过日期选择器切换时间段，支持分页与关键词搜索（覆盖标题、描述与转录内容）。
 - 日期筛选为包含式区间，终止日期会覆盖当日全部事件。
+- 当选择的日期范围超过偏好设置时，时间线会自动扩大查询窗口，无需手动调整即可覆盖所选日期。
 - 历史事件会列出录音、转录、笔记，可预览或下载。
 - 未来事件可配置自动录音、自动转录、默认语言与翻译目标。
 
@@ -237,6 +239,7 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 <summary>Français</summary>
 
 - Naviguez entre les périodes via les sélecteurs de dates ; la recherche par mot-clé couvre les titres, descriptions et transcriptions.
+- Si la plage choisie dépasse vos préférences, la timeline agrandit automatiquement la fenêtre de recherche pour inclure ces événements.
 - Les événements passés affichent enregistrements, transcriptions et notes associés pour prévisualisation ou téléchargement.
 - Les événements futurs proposent des tâches automatiques : enregistrement, transcription, langues préconfigurées et cibles de traduction.
 
