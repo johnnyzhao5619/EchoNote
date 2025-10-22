@@ -4,7 +4,7 @@ from types import MethodType
 import pytest
 
 PyQt6 = pytest.importorskip("PyQt6")
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QDate
 from PyQt6.QtWidgets import QApplication, QDialog, QWidget
 
 from data.database.models import CalendarEvent
@@ -175,6 +175,18 @@ def test_timeline_uses_settings_preferences(monkeypatch, qapp):
         assert widget.past_days == 7
         assert widget.future_days == 5
         assert widget.page_size == 12
+
+        today = QDate.currentDate()
+        assert widget.start_date_edit.date() == today.addDays(-7)
+        assert widget.end_date_edit.date() == today.addDays(5)
+
+        widget.past_days = 10.75
+        widget.future_days = -3
+        widget.sync_date_filters_with_preferences()
+
+        today = QDate.currentDate()
+        assert widget.start_date_edit.date() == today.addDays(-10)
+        assert widget.end_date_edit.date() == today
 
         widget.load_timeline_events()
 
