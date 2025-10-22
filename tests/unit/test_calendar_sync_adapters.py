@@ -212,6 +212,68 @@ def test_google_convert_offset_datetime(monkeypatch, google_adapter):
     assert payload['end']['dateTime'].endswith('+02:00')
 
 
+def test_google_convert_event_with_default_reminder(google_adapter):
+    google_event = {
+        'id': 'evt-default',
+        'summary': 'Meeting',
+        'start': {'dateTime': '2024-08-01T09:00:00Z'},
+        'end': {'dateTime': '2024-08-01T10:00:00Z'},
+        'reminders': {'useDefault': True},
+    }
+
+    converted = google_adapter._convert_google_event(google_event)
+
+    assert converted['reminder_minutes'] is None
+    assert converted['reminder_use_default'] is True
+
+
+def test_google_convert_event_with_custom_reminder(google_adapter):
+    google_event = {
+        'id': 'evt-custom',
+        'summary': 'Check-in',
+        'start': {'dateTime': '2024-08-01T09:00:00Z'},
+        'end': {'dateTime': '2024-08-01T10:00:00Z'},
+        'reminders': {
+            'useDefault': False,
+            'overrides': [{'method': 'popup', 'minutes': 25}],
+        },
+    }
+
+    converted = google_adapter._convert_google_event(google_event)
+
+    assert converted['reminder_minutes'] == 25
+    assert converted['reminder_use_default'] is False
+
+
+def test_google_convert_to_event_uses_default_reminder(google_adapter):
+    event = CalendarEvent(
+        title='Default reminder',
+        start_time='2024-08-01T09:00:00Z',
+        end_time='2024-08-01T10:00:00Z',
+        reminder_use_default=True,
+    )
+
+    payload = google_adapter._convert_to_google_event(event)
+
+    assert payload['reminders'] == {'useDefault': True}
+
+
+def test_google_convert_to_event_custom_reminder(google_adapter):
+    event = CalendarEvent(
+        title='Custom reminder',
+        start_time='2024-08-01T09:00:00Z',
+        end_time='2024-08-01T10:00:00Z',
+        reminder_minutes=20,
+    )
+
+    payload = google_adapter._convert_to_google_event(event)
+
+    assert payload['reminders']['useDefault'] is False
+    assert payload['reminders']['overrides'] == [
+        {'method': 'popup', 'minutes': 20}
+    ]
+
+
 def test_outlook_convert_naive_datetime(monkeypatch, outlook_adapter):
     monkeypatch.setenv('ECHONOTE_LOCAL_TIMEZONE', 'Asia/Shanghai')
     event = _build_event('2024-07-01T09:00:00', '2024-07-01T10:00:00')

@@ -130,6 +130,7 @@ class CalendarEvent:
     attendees: List[str] = field(default_factory=list)
     description: Optional[str] = None
     reminder_minutes: Optional[int] = None
+    reminder_use_default: Optional[bool] = None
     recurrence_rule: Optional[str] = None
     source: str = "local"  # local/google/outlook
     external_id: Optional[str] = None
@@ -158,6 +159,15 @@ class CalendarEvent:
                 attendees = list(loaded)
             else:
                 attendees = [loaded]
+        reminder_use_default = None
+        try:
+            row_keys = row.keys() if hasattr(row, 'keys') else []
+        except Exception:  # pragma: no cover - defensive guard
+            row_keys = []
+        if row_keys and 'reminder_use_default' in row_keys:
+            value = row['reminder_use_default']
+            reminder_use_default = bool(value) if value is not None else None
+
         return cls(
             id=row['id'],
             title=row['title'],
@@ -168,6 +178,7 @@ class CalendarEvent:
             attendees=attendees,
             description=row['description'],
             reminder_minutes=row['reminder_minutes'],
+            reminder_use_default=reminder_use_default,
             recurrence_rule=row['recurrence_rule'],
             source=row['source'],
             external_id=row['external_id'],
