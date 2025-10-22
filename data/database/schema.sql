@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS calendar_events (
     attendees TEXT, -- JSON array
     description TEXT,
     reminder_minutes INTEGER,
+    reminder_use_default BOOLEAN,
     recurrence_rule TEXT, -- iCalendar RRULE format
     source TEXT NOT NULL DEFAULT 'local', -- local/google/outlook
     external_id TEXT, -- External calendar event ID
