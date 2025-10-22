@@ -226,6 +226,7 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 - Past events display linked recordings, transcripts, and notes for download or preview.
 - Future events allow auto-tasks: auto-record, auto-transcribe, preset languages, and translation targets.
 - Changes to the reminder lead time in Settings take effect immediately; the auto task scheduler picks up the updated window without restarting EchoNote.
+- Audio playback relies on Qt Multimedia plugins. If the dialog reports that the Qt multimedia service is missing, install the Qt Multimedia backend for your platform and restart EchoNote. For unsupported formats, re-encode the recording to WAV or MP3 or add the required codecs.
 
 <details>
 <summary>中文</summary>
@@ -238,6 +239,7 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 - 历史事件会列出录音、转录、笔记，可预览或下载。
 - 未来事件可配置自动录音、自动转录、默认语言与翻译目标。
 - 在「设置」中调整提醒提前分钟数会即时生效，自动任务调度器无需重启即可应用新的时间窗口。
+- 音频播放依赖 Qt Multimedia 插件。如弹窗提示“缺少 Qt 多媒体服务”，请安装系统对应的 Qt Multimedia 组件后重启 EchoNote；若提示格式不受支持，请将录音转换为 WAV/MP3 或安装所需编解码器。
 
 </details>
 
@@ -250,6 +252,7 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 - Les événements passés affichent enregistrements, transcriptions et notes associés pour prévisualisation ou téléchargement.
 - Les événements futurs proposent des tâches automatiques : enregistrement, transcription, langues préconfigurées et cibles de traduction.
 - La modification du délai d’alerte dans Paramètres s’applique immédiatement ; le planificateur de tâches automatiques adopte la nouvelle fenêtre sans redémarrer EchoNote.
+- La lecture audio dépend des plugins Qt Multimedia. Si la boîte de dialogue signale un service multimédia Qt manquant, installez le backend Qt Multimedia de votre plateforme puis redémarrez EchoNote. Pour les formats non pris en charge, ré-encodez l’enregistrement en WAV/MP3 ou ajoutez les codecs requis.
 
 </details>
 

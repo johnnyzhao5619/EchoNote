@@ -193,6 +193,8 @@
     "audio_player_title": "Lecteur Audio",
     "audio_player_unavailable_title": "Lecture audio indisponible",
     "audio_player_unavailable_message": "Les composants Qt Multimedia ne sont pas disponibles, la lecture des enregistrements est désactivée mais la chronologie reste accessible.",
+    "audio_player_open_failed_title": "Impossible d'ouvrir l'enregistrement",
+    "audio_player_open_failed_message": "Impossible d'ouvrir le lecteur audio : {error}. Vérifiez le fichier d'enregistrement et consultez le journal de l'application pour plus de détails.",
     "audio_player": {
       "initial_time": "00:00",
       "play_button_label": "▶",
@@ -205,7 +207,11 @@
       "load_failed": "Échec du chargement du fichier audio : {error}",
       "playback_error": "Erreur de lecture : {error}",
       "invalid_media": "Le format du média n'est pas pris en charge ou le fichier est corrompu",
-      "dialog_error_body": "{message}"
+      "dialog_error_body": "{message}",
+      "errors": {
+        "service_missing": "Lecture impossible : le service multimédia Qt est absent. Installez le backend Qt Multimedia de votre plateforme puis redémarrez EchoNote.",
+        "format_error": "Lecture impossible : le format du média n'est pas pris en charge. Ré-encodez l'enregistrement en WAV ou MP3, ou installez les codecs requis. Détails : {details}"
+      }
     },
     "snippet": {
       "title_prefix": "Titre",

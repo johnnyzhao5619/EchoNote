@@ -195,6 +195,8 @@
     "audio_player_title": "音频播放器",
     "audio_player_unavailable_title": "无法播放音频",
     "audio_player_unavailable_message": "缺少 Qt Multimedia 组件，无法播放录音，但时间线仍可正常查看。",
+    "audio_player_open_failed_title": "无法打开录音",
+    "audio_player_open_failed_message": "无法打开音频播放器：{error}。请检查录音文件，并查看应用日志获取更多信息。",
     "audio_player": {
       "initial_time": "00:00",
       "play_button_label": "▶",
@@ -207,7 +209,11 @@
       "load_failed": "音频文件加载失败：{error}",
       "playback_error": "播放出错：{error}",
       "invalid_media": "媒体文件格式不受支持或文件损坏",
-      "dialog_error_body": "{message}"
+      "dialog_error_body": "{message}",
+      "errors": {
+        "service_missing": "播放失败：缺少 Qt 多媒体服务。请安装操作系统对应的 Qt Multimedia 组件后重启 EchoNote。",
+        "format_error": "播放失败：音频格式不受支持。请将录音重新编码为 WAV 或 MP3，或安装缺失的编解码器。详情：{details}"
+      }
     },
     "snippet": {
       "title_prefix": "标题",

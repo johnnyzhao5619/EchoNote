@@ -6,11 +6,12 @@ import pytest
 
 PyQt6 = pytest.importorskip("PyQt6")
 from PyQt6.QtCore import Qt, QDate, QDateTime, QTime
+from PyQt6.QtMultimedia import QMediaPlayer
 from PyQt6.QtWidgets import QApplication, QDialog, QWidget
 
 from data.database.models import CalendarEvent
 
-from ui.timeline.audio_player import AudioPlayer, AudioPlayerDialog
+from ui.timeline.audio_player import AudioPlayerDialog, AudioPlayer
 from ui.timeline.event_card import CurrentTimeIndicator
 from ui.timeline.widget import TimelineWidget
 from utils.i18n import I18nQtManager
@@ -859,6 +860,50 @@ def test_view_recording_warns_when_audio_unavailable(monkeypatch, qapp, tmp_path
         qapp.processEvents()
 
 
+def test_view_recording_surfaces_creation_errors(monkeypatch, qapp, tmp_path):
+    monkeypatch.setattr(
+        "ui.timeline.widget.QTimer.singleShot",
+        staticmethod(lambda *_: None),
+    )
+
+    class _FailingAudioDialog:
+        def __init__(self, *_args, **_kwargs):
+            raise RuntimeError("dialog crashed")
+
+    monkeypatch.setattr(
+        "ui.timeline.audio_player.AudioPlayerDialog",
+        _FailingAudioDialog,
+    )
+
+    captured = []
+
+    def _capture_critical(parent, title, message):
+        captured.append((parent, title, message))
+
+    monkeypatch.setattr(
+        "ui.timeline.widget.QMessageBox.critical",
+        staticmethod(_capture_critical),
+    )
+
+    i18n = I18nQtManager(default_language="en_US")
+    widget = TimelineWidget(DummyTimelineManager(), i18n)
+
+    try:
+        file_path = tmp_path / "broken.wav"
+        widget._on_view_recording(str(file_path))
+
+        assert not widget._audio_player_dialogs
+        assert captured, "Expected an error dialog when audio dialog creation fails"
+        _, title, message = captured[0]
+        assert title == i18n.t('timeline.audio_player_open_failed_title')
+        assert message == i18n.t('timeline.audio_player_open_failed_message').format(
+            error="dialog crashed"
+        )
+    finally:
+        widget.deleteLater()
+        qapp.processEvents()
+
+
 def test_transcript_dialogs_are_non_modal_and_cached(monkeypatch, qapp, tmp_path):
     monkeypatch.setattr(
         "ui.timeline.widget.QTimer.singleShot",
@@ -1056,6 +1101,36 @@ def test_audio_player_dialog_surfaces_missing_file_error(monkeypatch, qapp, tmp_
     finally:
         dialog.close()
         dialog.deleteLater()
+        qapp.processEvents()
+
+
+@pytest.mark.parametrize(
+    "error_enum, translation_key",
+    [
+        (
+            QMediaPlayer.Error.ServiceMissingError,
+            "timeline.audio_player.errors.service_missing",
+        ),
+        (
+            QMediaPlayer.Error.FormatError,
+            "timeline.audio_player.errors.format_error",
+        ),
+    ],
+)
+def test_audio_player_emits_localized_qt_errors(qapp, tmp_path, error_enum, translation_key):
+    detail = "mock detail"
+    i18n = I18nQtManager(default_language="en_US")
+    player = AudioPlayer(str(tmp_path / "dummy.wav"), i18n, auto_load=False)
+
+    messages = []
+    player.playback_error.connect(messages.append)
+
+    try:
+        player._on_error(error_enum, detail)
+        assert messages, "Expected localized error message to be emitted"
+        assert messages[-1] == i18n.t(translation_key, details=detail)
+    finally:
+        player.deleteLater()
         qapp.processEvents()
 
 
