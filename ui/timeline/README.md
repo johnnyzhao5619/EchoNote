@@ -55,6 +55,7 @@ Built-in audio player for recordings:
 - **Volume control**
 - **Time display** (current/total)
 - **Error handling** for missing or unsupported files
+- **Automatic reset on errors** so progress indicators clear and playback controls return to the initial state when decoding fails
 - **Immediate feedback** when recordings are missing so users understand the failure reason
 - **Instant translation refresh** when the application language changes
 

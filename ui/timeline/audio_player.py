@@ -398,6 +398,10 @@ class AudioPlayer(QWidget):
                 'timeline.audio_player.playback_error',
                 error=self.i18n.t('timeline.audio_player.invalid_media')
             )
+            self.player.stop()
+            self._playback_state = QMediaPlayer.PlaybackState.StoppedState
+            self._reset_playback_state(reset_total=True)
+            self.update_translations()
             self._set_controls_enabled(False)
         elif status == QMediaPlayer.MediaStatus.EndOfMedia:
             # Align UI with stopped state when playback naturally ends
