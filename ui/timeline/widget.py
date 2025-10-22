@@ -640,8 +640,36 @@ class TimelineWidget(QWidget):
         source = self.source_filter.currentData()
         
         # Get date range with inclusive bounds
-        start_dt = QDateTime(self.start_date_edit.date(), QTime(0, 0, 0))
-        end_dt = QDateTime(self.end_date_edit.date(), QTime(23, 59, 59))
+        start_qdate = self.start_date_edit.date()
+        end_qdate = self.end_date_edit.date()
+        start_dt = QDateTime(start_qdate, QTime(0, 0, 0))
+        end_dt = QDateTime(end_qdate, QTime(23, 59, 59))
+
+        if start_dt > end_dt:
+            logger.warning(
+                "Start date %s is after end date %s; swapping values for timeline filter.",
+                start_qdate.toString(Qt.DateFormat.ISODate),
+                end_qdate.toString(Qt.DateFormat.ISODate),
+            )
+
+            prev_start_blocked = self.start_date_edit.blockSignals(True)
+            prev_end_blocked = self.end_date_edit.blockSignals(True)
+            try:
+                self.start_date_edit.setDate(end_qdate)
+                self.end_date_edit.setDate(start_qdate)
+            finally:
+                self.start_date_edit.blockSignals(prev_start_blocked)
+                self.end_date_edit.blockSignals(prev_end_blocked)
+
+            start_qdate, end_qdate = end_qdate, start_qdate
+            start_dt = QDateTime(start_qdate, QTime(0, 0, 0))
+            end_dt = QDateTime(end_qdate, QTime(23, 59, 59))
+            logger.info(
+                "Timeline date range corrected to %s → %s.",
+                start_qdate.toString(Qt.DateFormat.ISODate),
+                end_qdate.toString(Qt.DateFormat.ISODate),
+            )
+
         start_date = start_dt.toString(Qt.DateFormat.ISODate)
         end_date = end_dt.toString(Qt.DateFormat.ISODate)
         
