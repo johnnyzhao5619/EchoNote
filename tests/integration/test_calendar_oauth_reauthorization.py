@@ -1,6 +1,7 @@
 import sys
+import types
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
@@ -9,6 +10,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from tests.unit.test_transcription_manager_failure import _ensure_cryptography_stubs
 from tests.unit.test_calendar_manager import _ensure_apscheduler_stub
+from tests.unit.test_calendar_hub_account_display import CalendarHubWidget
 
 
 _ensure_cryptography_stubs()
@@ -25,6 +27,7 @@ from data.database.models import (
     EventAttachment,
 )
 from data.security.encryption import SecurityManager
+from engines.calendar_sync.outlook_calendar import OutlookCalendarAdapter
 
 
 class _StubCalendarAdapter:
@@ -300,3 +303,45 @@ def test_sync_removes_cancelled_and_missing_remote_events(tmp_path):
     )
 
     db.close_all()
+
+
+def test_outlook_user_email_lookup_uses_graph_profile(monkeypatch):
+    adapter = OutlookCalendarAdapter('client-id', 'client-secret')
+    adapter.access_token = 'access-123'
+
+    httpx_stub = types.ModuleType('httpx')
+
+    class DummyHTTPError(Exception):
+        pass
+
+    class DummyResponse:
+        status_code = 200
+
+        @staticmethod
+        def json():
+            return {'mail': 'alex@example.com'}
+
+    requested_calls: List[Tuple[str, Optional[str]]] = []
+
+    class DummyClient:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def get(self, url, *, headers=None, timeout=None):
+            requested_calls.append((url, headers.get('Authorization') if headers else None))
+            return DummyResponse()
+
+    httpx_stub.Client = DummyClient
+    httpx_stub.HTTPError = DummyHTTPError
+
+    monkeypatch.setitem(sys.modules, 'httpx', httpx_stub)
+
+    email = CalendarHubWidget._get_user_email(object(), 'outlook', adapter)
+
+    assert email == 'alex@example.com'
+    assert requested_calls, 'Graph profile endpoint should be called'
+    assert requested_calls[0][0] == 'https://graph.microsoft.com/v1.0/me'
+    assert requested_calls[0][1] == 'Bearer access-123'

@@ -116,12 +116,14 @@ def test_outlook_scopes_include_offline_access():
     adapter = OutlookCalendarAdapter('id', 'secret')
 
     assert 'offline_access' in adapter.SCOPES
+    assert 'User.Read' in adapter.SCOPES
 
     auth_payload = adapter.get_authorization_url()
     query = parse_qs(urlparse(auth_payload['authorization_url']).query)
     scope_value = query.get('scope', [''])[0].split()
 
     assert 'offline_access' in scope_value
+    assert 'User.Read' in scope_value
 
 
 def test_google_scopes_include_userinfo_permissions(google_adapter):
