@@ -268,6 +268,82 @@ def test_get_timeline_events_future_preserved_on_first_page():
     assert result['has_more']
 
 
+def test_get_timeline_events_applies_filters_to_past_and_future():
+    center_time = datetime(2024, 5, 20, 12, 0, tzinfo=timezone.utc)
+
+    matching_past = CalendarEvent(
+        id='past-match',
+        title='Past Match',
+        event_type='Event',
+        source='google',
+        start_time=iso_z(center_time - timedelta(hours=3)),
+        end_time=iso_z(center_time - timedelta(hours=2, minutes=30)),
+    )
+    mismatched_type = CalendarEvent(
+        id='past-type',
+        title='Past Type',
+        event_type='Task',
+        source='google',
+        start_time=iso_z(center_time - timedelta(hours=4)),
+        end_time=iso_z(center_time - timedelta(hours=3, minutes=30)),
+    )
+    matching_future = CalendarEvent(
+        id='future-match',
+        title='Future Match',
+        event_type='Event',
+        source='google',
+        start_time=iso_z(center_time + timedelta(hours=4)),
+        end_time=iso_z(center_time + timedelta(hours=5)),
+    )
+    mismatched_source = CalendarEvent(
+        id='future-source',
+        title='Future Source',
+        event_type='Event',
+        source='local',
+        start_time=iso_z(center_time + timedelta(hours=6)),
+        end_time=iso_z(center_time + timedelta(hours=7)),
+    )
+    out_of_range_future = CalendarEvent(
+        id='future-range',
+        title='Future Range',
+        event_type='Event',
+        source='google',
+        start_time=iso_z(center_time + timedelta(days=3)),
+        end_time=iso_z(center_time + timedelta(days=3, hours=1)),
+    )
+
+    manager = TimelineManagerForTest(
+        calendar_manager=DummyCalendarManager([
+            matching_past,
+            mismatched_type,
+            matching_future,
+            mismatched_source,
+            out_of_range_future,
+        ]),
+        db_connection=NOOP_DB,
+    )
+
+    filters = {
+        'event_type': 'Event',
+        'source': 'google',
+        'start_date': (center_time - timedelta(days=1)).date().isoformat(),
+        'end_date': (center_time + timedelta(days=1)).date().isoformat(),
+    }
+
+    result = manager.get_timeline_events(
+        center_time=center_time,
+        past_days=2,
+        future_days=2,
+        filters=filters,
+    )
+
+    assert [item['event'].id for item in result['past_events']] == ['past-match']
+    assert [item['event'].id for item in result['future_events']] == ['future-match']
+    assert result['total_count'] == 1
+    assert result['future_total_count'] == 1
+    assert not result['has_more']
+
+
 def test_get_timeline_events_batches_past_attachments(monkeypatch):
     center_time = datetime(2024, 6, 1, 12, 0, tzinfo=timezone.utc)
 

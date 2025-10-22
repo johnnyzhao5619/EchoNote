@@ -302,7 +302,8 @@ class TimelineWidget(QWidget):
                     past_days=self.past_days,
                     future_days=self.future_days,
                     page=page_to_load,
-                    page_size=self.page_size
+                    page_size=self.page_size,
+                    filters=self.current_filters or None
                 )
 
             # Update state
