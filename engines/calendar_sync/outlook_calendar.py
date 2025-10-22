@@ -1,6 +1,7 @@
 """Outlook Calendar synchronization adapter."""
 
 import logging
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 
 import httpx
@@ -28,6 +29,8 @@ IANA_TO_WINDOWS_MAP = {
     'Europe/Berlin': 'W. Europe Standard Time',
     'Australia/Sydney': 'AUS Eastern Standard Time',
 }
+
+WINDOWS_TO_IANA_MAP = {value: key for key, value in IANA_TO_WINDOWS_MAP.items()}
 
 
 class OutlookCalendarAdapter(OAuthCalendarAdapter):
@@ -283,8 +286,120 @@ class OutlookCalendarAdapter(OAuthCalendarAdapter):
             start = outlook_event.get('start', {})
             end = outlook_event.get('end', {})
 
-            start_time = start.get('dateTime')
-            end_time = end.get('dateTime')
+            start_time_raw = start.get('dateTime')
+            end_time_raw = end.get('dateTime')
+
+            if not start_time_raw or not end_time_raw:
+                return None
+
+            fallback_start_identifier = outlook_event.get('originalStartTimeZone')
+            fallback_end_identifier = outlook_event.get(
+                'originalEndTimeZone', fallback_start_identifier
+            )
+
+            def _normalise_identifier(identifier: Optional[str]) -> Optional[str]:
+                if not identifier:
+                    return None
+                normalised = identifier.strip()
+                if not normalised:
+                    return None
+                return WINDOWS_TO_IANA_MAP.get(normalised, normalised)
+
+            def _prepare_datetime_text(value: str) -> str:
+                text = value.strip()
+                if text.endswith('Z'):
+                    text = f"{text[:-1]}+00:00"
+
+                if '.' not in text:
+                    return text
+
+                main, remainder = text.split('.', 1)
+                offset = ''
+                for sign in ('+', '-'):
+                    idx = remainder.find(sign)
+                    if idx > 0:
+                        offset = remainder[idx:]
+                        remainder = remainder[:idx]
+                        break
+
+                fraction = ''.join(ch for ch in remainder if ch.isdigit())
+                if not fraction:
+                    return f"{main}{offset}"
+
+                fraction = (fraction + '000000')[:6]
+                if set(fraction) == {'0'}:
+                    return f"{main}{offset}"
+                return f"{main}.{fraction}{offset}"
+
+            def _convert_datetime(
+                payload: dict,
+                *,
+                fallback_identifier: Optional[str],
+                is_all_day: bool,
+            ) -> Optional[str]:
+                value = payload.get('dateTime')
+                if not value:
+                    return None
+
+                identifier = _normalise_identifier(
+                    payload.get('timeZone') or fallback_identifier
+                )
+
+                # For all-day events, only keep the calendar date
+                if is_all_day or 'T' not in value:
+                    text = value.strip()
+                    if 'T' in text:
+                        try:
+                            parsed = datetime.fromisoformat(_prepare_datetime_text(text))
+                            if identifier:
+                                tzinfo_value = self._timezone_from_identifier(identifier)
+                                if parsed.tzinfo:
+                                    parsed = parsed.astimezone(tzinfo_value)
+                                else:
+                                    parsed = parsed.replace(tzinfo=tzinfo_value)
+                            return parsed.date().isoformat()
+                        except Exception:  # pragma: no cover - fallback to raw date
+                            pass
+                    return text[:10]
+
+                try:
+                    parsed_value = datetime.fromisoformat(
+                        _prepare_datetime_text(value)
+                    )
+                except ValueError:
+                    self.logger.warning(
+                        "Failed to parse Outlook datetime value: %s", value
+                    )
+                    return value
+
+                if identifier:
+                    tzinfo_value = self._timezone_from_identifier(identifier)
+                    if parsed_value.tzinfo:
+                        parsed_value = parsed_value.astimezone(tzinfo_value)
+                    else:
+                        parsed_value = parsed_value.replace(tzinfo=tzinfo_value)
+                elif parsed_value.tzinfo is None:
+                    parsed_value = parsed_value.replace(tzinfo=timezone.utc)
+
+                return parsed_value.isoformat()
+
+            is_all_day = bool(outlook_event.get('isAllDay'))
+            if not is_all_day:
+                if isinstance(start_time_raw, str) and 'T' not in start_time_raw:
+                    is_all_day = True
+                elif isinstance(end_time_raw, str) and 'T' not in end_time_raw:
+                    is_all_day = True
+
+            start_time = _convert_datetime(
+                start,
+                fallback_identifier=fallback_start_identifier,
+                is_all_day=is_all_day,
+            )
+            end_time = _convert_datetime(
+                end,
+                fallback_identifier=fallback_end_identifier,
+                is_all_day=is_all_day,
+            )
 
             if not start_time or not end_time:
                 return None

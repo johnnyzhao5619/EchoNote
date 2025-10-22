@@ -1,6 +1,7 @@
 """Unit tests for calendar synchronization adapters time handling."""
 
 import sys
+from datetime import datetime
 from pathlib import Path
 import types
 
@@ -82,7 +83,10 @@ _ensure_httpx_stub()
 
 from data.database.models import CalendarEvent
 from engines.calendar_sync.google_calendar import GoogleCalendarAdapter
-from engines.calendar_sync.outlook_calendar import OutlookCalendarAdapter
+from engines.calendar_sync.outlook_calendar import (
+    OutlookCalendarAdapter,
+    WINDOWS_TO_IANA_MAP,
+)
 
 
 @pytest.fixture
@@ -93,6 +97,47 @@ def google_adapter():
 @pytest.fixture
 def outlook_adapter():
     return OutlookCalendarAdapter('id', 'secret')
+
+
+def _normalise_iso_value(value: str) -> str:
+    text = value.strip()
+    if text.endswith('Z'):
+        text = f"{text[:-1]}+00:00"
+
+    if '.' not in text:
+        return text
+
+    main, remainder = text.split('.', 1)
+    offset = ''
+    for sign in ('+', '-'):
+        idx = remainder.find(sign)
+        if idx > 0:
+            offset = remainder[idx:]
+            remainder = remainder[:idx]
+            break
+
+    fraction = ''.join(ch for ch in remainder if ch.isdigit())
+    if not fraction:
+        return f"{main}{offset}"
+
+    fraction = (fraction + '000000')[:6]
+    if set(fraction) == {'0'}:
+        return f"{main}{offset}"
+    return f"{main}.{fraction}{offset}"
+
+
+def _build_remote_instant(
+    adapter: OutlookCalendarAdapter,
+    date_value: str,
+    timezone_identifier: str,
+) -> datetime:
+    identifier = WINDOWS_TO_IANA_MAP.get(timezone_identifier, timezone_identifier)
+    tzinfo_value = adapter._timezone_from_identifier(identifier)
+
+    parsed = datetime.fromisoformat(_normalise_iso_value(date_value))
+    if parsed.tzinfo:
+        return parsed.astimezone(tzinfo_value)
+    return parsed.replace(tzinfo=tzinfo_value)
 
 
 def _build_event(start: str, end: str) -> CalendarEvent:
@@ -179,3 +224,158 @@ def test_outlook_convert_offset_datetime(monkeypatch, outlook_adapter):
     assert payload['start']['dateTime'] == '2024-07-01T09:00:00'
     assert payload['end']['timeZone'] == 'UTC+02'
     assert payload['end']['dateTime'] == '2024-07-01T10:30:00'
+
+
+def test_outlook_event_roundtrip_with_explicit_timezone(outlook_adapter):
+    remote_payload = {
+        'id': 'evt-001',
+        'subject': 'Remote Meeting',
+        'start': {
+            'dateTime': '2024-07-01T09:00:00.0000000',
+            'timeZone': 'China Standard Time',
+        },
+        'end': {
+            'dateTime': '2024-07-01T10:00:00.0000000',
+            'timeZone': 'China Standard Time',
+        },
+    }
+
+    internal_event = outlook_adapter._convert_outlook_event(remote_payload)
+
+    assert internal_event['start_time'].startswith('2024-07-01T09:00:00')
+    assert internal_event['start_time'].endswith('+08:00')
+    assert internal_event['end_time'].startswith('2024-07-01T10:00:00')
+    assert internal_event['end_time'].endswith('+08:00')
+
+    calendar_event = CalendarEvent(
+        id=internal_event['id'],
+        title=internal_event['title'],
+        event_type=internal_event['event_type'],
+        start_time=internal_event['start_time'],
+        end_time=internal_event['end_time'],
+        location=internal_event['location'],
+        attendees=internal_event['attendees'],
+        description=internal_event['description'],
+        reminder_minutes=internal_event['reminder_minutes'],
+        recurrence_rule=internal_event['recurrence_rule'],
+        source='outlook',
+        external_id=internal_event['id'],
+    )
+
+    roundtrip_payload = outlook_adapter._convert_to_outlook_event(calendar_event)
+
+    assert roundtrip_payload['start']['dateTime'] == '2024-07-01T09:00:00'
+    assert roundtrip_payload['end']['dateTime'] == '2024-07-01T10:00:00'
+
+    original_start = _build_remote_instant(
+        outlook_adapter,
+        remote_payload['start']['dateTime'],
+        remote_payload['start']['timeZone'],
+    )
+    roundtrip_start = _build_remote_instant(
+        outlook_adapter,
+        roundtrip_payload['start']['dateTime'],
+        roundtrip_payload['start']['timeZone'],
+    )
+    original_end = _build_remote_instant(
+        outlook_adapter,
+        remote_payload['end']['dateTime'],
+        remote_payload['end']['timeZone'],
+    )
+    roundtrip_end = _build_remote_instant(
+        outlook_adapter,
+        roundtrip_payload['end']['dateTime'],
+        roundtrip_payload['end']['timeZone'],
+    )
+
+    assert roundtrip_start == original_start
+    assert roundtrip_end == original_end
+
+
+def test_outlook_event_roundtrip_with_original_timezone(outlook_adapter):
+    remote_payload = {
+        'id': 'evt-002',
+        'subject': 'Fallback Zone',
+        'start': {
+            'dateTime': '2024-12-01T09:30:00.0000000',
+        },
+        'end': {
+            'dateTime': '2024-12-01T10:45:00.0000000',
+        },
+        'originalStartTimeZone': 'Pacific Standard Time',
+    }
+
+    internal_event = outlook_adapter._convert_outlook_event(remote_payload)
+
+    assert internal_event['start_time'].startswith('2024-12-01T09:30:00')
+    assert internal_event['start_time'].endswith('-08:00')
+    assert internal_event['end_time'].startswith('2024-12-01T10:45:00')
+    assert internal_event['end_time'].endswith('-08:00')
+
+    calendar_event = CalendarEvent(
+        id=internal_event['id'],
+        title=internal_event['title'],
+        event_type=internal_event['event_type'],
+        start_time=internal_event['start_time'],
+        end_time=internal_event['end_time'],
+        location=internal_event['location'],
+        attendees=internal_event['attendees'],
+        description=internal_event['description'],
+        reminder_minutes=internal_event['reminder_minutes'],
+        recurrence_rule=internal_event['recurrence_rule'],
+        source='outlook',
+        external_id=internal_event['id'],
+    )
+
+    roundtrip_payload = outlook_adapter._convert_to_outlook_event(calendar_event)
+
+    assert roundtrip_payload['start']['dateTime'] == '2024-12-01T09:30:00'
+    assert roundtrip_payload['end']['dateTime'] == '2024-12-01T10:45:00'
+
+    expected_identifier = remote_payload['start'].get(
+        'timeZone', remote_payload['originalStartTimeZone']
+    )
+    original_start = _build_remote_instant(
+        outlook_adapter,
+        remote_payload['start']['dateTime'],
+        expected_identifier,
+    )
+    original_end = _build_remote_instant(
+        outlook_adapter,
+        remote_payload['end']['dateTime'],
+        expected_identifier,
+    )
+    roundtrip_start = _build_remote_instant(
+        outlook_adapter,
+        roundtrip_payload['start']['dateTime'],
+        roundtrip_payload['start']['timeZone'],
+    )
+    roundtrip_end = _build_remote_instant(
+        outlook_adapter,
+        roundtrip_payload['end']['dateTime'],
+        roundtrip_payload['end']['timeZone'],
+    )
+
+    assert roundtrip_start == original_start
+    assert roundtrip_end == original_end
+
+
+def test_outlook_all_day_event_conversion(outlook_adapter):
+    remote_payload = {
+        'id': 'evt-003',
+        'subject': 'All Day',
+        'isAllDay': True,
+        'start': {
+            'dateTime': '2024-08-15T00:00:00',
+            'timeZone': 'UTC',
+        },
+        'end': {
+            'dateTime': '2024-08-16T00:00:00',
+            'timeZone': 'UTC',
+        },
+    }
+
+    internal_event = outlook_adapter._convert_outlook_event(remote_payload)
+
+    assert internal_event['start_time'] == '2024-08-15'
+    assert internal_event['end_time'] == '2024-08-16'
