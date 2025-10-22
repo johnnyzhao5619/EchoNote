@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QScrollArea,
     QLineEdit, QComboBox, QLabel, QFrame, QPushButton, QMessageBox
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QDateTime, QTime
 from PyQt6.QtGui import QPalette
 
 from utils.i18n import I18nQtManager
@@ -558,9 +558,11 @@ class TimelineWidget(QWidget):
         event_type = self.type_filter.currentData()
         source = self.source_filter.currentData()
         
-        # Get date range
-        start_date = self.start_date_edit.date().toString("yyyy-MM-dd")
-        end_date = self.end_date_edit.date().toString("yyyy-MM-dd")
+        # Get date range with inclusive bounds
+        start_dt = QDateTime(self.start_date_edit.date(), QTime(0, 0, 0))
+        end_dt = QDateTime(self.end_date_edit.date(), QTime(23, 59, 59))
+        start_date = start_dt.toString(Qt.DateFormat.ISODate)
+        end_date = end_dt.toString(Qt.DateFormat.ISODate)
         
         # Update filters
         self.current_filters = {}

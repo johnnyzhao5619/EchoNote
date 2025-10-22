@@ -219,6 +219,7 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 
 ### 3.4 Timeline
 - Jump across periods using date pickers; pagination and keyword search cover titles, descriptions, and transcripts.
+- Date filters are inclusive; the selected end date covers the entire day.
 - Past events display linked recordings, transcripts, and notes for download or preview.
 - Future events allow auto-tasks: auto-record, auto-transcribe, preset languages, and translation targets.
 
@@ -226,6 +227,7 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 <summary>中文</summary>
 
 - 通过日期选择器切换时间段，支持分页与关键词搜索（覆盖标题、描述与转录内容）。
+- 日期筛选为包含式区间，终止日期会覆盖当日全部事件。
 - 历史事件会列出录音、转录、笔记，可预览或下载。
 - 未来事件可配置自动录音、自动转录、默认语言与翻译目标。
 
