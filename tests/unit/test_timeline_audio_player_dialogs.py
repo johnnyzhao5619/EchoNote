@@ -100,6 +100,29 @@ class AutoTaskFailureTimelineManager(DummyTimelineManager):
         }
 
 
+class CapturingAutoTaskTimelineManager(DummyTimelineManager):
+    """Timeline manager that records auto-task updates for assertions."""
+
+    def __init__(self, event, initial_config):
+        self._event = event
+        self.initial_config = dict(initial_config)
+        self.saved_configs = []
+
+    def get_timeline_events(self, **_):
+        current = datetime.now().isoformat()
+        return {
+            "current_time": current,
+            "past_events": [],
+            "future_events": [
+                {"event": self._event, "auto_tasks": dict(self.initial_config)},
+            ],
+            "has_more": False,
+        }
+
+    def set_auto_task(self, event_id, config):
+        self.saved_configs.append((event_id, dict(config)))
+
+
 @pytest.fixture(scope="module")
 def qapp():
     app = QApplication.instance()
@@ -337,6 +360,53 @@ def test_auto_task_failure_restores_ui(monkeypatch, qapp):
         expected_prefix = i18n.t("timeline.auto_task_save_failed_message").split("\n")[0]
         assert expected_prefix in message
         assert "save failed" in message
+    finally:
+        widget.deleteLater()
+        qapp.processEvents()
+
+
+def test_transcription_language_preserved_on_toggle(monkeypatch, qapp):
+    monkeypatch.setattr(
+        "ui.timeline.widget.QTimer.singleShot",
+        staticmethod(lambda *_: None),
+    )
+
+    now = datetime.now().astimezone()
+    future_event = CalendarEvent(
+        id="event-transcription",
+        title="Language capture meeting",
+        start_time=(now + timedelta(hours=3)).isoformat(),
+        end_time=(now + timedelta(hours=4)).isoformat(),
+    )
+
+    i18n = I18nQtManager(default_language="en_US")
+    initial_config = {
+        "enable_transcription": True,
+        "enable_recording": False,
+        "transcription_language": i18n.default_language,
+        "enable_translation": False,
+        "translation_target_language": None,
+    }
+
+    manager = CapturingAutoTaskTimelineManager(future_event, initial_config)
+    widget = TimelineWidget(manager, i18n)
+
+    try:
+        assert widget.load_timeline_events(reset=True)
+        qapp.processEvents()
+
+        card = widget.get_event_card_by_id(future_event.id)
+        assert card is not None, "Expected future event card to be created"
+        assert card.event_data["auto_tasks"]["transcription_language"] == i18n.default_language
+
+        # Toggle recording to trigger an auto-task change emission.
+        card.recording_checkbox.setChecked(True)
+        qapp.processEvents()
+
+        assert manager.saved_configs, "Expected auto-task update to be persisted"
+        _, saved_config = manager.saved_configs[-1]
+        assert saved_config["transcription_language"] == i18n.default_language
+        assert card.event_data["auto_tasks"]["transcription_language"] == i18n.default_language
     finally:
         widget.deleteLater()
         qapp.processEvents()

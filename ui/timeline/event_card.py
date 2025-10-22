@@ -460,7 +460,10 @@ class EventCard(QFrame):
             return
 
         config = config or {}
-        self.event_data['auto_tasks'] = dict(config)
+        existing_auto_tasks = self.event_data.get('auto_tasks', {}) or {}
+        merged_config = dict(existing_auto_tasks)
+        merged_config.update(config)
+        self.event_data['auto_tasks'] = dict(merged_config)
 
         def _set_checked(checkbox: Optional[QCheckBox], value: bool):
             if checkbox is None:
@@ -469,10 +472,10 @@ class EventCard(QFrame):
             checkbox.setChecked(bool(value))
             checkbox.blockSignals(False)
 
-        enable_transcription = config.get('enable_transcription', False)
-        enable_recording = config.get('enable_recording', False)
-        enable_translation = config.get('enable_translation', False)
-        target_language = config.get('translation_target_language')
+        enable_transcription = merged_config.get('enable_transcription', False)
+        enable_recording = merged_config.get('enable_recording', False)
+        enable_translation = merged_config.get('enable_translation', False)
+        target_language = merged_config.get('translation_target_language')
 
         _set_checked(self.transcription_checkbox, enable_transcription)
         _set_checked(self.recording_checkbox, enable_recording)
@@ -506,12 +509,16 @@ class EventCard(QFrame):
     
     def _on_auto_task_changed(self):
         """Handle auto-task configuration change."""
+        auto_tasks = self.event_data.get('auto_tasks', {}) or {}
         config = {
             'enable_transcription': self.transcription_checkbox.isChecked(),
             'enable_recording': self.recording_checkbox.isChecked(),
             'enable_translation': False,
             'translation_target_language': None,
         }
+
+        if 'transcription_language' in auto_tasks:
+            config['transcription_language'] = auto_tasks.get('transcription_language')
 
         if self.translation_checkbox:
             enable_translation = self.translation_checkbox.isChecked()
@@ -521,6 +528,8 @@ class EventCard(QFrame):
                 config['translation_target_language'] = (
                     self.translation_language_combo.currentData()
                 )
+
+        self.event_data['auto_tasks'] = dict(config)
 
         logger.debug(f"Auto-task changed for event {self.event.id}: {config}")
         self.auto_task_changed.emit(self.event.id, config)
