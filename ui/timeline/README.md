@@ -17,6 +17,7 @@ Main timeline interface with the following features:
 - **Lazy loading** with pagination（默认每页 50 条，可在设置页调整）
 - **Configurable time window**（默认展示当前时间前后各 30 天，可在设置页调整）
 - **Virtual scrolling** for smooth performance with large datasets
+- **加载期间的操作自动排队**，如果用户在刷新中发起新的搜索或过滤操作，会在当前加载完成后自动兑现，无需重复点击
 
 **Key Methods:**
 
@@ -127,6 +128,8 @@ The timeline UI integrates with:
 并且在需要重置控件时同样会重新同步，确保界面与设置保持一致。
 
 当 `TimelineWidget` 接收到 `SettingsManager` 或底层 `ConfigManager` 时，会在初始化期间读取这些设置，并在调用 `load_timeline_events()` 时应用。若设置不存在或值非法，将回退到默认配置，确保时间线功能稳定。
+
+加载流程在最新版本中进一步增强：当 `TimelineWidget` 正在等待时间线数据返回时，用户触发的刷新请求会记录下来。当前加载完成后，这些请求会立即通过 `QTimer.singleShot(0, ...)` 重新调度，从新的调用栈发起最新一次刷新，避免重复工作和潜在的递归调用。
 
 ## Translation Keys
 

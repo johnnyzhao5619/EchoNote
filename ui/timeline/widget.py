@@ -75,6 +75,7 @@ class TimelineWidget(QWidget):
             "timeline.page_size", default=50, minimum=1
         )
         self.is_loading = False
+        self._pending_refresh: Optional[bool] = None
         self.has_more = True
         self.event_cards: List[QWidget] = []
         self._audio_player_dialogs: Dict[str, 'AudioPlayerDialog'] = {}
@@ -279,6 +280,7 @@ class TimelineWidget(QWidget):
             bool: ``True`` if events were loaded successfully, ``False`` otherwise.
         """
         if self.is_loading:
+            self._pending_refresh = bool(reset)
             return False
 
         previous_has_more = self.has_more
@@ -411,6 +413,16 @@ class TimelineWidget(QWidget):
             self.current_page = previous_page
         finally:
             self.is_loading = False
+
+            if self._pending_refresh is not None:
+                pending_reset = self._pending_refresh
+                self._pending_refresh = None
+                QTimer.singleShot(
+                    0,
+                    lambda pending=pending_reset: self.load_timeline_events(
+                        reset=pending
+                    ),
+                )
 
         return success
 
