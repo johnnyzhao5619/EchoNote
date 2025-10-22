@@ -1,31 +1,19 @@
-"""
-Outlook Calendar synchronization adapter.
-
-Implements OAuth 2.0 authentication and event synchronization
-with Microsoft Graph API.
-"""
+"""Outlook Calendar synchronization adapter."""
 
 import logging
-from urllib.parse import urlencode
 
 import httpx
 from typing import Dict, Any, Optional, List
-from datetime import datetime
 
-from engines.calendar_sync.base import CalendarSyncAdapter
+from engines.calendar_sync.base import OAuthCalendarAdapter, OAuthEndpoints
 from data.database.models import CalendarEvent
 
 
 logger = logging.getLogger('echonote.calendar_sync.outlook')
 
 
-class OutlookCalendarAdapter(CalendarSyncAdapter):
-    """
-    Outlook Calendar synchronization adapter.
-
-    Implements OAuth 2.0 authentication and event sync using
-    Microsoft Graph API.
-    """
+class OutlookCalendarAdapter(OAuthCalendarAdapter):
+    """Outlook Calendar synchronization adapter."""
 
     # Microsoft OAuth endpoints
     AUTH_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize"  # noqa: E501
@@ -42,191 +30,31 @@ class OutlookCalendarAdapter(CalendarSyncAdapter):
         self,
         client_id: str,
         client_secret: str,
-        redirect_uri: str = "http://localhost:8080/callback"
+        redirect_uri: str = "http://localhost:8080/callback",
+        http_client_config: Optional[Dict[str, Any]] = None,
     ):
-        """
-        Initialize Outlook Calendar adapter.
+        super().__init__(
+            client_id=client_id,
+            client_secret=client_secret,
+            redirect_uri=redirect_uri,
+            scopes=self.SCOPES,
+            endpoints=OAuthEndpoints(
+                auth_url=self.AUTH_URL,
+                token_url=self.TOKEN_URL,
+                api_base_url=self.API_BASE_URL,
+                revoke_url=None,
+            ),
+            logger=logger,
+            http_client_config=http_client_config,
+        )
+        self.logger.info("OutlookCalendarAdapter initialized")
 
-        Args:
-            client_id: Microsoft OAuth client ID
-            client_secret: Microsoft OAuth client secret
-            redirect_uri: OAuth redirect URI
-        """
-        self.client_id = client_id
-        self.client_secret = client_secret
-        self.redirect_uri = redirect_uri
-        self.access_token = None
-        self.refresh_token = None
-        self.expires_at: Optional[str] = None
-        self.token_type: Optional[str] = None
-        logger.info("OutlookCalendarAdapter initialized")
-
-    def get_authorization_url(self) -> Dict[str, str]:
-        """
-        Generate OAuth authorization URL.
-
-        Returns:
-            Dictionary containing authorization URL, state, and PKCE verifier
-        """
-        oauth_params = self._generate_state_and_pkce()
-
-        params = {
-            'client_id': self.client_id,
-            'redirect_uri': self.redirect_uri,
-            'response_type': 'code',
-            'scope': ' '.join(self.SCOPES),
-            'response_mode': 'query',
-            'state': oauth_params['state'],
-            'code_challenge': oauth_params['code_challenge'],
-            'code_challenge_method': 'S256'
-        }
-
-        query_string = urlencode(params, doseq=True)
-        auth_url = f"{self.AUTH_URL}?{query_string}"
-
-        logger.info("Generated Outlook authorization URL: %s", auth_url)
-        return {
-            'authorization_url': auth_url,
-            'state': oauth_params['state'],
-            'code_verifier': oauth_params['code_verifier'],
-        }
-
-    def exchange_code_for_token(self, code: str, code_verifier: Optional[str] = None) -> dict:
-        """
-        Exchange authorization code for access token.
-
-        Args:
-            code: Authorization code from OAuth callback
-            code_verifier: PKCE code verifier associated with the authorization request
-
-        Returns:
-            Token data dictionary
-        """
-        try:
-            with httpx.Client() as client:
-                data = {
-                    'code': code,
-                    'client_id': self.client_id,
-                    'client_secret': self.client_secret,
-                    'redirect_uri': self.redirect_uri,
-                    'grant_type': 'authorization_code'
-                }
-
-                if code_verifier:
-                    data['code_verifier'] = code_verifier
-
-                response = client.post(
-                    self.TOKEN_URL,
-                    data=data
-                )
-                response.raise_for_status()
-
-            token_data = response.json()
-            self.access_token = token_data['access_token']
-            self.refresh_token = token_data.get('refresh_token')
-            token_type = token_data.get('token_type', 'Bearer')
-            self.token_type = token_type
-
-            # Calculate expiration time
-            raw_expires_in = token_data.get('expires_in')
-            expires_in = raw_expires_in if raw_expires_in is not None else 3600
-            expires_at = datetime.now().timestamp() + expires_in
-            self.expires_at = datetime.fromtimestamp(expires_at).isoformat()
-
-            logger.info("Successfully exchanged code for token")
-
-            return {
-                'access_token': self.access_token,
-                'refresh_token': self.refresh_token,
-                'expires_in': raw_expires_in if raw_expires_in is not None else expires_in,
-                'expires_at': self.expires_at,
-                'token_type': token_type
-            }
-
-        except Exception as e:
-            logger.error(f"Failed to exchange code for token: {e}")
-            raise
-
-    def authenticate(self, credentials: dict) -> dict:
-        """
-        Perform OAuth authentication.
-
-        Args:
-            credentials: Dictionary with client_id, client_secret,
-                        and optionally authorization_code
-
-        Returns:
-            Token data dictionary
-        """
-        try:
-            if 'authorization_code' in credentials:
-                return self.exchange_code_for_token(
-                    credentials['authorization_code'],
-                    code_verifier=credentials.get('code_verifier')
-                )
-            else:
-                # Return authorization URL for user to visit
-                return self.get_authorization_url()
-
-        except Exception as e:
-            logger.error(f"Authentication failed: {e}")
-            raise
-
-    def refresh_access_token(self, code_verifier: Optional[str] = None) -> dict:
-        """
-        Refresh the access token using refresh token.
-
-        Returns:
-            New token data
-        """
-        if not self.refresh_token:
-            raise ValueError("No refresh token available")
-
-        try:
-            with httpx.Client() as client:
-                data = {
-                    'refresh_token': self.refresh_token,
-                    'client_id': self.client_id,
-                    'client_secret': self.client_secret,
-                    'grant_type': 'refresh_token'
-                }
-
-                if code_verifier:
-                    data['code_verifier'] = code_verifier
-
-                response = client.post(
-                    self.TOKEN_URL,
-                    data=data
-                )
-                response.raise_for_status()
-
-            token_data = response.json()
-            self.access_token = token_data['access_token']
-            token_type = token_data.get('token_type', 'Bearer')
-            self.token_type = token_type
-
-            new_refresh_token = token_data.get('refresh_token')
-            if new_refresh_token:
-                self.refresh_token = new_refresh_token
-
-            raw_expires_in = token_data.get('expires_in')
-            expires_in = raw_expires_in if raw_expires_in is not None else 3600
-            expires_at = datetime.now().timestamp() + expires_in
-            self.expires_at = datetime.fromtimestamp(expires_at).isoformat()
-
-            logger.info("Successfully refreshed access token")
-
-            return {
-                'access_token': self.access_token,
-                'refresh_token': self.refresh_token,
-                'expires_in': raw_expires_in if raw_expires_in is not None else expires_in,
-                'expires_at': self.expires_at,
-                'token_type': token_type
-            }
-
-        except Exception as e:
-            logger.error(f"Failed to refresh token: {e}")
-            raise
+    def build_authorization_params(
+        self, state: str, code_challenge: str
+    ) -> Dict[str, Any]:
+        params = super().build_authorization_params(state, code_challenge)
+        params['response_mode'] = 'query'
+        return params
 
     def fetch_events(
         self,
@@ -245,9 +73,6 @@ class OutlookCalendarAdapter(CalendarSyncAdapter):
         Returns:
             Dictionary with events and new delta link
         """
-        if not self.access_token:
-            raise ValueError("Not authenticated")
-
         try:
             events = []
             deleted_events: List[str] = []
@@ -278,17 +103,12 @@ class OutlookCalendarAdapter(CalendarSyncAdapter):
                 url += ('&' if '?' in url else '?') + '$deltatoken=latest'
 
             while True:
-                with httpx.Client() as client:
-                    response = client.get(
-                        url if next_link else url,
-                        headers={
-                            'Authorization': f'Bearer {self.access_token}',
-                            'Prefer': 'odata.maxpagesize=250'
-                        },
-                        timeout=30.0
-                    )
-                    response.raise_for_status()
-
+                response = self.api_request(
+                    'GET',
+                    url if next_link else url,
+                    headers={'Prefer': 'odata.maxpagesize=250'},
+                    timeout=30.0,
+                )
                 data = response.json()
 
                 # Convert Outlook events to internal format
@@ -313,7 +133,7 @@ class OutlookCalendarAdapter(CalendarSyncAdapter):
                 else:
                     url = next_link
 
-            logger.info(f"Fetched {len(events)} events from Outlook")
+            self.logger.info("Fetched %s events from Outlook", len(events))
 
             return {
                 'events': events,
@@ -324,14 +144,14 @@ class OutlookCalendarAdapter(CalendarSyncAdapter):
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 410:
                 # Delta link expired, need full sync
-                logger.warning(
+                self.logger.warning(
                     "Delta link expired, performing full sync"
                 )
                 return self.fetch_events(start_date, end_date, None)
-            logger.error(f"HTTP error fetching events: {e}")
+            self.logger.error("HTTP error fetching events: %s", e)
             raise
         except Exception as e:
-            logger.error(f"Failed to fetch events: {e}")
+            self.logger.error("Failed to fetch events: %s", e)
             raise
 
     def push_event(self, event: CalendarEvent) -> str:
@@ -344,103 +164,75 @@ class OutlookCalendarAdapter(CalendarSyncAdapter):
         Returns:
             Outlook event ID
         """
-        if not self.access_token:
-            raise ValueError("Not authenticated")
-
         try:
             outlook_event = self._convert_to_outlook_event(event)
 
-            with httpx.Client() as client:
-                response = client.post(
-                    f"{self.API_BASE_URL}/me/calendar/events",
-                    json=outlook_event,
-                    headers={
-                        'Authorization': f'Bearer {self.access_token}',
-                        'Content-Type': 'application/json'
-                    },
-                    timeout=30.0
-                )
-                response.raise_for_status()
-
+            response = self.api_request(
+                'POST',
+                f"{self.api_base_url}/me/calendar/events",
+                json=outlook_event,
+                headers={'Content-Type': 'application/json'},
+                timeout=30.0,
+            )
             data = response.json()
             outlook_id = data['id']
 
-            logger.info(f"Pushed event to Outlook: {outlook_id}")
+            self.logger.info("Pushed event to Outlook: %s", outlook_id)
             return outlook_id
 
         except Exception as e:
-            logger.error(f"Failed to push event: {e}")
+            self.logger.error("Failed to push event: %s", e)
             raise
 
     def update_event(self, event: CalendarEvent, external_id: str) -> None:
         """Update an existing Outlook calendar event."""
-        if not self.access_token:
-            raise ValueError("Not authenticated")
         if not external_id:
             raise ValueError("Missing external event identifier")
 
         try:
             outlook_event = self._convert_to_outlook_event(event)
 
-            with httpx.Client() as client:
-                response = client.patch(
-                    f"{self.API_BASE_URL}/me/events/{external_id}",
-                    json=outlook_event,
-                    headers={
-                        'Authorization': f'Bearer {self.access_token}',
-                        'Content-Type': 'application/json'
-                    },
-                    timeout=30.0
-                )
-                response.raise_for_status()
+            self.api_request(
+                'PATCH',
+                f"{self.api_base_url}/me/events/{external_id}",
+                json=outlook_event,
+                headers={'Content-Type': 'application/json'},
+                timeout=30.0,
+            )
 
-            logger.info("Updated Outlook event: %s", external_id)
+            self.logger.info("Updated Outlook event: %s", external_id)
 
         except Exception as e:
-            logger.error("Failed to update Outlook event %s: %s", external_id, e)
+            self.logger.error("Failed to update Outlook event %s: %s", external_id, e)
             raise
 
     def delete_event(self, event: CalendarEvent, external_id: str) -> None:
         """Delete an Outlook calendar event."""
-        if not self.access_token:
-            raise ValueError("Not authenticated")
         if not external_id:
             raise ValueError("Missing external event identifier")
 
         try:
-            with httpx.Client() as client:
-                response = client.delete(
-                    f"{self.API_BASE_URL}/me/events/{external_id}",
-                    headers={
-                        'Authorization': f'Bearer {self.access_token}',
-                    },
-                    timeout=30.0
+            self.api_request(
+                'DELETE',
+                f"{self.api_base_url}/me/events/{external_id}",
+                timeout=30.0,
+            )
+
+            self.logger.info("Deleted Outlook event: %s", external_id)
+
+        except httpx.HTTPStatusError as err:
+            if err.response.status_code == 404:
+                self.logger.warning(
+                    "Outlook event %s already removed", external_id
                 )
-
-                if response.status_code == 404:
-                    logger.warning(
-                        "Outlook event %s already removed", external_id
-                    )
-                    return
-
-                response.raise_for_status()
-
-            logger.info("Deleted Outlook event: %s", external_id)
-
-        except Exception as e:
-            logger.error("Failed to delete Outlook event %s: %s", external_id, e)
+                return
+            self.logger.error(
+                "HTTP error deleting Outlook event %s: %s", external_id, err
+            )
             raise
-
-    def revoke_access(self):
-        """
-        Revoke OAuth access token.
-
-        Note: Microsoft doesn't provide a direct revoke endpoint,
-        so we just clear the local tokens.
-        """
-        self.access_token = None
-        self.refresh_token = None
-        logger.info("Cleared access tokens")
+        except Exception as e:
+            self.logger.error("Failed to delete Outlook event %s: %s", external_id, e)
+            raise
 
     def _convert_outlook_event(
         self,
@@ -520,7 +312,7 @@ class OutlookCalendarAdapter(CalendarSyncAdapter):
             }
 
         except Exception as e:
-            logger.error(f"Failed to convert Outlook event: {e}")
+            self.logger.error("Failed to convert Outlook event: %s", e)
             return None
 
     def _convert_to_outlook_event(

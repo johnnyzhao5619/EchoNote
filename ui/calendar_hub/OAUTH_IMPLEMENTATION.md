@@ -84,6 +84,8 @@ Manages secure storage and retrieval of OAuth tokens:
 
 ### 4. Calendar Sync Adapters
 
+Both adapters inherit from the shared `OAuthCalendarAdapter` in `engines/calendar_sync/base.py`. The base class centralizes the PKCE flow, token exchange/refresh, and wraps a `RetryableHttpClient` so adapters only specify provider-specific scopes and event mappings.
+
 #### GoogleCalendarAdapter (`engines/calendar_sync/google_calendar.py`)
 
 - **OAuth Endpoints**:
