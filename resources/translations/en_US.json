@@ -184,6 +184,8 @@
     "enable_transcription": "Enable Real-time Transcription",
     "enable_recording": "Enable Meeting Recording",
     "enable_translation": "Enable Translation",
+    "auto_task_save_failed_title": "Failed to save auto-task settings",
+    "auto_task_save_failed_message": "We couldn't save your automatic task preferences. Previous values have been restored.\nError: {error}",
     "translation_target_label": "Target Language:",
     "play_recording": "Play Recording",
     "view_transcript": "View Transcript",

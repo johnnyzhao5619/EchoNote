@@ -182,6 +182,8 @@
     "enable_transcription": "Activer la Transcription en Temps Réel",
     "enable_recording": "Activer l'Enregistrement de Réunion",
     "enable_translation": "Activer la Traduction",
+    "auto_task_save_failed_title": "Échec de l'enregistrement des tâches automatiques",
+    "auto_task_save_failed_message": "Impossible d'enregistrer vos préférences de tâches automatiques. Les valeurs précédentes ont été restaurées.\nErreur : {error}",
     "translation_target_label": "Langue Cible :",
     "play_recording": "Lire l'Enregistrement",
     "view_transcript": "Voir la Transcription",

@@ -454,6 +454,48 @@ class EventCard(QFrame):
         
         return actions_layout
     
+    def apply_auto_task_config(self, config: Optional[Dict[str, Any]]):
+        """Apply an auto-task configuration to the current card."""
+        if not self.is_future:
+            return
+
+        config = config or {}
+        self.event_data['auto_tasks'] = dict(config)
+
+        def _set_checked(checkbox: Optional[QCheckBox], value: bool):
+            if checkbox is None:
+                return
+            checkbox.blockSignals(True)
+            checkbox.setChecked(bool(value))
+            checkbox.blockSignals(False)
+
+        enable_transcription = config.get('enable_transcription', False)
+        enable_recording = config.get('enable_recording', False)
+        enable_translation = config.get('enable_translation', False)
+        target_language = config.get('translation_target_language')
+
+        _set_checked(self.transcription_checkbox, enable_transcription)
+        _set_checked(self.recording_checkbox, enable_recording)
+        _set_checked(self.translation_checkbox, enable_translation)
+
+        if self.translation_language_combo:
+            self.translation_language_combo.blockSignals(True)
+
+            if target_language:
+                index = self.translation_language_combo.findData(target_language)
+            else:
+                index = self.translation_language_combo.findData('en')
+
+            if index == -1 and self.translation_language_combo.count() > 0:
+                index = 0
+
+            if index != -1:
+                self.translation_language_combo.setCurrentIndex(index)
+
+            self.translation_language_combo.blockSignals(False)
+
+        self._set_translation_controls_enabled(enable_translation)
+
     def _load_artifacts(self):
         """Lazy load artifacts for past events."""
         if not self.artifacts_loaded and not self.is_future:
