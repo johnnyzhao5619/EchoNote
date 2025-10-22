@@ -2,6 +2,7 @@
 
 import logging
 import re
+from html import unescape
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 
@@ -446,6 +447,51 @@ class OutlookCalendarAdapter(OAuthCalendarAdapter):
                     'reminderMinutesBeforeStart'
                 )
 
+            def _extract_description() -> Optional[str]:
+                body_payload = outlook_event.get('body')
+                if isinstance(body_payload, dict):
+                    content = body_payload.get('content')
+                    if isinstance(content, str):
+                        content_type = str(body_payload.get('contentType') or '').lower()
+                        text = content
+                        if content_type == 'html':
+                            text = re.sub(
+                                r'<(script|style)[^>]*?>.*?</\\1>',
+                                '',
+                                text,
+                                flags=re.IGNORECASE | re.DOTALL,
+                            )
+                            text = re.sub(
+                                r'<br\s*/?>',
+                                '\n',
+                                text,
+                                flags=re.IGNORECASE,
+                            )
+                            text = re.sub(
+                                r'</p\s*>',
+                                '\n',
+                                text,
+                                flags=re.IGNORECASE,
+                            )
+                            text = re.sub(r'<[^>]+>', '', text)
+                            text = unescape(text)
+                        if isinstance(text, str):
+                            text = text.replace('\r\n', '\n')
+                            text = text.replace('\r', '\n')
+                            text = re.sub(r'\s+\n', '\n', text)
+                            text = re.sub(r'\n{3,}', '\n\n', text)
+                            cleaned = text.strip()
+                            if cleaned:
+                                return cleaned
+
+                preview = outlook_event.get('bodyPreview')
+                if isinstance(preview, str):
+                    cleaned_preview = preview.strip()
+                    if cleaned_preview:
+                        return cleaned_preview
+
+                return None
+
             # Extract recurrence
             recurrence_rule = None
             if outlook_event.get('recurrence'):
@@ -467,7 +513,7 @@ class OutlookCalendarAdapter(OAuthCalendarAdapter):
                     'displayName'
                 ),
                 'attendees': attendees,
-                'description': outlook_event.get('bodyPreview'),
+                'description': _extract_description(),
                 'reminder_minutes': reminder_minutes,
                 'recurrence_rule': recurrence_rule
             }
