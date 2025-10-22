@@ -224,6 +224,7 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 - When a chosen range exceeds your saved window, the timeline automatically expands its fetch span so those events remain visible.
 - Past events display linked recordings, transcripts, and notes for download or preview.
 - Future events allow auto-tasks: auto-record, auto-transcribe, preset languages, and translation targets.
+- Changes to the reminder lead time in Settings take effect immediately; the auto task scheduler picks up the updated window without restarting EchoNote.
 
 <details>
 <summary>中文</summary>
@@ -234,6 +235,7 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 - 当选择的日期范围超过偏好设置时，时间线会自动扩大查询窗口，无需手动调整即可覆盖所选日期。
 - 历史事件会列出录音、转录、笔记，可预览或下载。
 - 未来事件可配置自动录音、自动转录、默认语言与翻译目标。
+- 在「设置」中调整提醒提前分钟数会即时生效，自动任务调度器无需重启即可应用新的时间窗口。
 
 </details>
 
@@ -244,6 +246,7 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 - Si la plage choisie dépasse vos préférences, la timeline agrandit automatiquement la fenêtre de recherche pour inclure ces événements.
 - Les événements passés affichent enregistrements, transcriptions et notes associés pour prévisualisation ou téléchargement.
 - Les événements futurs proposent des tâches automatiques : enregistrement, transcription, langues préconfigurées et cibles de traduction.
+- La modification du délai d’alerte dans Paramètres s’applique immédiatement ; le planificateur de tâches automatiques adopte la nouvelle fenêtre sans redémarrer EchoNote.
 
 </details>
 

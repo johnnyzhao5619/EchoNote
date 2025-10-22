@@ -61,13 +61,13 @@ class AutoTaskScheduler:
         self.file_manager = file_manager
         self.scheduler = BackgroundScheduler()
         self.is_running = False
-        self.reminder_minutes = reminder_minutes
         self.settings_manager = settings_manager
         self.i18n = self._initialize_i18n(i18n_manager)
 
-        # Default windows for timeline queries (in minutes)
-        self._past_window_minutes = max(reminder_minutes, 5)
-        self._future_window_minutes = max(reminder_minutes + 10, 15)
+        initial_reminder = self._coerce_reminder_minutes(reminder_minutes)
+        if initial_reminder is None:
+            initial_reminder = 5
+        self._apply_reminder_minutes(initial_reminder)
 
         # Track events that have been notified/started/stopped
         self.notified_events = set()
@@ -77,9 +77,12 @@ class AutoTaskScheduler:
         # Get notification manager
         self.notification_manager = get_notification_manager()
 
+        # Subscribe to setting changes when available
+        self._subscribe_to_setting_changes()
+
         logger.info(
             f"AutoTaskScheduler initialized "
-            f"(reminder: {reminder_minutes} minutes)"
+            f"(reminder: {self.reminder_minutes} minutes)"
         )
 
     def start(self):
@@ -164,6 +167,75 @@ class AutoTaskScheduler:
                     default_language = language
 
         return I18nQtManager(default_language=default_language)
+
+    def _coerce_reminder_minutes(self, value) -> Optional[int]:
+        """Convert reminder minutes to a non-negative integer when possible."""
+        if value is None:
+            logger.info("Received None for reminder minutes; keeping previous value")
+            return None
+
+        try:
+            minutes = int(value)
+        except (TypeError, ValueError):
+            logger.warning(
+                "Invalid reminder minutes value %r; keeping previous value", value
+            )
+            return None
+
+        if minutes < 0:
+            logger.warning(
+                "Reminder minutes %s is negative; clamping to zero", minutes
+            )
+            minutes = 0
+
+        return minutes
+
+    def _apply_reminder_minutes(self, minutes: int) -> None:
+        """Persist reminder minutes and refresh dependent time windows."""
+        self.reminder_minutes = minutes
+        self._past_window_minutes = max(minutes, 5)
+        self._future_window_minutes = max(minutes + 10, 15)
+
+    def _subscribe_to_setting_changes(self) -> None:
+        """Listen for reminder preference updates from the settings manager."""
+        if not self.settings_manager:
+            return
+
+        signal = getattr(self.settings_manager, 'setting_changed', None)
+        if signal is None:
+            return
+
+        connect = getattr(signal, 'connect', None)
+        if not callable(connect):
+            logger.warning(
+                "settings_manager.setting_changed lacks a callable connect method"
+            )
+            return
+
+        try:
+            connect(self._on_setting_changed)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Failed to connect to settings_manager.setting_changed: %s",
+                exc,
+                exc_info=True
+            )
+
+    def _on_setting_changed(self, key: str, value) -> None:
+        """React to reminder preference updates without restarting the scheduler."""
+        if key != 'timeline.reminder_minutes':
+            return
+
+        minutes = self._coerce_reminder_minutes(value)
+        if minutes is None or minutes == self.reminder_minutes:
+            return
+
+        self._apply_reminder_minutes(minutes)
+        self.notified_events.clear()
+
+        logger.info(
+            "Reminder minutes updated to %s via settings change", minutes
+        )
 
     def _check_upcoming_events(self):
         """
