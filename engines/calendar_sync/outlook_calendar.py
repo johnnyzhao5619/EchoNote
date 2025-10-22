@@ -148,13 +148,10 @@ class OutlookCalendarAdapter(OAuthCalendarAdapter):
                 else:
                     url = base_url
 
-                # Request delta link for next sync
-                url += ('&' if '?' in url else '?') + '$deltatoken=latest'
-
             while True:
                 response = self.api_request(
                     'GET',
-                    url if next_link else url,
+                    url,
                     headers={'Prefer': 'odata.maxpagesize=250'},
                     timeout=30.0,
                 )
