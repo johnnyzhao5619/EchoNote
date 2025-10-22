@@ -637,6 +637,7 @@ class CalendarHubWidget(QWidget):
         try:
             # Get sync adapter
             adapter = self.calendar_manager.sync_adapters[provider]
+            existing_refresh_token = getattr(adapter, 'refresh_token', None)
 
             # Exchange code for token
             token_data = adapter.exchange_code_for_token(code, code_verifier=code_verifier)
@@ -674,7 +675,22 @@ class CalendarHubWidget(QWidget):
             
             # Update adapter with stored token
             adapter.access_token = token_data['access_token']
-            adapter.refresh_token = token_data.get('refresh_token')
+
+            new_refresh_token = token_data.get('refresh_token')
+            if new_refresh_token:
+                adapter.refresh_token = new_refresh_token
+            else:
+                retained_refresh = (
+                    getattr(adapter, 'refresh_token', None)
+                    or existing_refresh_token
+                )
+                if not retained_refresh and self.oauth_manager:
+                    stored_token = self.oauth_manager.get_token(provider)
+                    if stored_token:
+                        retained_refresh = stored_token.get('refresh_token')
+
+                if retained_refresh:
+                    adapter.refresh_token = retained_refresh
             
             # Get user email (try to fetch from provider)
             email = self._get_user_email(provider, adapter)
