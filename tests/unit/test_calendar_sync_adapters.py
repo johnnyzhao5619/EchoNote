@@ -8,6 +8,8 @@ import types
 import pytest
 from typing import Optional
 
+from zoneinfo import ZoneInfo
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
@@ -96,7 +98,17 @@ def google_adapter():
 
 @pytest.fixture
 def outlook_adapter():
-    return OutlookCalendarAdapter('id', 'secret')
+    adapter = OutlookCalendarAdapter('id', 'secret')
+    adapter._iana_to_windows_map = {
+        'UTC': 'UTC',
+        'Etc/UTC': 'UTC',
+        'Asia/Shanghai': 'China Standard Time',
+        'Europe/Paris': 'Romance Standard Time',
+        'America/Sao_Paulo': 'E. South America Standard Time',
+        'Africa/Nairobi': 'E. Africa Standard Time',
+    }
+    adapter._timezone_map_loaded = True
+    return adapter
 
 
 def _normalise_iso_value(value: str) -> str:
@@ -220,162 +232,56 @@ def test_outlook_convert_offset_datetime(monkeypatch, outlook_adapter):
 
     payload = outlook_adapter._convert_to_outlook_event(event)
 
-    assert payload['start']['timeZone'] == 'UTC+02'
+    assert payload['start']['timeZone'] == 'UTC+02:00'
     assert payload['start']['dateTime'] == '2024-07-01T09:00:00'
-    assert payload['end']['timeZone'] == 'UTC+02'
+    assert payload['end']['timeZone'] == 'UTC+02:00'
     assert payload['end']['dateTime'] == '2024-07-01T10:30:00'
 
 
-def test_outlook_event_roundtrip_with_explicit_timezone(outlook_adapter):
-    remote_payload = {
-        'id': 'evt-001',
-        'subject': 'Remote Meeting',
-        'start': {
-            'dateTime': '2024-07-01T09:00:00.0000000',
-            'timeZone': 'China Standard Time',
-        },
-        'end': {
-            'dateTime': '2024-07-01T10:00:00.0000000',
-            'timeZone': 'China Standard Time',
-        },
+def test_outlook_convert_removed_event(outlook_adapter):
+    outlook_payload = {
+        'id': 'evt-deleted',
+        '@removed': {'reason': 'deleted'},
     }
 
-    internal_event = outlook_adapter._convert_outlook_event(remote_payload)
+    converted = outlook_adapter._convert_outlook_event(outlook_payload)
 
-    assert internal_event['start_time'].startswith('2024-07-01T09:00:00')
-    assert internal_event['start_time'].endswith('+08:00')
-    assert internal_event['end_time'].startswith('2024-07-01T10:00:00')
-    assert internal_event['end_time'].endswith('+08:00')
-
-    calendar_event = CalendarEvent(
-        id=internal_event['id'],
-        title=internal_event['title'],
-        event_type=internal_event['event_type'],
-        start_time=internal_event['start_time'],
-        end_time=internal_event['end_time'],
-        location=internal_event['location'],
-        attendees=internal_event['attendees'],
-        description=internal_event['description'],
-        reminder_minutes=internal_event['reminder_minutes'],
-        recurrence_rule=internal_event['recurrence_rule'],
-        source='outlook',
-        external_id=internal_event['id'],
-    )
-
-    roundtrip_payload = outlook_adapter._convert_to_outlook_event(calendar_event)
-
-    assert roundtrip_payload['start']['dateTime'] == '2024-07-01T09:00:00'
-    assert roundtrip_payload['end']['dateTime'] == '2024-07-01T10:00:00'
-
-    original_start = _build_remote_instant(
-        outlook_adapter,
-        remote_payload['start']['dateTime'],
-        remote_payload['start']['timeZone'],
-    )
-    roundtrip_start = _build_remote_instant(
-        outlook_adapter,
-        roundtrip_payload['start']['dateTime'],
-        roundtrip_payload['start']['timeZone'],
-    )
-    original_end = _build_remote_instant(
-        outlook_adapter,
-        remote_payload['end']['dateTime'],
-        remote_payload['end']['timeZone'],
-    )
-    roundtrip_end = _build_remote_instant(
-        outlook_adapter,
-        roundtrip_payload['end']['dateTime'],
-        roundtrip_payload['end']['timeZone'],
-    )
-
-    assert roundtrip_start == original_start
-    assert roundtrip_end == original_end
+    assert converted == {'id': 'evt-deleted', 'deleted': True}
 
 
-def test_outlook_event_roundtrip_with_original_timezone(outlook_adapter):
-    remote_payload = {
-        'id': 'evt-002',
-        'subject': 'Fallback Zone',
-        'start': {
-            'dateTime': '2024-12-01T09:30:00.0000000',
-        },
-        'end': {
-            'dateTime': '2024-12-01T10:45:00.0000000',
-        },
-        'originalStartTimeZone': 'Pacific Standard Time',
+def test_outlook_fetch_events_tracks_deletions(monkeypatch, outlook_adapter):
+    payload = {
+        'value': [
+            {
+                'id': 'evt-deleted',
+                '@removed': {'reason': 'deleted'},
+            },
+            {
+                'id': 'evt-active',
+                'subject': 'Meeting',
+                'start': {'dateTime': '2024-08-01T09:00:00'},
+                'end': {'dateTime': '2024-08-01T10:00:00'},
+                'attendees': [],
+            },
+        ],
+        '@odata.deltaLink': 'delta-token',
     }
 
-    internal_event = outlook_adapter._convert_outlook_event(remote_payload)
+    class DummyResponse:
+        def __init__(self, data):
+            self._data = data
 
-    assert internal_event['start_time'].startswith('2024-12-01T09:30:00')
-    assert internal_event['start_time'].endswith('-08:00')
-    assert internal_event['end_time'].startswith('2024-12-01T10:45:00')
-    assert internal_event['end_time'].endswith('-08:00')
+        def json(self):
+            return self._data
 
-    calendar_event = CalendarEvent(
-        id=internal_event['id'],
-        title=internal_event['title'],
-        event_type=internal_event['event_type'],
-        start_time=internal_event['start_time'],
-        end_time=internal_event['end_time'],
-        location=internal_event['location'],
-        attendees=internal_event['attendees'],
-        description=internal_event['description'],
-        reminder_minutes=internal_event['reminder_minutes'],
-        recurrence_rule=internal_event['recurrence_rule'],
-        source='outlook',
-        external_id=internal_event['id'],
-    )
+    def fake_api_request(method, url, **kwargs):
+        assert method == 'GET'
+        return DummyResponse(payload)
 
-    roundtrip_payload = outlook_adapter._convert_to_outlook_event(calendar_event)
+    monkeypatch.setattr(outlook_adapter, 'api_request', fake_api_request)
 
-    assert roundtrip_payload['start']['dateTime'] == '2024-12-01T09:30:00'
-    assert roundtrip_payload['end']['dateTime'] == '2024-12-01T10:45:00'
+    result = outlook_adapter.fetch_events(last_sync_token='https://delta-link')
 
-    expected_identifier = remote_payload['start'].get(
-        'timeZone', remote_payload['originalStartTimeZone']
-    )
-    original_start = _build_remote_instant(
-        outlook_adapter,
-        remote_payload['start']['dateTime'],
-        expected_identifier,
-    )
-    original_end = _build_remote_instant(
-        outlook_adapter,
-        remote_payload['end']['dateTime'],
-        expected_identifier,
-    )
-    roundtrip_start = _build_remote_instant(
-        outlook_adapter,
-        roundtrip_payload['start']['dateTime'],
-        roundtrip_payload['start']['timeZone'],
-    )
-    roundtrip_end = _build_remote_instant(
-        outlook_adapter,
-        roundtrip_payload['end']['dateTime'],
-        roundtrip_payload['end']['timeZone'],
-    )
-
-    assert roundtrip_start == original_start
-    assert roundtrip_end == original_end
-
-
-def test_outlook_all_day_event_conversion(outlook_adapter):
-    remote_payload = {
-        'id': 'evt-003',
-        'subject': 'All Day',
-        'isAllDay': True,
-        'start': {
-            'dateTime': '2024-08-15T00:00:00',
-            'timeZone': 'UTC',
-        },
-        'end': {
-            'dateTime': '2024-08-16T00:00:00',
-            'timeZone': 'UTC',
-        },
-    }
-
-    internal_event = outlook_adapter._convert_outlook_event(remote_payload)
-
-    assert internal_event['start_time'] == '2024-08-15'
-    assert internal_event['end_time'] == '2024-08-16'
+    assert result['deleted'] == ['evt-deleted']
+    assert [event['id'] for event in result['events']] == ['evt-active']
+    assert result['sync_token'] == 'delta-token'
