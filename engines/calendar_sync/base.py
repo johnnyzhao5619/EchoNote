@@ -1,21 +1,27 @@
-"""
-Base class for external calendar synchronization adapters.
-
-Defines the interface that all calendar sync adapters must implement.
-"""
+"""Base utilities and interfaces for calendar synchronization adapters."""
 
 import base64
 import hashlib
 import logging
+import os
 import secrets
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timezone, tzinfo, timedelta
+from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urlencode
+
+try:  # Python 3.9+
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+except ImportError:  # pragma: no cover - fallback for older Python
+    ZoneInfo = None  # type: ignore
+    ZoneInfoNotFoundError = Exception  # type: ignore
 
 from data.database.models import CalendarEvent
 from utils.http_client import RetryableHttpClient
+
+
+logger = logging.getLogger('echonote.calendar_sync.base')
 
 
 class CalendarSyncAdapter(ABC):
@@ -198,6 +204,129 @@ class CalendarSyncAdapter(ABC):
             'code_verifier': code_verifier,
             'code_challenge': code_challenge,
         }
+
+    # ------------------------------------------------------------------
+    # Date/time helpers
+    # ------------------------------------------------------------------
+    @classmethod
+    def _get_local_timezone(cls) -> tzinfo:
+        """Return the preferred local timezone.
+
+        Lookup order:
+            1. ``ECHONOTE_LOCAL_TIMEZONE`` environment variable.
+            2. System timezone via ``datetime.now().astimezone()``.
+            3. UTC fallback.
+        """
+
+        env_tz = os.getenv('ECHONOTE_LOCAL_TIMEZONE')
+        if env_tz and ZoneInfo is not None:
+            try:
+                return ZoneInfo(env_tz)
+            except ZoneInfoNotFoundError:
+                logger.warning(
+                    "Unknown timezone configured in ECHONOTE_LOCAL_TIMEZONE: %s",
+                    env_tz
+                )
+
+        try:
+            system_tz = datetime.now().astimezone().tzinfo
+            if system_tz:
+                return system_tz
+        except Exception:  # pragma: no cover - defensive
+            logger.exception("Failed to detect system timezone")
+
+        return timezone.utc
+
+    @classmethod
+    def _parse_event_datetime(
+        cls,
+        value: Union[str, datetime],
+        local_tz: Optional[tzinfo] = None,
+    ) -> datetime:
+        """Parse calendar event datetimes and attach timezone information."""
+
+        if isinstance(value, datetime):
+            dt_value = value
+        elif isinstance(value, str):
+            text = value.strip()
+            if text.endswith('Z'):
+                text = f"{text[:-1]}+00:00"
+            try:
+                dt_value = datetime.fromisoformat(text)
+            except ValueError as exc:
+                raise ValueError(
+                    "Event datetime must be a datetime instance or ISO 8601 string"
+                ) from exc
+        else:  # pragma: no cover - defensive branch
+            raise TypeError(
+                "Event datetime must be provided as datetime instance or ISO string"
+            )
+
+        if dt_value.tzinfo:
+            return dt_value
+
+        tzinfo_value = local_tz or cls._get_local_timezone()
+        return dt_value.replace(tzinfo=tzinfo_value)
+
+    @staticmethod
+    def _get_timezone_identifier(dt_value: datetime) -> Optional[str]:
+        """Return a descriptive timezone identifier for payload construction."""
+
+        tzinfo_value = dt_value.tzinfo
+        if tzinfo_value is None:
+            return None
+
+        key = getattr(tzinfo_value, 'key', None)
+        if key:
+            if key in {'UTC', 'Etc/UTC', 'Etc/GMT', 'GMT'}:
+                return 'UTC'
+            return key
+
+        if tzinfo_value is timezone.utc:
+            return 'UTC'
+
+        tz_name = tzinfo_value.tzname(dt_value)
+        if tz_name in {'UTC', 'GMT', 'Etc/UTC'}:
+            return 'UTC'
+
+        offset = dt_value.utcoffset()
+        if offset is None:
+            return None
+
+        total_minutes = int(offset.total_seconds() // 60)
+        if total_minutes == 0:
+            return 'UTC'
+
+        sign = '+' if total_minutes > 0 else '-'
+        total_minutes = abs(total_minutes)
+        hours, minutes = divmod(total_minutes, 60)
+        return f"UTC{sign}{hours:02d}:{minutes:02d}"
+
+    @staticmethod
+    def _timezone_from_identifier(identifier: str) -> tzinfo:
+        """Convert timezone identifier to a ``tzinfo`` implementation."""
+
+        if identifier == 'UTC':
+            return timezone.utc
+
+        if identifier.startswith('UTC') and len(identifier) > 3:
+            sign = 1 if identifier[3] == '+' else -1
+            try:
+                hours, minutes = identifier[4:].split(':')
+                offset = timedelta(
+                    hours=int(hours) * sign,
+                    minutes=int(minutes) * sign,
+                )
+                return timezone(offset)
+            except (ValueError, TypeError):  # pragma: no cover - defensive
+                return timezone.utc
+
+        if ZoneInfo is not None:
+            try:
+                return ZoneInfo(identifier)
+            except ZoneInfoNotFoundError:
+                logger.warning("Unknown timezone identifier: %s", identifier)
+        return timezone.utc
 
 
 @dataclass(frozen=True)

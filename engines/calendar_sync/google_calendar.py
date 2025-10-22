@@ -1,11 +1,12 @@
 """Google Calendar synchronization adapter."""
 
 import logging
+from datetime import timezone
+from typing import Dict, Any, Optional, List
 
 from datetime import datetime
 
 import httpx
-from typing import Dict, Any, Optional, List
 
 from engines.calendar_sync.base import OAuthCalendarAdapter, OAuthEndpoints
 from data.database.models import CalendarEvent
@@ -306,29 +307,24 @@ class GoogleCalendarAdapter(OAuthCalendarAdapter):
         Returns:
             Google event format
         """
+        local_tz = self._get_local_timezone()
+        start_dt = self._parse_event_datetime(event.start_time, local_tz)
+        end_dt = self._parse_event_datetime(event.end_time, local_tz)
+
+        def _format_google_datetime(dt_value):
+            identifier = self._get_timezone_identifier(dt_value)
+            payload = {'dateTime': dt_value.isoformat()}
+            if identifier:
+                if identifier == 'UTC':
+                    payload['dateTime'] = dt_value.astimezone(timezone.utc).isoformat()
+                payload['timeZone'] = identifier
+            return payload
+
         google_event = {
             'summary': event.title,
+            'start': _format_google_datetime(start_dt),
+            'end': _format_google_datetime(end_dt)
         }
-
-        if event.is_all_day_event():
-            def _coerce_date(value: Any) -> str:
-                if isinstance(value, datetime):
-                    return value.date().isoformat()
-                if isinstance(value, str):
-                    return value.split('T', 1)[0]
-                raise TypeError('Unsupported all-day date value')
-
-            google_event['start'] = {'date': _coerce_date(event.start_time)}
-            google_event['end'] = {'date': _coerce_date(event.end_time)}
-        else:
-            google_event['start'] = {
-                'dateTime': event.start_time,
-                'timeZone': 'UTC'
-            }
-            google_event['end'] = {
-                'dateTime': event.end_time,
-                'timeZone': 'UTC'
-            }
 
         if event.location:
             google_event['location'] = event.location
