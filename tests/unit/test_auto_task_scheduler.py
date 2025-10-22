@@ -306,6 +306,68 @@ class DummyNotificationManager:
         self.messages.append(('error', title, message))
 
 
+class _CollectingSignal:
+    def __init__(self):
+        self.connections = []
+
+    def connect(self, callback):
+        self.connections.append(callback)
+
+    def emit(self, *args, **kwargs):
+        for callback in list(self.connections):
+            callback(*args, **kwargs)
+
+
+class DummySettingsManager:
+    def __init__(self):
+        self.setting_changed = _CollectingSignal()
+
+
+def test_scheduler_updates_windows_after_setting_change(monkeypatch):
+    timeline_manager = DummyTimelineManager([])
+    recorder = DummyRecorder()
+    notifications = DummyNotificationManager()
+    settings_manager = DummySettingsManager()
+
+    monkeypatch.setattr(
+        'core.timeline.auto_task_scheduler.get_notification_manager',
+        lambda: notifications,
+    )
+
+    scheduler = AutoTaskScheduler(
+        timeline_manager=timeline_manager,
+        realtime_recorder=recorder,
+        db_connection=None,
+        file_manager=None,
+        reminder_minutes=5,
+        settings_manager=settings_manager,
+    )
+
+    assert settings_manager.setting_changed.connections
+
+    scheduler.notified_events.update({'event-1', 'event-2'})
+
+    settings_manager.setting_changed.emit('timeline.reminder_minutes', '25')
+
+    assert scheduler.reminder_minutes == 25
+    assert scheduler._past_window_minutes == 25
+    assert scheduler._future_window_minutes == 35
+    assert scheduler.notified_events == set()
+
+    scheduler._check_upcoming_events()
+
+    assert timeline_manager.calls
+    main_call = next(
+        (call for call in timeline_manager.calls if call[2] > 0),
+        timeline_manager.calls[0]
+    )
+    _, past_days, future_days = main_call
+    expected_past_days = scheduler._past_window_minutes / (24 * 60)
+    expected_future_days = scheduler._future_window_minutes / (24 * 60)
+    assert past_days == pytest.approx(expected_past_days)
+    assert future_days == pytest.approx(expected_future_days)
+
+
 def test_scheduler_triggers_reminder_with_timezone(monkeypatch):
     base_now = datetime.now().astimezone()
     future_event = CalendarEvent(
