@@ -123,12 +123,11 @@ class OutlookCalendarAdapter(OAuthCalendarAdapter):
         try:
             events = []
             deleted_events: List[str] = []
-            next_link = None
             new_delta_link = None
 
-            # Use delta link for incremental sync
-            if last_sync_token:
-                url = last_sync_token
+            token = (last_sync_token or '').strip()
+            if token:
+                current_url = token
             else:
                 base_url = f"{self.API_BASE_URL}/me/calendar/events/delta"
                 filters = []
@@ -144,14 +143,14 @@ class OutlookCalendarAdapter(OAuthCalendarAdapter):
 
                 if filters:
                     filter_str = ' and '.join(filters)
-                    url = f"{base_url}?$filter={filter_str}"
+                    current_url = f"{base_url}?$filter={filter_str}"
                 else:
-                    url = base_url
+                    current_url = base_url
 
             while True:
                 response = self.api_request(
                     'GET',
-                    url,
+                    current_url,
                     headers={'Prefer': 'odata.maxpagesize=250'},
                     timeout=30.0,
                 )
@@ -180,11 +179,12 @@ class OutlookCalendarAdapter(OAuthCalendarAdapter):
 
                 # Check for pagination
                 next_link = data.get('@odata.nextLink')
-                if not next_link:
-                    new_delta_link = data.get('@odata.deltaLink')
-                    break
-                else:
-                    url = next_link
+                if next_link:
+                    current_url = next_link
+                    continue
+
+                new_delta_link = data.get('@odata.deltaLink')
+                break
 
             self.logger.info("Fetched %s events from Outlook", len(events))
 
