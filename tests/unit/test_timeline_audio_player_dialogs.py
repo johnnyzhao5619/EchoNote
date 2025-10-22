@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import QApplication, QDialog, QWidget
 
 from data.database.models import CalendarEvent
 
+from ui.timeline.audio_player import AudioPlayerDialog
 from ui.timeline.event_card import CurrentTimeIndicator
 from ui.timeline.widget import TimelineWidget
 from utils.i18n import I18nQtManager
@@ -639,6 +640,54 @@ def test_audio_dialog_cleanup_via_finished_signal(monkeypatch, qapp, tmp_path):
         if dialog is not None:
             dialog.deleteLater()
         widget.deleteLater()
+        qapp.processEvents()
+
+
+def test_audio_player_dialog_surfaces_missing_file_error(monkeypatch, qapp, tmp_path):
+    missing_file = tmp_path / "missing.wav"
+
+    captured_errors = []
+
+    original_handler = AudioPlayerDialog._on_playback_error
+
+    def capturing_handler(self, error_msg):
+        captured_errors.append(error_msg)
+        return original_handler(self, error_msg)
+
+    monkeypatch.setattr(
+        AudioPlayerDialog,
+        "_on_playback_error",
+        capturing_handler,
+    )
+
+    message_calls = []
+
+    def fake_critical(parent, title, message):
+        message_calls.append((parent, title, message))
+        return None
+
+    monkeypatch.setattr(
+        "ui.timeline.audio_player.QMessageBox.critical",
+        staticmethod(fake_critical),
+    )
+
+    i18n = I18nQtManager(default_language="en_US")
+    dialog = AudioPlayerDialog(str(missing_file), i18n)
+
+    try:
+        qapp.processEvents()
+
+        assert captured_errors, "Expected dialog to receive playback_error signal"
+        error_msg = captured_errors[-1]
+        assert str(missing_file) in error_msg
+
+        assert message_calls, "Expected critical message box to be shown"
+        _, title, body = message_calls[-1]
+        assert title == i18n.t("common.error")
+        assert error_msg in body
+    finally:
+        dialog.close()
+        dialog.deleteLater()
         qapp.processEvents()
 
 
