@@ -859,6 +859,50 @@ def test_view_recording_warns_when_audio_unavailable(monkeypatch, qapp, tmp_path
         qapp.processEvents()
 
 
+def test_view_recording_surfaces_creation_errors(monkeypatch, qapp, tmp_path):
+    monkeypatch.setattr(
+        "ui.timeline.widget.QTimer.singleShot",
+        staticmethod(lambda *_: None),
+    )
+
+    class _FailingAudioDialog:
+        def __init__(self, *_args, **_kwargs):
+            raise RuntimeError("dialog crashed")
+
+    monkeypatch.setattr(
+        "ui.timeline.audio_player.AudioPlayerDialog",
+        _FailingAudioDialog,
+    )
+
+    captured = []
+
+    def _capture_critical(parent, title, message):
+        captured.append((parent, title, message))
+
+    monkeypatch.setattr(
+        "ui.timeline.widget.QMessageBox.critical",
+        staticmethod(_capture_critical),
+    )
+
+    i18n = I18nQtManager(default_language="en_US")
+    widget = TimelineWidget(DummyTimelineManager(), i18n)
+
+    try:
+        file_path = tmp_path / "broken.wav"
+        widget._on_view_recording(str(file_path))
+
+        assert not widget._audio_player_dialogs
+        assert captured, "Expected an error dialog when audio dialog creation fails"
+        _, title, message = captured[0]
+        assert title == i18n.t('timeline.audio_player_open_failed_title')
+        assert message == i18n.t('timeline.audio_player_open_failed_message').format(
+            error="dialog crashed"
+        )
+    finally:
+        widget.deleteLater()
+        qapp.processEvents()
+
+
 def test_transcript_dialogs_are_non_modal_and_cached(monkeypatch, qapp, tmp_path):
     monkeypatch.setattr(
         "ui.timeline.widget.QTimer.singleShot",

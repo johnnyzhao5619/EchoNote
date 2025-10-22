@@ -65,6 +65,11 @@ Uses PyQt6's QMediaPlayer and QAudioOutput.
 > the timeline continues to load events, but playback controls are disabled and
 > the user sees a localized warning explaining the limitation.
 
+> ⚠️ When the audio player dialog fails to initialize (e.g., corrupted media or
+> missing dependencies), the widget now surfaces a localized critical dialog
+> summarizing the exception and suggests checking the recording file and
+> application logs。发生错误时不会缓存对话框实例，避免残留的失效引用。
+
 ### 4. TranscriptViewer (`transcript_viewer.py`)
 
 Transcript text viewer with:

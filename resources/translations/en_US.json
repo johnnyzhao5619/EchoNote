@@ -195,6 +195,8 @@
     "audio_player_title": "Audio Player",
     "audio_player_unavailable_title": "Audio playback unavailable",
     "audio_player_unavailable_message": "Qt Multimedia components are not available, so recordings cannot be played. Timeline items remain accessible.",
+    "audio_player_open_failed_title": "Failed to open recording",
+    "audio_player_open_failed_message": "The audio player could not be opened: {error}. Please verify the recording file and review the application log for more details.",
     "audio_player": {
       "initial_time": "00:00",
       "play_button_label": "▶",

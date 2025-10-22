@@ -193,6 +193,8 @@
     "audio_player_title": "Lecteur Audio",
     "audio_player_unavailable_title": "Lecture audio indisponible",
     "audio_player_unavailable_message": "Les composants Qt Multimedia ne sont pas disponibles, la lecture des enregistrements est désactivée mais la chronologie reste accessible.",
+    "audio_player_open_failed_title": "Impossible d'ouvrir l'enregistrement",
+    "audio_player_open_failed_message": "Impossible d'ouvrir le lecteur audio : {error}. Vérifiez le fichier d'enregistrement et consultez le journal de l'application pour plus de détails.",
     "audio_player": {
       "initial_time": "00:00",
       "play_button_label": "▶",
