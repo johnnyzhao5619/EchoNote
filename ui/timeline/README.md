@@ -55,6 +55,7 @@ Built-in audio player for recordings:
 - **Volume control**
 - **Time display** (current/total)
 - **Error handling** for missing or unsupported files
+- **Automatic reset on errors** so progress indicators clear and playback controls return to the initial state when decoding fails
 - **Immediate feedback** when recordings are missing so users understand the failure reason
 - **Instant translation refresh** when the application language changes
 
@@ -64,6 +65,8 @@ Uses PyQt6's QMediaPlayer and QAudioOutput.
 > ℹ️ If QtMultimedia components are unavailable (e.g., package not installed),
 > the timeline continues to load events, but playback controls are disabled and
 > the user sees a localized warning explaining the limitation.
+
+当播放过程中出现错误或检测到媒体文件无效时，音频播放器会立即停止播放，清空进度条并将时间标签恢复为初始值，同时提示用户发生了故障，避免界面停留在错误状态。
 
 ### 4. TranscriptViewer (`transcript_viewer.py`)
 

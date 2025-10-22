@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import QApplication, QDialog, QWidget
 
 from data.database.models import CalendarEvent
 
-from ui.timeline.audio_player import AudioPlayerDialog
+from ui.timeline.audio_player import AudioPlayer, AudioPlayerDialog
 from ui.timeline.event_card import CurrentTimeIndicator
 from ui.timeline.widget import TimelineWidget
 from utils.i18n import I18nQtManager
@@ -930,6 +930,84 @@ def test_audio_dialog_cleanup_via_finished_signal(monkeypatch, qapp, tmp_path):
         if dialog is not None:
             dialog.deleteLater()
         widget.deleteLater()
+        qapp.processEvents()
+
+
+def test_audio_player_resets_ui_on_error(monkeypatch, qapp):
+    import ui.timeline.audio_player as audio_player_module
+
+    original_media_player = audio_player_module.QMediaPlayer
+
+    class _StubAudioOutput:
+        def __init__(self, *_args, **_kwargs):
+            self.volume = 1.0
+
+        def setVolume(self, volume):
+            self.volume = volume
+
+    class _StubMediaPlayer:
+        PlaybackState = original_media_player.PlaybackState
+        MediaStatus = original_media_player.MediaStatus
+        Error = original_media_player.Error
+
+        def __init__(self, *_args, **_kwargs):
+            self._state = self.PlaybackState.StoppedState
+            self._duration = 0
+            self._position = 0
+            self._audio_output = None
+            self.positionChanged = _Signal()
+            self.durationChanged = _Signal()
+            self.playbackStateChanged = _Signal()
+            self.errorOccurred = _Signal()
+            self.mediaStatusChanged = _Signal()
+
+        def setAudioOutput(self, output):
+            self._audio_output = output
+
+        def playbackState(self):
+            return self._state
+
+        def stop(self):
+            self._state = self.PlaybackState.StoppedState
+            self.playbackStateChanged.emit(self._state)
+
+        def duration(self):
+            return self._duration
+
+        def setPosition(self, position):
+            self._position = position
+            self.positionChanged.emit(position)
+
+    monkeypatch.setattr(audio_player_module, "QMediaPlayer", _StubMediaPlayer)
+    monkeypatch.setattr(audio_player_module, "QAudioOutput", _StubAudioOutput)
+
+    i18n = I18nQtManager(default_language="en_US")
+    player = AudioPlayer("fake.wav", i18n, auto_load=False)
+
+    try:
+        initial_time = i18n.t("timeline.audio_player.initial_time")
+
+        player._on_duration_changed(120000)
+        player._on_position_changed(60000)
+        assert player.progress_slider.value() == 60000
+        assert player.current_time_label.text() != initial_time
+
+        player._playback_state = original_media_player.PlaybackState.PlayingState
+        player.update_translations()
+        assert player.play_button.text() == i18n.t("timeline.audio_player.pause_button_label")
+
+        player._on_error(original_media_player.Error.FormatError, "decode failed")
+
+        assert player.progress_slider.value() == 0
+        assert player.current_time_label.text() == initial_time
+        assert player.total_time_label.text() == initial_time
+        assert player.play_button.text() == i18n.t("timeline.audio_player.play_button_label")
+        assert (
+            player.player.playbackState()
+            == original_media_player.PlaybackState.StoppedState
+        )
+    finally:
+        player.deleteLater()
         qapp.processEvents()
 
 
