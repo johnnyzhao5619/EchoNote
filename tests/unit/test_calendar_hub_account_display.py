@@ -109,6 +109,25 @@ if "PyQt6" not in sys.modules:
     sys.modules["PyQt6"] = qt_module
     sys.modules["PyQt6.QtWidgets"] = qt_widgets
     sys.modules["PyQt6.QtCore"] = qt_core
+else:
+    qt_widgets = sys.modules.get("PyQt6.QtWidgets")
+    if qt_widgets:
+        class _FallbackWidget:
+            def __init__(self, *_, **__):
+                pass
+
+            def setText(self, *_, **__):
+                pass
+
+        for name in (
+            "QStackedWidget",
+            "QButtonGroup",
+            "QFrame",
+            "QDialog",
+            "QMessageBox",
+        ):
+            if not hasattr(qt_widgets, name):
+                setattr(qt_widgets, name, _FallbackWidget)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
@@ -172,6 +191,37 @@ def test_get_user_email_handles_unauthorized(monkeypatch, caplog, adapter, httpx
     assert result is None
     assert any(
         "request failed with status 401" in record.message
+        for record in caplog.records
+    )
+
+
+def test_get_user_email_returns_email_when_authorized(monkeypatch, caplog, adapter, httpx_stub):
+    class DummyResponse:
+        status_code = 200
+
+        @staticmethod
+        def json():
+            return {'email': 'person@example.com'}
+
+    class DummyClient:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def get(self, *args, **kwargs):
+            return DummyResponse()
+
+    httpx_stub.Client = DummyClient
+    caplog.set_level(logging.WARNING, logger="echonote.ui.calendar_hub")
+
+    result = CalendarHubWidget._get_user_email(object(), "google", adapter)
+
+    assert result == 'person@example.com'
+    assert all(
+        "request failed" not in record.message
+        and "HTTP error fetching google user email" not in record.message
         for record in caplog.records
     )
 

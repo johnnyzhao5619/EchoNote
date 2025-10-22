@@ -18,6 +18,9 @@
    - Under “Scopes,” add:
      - `https://www.googleapis.com/auth/calendar.readonly`
      - `https://www.googleapis.com/auth/calendar.events`
+     - `openid`
+     - `https://www.googleapis.com/auth/userinfo.email`
+     - *(Optional, for profile names)* `https://www.googleapis.com/auth/userinfo.profile`
    - Under “Test users,” add your Google account and save.
 4. Return to the **Credentials** page, click **+ Create Credentials → OAuth client ID**, choose “Desktop app” as the application type, name it (for example, “EchoNote Desktop”), then save and record the **Client ID** and **Client Secret** shown.
 
@@ -111,6 +114,9 @@ After completing these steps, EchoNote can sync and manage Google Calendar event
    - 在“范围”中添加：
      - `https://www.googleapis.com/auth/calendar.readonly`
      - `https://www.googleapis.com/auth/calendar.events`
+     - `openid`
+     - `https://www.googleapis.com/auth/userinfo.email`
+     - （可选，用于显示昵称）`https://www.googleapis.com/auth/userinfo.profile`
    - 在“测试用户”中添加你的 Google 账号，保存返回。
 4. 回到 **凭据** 页面，点击 **+ 创建凭据 → OAuth 客户端 ID**，应用类型选择“桌面应用”，名称可填“EchoNote Desktop”，保存并记录弹窗中的 **Client ID** 与 **Client Secret**。
 
@@ -204,6 +210,9 @@ After completing these steps, EchoNote can sync and manage Google Calendar event
    - Dans « Scopes », ajoutez :
      - `https://www.googleapis.com/auth/calendar.readonly`
      - `https://www.googleapis.com/auth/calendar.events`
+     - `openid`
+     - `https://www.googleapis.com/auth/userinfo.email`
+     - *(Facultatif, pour les noms de profil)* `https://www.googleapis.com/auth/userinfo.profile`
    - Dans « Test users », ajoutez votre compte Google puis enregistrez.
 4. Revenez à la page **Credentials**, cliquez sur **+ Create Credentials → OAuth client ID**, choisissez « Desktop app » comme type d’application, nommez-la (par exemple « EchoNote Desktop »), puis enregistrez et notez le **Client ID** et le **Client Secret** affichés.
 

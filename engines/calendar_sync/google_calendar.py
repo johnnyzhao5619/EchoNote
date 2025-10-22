@@ -27,7 +27,10 @@ class GoogleCalendarAdapter(OAuthCalendarAdapter):
     # OAuth scopes
     SCOPES = [
         "https://www.googleapis.com/auth/calendar.readonly",
-        "https://www.googleapis.com/auth/calendar.events"
+        "https://www.googleapis.com/auth/calendar.events",
+        "openid",
+        "https://www.googleapis.com/auth/userinfo.email",
+        "https://www.googleapis.com/auth/userinfo.profile",
     ]
 
     def __init__(

@@ -124,6 +124,24 @@ def test_outlook_scopes_include_offline_access():
     assert 'offline_access' in scope_value
 
 
+def test_google_scopes_include_userinfo_permissions(google_adapter):
+    required_scopes = {
+        'https://www.googleapis.com/auth/calendar.readonly',
+        'https://www.googleapis.com/auth/calendar.events',
+        'openid',
+        'https://www.googleapis.com/auth/userinfo.email',
+        'https://www.googleapis.com/auth/userinfo.profile',
+    }
+
+    assert required_scopes.issubset(set(google_adapter.SCOPES))
+
+    auth_payload = google_adapter.get_authorization_url()
+    query = parse_qs(urlparse(auth_payload['authorization_url']).query)
+    scope_value = set(query.get('scope', [''])[0].split())
+
+    assert required_scopes.issubset(scope_value)
+
+
 def _normalise_iso_value(value: str) -> str:
     text = value.strip()
     if text.endswith('Z'):
