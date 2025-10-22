@@ -66,6 +66,7 @@ class OutlookCalendarAdapter(OAuthCalendarAdapter):
     SCOPES = [
         "Calendars.Read",
         "Calendars.ReadWrite",
+        "User.Read",
         "offline_access",
         "openid",
         "profile",

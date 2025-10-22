@@ -108,6 +108,7 @@ Both adapters inherit from the shared `OAuthCalendarAdapter` in `engines/calenda
 - **Scopes**:
   - `Calendars.Read`
   - `Calendars.ReadWrite`
+  - `User.Read`
 
 ## Configuration
 

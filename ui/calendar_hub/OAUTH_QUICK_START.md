@@ -101,6 +101,7 @@
    - Add "Microsoft Graph" permissions:
      - Calendars.Read
      - Calendars.ReadWrite
+     - User.Read
    - Grant admin consent if required
 
 4. **Create Client Secret**:
