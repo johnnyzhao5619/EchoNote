@@ -115,13 +115,81 @@ class TimelineManager:
 
         return value
 
+    def _prepare_filter_context(
+        self,
+        filters: Optional[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Normalize and pre-compute reusable filter parameters."""
+        resolved_filters: Dict[str, Any] = dict(filters or {})
+
+        start_dt = (
+            to_local_naive(resolved_filters['start_date'])
+            if resolved_filters.get('start_date')
+            else datetime(1970, 1, 1)
+        )
+        end_dt = (
+            to_local_naive(resolved_filters['end_date'])
+            if resolved_filters.get('end_date')
+            else datetime(2099, 12, 31, 23, 59, 59)
+        )
+
+        attendees_filter = resolved_filters.get('attendees')
+        if attendees_filter:
+            if isinstance(attendees_filter, (list, tuple, set)):
+                attendees_filter = set(attendees_filter)
+            else:
+                attendees_filter = {attendees_filter}
+        else:
+            attendees_filter = None
+
+        return {
+            'filters': resolved_filters,
+            'start_dt': start_dt,
+            'end_dt': end_dt,
+            'has_date_filter': bool(
+                resolved_filters.get('start_date') or
+                resolved_filters.get('end_date')
+            ),
+            'attendees_filter': attendees_filter,
+        }
+
+    def _event_matches_filters(
+        self,
+        event: CalendarEvent,
+        context: Dict[str, Any]
+    ) -> bool:
+        """Return ``True`` when ``event`` satisfies ``context`` filters."""
+        filters = context['filters']
+
+        if context['has_date_filter']:
+            event_start = to_local_naive(event.start_time)
+            if not (context['start_dt'] <= event_start <= context['end_dt']):
+                return False
+
+        attendees_filter = context['attendees_filter']
+        if attendees_filter:
+            attendees = getattr(event, 'attendees', []) or []
+            if not any(attendee in attendees_filter for attendee in attendees):
+                return False
+
+        event_type = filters.get('event_type')
+        if event_type and getattr(event, 'event_type', None) != event_type:
+            return False
+
+        source = filters.get('source')
+        if source and getattr(event, 'source', None) != source:
+            return False
+
+        return True
+
     def get_timeline_events(
         self,
         center_time: datetime,
         past_days: float,
         future_days: float,
         page: int = 0,
-        page_size: int = 50
+        page_size: int = 50,
+        filters: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Get timeline events around a center time.
@@ -132,6 +200,8 @@ class TimelineManager:
             future_days: Number of days to look forward (supports fractional days)
             page: Page number for pagination (0-indexed)
             page_size: Number of events per page
+            filters: Optional filters matching ``search_events`` (``start_date``,
+                ``end_date``, ``attendees``, ``event_type``, ``source``)
 
         Returns:
             Dictionary containing:
@@ -148,11 +218,25 @@ class TimelineManager:
             start_time = center_time_local - timedelta(days=past_days)
             end_time = center_time_local + timedelta(days=future_days)
 
+            filter_context = self._prepare_filter_context(filters)
+
+            calendar_filters = {
+                key: filter_context['filters'][key]
+                for key in ('event_type', 'source')
+                if filter_context['filters'].get(key)
+            }
+
             # Get all events in range
             all_events = self.calendar_manager.get_events(
                 start_date=start_time.isoformat(),
-                end_date=end_time.isoformat()
+                end_date=end_time.isoformat(),
+                filters=calendar_filters or None
             )
+
+            filtered_events = [
+                event for event in all_events
+                if self._event_matches_filters(event, filter_context)
+            ]
 
             # Separate past and future events
             past_events: List[Dict[str, Any]] = []
@@ -160,7 +244,7 @@ class TimelineManager:
             future_event_items: List[CalendarEvent] = []
             past_event_items: List[CalendarEvent] = []
 
-            for event in all_events:
+            for event in filtered_events:
                 event_start = to_local_naive(event.start_time)
 
                 if event_start < center_time_local:
@@ -454,38 +538,12 @@ class TimelineManager:
             ``auto_tasks`` key matching the ``get_timeline_events`` contract.
         """
         try:
-            filters = filters or {}
+            filter_context = self._prepare_filter_context(filters)
+            filters = filter_context['filters']
 
             query_lower = query.lower() if query else ''
-
-            start_dt = (
-                to_local_naive(filters['start_date'])
-                if filters.get('start_date') else
-                datetime(1970, 1, 1)
-            )
-            end_dt = (
-                to_local_naive(filters['end_date'])
-                if filters.get('end_date') else
-                datetime(2099, 12, 31, 23, 59, 59)
-            )
-            start_iso = start_dt.isoformat()
-            end_iso = end_dt.isoformat()
-            has_date_filter = bool(filters.get('start_date') or filters.get('end_date'))
-
-            filter_attendees = (
-                set(filters['attendees']) if filters.get('attendees') else None
-            )
-
-            def _passes_filters(event: CalendarEvent) -> bool:
-                if has_date_filter:
-                    event_start = to_local_naive(event.start_time)
-                    if not (start_dt <= event_start <= end_dt):
-                        return False
-                if filter_attendees:
-                    attendees = getattr(event, 'attendees', []) or []
-                    if not any(attendee in filter_attendees for attendee in attendees):
-                        return False
-                return True
+            start_dt = filter_context['start_dt']
+            end_dt = filter_context['end_dt']
 
             # Get events by keyword
             events = CalendarEvent.search(
@@ -495,7 +553,10 @@ class TimelineManager:
                 source=filters.get('source')
             )
 
-            events = [event for event in events if _passes_filters(event)]
+            events = [
+                event for event in events
+                if self._event_matches_filters(event, filter_context)
+            ]
 
             event_ids = {event.id for event in events}
 
@@ -546,7 +607,7 @@ class TimelineManager:
                 for candidate in candidate_events:
                     if candidate.id in event_ids:
                         continue
-                    if not _passes_filters(candidate):
+                    if not self._event_matches_filters(candidate, filter_context):
                         continue
                     additional_events.append(candidate)
                     if len(additional_events) >= _MAX_TRANSCRIPT_CANDIDATES:
