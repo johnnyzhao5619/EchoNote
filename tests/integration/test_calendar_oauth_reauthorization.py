@@ -27,6 +27,7 @@ from data.database.models import (
     EventAttachment,
 )
 from data.security.encryption import SecurityManager
+from data.security.oauth_manager import OAuthManager
 from engines.calendar_sync.outlook_calendar import OutlookCalendarAdapter
 
 
@@ -174,6 +175,103 @@ def test_calendar_reauthorization_keeps_single_active_status(tmp_path):
     db.close_all()
 
 
+def test_oauth_reauthorization_without_refresh_token_keeps_existing(tmp_path):
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+
+    security_manager = SecurityManager(str(config_dir))
+    initialize_encryption_helper(security_manager)
+
+    tokens_dir = tmp_path / "tokens"
+    oauth_manager = OAuthManager(security_manager, config_dir=str(tokens_dir))
+    oauth_manager.store_token(
+        provider="google",
+        access_token="existing-access-token",
+        refresh_token="legacy-refresh-token",
+        expires_in=3600,
+    )
+
+    db_path = tmp_path / "calendar.db"
+    db = DatabaseConnection(str(db_path))
+    db.initialize_schema()
+
+    class TrackingCalendarManager(CalendarManager):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.sync_call_count = 0
+            self.last_refresh_token_seen: Optional[str] = None
+
+        def sync_external_calendar(self, provider: str):
+            self.sync_call_count += 1
+            adapter = self.sync_adapters[provider]
+            self.last_refresh_token_seen = getattr(adapter, "refresh_token", None)
+
+    class DummyAdapter:
+        def __init__(self):
+            self.refresh_token = "legacy-refresh-token"
+            self.access_token = "existing-access-token"
+            self.exchange_calls: List[Tuple[str, str]] = []
+
+        def exchange_code_for_token(self, code: str, code_verifier: str):
+            self.exchange_calls.append((code, code_verifier))
+            return {
+                "access_token": "new-access-token",
+                "expires_in": 3600,
+                "token_type": "Bearer",
+            }
+
+    adapter = DummyAdapter()
+
+    manager = TrackingCalendarManager(
+        db_connection=db,
+        sync_adapters={"google": adapter},
+        oauth_manager=oauth_manager,
+    )
+
+    widget = object.__new__(CalendarHubWidget)
+    widget.calendar_manager = manager
+    widget.oauth_manager = oauth_manager
+    widget.connected_accounts = {}
+    widget._get_user_email = types.MethodType(
+        lambda self, provider, adapter: "person@example.com",
+        widget,
+    )
+    widget.add_connected_account = types.MethodType(
+        lambda self, provider, email: self.connected_accounts.setdefault(provider, email),
+        widget,
+    )
+    widget._refresh_current_view = types.MethodType(lambda self: None, widget)
+    widget._get_provider_display_name = types.MethodType(
+        lambda self, provider: provider.title(),
+        widget,
+    )
+
+    qt_widgets = sys.modules.get("PyQt6.QtWidgets")
+
+    if qt_widgets is not None:
+        class _MessageBoxStub:
+            @staticmethod
+            def information(*_, **__):
+                return None
+
+            @staticmethod
+            def critical(*_, **__):
+                return None
+
+        qt_widgets.QMessageBox = _MessageBoxStub
+
+    widget._complete_oauth_flow("google", "auth-code", "verifier")
+
+    stored_token = oauth_manager.get_token("google")
+
+    assert adapter.access_token == "new-access-token"
+    assert adapter.refresh_token == "legacy-refresh-token"
+    assert stored_token is not None
+    assert stored_token.get("refresh_token") == "legacy-refresh-token"
+    assert manager.sync_call_count == 1
+    assert manager.last_refresh_token_seen == "legacy-refresh-token"
+
+    db.close_all()
 def test_sync_removes_cancelled_and_missing_remote_events(tmp_path):
     config_dir = tmp_path / "sync-config"
     config_dir.mkdir()
