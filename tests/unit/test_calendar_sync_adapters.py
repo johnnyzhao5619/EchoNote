@@ -85,7 +85,10 @@ _ensure_httpx_stub()
 
 from data.database.models import CalendarEvent
 from engines.calendar_sync.google_calendar import GoogleCalendarAdapter
-from engines.calendar_sync.outlook_calendar import OutlookCalendarAdapter
+from engines.calendar_sync.outlook_calendar import (
+    OutlookCalendarAdapter,
+    WINDOWS_TO_IANA_MAP,
+)
 
 
 @pytest.fixture
@@ -106,6 +109,47 @@ def outlook_adapter():
     }
     adapter._timezone_map_loaded = True
     return adapter
+
+
+def _normalise_iso_value(value: str) -> str:
+    text = value.strip()
+    if text.endswith('Z'):
+        text = f"{text[:-1]}+00:00"
+
+    if '.' not in text:
+        return text
+
+    main, remainder = text.split('.', 1)
+    offset = ''
+    for sign in ('+', '-'):
+        idx = remainder.find(sign)
+        if idx > 0:
+            offset = remainder[idx:]
+            remainder = remainder[:idx]
+            break
+
+    fraction = ''.join(ch for ch in remainder if ch.isdigit())
+    if not fraction:
+        return f"{main}{offset}"
+
+    fraction = (fraction + '000000')[:6]
+    if set(fraction) == {'0'}:
+        return f"{main}{offset}"
+    return f"{main}.{fraction}{offset}"
+
+
+def _build_remote_instant(
+    adapter: OutlookCalendarAdapter,
+    date_value: str,
+    timezone_identifier: str,
+) -> datetime:
+    identifier = WINDOWS_TO_IANA_MAP.get(timezone_identifier, timezone_identifier)
+    tzinfo_value = adapter._timezone_from_identifier(identifier)
+
+    parsed = datetime.fromisoformat(_normalise_iso_value(date_value))
+    if parsed.tzinfo:
+        return parsed.astimezone(tzinfo_value)
+    return parsed.replace(tzinfo=tzinfo_value)
 
 
 def _build_event(start: str, end: str) -> CalendarEvent:

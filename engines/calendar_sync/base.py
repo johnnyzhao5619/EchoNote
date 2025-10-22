@@ -311,11 +311,15 @@ class CalendarSyncAdapter(ABC):
 
         if identifier.startswith('UTC') and len(identifier) > 3:
             sign = 1 if identifier[3] == '+' else -1
+            remainder = identifier[4:]
             try:
-                hours, minutes = identifier[4:].split(':')
+                if ':' in remainder:
+                    hours_text, minutes_text = remainder.split(':', 1)
+                else:
+                    hours_text, minutes_text = remainder, '00'
                 offset = timedelta(
-                    hours=int(hours) * sign,
-                    minutes=int(minutes) * sign,
+                    hours=int(hours_text) * sign,
+                    minutes=int(minutes_text) * sign,
                 )
                 return timezone(offset)
             except (ValueError, TypeError):  # pragma: no cover - defensive
