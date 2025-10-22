@@ -160,6 +160,12 @@
     "create_event": "Create Event",
     "sync_now": "Sync Now",
     "sync_now_tooltip": "Manually sync all connected calendars",
+    "providers": {
+      "google": "Google",
+      "outlook": "Outlook"
+    },
+    "account_with_email": "{provider} ({email})",
+    "account_without_email": "{provider} account",
     "event_types": {
       "event": "Event",
       "task": "Task",

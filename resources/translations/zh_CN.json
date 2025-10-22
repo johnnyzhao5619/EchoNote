@@ -160,6 +160,12 @@
     "create_event": "创建事件",
     "sync_now": "立即同步",
     "sync_now_tooltip": "手动同步所有已连接的日历",
+    "providers": {
+      "google": "Google",
+      "outlook": "Outlook"
+    },
+    "account_with_email": "{provider}（{email}）",
+    "account_without_email": "{provider} 账号",
     "event_types": {
       "event": "事件",
       "task": "任务",
