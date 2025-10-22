@@ -67,7 +67,7 @@ class CalendarHubWidget(QWidget):
         self.current_date = None  # Will be set by calendar view
         
         # Connected accounts
-        self.connected_accounts: Dict[str, str] = {}
+        self.connected_accounts: Dict[str, Optional[str]] = {}
         
         # Setup UI
         self.setup_ui()
@@ -520,10 +520,11 @@ class CalendarHubWidget(QWidget):
             # Get sync adapter
             if provider not in self.calendar_manager.sync_adapters:
                 from PyQt6.QtWidgets import QMessageBox
+                provider_name = self._get_provider_display_name(provider)
                 QMessageBox.warning(
                     self,
                     "Error",
-                    f"{provider.capitalize()} calendar sync is not configured."
+                    f"{provider_name} calendar sync is not configured."
                 )
                 return
             
@@ -719,10 +720,11 @@ class CalendarHubWidget(QWidget):
             
             # Show success message
             from PyQt6.QtWidgets import QMessageBox
+            provider_name = self._get_provider_display_name(provider)
             QMessageBox.information(
                 self,
                 "Success",
-                f"Successfully connected {provider.capitalize()} calendar!"
+                f"Successfully connected {provider_name} calendar!"
             )
             
             logger.info(f"OAuth flow completed for {provider}")
@@ -731,78 +733,199 @@ class CalendarHubWidget(QWidget):
             logger.error(f"Error completing OAuth flow: {e}")
             self._handle_oauth_error(provider, str(e))
     
-    def _get_user_email(self, provider: str, adapter) -> str:
+    def _get_user_email(self, provider: str, adapter) -> Optional[str]:
         """
-        Get user email from provider.
-        
+        Try to resolve the authenticated user's email from the provider API.
+
         Args:
             provider: Provider name
             adapter: Sync adapter instance
-            
+
         Returns:
-            User email or default
+            Email address if available, otherwise ``None``
         """
         try:
             import httpx
-            
+        except Exception as import_error:  # pragma: no cover - defensive branch
+            logger.warning(
+                "HTTP client unavailable when requesting %s user email: %s",
+                provider,
+                import_error
+            )
+            return None
+
+        access_token = getattr(adapter, 'access_token', None)
+        if not access_token:
+            logger.warning(
+                "No access token provided for %s email lookup", provider
+            )
+            return None
+
+        headers = {'Authorization': f'Bearer {access_token}'}
+
+        try:
             if provider == 'google':
-                # Get user info from Google
                 with httpx.Client() as client:
                     response = client.get(
                         'https://www.googleapis.com/oauth2/v2/userinfo',
-                        headers={'Authorization': f'Bearer {adapter.access_token}'},
+                        headers=headers,
                         timeout=10.0
                     )
-                    if response.status_code == 200:
-                        data = response.json()
-                        return data.get('email', 'user@gmail.com')
-            
+
+                if response.status_code == 200:
+                    data = response.json()
+                    email = data.get('email')
+                    if email:
+                        return email
+                    logger.warning(
+                        "Google user info response missing email field"
+                    )
+                else:
+                    logger.warning(
+                        "Google user info request failed with status %s",
+                        response.status_code
+                    )
+
             elif provider == 'outlook':
-                # Get user info from Microsoft Graph
                 with httpx.Client() as client:
                     response = client.get(
                         'https://graph.microsoft.com/v1.0/me',
-                        headers={'Authorization': f'Bearer {adapter.access_token}'},
+                        headers=headers,
                         timeout=10.0
                     )
-                    if response.status_code == 200:
-                        data = response.json()
-                        return data.get('mail') or data.get('userPrincipalName', 'user@outlook.com')
-            
-        except Exception as e:
-            logger.warning(f"Could not fetch user email: {e}")
-        
-        return f'user@{provider}.com'
+
+                if response.status_code == 200:
+                    data = response.json()
+                    email = data.get('mail') or data.get('userPrincipalName')
+                    if email:
+                        return email
+                    logger.warning(
+                        "Outlook user info response missing mail fields"
+                    )
+                else:
+                    logger.warning(
+                        "Outlook user info request failed with status %s",
+                        response.status_code
+                    )
+
+            else:
+                logger.debug(
+                    "Skipping email lookup for unsupported provider: %s",
+                    provider
+                )
+
+        except httpx.HTTPError as http_error:
+            logger.warning(
+                "HTTP error fetching %s user email: %s",
+                provider,
+                http_error
+            )
+        except Exception as error:  # pragma: no cover - defensive branch
+            logger.warning(
+                "Unexpected error fetching %s user email: %s",
+                provider,
+                error
+            )
+
+        return None
     
     def _handle_oauth_error(self, provider: str, error: str):
         """
         Handle OAuth authorization error.
-        
+
         Args:
             provider: Provider name
             error: Error message
         """
         from PyQt6.QtWidgets import QMessageBox
-        
+
+        provider_name = self._get_provider_display_name(provider)
+
         QMessageBox.critical(
             self,
             "Authorization Failed",
-            f"Failed to connect {provider.capitalize()} calendar:\n{error}"
+            f"Failed to connect {provider_name} calendar:\n{error}"
         )
-        
+
         logger.error(f"OAuth error for {provider}: {error}")
-    
-    def add_connected_account(self, provider: str, email: str):
+
+    def _get_provider_display_name(self, provider: str) -> str:
+        """Return the localized provider label."""
+        calendar_hub_translations = {}
+        if isinstance(self.i18n.translations, dict):
+            calendar_hub_translations = self.i18n.translations.get(
+                'calendar_hub', {}
+            )
+
+        if isinstance(calendar_hub_translations, dict):
+            providers_map = calendar_hub_translations.get('providers', {})
+            if isinstance(providers_map, dict):
+                label = providers_map.get(provider)
+                if isinstance(label, str) and label:
+                    return label
+
+        return provider.capitalize()
+
+    def _format_account_label(self, provider: str, email: Optional[str]) -> str:
+        """Build the account badge label text."""
+        provider_name = self._get_provider_display_name(provider)
+
+        if email:
+            localized = self.i18n.t(
+                'calendar_hub.account_with_email',
+                provider=provider_name,
+                email=email
+            )
+            if localized != 'calendar_hub.account_with_email':
+                return localized
+            return f"{provider_name} ({email})"
+
+        localized = self.i18n.t(
+            'calendar_hub.account_without_email',
+            provider=provider_name
+        )
+        if localized != 'calendar_hub.account_without_email':
+            return localized
+        return provider_name
+
+    def _update_account_badge_label(self, provider: str, email: Optional[str]) -> None:
+        """Update the text on an existing account badge if it exists."""
+        badge_name = f'account_badge_{provider}'
+        label_name = f'account_label_{provider}'
+
+        for i in range(self.accounts_container_layout.count()):
+            widget = self.accounts_container_layout.itemAt(i).widget()
+            if widget and widget.objectName() == badge_name:
+                layout = widget.layout()
+                if not layout:
+                    continue
+                for j in range(layout.count()):
+                    child = layout.itemAt(j).widget()
+                    if child and child.objectName() == label_name:
+                        child.setText(
+                            self._format_account_label(provider, email)
+                        )
+                        return
+
+    def add_connected_account(self, provider: str, email: Optional[str]):
         """
         Add a connected account badge.
-        
+
         Args:
             provider: Provider name (google/outlook)
-            email: User email
+            email: User email if available
         """
         # Don't add if already exists
         if provider in self.connected_accounts:
-            logger.debug(f"Account badge for {provider} already exists")
+            if email and self.connected_accounts[provider] != email:
+                logger.debug(
+                    "Updating account badge for %s with newly available email",
+                    provider
+                )
+                self.connected_accounts[provider] = email
+                self._update_account_badge_label(provider, email)
+            else:
+                logger.debug(f"Account badge for {provider} already exists")
             return
         
         # Create account badge
@@ -827,7 +950,8 @@ class CalendarHubWidget(QWidget):
         badge_layout.addWidget(indicator)
         
         # Account info
-        info_label = QLabel(f'{provider.capitalize()} ({email})')
+        info_label = QLabel(self._format_account_label(provider, email))
+        info_label.setObjectName(f'account_label_{provider}')
         badge_layout.addWidget(info_label)
         
         # Disconnect button
@@ -855,8 +979,12 @@ class CalendarHubWidget(QWidget):
         
         # Store reference
         self.connected_accounts[provider] = email
-        
-        logger.info(f"Added connected account: {provider} - {email}")
+
+        logger.info(
+            "Added connected account: %s - %s",
+            provider,
+            email or 'email_unavailable'
+        )
     
     def remove_connected_account(self, provider: str):
         """
@@ -882,21 +1010,23 @@ class CalendarHubWidget(QWidget):
     def disconnect_account(self, provider: str):
         """
         Disconnect an external calendar account.
-        
+
         Args:
             provider: Provider name (google/outlook)
         """
         try:
             from PyQt6.QtWidgets import QMessageBox
             from data.database.models import CalendarSyncStatus
-            
+
+            provider_name = self._get_provider_display_name(provider)
+
             # Confirm with user
             reply = QMessageBox.question(
                 self,
                 "Disconnect Account",
-                f"Are you sure you want to disconnect {provider.capitalize()} calendar?\n\n"
+                f"Are you sure you want to disconnect {provider_name} calendar?\n\n"
                 f"This will:\n"
-                f"- Remove all synced events from {provider.capitalize()}\n"
+                f"- Remove all synced events from {provider_name}\n"
                 f"- Delete stored OAuth tokens\n"
                 f"- Stop automatic synchronization",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
@@ -939,7 +1069,7 @@ class CalendarHubWidget(QWidget):
             QMessageBox.information(
                 self,
                 "Success",
-                f"Successfully disconnected {provider.capitalize()} calendar."
+                f"Successfully disconnected {provider_name} calendar."
             )
             
             logger.info(f"Disconnected account: {provider}")
@@ -1111,8 +1241,7 @@ class CalendarHubWidget(QWidget):
             )
             
             for status in sync_statuses:
-                email = status.user_email or 'user@example.com'
-                self.add_connected_account(status.provider, email)
+                self.add_connected_account(status.provider, status.user_email)
                 
             logger.info(f"Loaded {len(sync_statuses)} connected accounts")
             

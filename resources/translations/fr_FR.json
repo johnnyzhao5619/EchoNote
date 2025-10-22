@@ -158,6 +158,12 @@
     "connected_accounts": "Connecté",
     "add_account": "Ajouter un Compte",
     "create_event": "Créer un Événement",
+    "providers": {
+      "google": "Google",
+      "outlook": "Outlook"
+    },
+    "account_with_email": "{provider} ({email})",
+    "account_without_email": "Compte {provider}",
     "event_types": {
       "event": "Événement",
       "task": "Tâche",

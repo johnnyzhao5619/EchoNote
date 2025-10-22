@@ -38,8 +38,14 @@ The main calendar hub widget that serves as the container for all calendar funct
 - `_create_event(event_data)`: Create new event
 - `_update_event(event_data)`: Update existing event
 - `show_add_account_dialog()`: Show account connection dialog
-- `add_connected_account(provider, email)`: Add account badge
+- `add_connected_account(provider, email=None)`: Add account badge with optional email display
 - `remove_connected_account(provider)`: Remove account badge
+
+#### Account Badge Display Strategy
+
+- The widget requests the provider's profile email when possible. If the request fails (for example due to network issues or an expired token), the sync status is stored without a placeholder address.
+- Account badges fall back to localized provider labels such as "Google" or "Outlook" when no email is available, ensuring that fake addresses never appear in the UI or database records.
+- When an email becomes available later (e.g., after a successful refresh), the existing badge text is updated in-place without recreating the badge.
 
 ### 2. Calendar Views (`calendar_view.py`)
 
