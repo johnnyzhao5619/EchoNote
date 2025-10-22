@@ -6,12 +6,13 @@ Displays a vertical timeline of past and future events with search and filtering
 
 import importlib
 import logging
+import math
 from typing import Optional, Dict, Any, List, TYPE_CHECKING, cast
 from datetime import datetime
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QScrollArea,
-    QLineEdit, QComboBox, QLabel, QFrame, QPushButton, QMessageBox
+    QLineEdit, QComboBox, QLabel, QFrame, QPushButton, QMessageBox, QDateEdit
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QDateTime, QTime
 from PyQt6.QtGui import QPalette
@@ -147,9 +148,6 @@ class TimelineWidget(QWidget):
         Returns:
             Header layout (VBoxLayout with search and filter rows)
         """
-        from PyQt6.QtWidgets import QDateEdit
-        from PyQt6.QtCore import QDate
-        
         header_layout = QVBoxLayout()
         header_layout.setSpacing(10)
         
@@ -185,18 +183,18 @@ class TimelineWidget(QWidget):
         
         self.start_date_edit = QDateEdit()
         self.start_date_edit.setCalendarPopup(True)
-        self.start_date_edit.setDate(QDate.currentDate().addDays(-30))
-        self.start_date_edit.dateChanged.connect(self._on_filter_changed)
         filter_row.addWidget(self.start_date_edit)
-        
+
         self.date_range_separator = QLabel(
             self.i18n.t('timeline.filter_date_range_separator')
         )
         filter_row.addWidget(self.date_range_separator)
-        
+
         self.end_date_edit = QDateEdit()
         self.end_date_edit.setCalendarPopup(True)
-        self.end_date_edit.setDate(QDate.currentDate().addDays(30))
+        self.sync_date_filters_with_preferences()
+
+        self.start_date_edit.dateChanged.connect(self._on_filter_changed)
         self.end_date_edit.dateChanged.connect(self._on_filter_changed)
         filter_row.addWidget(self.end_date_edit)
         
@@ -231,8 +229,44 @@ class TimelineWidget(QWidget):
         filter_row.addWidget(self.source_filter, stretch=1)
         
         header_layout.addLayout(filter_row)
-        
+
         return header_layout
+
+    def _normalize_day_span(self, value: Any) -> int:
+        """Return a non-negative integer day span derived from ``value``."""
+        try:
+            numeric = float(value)
+        except (TypeError, ValueError):
+            return 0
+
+        normalized = math.floor(numeric)
+        return max(normalized, 0)
+
+    def _calculate_date_range_defaults(self) -> tuple[QDate, QDate]:
+        """Compute default start/end dates derived from user preferences."""
+        current_date = QDate.currentDate()
+        past_days = self._normalize_day_span(self.past_days)
+        future_days = self._normalize_day_span(self.future_days)
+
+        start_date = current_date.addDays(-past_days) if past_days else current_date
+        end_date = current_date.addDays(future_days) if future_days else current_date
+        return start_date, end_date
+
+    def sync_date_filters_with_preferences(self) -> None:
+        """Update date range widgets so they match the configured preferences."""
+        if not hasattr(self, 'start_date_edit') or not hasattr(self, 'end_date_edit'):
+            return
+
+        start_date, end_date = self._calculate_date_range_defaults()
+
+        previous_start_block = self.start_date_edit.blockSignals(True)
+        previous_end_block = self.end_date_edit.blockSignals(True)
+        try:
+            self.start_date_edit.setDate(start_date)
+            self.end_date_edit.setDate(end_date)
+        finally:
+            self.start_date_edit.blockSignals(previous_start_block)
+            self.end_date_edit.blockSignals(previous_end_block)
     
     def load_timeline_events(self, reset: bool = True) -> bool:
         """

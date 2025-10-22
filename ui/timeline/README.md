@@ -122,6 +122,9 @@ The timeline UI integrates with:
 - `timeline.future_days`：控制向后加载多少天的事件，默认 30。
 - `timeline.page_size`：分页加载的事件数量，默认 50。
 
+时间线顶部的日期范围选择器会在构建时根据上述 past/future 配置自动计算默认范围，
+并且在需要重置控件时同样会重新同步，确保界面与设置保持一致。
+
 当 `TimelineWidget` 接收到 `SettingsManager` 或底层 `ConfigManager` 时，会在初始化期间读取这些设置，并在调用 `load_timeline_events()` 时应用。若设置不存在或值非法，将回退到默认配置，确保时间线功能稳定。
 
 ## Translation Keys
