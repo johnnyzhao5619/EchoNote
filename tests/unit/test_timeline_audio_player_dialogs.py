@@ -50,6 +50,23 @@ class RecordingTimelineManager(DummyTimelineManager):
         return super().get_timeline_events(**kwargs)
 
 
+class SlowTimelineManager(DummyTimelineManager):
+    """Timeline manager that triggers a refresh while loading."""
+
+    def __init__(self):
+        super().__init__()
+        self.calls = []
+        self.refresh_callback = None
+        self._triggered = False
+
+    def get_timeline_events(self, **kwargs):
+        self.calls.append(kwargs)
+        if self.refresh_callback and not self._triggered:
+            self._triggered = True
+            self.refresh_callback()
+        return super().get_timeline_events(**kwargs)
+
+
 class _StubSettingsManager:
     """Minimal settings facade exposing timeline preferences."""
 
@@ -336,6 +353,54 @@ def test_search_always_refreshes_timeline(monkeypatch, qapp):
 
         assert load_calls == [True, True]
         assert widget.current_query == "meeting"
+    finally:
+        widget.deleteLater()
+        qapp.processEvents()
+
+
+def test_refresh_during_loading_schedules_follow_up(monkeypatch, qapp):
+    scheduled_calls = []
+
+    def fake_single_shot(delay, callback):
+        scheduled_calls.append((delay, callback))
+        return None
+
+    monkeypatch.setattr(
+        "ui.timeline.widget.QTimer.singleShot",
+        staticmethod(fake_single_shot),
+    )
+
+    manager = SlowTimelineManager()
+    i18n = I18nQtManager(default_language="en_US")
+    widget = TimelineWidget(manager, i18n)
+
+    try:
+        scheduled_calls.clear()
+
+        original_load = widget.load_timeline_events
+        load_resets = []
+
+        def counting_load(self, reset=True):
+            load_resets.append(reset)
+            return original_load(reset=reset)
+
+        widget.load_timeline_events = MethodType(counting_load, widget)
+
+        manager.refresh_callback = lambda: widget._refresh_timeline(reset=True)
+
+        assert widget.load_timeline_events(reset=True)
+        assert len(manager.calls) == 1
+
+        zero_delay = [cb for delay, cb in scheduled_calls if delay == 0]
+        assert zero_delay, "Expected pending refresh to be scheduled"
+
+        scheduled_calls[:] = [item for item in scheduled_calls if item[0] != 0]
+        for callback in zero_delay:
+            callback()
+
+        assert len(manager.calls) == 2
+        assert load_resets == [True, True, True]
+        assert widget._pending_refresh is None
     finally:
         widget.deleteLater()
         qapp.processEvents()
