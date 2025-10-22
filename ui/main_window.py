@@ -223,7 +223,8 @@ class MainWindow(QMainWindow):
             try:
                 timeline_widget = TimelineWidget(
                     self.managers['timeline_manager'],
-                    self.i18n
+                    self.i18n,
+                    settings_manager=self.managers.get('settings_manager')
                 )
                 content_area.addWidget(timeline_widget)
                 self.pages['timeline'] = timeline_widget
