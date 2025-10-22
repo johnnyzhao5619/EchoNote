@@ -344,6 +344,33 @@ def test_get_timeline_events_applies_filters_to_past_and_future():
     assert not result['has_more']
 
 
+def test_get_timeline_events_date_filter_is_inclusive():
+    center_time = datetime(2024, 5, 21, 12, 0, tzinfo=timezone.utc)
+
+    late_same_day = CalendarEvent(
+        id='late-same-day',
+        title='Late Same Day',
+        start_time=iso_z(datetime(2024, 5, 21, 20, 30, tzinfo=timezone.utc)),
+        end_time=iso_z(datetime(2024, 5, 21, 21, 0, tzinfo=timezone.utc)),
+    )
+
+    manager = _build_manager([late_same_day])
+
+    filters = {
+        'start_date': (center_time - timedelta(days=1)).date().isoformat(),
+        'end_date': center_time.date().isoformat(),
+    }
+
+    result = manager.get_timeline_events(
+        center_time=center_time,
+        past_days=1,
+        future_days=1,
+        filters=filters,
+    )
+
+    assert [item['event'].id for item in result['future_events']] == ['late-same-day']
+
+
 def test_get_timeline_events_batches_past_attachments(monkeypatch):
     center_time = datetime(2024, 6, 1, 12, 0, tzinfo=timezone.utc)
 

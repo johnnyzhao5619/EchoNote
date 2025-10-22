@@ -122,6 +122,30 @@ class TimelineManager:
         """Normalize and pre-compute reusable filter parameters."""
         resolved_filters: Dict[str, Any] = dict(filters or {})
 
+        def _normalize_date(value: Any, *, is_start: bool) -> Any:
+            if isinstance(value, str):
+                text = value.strip()
+                if text:
+                    try:
+                        datetime.strptime(text, '%Y-%m-%d')
+                    except ValueError:
+                        pass
+                    else:
+                        suffix = 'T00:00:00' if is_start else 'T23:59:59'
+                        return f"{text}{suffix}"
+            return value
+
+        if 'start_date' in resolved_filters:
+            resolved_filters['start_date'] = _normalize_date(
+                resolved_filters['start_date'],
+                is_start=True,
+            )
+        if 'end_date' in resolved_filters:
+            resolved_filters['end_date'] = _normalize_date(
+                resolved_filters['end_date'],
+                is_start=False,
+            )
+
         start_dt = (
             to_local_naive(resolved_filters['start_date'])
             if resolved_filters.get('start_date')
