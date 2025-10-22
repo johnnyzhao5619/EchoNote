@@ -1,6 +1,8 @@
 """Outlook Calendar synchronization adapter."""
 
 import logging
+import re
+from datetime import datetime
 from typing import Dict, Any, Optional, List
 
 import httpx
@@ -12,7 +14,7 @@ from data.database.models import CalendarEvent
 logger = logging.getLogger('echonote.calendar_sync.outlook')
 
 
-IANA_TO_WINDOWS_MAP = {
+DEFAULT_IANA_TO_WINDOWS_MAP = {
     'UTC': 'UTC',
     'Etc/UTC': 'UTC',
     'Etc/GMT': 'UTC',
@@ -24,8 +26,11 @@ IANA_TO_WINDOWS_MAP = {
     'America/Los_Angeles': 'Pacific Standard Time',
     'America/Chicago': 'Central Standard Time',
     'America/Denver': 'Mountain Standard Time',
+    'America/Sao_Paulo': 'E. South America Standard Time',
     'Europe/London': 'GMT Standard Time',
     'Europe/Berlin': 'W. Europe Standard Time',
+    'Europe/Paris': 'Romance Standard Time',
+    'Africa/Nairobi': 'E. Africa Standard Time',
     'Australia/Sydney': 'AUS Eastern Standard Time',
 }
 
@@ -66,6 +71,8 @@ class OutlookCalendarAdapter(OAuthCalendarAdapter):
             http_client_config=http_client_config,
         )
         self.logger.info("OutlookCalendarAdapter initialized")
+        self._iana_to_windows_map: Dict[str, str] = {}
+        self._timezone_map_loaded = False
 
     def build_authorization_params(
         self, state: str, code_challenge: str
@@ -333,6 +340,106 @@ class OutlookCalendarAdapter(OAuthCalendarAdapter):
             self.logger.error("Failed to convert Outlook event: %s", e)
             return None
 
+    _UTC_OFFSET_PATTERN = re.compile(r"^UTC(?P<sign>[+-])(?P<hours>\d{1,2})(?::?(?P<minutes>\d{2}))?$")
+
+    def _normalize_utc_offset_name(self, identifier: str) -> Optional[str]:
+        if identifier == 'UTC':
+            return 'UTC'
+        match = self._UTC_OFFSET_PATTERN.match(identifier)
+        if not match:
+            return None
+        sign = match.group('sign')
+        hours = int(match.group('hours'))
+        minutes_group = match.group('minutes')
+        minutes = int(minutes_group) if minutes_group else 0
+        return f"UTC{sign}{hours:02d}:{minutes:02d}"
+
+    def _query_supported_timezones(self, standard: str) -> List[Dict[str, Any]]:
+        url = (
+            f"{self.api_base_url}/me/outlook/supportedTimeZones("
+            f"TimeZoneStandard=microsoft.graph.timeZoneStandard'{standard}')"
+        )
+        response = self.api_request('GET', url, timeout=30.0)
+        data = response.json()
+        return data.get('value', []) if isinstance(data, dict) else []
+
+    def _fetch_supported_timezone_mappings(self) -> Dict[str, str]:
+        if not self.access_token:
+            return {}
+
+        try:
+            windows_timezones = self._query_supported_timezones('Windows')
+            iana_timezones = self._query_supported_timezones('Iana')
+        except Exception as exc:
+            self.logger.warning(
+                "Failed to load Outlook supported time zones dynamically: %s",
+                exc
+            )
+            return {}
+
+        mapping: Dict[str, str] = {}
+        windows_by_display: Dict[str, str] = {}
+
+        for entry in windows_timezones:
+            windows_name = entry.get('alias') or entry.get('name')
+            display_name = entry.get('displayName')
+            if not windows_name:
+                continue
+            if display_name and display_name not in windows_by_display:
+                windows_by_display[display_name] = windows_name
+            mapping[windows_name] = windows_name
+
+        for entry in iana_timezones:
+            iana_name = entry.get('alias') or entry.get('name')
+            display_name = entry.get('displayName')
+            if not iana_name:
+                continue
+            if display_name and display_name in windows_by_display:
+                mapping[iana_name] = windows_by_display[display_name]
+
+        return mapping
+
+    def _get_iana_to_windows_map(self) -> Dict[str, str]:
+        if not self._timezone_map_loaded:
+            mapping = self._fetch_supported_timezone_mappings()
+            if not mapping:
+                mapping = dict(DEFAULT_IANA_TO_WINDOWS_MAP)
+                self.logger.debug(
+                    "Using default Outlook timezone mapping with %d entries",
+                    len(mapping)
+                )
+            mapping.setdefault('UTC', 'UTC')
+            mapping.setdefault('Etc/UTC', 'UTC')
+            mapping.setdefault('Etc/GMT', 'UTC')
+            mapping.setdefault('GMT', 'UTC')
+            self._iana_to_windows_map = mapping
+            self._timezone_map_loaded = True
+        return self._iana_to_windows_map
+
+    def _to_windows_timezone(self, identifier: str, dt_value: datetime) -> str:
+        normalized_offset = self._normalize_utc_offset_name(identifier)
+        if normalized_offset:
+            return normalized_offset
+
+        mapping = self._get_iana_to_windows_map()
+        mapped = mapping.get(identifier)
+        if mapped:
+            return mapped
+
+        offset = dt_value.utcoffset()
+        if offset is not None:
+            total_minutes = int(offset.total_seconds() // 60)
+            sign = '+' if total_minutes >= 0 else '-'
+            total_minutes = abs(total_minutes)
+            hours, minutes = divmod(total_minutes, 60)
+            return f"UTC{sign}{hours:02d}:{minutes:02d}"
+
+        self.logger.warning(
+            "Unable to determine Outlook timezone for identifier '%s'; using UTC",
+            identifier
+        )
+        return 'UTC'
+
     def _convert_to_outlook_event(
         self,
         event: CalendarEvent
@@ -350,22 +457,13 @@ class OutlookCalendarAdapter(OAuthCalendarAdapter):
         start_dt = self._parse_event_datetime(event.start_time, local_tz)
         end_dt = self._parse_event_datetime(event.end_time, local_tz)
 
-        def _to_windows_timezone(identifier: str) -> str:
-            if identifier in IANA_TO_WINDOWS_MAP:
-                return IANA_TO_WINDOWS_MAP[identifier]
-            if identifier.startswith('UTC') and identifier not in IANA_TO_WINDOWS_MAP:
-                if identifier.endswith(':00'):
-                    return identifier[:-3]
-                return identifier
-            return 'UTC'
-
         def _format_outlook_datetime(dt_value):
             identifier = self._get_timezone_identifier(dt_value) or 'UTC'
             tzinfo_value = self._timezone_from_identifier(identifier)
             localized = dt_value.astimezone(tzinfo_value)
             payload = {
                 'dateTime': localized.replace(tzinfo=None).isoformat(),
-                'timeZone': _to_windows_timezone(identifier)
+                'timeZone': self._to_windows_timezone(identifier, localized)
             }
             return payload
 
