@@ -542,7 +542,7 @@ def test_outlook_fetch_events_initial_sync_uses_delta_endpoint(monkeypatch, outl
 
     monkeypatch.setattr(outlook_adapter, 'api_request', fake_api_request)
 
-    result = outlook_adapter.fetch_events()
+    result = outlook_adapter.fetch_events(last_sync_token='')
 
     assert captured['method'] == 'GET'
     assert captured['url'].startswith(
@@ -551,6 +551,57 @@ def test_outlook_fetch_events_initial_sync_uses_delta_endpoint(monkeypatch, outl
     assert 'deltatoken=latest' not in captured['url']
     assert result['sync_token'] == 'https://graph.microsoft.com/v1.0/me/calendar/events/delta?$deltatoken=abc'
     assert [event['id'] for event in result['events']] == ['evt-1']
+
+
+def test_outlook_fetch_events_initial_sync_follows_next_link(monkeypatch, outlook_adapter):
+    called_urls = []
+
+    class DummyResponse:
+        def __init__(self, data):
+            self._data = data
+
+        def json(self):
+            return self._data
+
+    responses = [
+        {
+            'value': [
+                {
+                    'id': 'evt-1',
+                    'subject': 'Kick-off',
+                    'start': {'dateTime': '2024-08-01T09:00:00'},
+                    'end': {'dateTime': '2024-08-01T10:00:00'},
+                },
+            ],
+            '@odata.nextLink': 'https://graph.microsoft.com/v1.0/me/calendar/events/delta?$skiptoken=123',
+        },
+        {
+            'value': [
+                {
+                    'id': 'evt-2',
+                    'subject': 'Wrap-up',
+                    'start': {'dateTime': '2024-08-01T11:00:00'},
+                    'end': {'dateTime': '2024-08-01T12:00:00'},
+                },
+            ],
+            '@odata.deltaLink': 'https://graph.microsoft.com/v1.0/me/calendar/events/delta?$deltatoken=xyz',
+        },
+    ]
+
+    def fake_api_request(method, url, **kwargs):
+        called_urls.append(url)
+        return DummyResponse(responses.pop(0))
+
+    monkeypatch.setattr(outlook_adapter, 'api_request', fake_api_request)
+
+    result = outlook_adapter.fetch_events()
+
+    assert called_urls[0].startswith(
+        f"{outlook_adapter.API_BASE_URL}/me/calendar/events/delta"
+    )
+    assert called_urls[1] == 'https://graph.microsoft.com/v1.0/me/calendar/events/delta?$skiptoken=123'
+    assert [event['id'] for event in result['events']] == ['evt-1', 'evt-2']
+    assert result['sync_token'] == 'https://graph.microsoft.com/v1.0/me/calendar/events/delta?$deltatoken=xyz'
 
 
 def test_outlook_fetch_events_tracks_deletions(monkeypatch, outlook_adapter):
