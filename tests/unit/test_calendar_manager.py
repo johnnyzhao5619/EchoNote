@@ -666,6 +666,32 @@ def test_google_adapter_converts_all_day_event():
     assert google_event['end'] == {'date': '2024-05-02'}
 
 
+def test_google_adapter_converts_timed_event(monkeypatch):
+    monkeypatch.setenv('ECHONOTE_LOCAL_TIMEZONE', 'Asia/Shanghai')
+
+    adapter = GoogleCalendarAdapter(
+        client_id="id",
+        client_secret="secret",
+        redirect_uri="http://localhost/callback",
+    )
+    event = CalendarEvent(
+        title="定时会议",
+        start_time="2024-05-01T09:00:00",
+        end_time="2024-05-01T10:30:00",
+    )
+
+    google_event = adapter._convert_to_google_event(event)
+
+    assert google_event['start'] == {
+        'dateTime': '2024-05-01T09:00:00+08:00',
+        'timeZone': 'Asia/Shanghai',
+    }
+    assert google_event['end'] == {
+        'dateTime': '2024-05-01T10:30:00+08:00',
+        'timeZone': 'Asia/Shanghai',
+    }
+
+
 def test_all_day_event_round_trip_sync(tmp_path):
     db = _create_db(tmp_path)
     recorder = RecordingAdapter()
