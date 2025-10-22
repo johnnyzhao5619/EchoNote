@@ -20,6 +20,7 @@ class _DummyOAuthAdapter(OAuthCalendarAdapter):
                 auth_url='https://auth.example.com/authorize',
                 token_url='https://auth.example.com/token',
                 api_base_url='https://api.example.com',
+                revoke_url='https://auth.example.com/revoke',
             ),
             http_client_config={'transport': transport},
         )
@@ -73,6 +74,10 @@ def test_exchange_code_normalizes_token_type_and_updates_state():
     # The adapter should reuse the same HTTP client for API calls.
     adapter.api_request('GET', 'https://api.example.com/ping')
 
+    adapter.clear_tokens()
+    assert adapter.access_token is None
+    assert adapter.refresh_token is None
+
 
 def test_retryable_http_client_respects_max_retry_after(monkeypatch):
     def handler(_: httpx.Request) -> httpx.Response:
@@ -91,3 +96,57 @@ def test_retryable_http_client_respects_max_retry_after(monkeypatch):
         client.get('https://example.com/slow-retry')
 
     client.close()
+
+
+def test_retryable_http_client_custom_status_codes(monkeypatch):
+    calls = 0
+
+    def handler(_: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(418)
+
+    client = RetryableHttpClient(
+        max_retries=1,
+        retryable_status_codes={418},
+        transport=httpx.MockTransport(handler),
+    )
+
+    monkeypatch.setattr('utils.http_client.time.sleep', lambda *_: None)
+
+    with pytest.raises(httpx.HTTPStatusError):
+        client.get('https://example.com/teapot')
+
+    assert calls == 2
+    client.close()
+
+
+def test_revoke_access_calls_endpoint_and_clears_state(monkeypatch):
+    token_response = {
+        'access_token': 'access-123',
+        'refresh_token': 'refresh-456',
+        'token_type': 'Bearer',
+    }
+
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith('/token'):
+            return httpx.Response(200, json=token_response)
+
+        if request.url.path.endswith('/revoke'):
+            calls.append({'method': request.method, 'params': dict(request.url.params)})
+            return httpx.Response(200, json={'revoked': True})
+
+        raise AssertionError(f"Unexpected request: {request.url!r}")
+
+    adapter = _DummyOAuthAdapter(httpx.MockTransport(handler))
+
+    adapter.exchange_code_for_token('auth-code')
+    assert adapter.access_token == 'access-123'
+
+    adapter.revoke_access()
+
+    assert calls == [{'method': 'POST', 'params': {'token': 'access-123'}}]
+    assert adapter.access_token is None
+    assert adapter.refresh_token is None
