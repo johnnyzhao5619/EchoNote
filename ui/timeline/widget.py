@@ -44,7 +44,8 @@ class TimelineWidget(QWidget):
         self,
         timeline_manager,
         i18n: I18nQtManager,
-        parent: Optional[QWidget] = None
+        parent: Optional[QWidget] = None,
+        settings_manager: Optional[object] = None
     ):
         """
         Initialize timeline widget.
@@ -58,10 +59,19 @@ class TimelineWidget(QWidget):
         
         self.timeline_manager = timeline_manager
         self.i18n = i18n
-        
+        self.settings_manager = settings_manager
+
         # State
         self.current_page = 0
-        self.page_size = 50
+        self.past_days = self._get_timeline_setting(
+            "timeline.past_days", default=30
+        )
+        self.future_days = self._get_timeline_setting(
+            "timeline.future_days", default=30
+        )
+        self.page_size = self._get_timeline_setting(
+            "timeline.page_size", default=50, minimum=1
+        )
         self.is_loading = False
         self.has_more = True
         self.event_cards: List[QWidget] = []
@@ -288,8 +298,8 @@ class TimelineWidget(QWidget):
                 # Normal timeline mode
                 data = self.timeline_manager.get_timeline_events(
                     center_time=center_time_local,
-                    past_days=30,
-                    future_days=30,
+                    past_days=self.past_days,
+                    future_days=self.future_days,
                     page=page_to_load,
                     page_size=self.page_size
                 )
@@ -332,6 +342,53 @@ class TimelineWidget(QWidget):
             self.is_loading = False
 
         return success
+
+    def _get_timeline_setting(
+        self,
+        key: str,
+        default: int,
+        *,
+        minimum: int = 0
+    ) -> int:
+        """Return a timeline preference from settings with fallbacks."""
+        manager = self.settings_manager
+        if manager is None:
+            return default
+
+        value: Any = default
+
+        try:
+            if hasattr(manager, "get_setting"):
+                value = getattr(manager, "get_setting")(key)
+            elif hasattr(manager, "get"):
+                getter = getattr(manager, "get")
+                try:
+                    value = getter(key, default)
+                except TypeError:
+                    value = getter(key)
+            else:
+                return default
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.warning(
+                "Failed to read %s from settings manager: %s", key, exc,
+                exc_info=True
+            )
+            return default
+
+        if isinstance(value, bool):
+            return default
+
+        if isinstance(value, int):
+            return value if value >= minimum else default
+
+        if isinstance(value, float) and value.is_integer():
+            coerced = int(value)
+            return coerced if coerced >= minimum else default
+
+        logger.debug(
+            "Using default for %s due to invalid value: %r", key, value
+        )
+        return default
     
     def _add_current_time_indicator(self):
         """Add current time indicator line to timeline."""

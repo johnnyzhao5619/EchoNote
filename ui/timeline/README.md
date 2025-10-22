@@ -14,7 +14,8 @@ Main timeline interface with the following features:
 - **Search functionality** to find events by keyword
   - 点击搜索按钮或在搜索框中按下回车都会刷新时间线，即使关键字未变化，可作为手动刷新手段
 - **Filter controls** for event type and source
-- **Lazy loading** with pagination (50 events per page)
+- **Lazy loading** with pagination（默认每页 50 条，可在设置页调整）
+- **Configurable time window**（默认展示当前时间前后各 30 天，可在设置页调整）
 - **Virtual scrolling** for smooth performance with large datasets
 
 **Key Methods:**
@@ -111,6 +112,14 @@ The timeline UI integrates with:
   缺省值），UI 不再直接访问 `_get_auto_task_map()`。
 - 历史事件的返回结构保持不变，不包含 `auto_tasks` 字段。
 
+## Configuration
+
+- `timeline.past_days`：控制向前加载多少天的事件，默认 30。
+- `timeline.future_days`：控制向后加载多少天的事件，默认 30。
+- `timeline.page_size`：分页加载的事件数量，默认 50。
+
+当 `TimelineWidget` 接收到 `SettingsManager` 或底层 `ConfigManager` 时，会在初始化期间读取这些设置，并在调用 `load_timeline_events()` 时应用。若设置不存在或值非法，将回退到默认配置，确保时间线功能稳定。
+
 ## Translation Keys
 
 All UI text is internationalized using the following keys:
@@ -143,13 +152,21 @@ All UI text is internationalized using the following keys:
 from ui.timeline import TimelineWidget
 from core.timeline.manager import TimelineManager
 from utils.i18n import I18nQtManager
+from core.settings.manager import SettingsManager
+from config.app_config import ConfigManager
 
 # Initialize managers
 timeline_manager = TimelineManager(calendar_manager, db_connection)
 i18n = I18nQtManager()
+config_manager = ConfigManager()
+settings_manager = SettingsManager(config_manager)
 
-# Create timeline widget
-timeline_widget = TimelineWidget(timeline_manager, i18n)
+# Create timeline widget（可选传入 settings_manager 或 ConfigManager）
+timeline_widget = TimelineWidget(
+    timeline_manager,
+    i18n,
+    settings_manager=settings_manager,
+)
 
 # Connect signals
 timeline_widget.auto_task_changed.connect(on_auto_task_changed)
