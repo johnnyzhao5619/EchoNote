@@ -4,6 +4,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 import types
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 from typing import Optional
@@ -109,6 +110,18 @@ def outlook_adapter():
     }
     adapter._timezone_map_loaded = True
     return adapter
+
+
+def test_outlook_scopes_include_offline_access():
+    adapter = OutlookCalendarAdapter('id', 'secret')
+
+    assert 'offline_access' in adapter.SCOPES
+
+    auth_payload = adapter.get_authorization_url()
+    query = parse_qs(urlparse(auth_payload['authorization_url']).query)
+    scope_value = query.get('scope', [''])[0].split()
+
+    assert 'offline_access' in scope_value
 
 
 def _normalise_iso_value(value: str) -> str:
