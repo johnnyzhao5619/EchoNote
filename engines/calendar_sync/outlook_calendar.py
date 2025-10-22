@@ -1,15 +1,33 @@
 """Outlook Calendar synchronization adapter."""
 
 import logging
+from typing import Dict, Any, Optional, List
 
 import httpx
-from typing import Dict, Any, Optional, List
 
 from engines.calendar_sync.base import OAuthCalendarAdapter, OAuthEndpoints
 from data.database.models import CalendarEvent
 
 
 logger = logging.getLogger('echonote.calendar_sync.outlook')
+
+
+IANA_TO_WINDOWS_MAP = {
+    'UTC': 'UTC',
+    'Etc/UTC': 'UTC',
+    'Etc/GMT': 'UTC',
+    'GMT': 'UTC',
+    'Asia/Shanghai': 'China Standard Time',
+    'Asia/Tokyo': 'Tokyo Standard Time',
+    'Asia/Kolkata': 'India Standard Time',
+    'America/New_York': 'Eastern Standard Time',
+    'America/Los_Angeles': 'Pacific Standard Time',
+    'America/Chicago': 'Central Standard Time',
+    'America/Denver': 'Mountain Standard Time',
+    'Europe/London': 'GMT Standard Time',
+    'Europe/Berlin': 'W. Europe Standard Time',
+    'Australia/Sydney': 'AUS Eastern Standard Time',
+}
 
 
 class OutlookCalendarAdapter(OAuthCalendarAdapter):
@@ -328,16 +346,33 @@ class OutlookCalendarAdapter(OAuthCalendarAdapter):
         Returns:
             Outlook event format
         """
+        local_tz = self._get_local_timezone()
+        start_dt = self._parse_event_datetime(event.start_time, local_tz)
+        end_dt = self._parse_event_datetime(event.end_time, local_tz)
+
+        def _to_windows_timezone(identifier: str) -> str:
+            if identifier in IANA_TO_WINDOWS_MAP:
+                return IANA_TO_WINDOWS_MAP[identifier]
+            if identifier.startswith('UTC') and identifier not in IANA_TO_WINDOWS_MAP:
+                if identifier.endswith(':00'):
+                    return identifier[:-3]
+                return identifier
+            return 'UTC'
+
+        def _format_outlook_datetime(dt_value):
+            identifier = self._get_timezone_identifier(dt_value) or 'UTC'
+            tzinfo_value = self._timezone_from_identifier(identifier)
+            localized = dt_value.astimezone(tzinfo_value)
+            payload = {
+                'dateTime': localized.replace(tzinfo=None).isoformat(),
+                'timeZone': _to_windows_timezone(identifier)
+            }
+            return payload
+
         outlook_event = {
             'subject': event.title,
-            'start': {
-                'dateTime': event.start_time,
-                'timeZone': 'UTC'
-            },
-            'end': {
-                'dateTime': event.end_time,
-                'timeZone': 'UTC'
-            }
+            'start': _format_outlook_datetime(start_dt),
+            'end': _format_outlook_datetime(end_dt)
         }
 
         if event.location:
