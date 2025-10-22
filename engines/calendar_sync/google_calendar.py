@@ -268,8 +268,12 @@ class GoogleCalendarAdapter(OAuthCalendarAdapter):
             reminder_use_default: Optional[bool] = None
             reminders = google_event.get('reminders', {})
             if isinstance(reminders, dict):
-                if reminders.get('useDefault'):
+                use_default_flag = reminders.get('useDefault')
+                if use_default_flag is True:
                     reminder_use_default = True
+                elif use_default_flag is False:
+                    reminder_use_default = False
+
                 overrides = reminders.get('overrides')
                 if overrides:
                     override = next(
@@ -282,6 +286,8 @@ class GoogleCalendarAdapter(OAuthCalendarAdapter):
                     if override is not None:
                         reminder_minutes = override.get('minutes')
                         reminder_use_default = False
+                elif use_default_flag is False:
+                    reminder_minutes = None
 
             return {
                 'id': google_event['id'],
@@ -382,17 +388,26 @@ class GoogleCalendarAdapter(OAuthCalendarAdapter):
             ]
 
         use_default_reminder = getattr(event, 'reminder_use_default', None)
-        if use_default_reminder:
+        overrides: Optional[List[Dict[str, Any]]] = None
+        if event.reminder_minutes is not None:
+            overrides = [
+                {
+                    'method': 'popup',
+                    'minutes': event.reminder_minutes
+                }
+            ]
+
+        if use_default_reminder is True:
             google_event['reminders'] = {'useDefault': True}
-        elif event.reminder_minutes is not None:
+        elif use_default_reminder is False:
             google_event['reminders'] = {
                 'useDefault': False,
-                'overrides': [
-                    {
-                        'method': 'popup',
-                        'minutes': event.reminder_minutes
-                    }
-                ]
+                'overrides': overrides or []
+            }
+        elif overrides is not None:
+            google_event['reminders'] = {
+                'useDefault': False,
+                'overrides': overrides
             }
 
         if event.recurrence_rule:
