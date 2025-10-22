@@ -52,7 +52,10 @@ class OutlookCalendarAdapter(OAuthCalendarAdapter):
     # OAuth scopes
     SCOPES = [
         "Calendars.Read",
-        "Calendars.ReadWrite"
+        "Calendars.ReadWrite",
+        "offline_access",
+        "openid",
+        "profile",
     ]
 
     def __init__(
