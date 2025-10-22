@@ -50,6 +50,26 @@ class RecordingTimelineManager(DummyTimelineManager):
         return super().get_timeline_events(**kwargs)
 
 
+class RecordingEventTimelineManager(RecordingTimelineManager):
+    """Recording manager that always returns a single past event."""
+
+    def __init__(self, event):
+        super().__init__()
+        self._event = event
+
+    def get_timeline_events(self, **kwargs):
+        self.calls.append(kwargs)
+        current = datetime.now().isoformat()
+        return {
+            "current_time": current,
+            "past_events": [
+                {"event": self._event, "artifacts": {}},
+            ],
+            "future_events": [],
+            "has_more": False,
+        }
+
+
 class _StubSettingsManager:
     """Minimal settings facade exposing timeline preferences."""
 
@@ -267,6 +287,56 @@ def test_date_filters_expand_query_window(monkeypatch, qapp):
 
         assert expanded["past_days"] == max(widget.past_days, required_past)
         assert expanded["future_days"] == max(widget.future_days, required_future)
+    finally:
+        widget.deleteLater()
+
+
+def test_filter_swaps_inverted_dates(monkeypatch, qapp):
+    monkeypatch.setattr(
+        "ui.timeline.widget.QTimer.singleShot",
+        staticmethod(lambda *_: None),
+    )
+
+    now = datetime.now()
+    event = CalendarEvent(
+        id="event-swapped",
+        title="Order corrected",
+        start_time=(now - timedelta(hours=2)).isoformat(),
+        end_time=(now - timedelta(hours=1)).isoformat(),
+    )
+
+    manager = RecordingEventTimelineManager(event)
+    i18n = I18nQtManager(default_language="en_US")
+    widget = TimelineWidget(manager, i18n)
+
+    try:
+        later = QDate.currentDate()
+        earlier = later.addDays(-5)
+
+        prev_start_blocked = widget.start_date_edit.blockSignals(True)
+        prev_end_blocked = widget.end_date_edit.blockSignals(True)
+        try:
+            widget.start_date_edit.setDate(later)
+            widget.end_date_edit.setDate(earlier)
+        finally:
+            widget.start_date_edit.blockSignals(prev_start_blocked)
+            widget.end_date_edit.blockSignals(prev_end_blocked)
+
+        widget._on_filter_changed()
+
+        assert manager.calls, "Expected timeline refresh after swapping dates"
+        filters = manager.calls[-1]["filters"]
+        assert filters is not None
+
+        start_filter = to_local_naive(filters["start_date"])
+        end_filter = to_local_naive(filters["end_date"])
+
+        assert start_filter <= end_filter
+
+        assert any(
+            getattr(card, "event", None) and card.event.id == event.id
+            for card in widget.event_cards
+        )
     finally:
         widget.deleteLater()
 
