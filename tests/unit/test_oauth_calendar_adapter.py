@@ -79,6 +79,34 @@ def test_exchange_code_normalizes_token_type_and_updates_state():
     assert adapter.refresh_token is None
 
 
+def test_exchange_code_normalizes_string_expires_in():
+    token_response = {
+        'access_token': 'access-xyz',
+        'refresh_token': 'refresh-xyz',
+        'token_type': 'Bearer',
+        'expires_in': '3600',
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith('/token'):
+            return httpx.Response(200, json=token_response)
+
+        raise AssertionError(f"Unexpected request: {request.url!r}")
+
+    adapter = _DummyOAuthAdapter(httpx.MockTransport(handler))
+
+    start = datetime.now()
+    payload = adapter.exchange_code_for_token('auth-code')
+
+    assert payload['expires_in'] == 3600
+
+    expires_at = datetime.fromisoformat(payload['expires_at'])
+    delta_seconds = (expires_at - start).total_seconds()
+    assert delta_seconds == pytest.approx(3600, abs=2)
+
+    assert adapter.expires_at == payload['expires_at']
+
+
 def test_retryable_http_client_respects_max_retry_after(monkeypatch):
     def handler(_: httpx.Request) -> httpx.Response:
         return httpx.Response(429, headers={'Retry-After': '5'})
