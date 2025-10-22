@@ -8,11 +8,11 @@ import base64
 import hashlib
 import logging
 import secrets
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
-from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, List
 
 from data.database.models import CalendarEvent
 from utils.http_client import RetryableHttpClient
@@ -210,6 +210,164 @@ class OAuthEndpoints:
     revoke_url: Optional[str] = None
 
 
+@dataclass
+class OAuthTokenState:
+    """In-memory snapshot of the provider OAuth tokens."""
+
+    access_token: Optional[str] = None
+    refresh_token: Optional[str] = None
+    expires_at: Optional[str] = None
+    token_type: Optional[str] = None
+
+
+class OAuthHttpClient:
+    """Encapsulates OAuth token handling and retryable HTTP requests."""
+
+    def __init__(
+        self,
+        *,
+        endpoints: OAuthEndpoints,
+        logger: logging.Logger,
+        http_client: Optional[RetryableHttpClient] = None,
+        http_client_config: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        if http_client and http_client_config:
+            raise ValueError("Provide either http_client or http_client_config, not both")
+
+        self.endpoints = endpoints
+        self.logger = logger
+
+        http_client_config = http_client_config or {}
+        self._owns_http_client = http_client is None
+        self._http_client = http_client or RetryableHttpClient(**http_client_config)
+        self.state = OAuthTokenState()
+
+    @property
+    def http_client(self) -> RetryableHttpClient:
+        return self._http_client
+
+    def close(self) -> None:
+        if self._owns_http_client:
+            self._http_client.close()
+
+    # Token lifecycle -------------------------------------------------
+    def exchange_authorization_code(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            token_data = self._token_request(data)
+            self.logger.info("Successfully exchanged authorization code")
+            return self._apply_token_response(token_data)
+        except Exception as exc:  # pragma: no cover - propagated for callers to inspect
+            self.logger.error("Failed to exchange code for token: %s", exc)
+            raise
+
+    def refresh_access_token(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            token_data = self._token_request(data)
+            self.logger.info("Successfully refreshed access token")
+            return self._apply_token_response(token_data)
+        except Exception as exc:  # pragma: no cover - propagated for callers to inspect
+            self.logger.error("Failed to refresh token: %s", exc)
+            raise
+
+    # HTTP interactions -----------------------------------------------
+    def api_request(
+        self,
+        method: str,
+        url: str,
+        *,
+        headers: Optional[Dict[str, str]] = None,
+        **kwargs: Any,
+    ):
+        if not self.state.access_token:
+            raise ValueError("Not authenticated")
+
+        token_type = self.state.token_type or 'Bearer'
+        auth_headers = {'Authorization': f'{token_type} {self.state.access_token}'}
+        if headers:
+            auth_headers.update(headers)
+
+        return self._http_client.request(method, url, headers=auth_headers, **kwargs)
+
+    def revoke(
+        self,
+        revoke_url: Optional[str],
+        request_kwargs: Optional[Dict[str, Any]],
+    ) -> None:
+        if not self.state.access_token:
+            self.logger.warning("No access token to revoke")
+            return
+
+        if not revoke_url:
+            self.logger.info("No revoke endpoint defined; clearing local tokens only")
+            self.clear_tokens()
+            return
+
+        try:
+            self._http_client.post(revoke_url, **(request_kwargs or {}))
+            self.logger.info("Successfully revoked access")
+        except Exception as exc:  # pragma: no cover - network errors bubbled to caller
+            self.logger.error("Failed to revoke access: %s", exc)
+            raise
+        finally:
+            self.clear_tokens()
+
+    # State helpers ---------------------------------------------------
+    def clear_tokens(self) -> None:
+        self.state = OAuthTokenState()
+
+    def set_access_token(self, access_token: Optional[str]) -> None:
+        self.state.access_token = access_token
+
+    def set_refresh_token(self, refresh_token: Optional[str]) -> None:
+        self.state.refresh_token = refresh_token
+
+    def set_expires_at(self, expires_at: Optional[str]) -> None:
+        self.state.expires_at = expires_at
+
+    def set_token_type(self, token_type: Optional[str]) -> None:
+        if token_type is None:
+            self.state.token_type = None
+        else:
+            self.state.token_type = self._normalize_token_type(token_type)
+
+    # Internal utilities ----------------------------------------------
+    def _token_request(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        response = self._http_client.post(self.endpoints.token_url, data=data)
+        return response.json()
+
+    def _apply_token_response(self, token_data: Dict[str, Any]) -> Dict[str, Any]:
+        access_token = token_data['access_token']
+        self.state.access_token = access_token
+
+        refresh_token = token_data.get('refresh_token')
+        if refresh_token:
+            self.state.refresh_token = refresh_token
+
+        self.state.token_type = self._normalize_token_type(token_data.get('token_type'))
+
+        raw_expires_in = token_data.get('expires_in')
+        expires_in = raw_expires_in if raw_expires_in is not None else 3600
+        expires_at_ts = datetime.now().timestamp() + expires_in
+        expires_at = datetime.fromtimestamp(expires_at_ts).isoformat()
+        self.state.expires_at = expires_at
+
+        return {
+            'access_token': access_token,
+            'refresh_token': self.state.refresh_token,
+            'expires_in': raw_expires_in if raw_expires_in is not None else expires_in,
+            'expires_at': expires_at,
+            'token_type': self.state.token_type,
+        }
+
+    def _normalize_token_type(self, token_type: Optional[str]) -> str:
+        if not token_type:
+            return 'Bearer'
+        normalized = token_type.strip()
+        if normalized.lower() == 'bearer':
+            return 'Bearer'
+        return normalized
+
+
 class OAuthCalendarAdapter(CalendarSyncAdapter):
     """Calendar adapter base that provides OAuth + HTTP helpers."""
 
@@ -224,37 +382,37 @@ class OAuthCalendarAdapter(CalendarSyncAdapter):
         http_client: Optional[RetryableHttpClient] = None,
         http_client_config: Optional[Dict[str, Any]] = None,
     ):
-        if http_client and http_client_config:
-            raise ValueError("Provide either http_client or http_client_config, not both")
-
         self.client_id = client_id
         self.client_secret = client_secret
         self.redirect_uri = redirect_uri
         self.scopes = scopes
         self.endpoints = endpoints
 
-        self.access_token: Optional[str] = None
-        self.refresh_token: Optional[str] = None
-        self.expires_at: Optional[str] = None
-        self.token_type: Optional[str] = None
-
         self.logger = logger or logging.getLogger(
             f"echonote.calendar_sync.{self.get_name()}"
         )
 
-        http_client_config = http_client_config or {}
-        self._owns_http_client = http_client is None
-        self.http_client = http_client or RetryableHttpClient(**http_client_config)
+        self._oauth_client = OAuthHttpClient(
+            endpoints=endpoints,
+            logger=self.logger,
+            http_client=http_client,
+            http_client_config=http_client_config,
+        )
 
     @property
     def api_base_url(self) -> str:
         return self.endpoints.api_base_url
 
+    @property
+    def http_client(self) -> RetryableHttpClient:
+        """Expose the underlying HTTP client for advanced scenarios/tests."""
+
+        return self._oauth_client.http_client
+
     def close(self) -> None:
         """Close the underlying HTTP client if this instance owns it."""
 
-        if self._owns_http_client and self.http_client:
-            self.http_client.close()
+        self._oauth_client.close()
 
     def build_authorization_params(
         self, state: str, code_challenge: str
@@ -313,13 +471,7 @@ class OAuthCalendarAdapter(CalendarSyncAdapter):
         if code_verifier:
             data['code_verifier'] = code_verifier
 
-        try:
-            token_data = self._token_request(data)
-            self.logger.info("Successfully exchanged authorization code")
-            return self._apply_token_response(token_data)
-        except Exception as exc:
-            self.logger.error("Failed to exchange code for token: %s", exc)
-            raise
+        return self._oauth_client.exchange_authorization_code(data)
 
     def refresh_access_token(self, code_verifier: Optional[str] = None) -> dict:
         if not self.refresh_token:
@@ -334,87 +486,59 @@ class OAuthCalendarAdapter(CalendarSyncAdapter):
         if code_verifier:
             data['code_verifier'] = code_verifier
 
-        try:
-            token_data = self._token_request(data)
-            self.logger.info("Successfully refreshed access token")
-            return self._apply_token_response(token_data)
-        except Exception as exc:
-            self.logger.error("Failed to refresh token: %s", exc)
-            raise
+        return self._oauth_client.refresh_access_token(data)
 
     def api_request(
         self, method: str, url: str, *, headers: Optional[Dict[str, str]] = None, **kwargs
     ):
-        if not self.access_token:
-            raise ValueError("Not authenticated")
-
-        token_type = self.token_type or 'Bearer'
-        auth_headers = {'Authorization': f'{token_type} {self.access_token}'}
-        if headers:
-            auth_headers.update(headers)
-
-        return self.http_client.request(method, url, headers=auth_headers, **kwargs)
+        return self._oauth_client.api_request(
+            method,
+            url,
+            headers=headers,
+            **kwargs,
+        )
 
     def revoke_access(self):
-        if not self.access_token:
-            self.logger.warning("No access token to revoke")
-            return
-
-        if not self.endpoints.revoke_url:
-            self.logger.info("No revoke endpoint defined; clearing local tokens only")
-            self._clear_tokens()
-            return
-
-        try:
-            request_kwargs = self.build_revoke_request()
-            self.http_client.post(self.endpoints.revoke_url, **request_kwargs)
-            self.logger.info("Successfully revoked access")
-        except Exception as exc:
-            self.logger.error("Failed to revoke access: %s", exc)
-            raise
-        finally:
-            self._clear_tokens()
+        request_kwargs = self.build_revoke_request()
+        self._oauth_client.revoke(self.endpoints.revoke_url, request_kwargs)
 
     def build_revoke_request(self) -> Dict[str, Any]:
         return {'params': {'token': self.access_token}}
 
-    def _token_request(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        response = self.http_client.post(self.endpoints.token_url, data=data)
-        return response.json()
+    # Token state passthroughs ---------------------------------------
+    @property
+    def access_token(self) -> Optional[str]:
+        return self._oauth_client.state.access_token
 
-    def _apply_token_response(self, token_data: Dict[str, Any]) -> Dict[str, Any]:
-        self.access_token = token_data['access_token']
+    @access_token.setter
+    def access_token(self, value: Optional[str]) -> None:
+        self._oauth_client.set_access_token(value)
 
-        refresh_token = token_data.get('refresh_token')
-        if refresh_token:
-            self.refresh_token = refresh_token
+    @property
+    def refresh_token(self) -> Optional[str]:
+        return self._oauth_client.state.refresh_token
 
-        raw_token_type = token_data.get('token_type')
-        self.token_type = self._normalize_token_type(raw_token_type)
+    @refresh_token.setter
+    def refresh_token(self, value: Optional[str]) -> None:
+        self._oauth_client.set_refresh_token(value)
 
-        raw_expires_in = token_data.get('expires_in')
-        expires_in = raw_expires_in if raw_expires_in is not None else 3600
-        expires_at_ts = datetime.now().timestamp() + expires_in
-        self.expires_at = datetime.fromtimestamp(expires_at_ts).isoformat()
+    @property
+    def expires_at(self) -> Optional[str]:
+        return self._oauth_client.state.expires_at
 
-        return {
-            'access_token': self.access_token,
-            'refresh_token': self.refresh_token,
-            'expires_in': raw_expires_in if raw_expires_in is not None else expires_in,
-            'expires_at': self.expires_at,
-            'token_type': self.token_type,
-        }
+    @expires_at.setter
+    def expires_at(self, value: Optional[str]) -> None:
+        self._oauth_client.set_expires_at(value)
 
-    def _normalize_token_type(self, token_type: Optional[str]) -> str:
-        if not token_type:
-            return 'Bearer'
-        normalized = token_type.strip()
-        if normalized.lower() == 'bearer':
-            return 'Bearer'
-        return normalized
+    @property
+    def token_type(self) -> Optional[str]:
+        return self._oauth_client.state.token_type
 
-    def _clear_tokens(self) -> None:
-        self.access_token = None
-        self.refresh_token = None
-        self.expires_at = None
-        self.token_type = None
+    @token_type.setter
+    def token_type(self, value: Optional[str]) -> None:
+        self._oauth_client.set_token_type(value)
+
+    def clear_tokens(self) -> None:
+        """Reset any cached OAuth tokens (used when revoking externally)."""
+
+        self._oauth_client.clear_tokens()

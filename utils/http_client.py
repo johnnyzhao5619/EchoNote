@@ -6,7 +6,7 @@
 
 import logging
 import time
-from typing import Optional
+from typing import Iterable, Optional, Set
 import httpx
 
 
@@ -33,13 +33,14 @@ class RetryableHttpClient:
         503,  # Service Unavailable
         504,  # Gateway Timeout
     }
-    
+
     def __init__(
         self,
         max_retries: int = 3,
         timeout: float = 30.0,
         base_delay: float = 1.0,
         max_retry_after: Optional[float] = 60.0,
+        retryable_status_codes: Optional[Iterable[int]] = None,
         **client_kwargs
     ):
         """
@@ -50,12 +51,18 @@ class RetryableHttpClient:
             timeout: 请求超时时间（秒，默认 30）
             base_delay: 基础延迟时间（秒，默认 1）
             max_retry_after: 429 响应允许的最大 Retry-After 秒数，None 表示不限制
+            retryable_status_codes: 自定义可重试的 HTTP 状态码集合，默认为类属性
             **client_kwargs: 传递给 httpx.Client 的其他参数
         """
         self.max_retries = max_retries
         self.timeout = timeout
         self.base_delay = base_delay
         self.max_retry_after = max_retry_after
+        self.retryable_status_codes: Set[int] = (
+            set(retryable_status_codes)
+            if retryable_status_codes is not None
+            else set(self.RETRYABLE_STATUS_CODES)
+        )
         
         # 设置默认超时
         if 'timeout' not in client_kwargs:
@@ -113,7 +120,7 @@ class RetryableHttpClient:
         
         # HTTP 状态错误
         if isinstance(error, httpx.HTTPStatusError):
-            if response and response.status_code in self.RETRYABLE_STATUS_CODES:
+            if response and response.status_code in self.retryable_status_codes:
                 return True
         
         return False
@@ -310,6 +317,7 @@ class AsyncRetryableHttpClient:
         timeout: float = 30.0,
         base_delay: float = 1.0,
         max_retry_after: Optional[float] = 60.0,
+        retryable_status_codes: Optional[Iterable[int]] = None,
         **client_kwargs
     ):
         """
@@ -320,12 +328,18 @@ class AsyncRetryableHttpClient:
             timeout: 请求超时时间（秒，默认 30）
             base_delay: 基础延迟时间（秒，默认 1）
             max_retry_after: 429 响应允许的最大 Retry-After 秒数，None 表示不限制
+            retryable_status_codes: 自定义可重试的 HTTP 状态码集合，默认为类属性
             **client_kwargs: 传递给 httpx.AsyncClient 的其他参数
         """
         self.max_retries = max_retries
         self.timeout = timeout
         self.base_delay = base_delay
         self.max_retry_after = max_retry_after
+        self.retryable_status_codes: Set[int] = (
+            set(retryable_status_codes)
+            if retryable_status_codes is not None
+            else set(self.RETRYABLE_STATUS_CODES)
+        )
         
         # 设置默认超时
         if 'timeout' not in client_kwargs:
@@ -363,7 +377,7 @@ class AsyncRetryableHttpClient:
             return True
         
         if isinstance(error, httpx.HTTPStatusError):
-            if response and response.status_code in self.RETRYABLE_STATUS_CODES:
+            if response and response.status_code in self.retryable_status_codes:
                 return True
         
         return False

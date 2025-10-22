@@ -102,12 +102,12 @@ class GoogleCalendarAdapter(OAuthCalendarAdapter):
                 if page_token:
                     params['pageToken'] = page_token
 
-            response = self.api_request(
-                'GET',
-                f"{self.api_base_url}/calendars/primary/events",
-                params=params,
-                timeout=30.0,
-            )
+                response = self.api_request(
+                    'GET',
+                    f"{self.api_base_url}/calendars/primary/events",
+                    params=params,
+                    timeout=30.0,
+                )
                 data = response.json()
 
                 # Convert Google events to internal format

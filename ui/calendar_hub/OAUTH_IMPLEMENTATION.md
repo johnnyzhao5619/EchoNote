@@ -84,7 +84,7 @@ Manages secure storage and retrieval of OAuth tokens:
 
 ### 4. Calendar Sync Adapters
 
-Both adapters inherit from the shared `OAuthCalendarAdapter` in `engines/calendar_sync/base.py`. The base class centralizes the PKCE flow, token exchange/refresh, and wraps a `RetryableHttpClient` so adapters only specify provider-specific scopes and event mappings.
+Both adapters inherit from the shared `OAuthCalendarAdapter` in `engines/calendar_sync/base.py`. The base class centralizes the PKCE flow, token exchange/refresh, and composes an internal `OAuthHttpClient` wrapper around `RetryableHttpClient` so adapters only specify provider-specific scopes and event mappings. Pass `http_client_config` when instantiating an adapter to tweak `timeout`, `max_retry_after`, or `retryable_status_codes` for long-poll calendar endpoints without re-implementing OAuth plumbing.
 
 #### GoogleCalendarAdapter (`engines/calendar_sync/google_calendar.py`)
 
