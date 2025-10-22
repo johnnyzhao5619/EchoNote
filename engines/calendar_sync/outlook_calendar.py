@@ -3,7 +3,7 @@
 import logging
 import re
 from html import unescape
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta, tzinfo
 from typing import Dict, Any, Optional, List
 
 import httpx
@@ -44,6 +44,18 @@ WINDOWS_TO_IANA_MAP = {
 
 class OutlookCalendarAdapter(OAuthCalendarAdapter):
     """Outlook Calendar synchronization adapter."""
+
+    _RRULE_WEEKDAY_MAP = {
+        'MO': 'monday',
+        'TU': 'tuesday',
+        'WE': 'wednesday',
+        'TH': 'thursday',
+        'FR': 'friday',
+        'SA': 'saturday',
+        'SU': 'sunday',
+    }
+
+    _RRULE_DAY_PATTERN = re.compile(r'^[+-]?\d*(?P<day>MO|TU|WE|TH|FR|SA|SU)$')
 
     # Microsoft OAuth endpoints
     AUTH_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize"  # noqa: E501
@@ -639,6 +651,35 @@ class OutlookCalendarAdapter(OAuthCalendarAdapter):
         start_dt = self._parse_event_datetime(event.start_time, local_tz)
         end_dt = self._parse_event_datetime(event.end_time, local_tz)
 
+        is_all_day = False
+        if hasattr(event, 'is_all_day_event'):
+            try:
+                is_all_day = bool(event.is_all_day_event())
+            except Exception:  # pragma: no cover - defensive guard
+                is_all_day = False
+
+        if is_all_day:
+            start_local = start_dt
+
+            if local_tz and start_dt.tzinfo:
+                start_local = start_dt.astimezone(local_tz)
+            elif local_tz and start_dt.tzinfo is None:
+                start_local = start_dt.replace(tzinfo=local_tz)
+
+            duration_seconds = max((end_dt - start_dt).total_seconds(), 0)
+            duration_days = max(1, int(round(duration_seconds / 86400)))
+
+            normalized_start = start_local.replace(
+                hour=0,
+                minute=0,
+                second=0,
+                microsecond=0,
+            )
+            normalized_end = normalized_start + timedelta(days=duration_days)
+
+            start_dt = normalized_start
+            end_dt = normalized_end
+
         def _format_outlook_datetime(dt_value):
             identifier = self._get_timezone_identifier(dt_value) or 'UTC'
             tzinfo_value = self._timezone_from_identifier(identifier)
@@ -654,6 +695,9 @@ class OutlookCalendarAdapter(OAuthCalendarAdapter):
             'start': _format_outlook_datetime(start_dt),
             'end': _format_outlook_datetime(end_dt)
         }
+
+        if is_all_day:
+            outlook_event['isAllDay'] = True
 
         if event.location:
             outlook_event['location'] = {
@@ -681,30 +725,81 @@ class OutlookCalendarAdapter(OAuthCalendarAdapter):
                 event.reminder_minutes
             )
 
-        # Note: Recurrence conversion from iCalendar to Outlook format
-        # would require more complex parsing - simplified here
         if event.recurrence_rule:
-            if 'DAILY' in event.recurrence_rule:
-                outlook_event['recurrence'] = {
-                    'pattern': {
-                        'type': 'daily',
-                        'interval': 1
-                    },
-                    'range': {
-                        'type': 'noEnd',
-                        'startDate': event.start_time.split('T')[0]
-                    }
-                }
-            elif 'WEEKLY' in event.recurrence_rule:
-                outlook_event['recurrence'] = {
-                    'pattern': {
-                        'type': 'weekly',
-                        'interval': 1
-                    },
-                    'range': {
-                        'type': 'noEnd',
-                        'startDate': event.start_time.split('T')[0]
-                    }
-                }
+            recurrence_payload = self._build_recurrence_payload(
+                event.recurrence_rule,
+                start_dt,
+                local_tz,
+            )
+            if recurrence_payload:
+                outlook_event['recurrence'] = recurrence_payload
 
         return outlook_event
+
+    def _build_recurrence_payload(
+        self,
+        rule: str,
+        start_dt: datetime,
+        local_tz: Optional[tzinfo]
+    ) -> Optional[Dict[str, Any]]:
+        if not rule:
+            return None
+
+        components: Dict[str, str] = {}
+        for segment in rule.split(';'):
+            if not segment or '=' not in segment:
+                continue
+            key, value = segment.split('=', 1)
+            components[key.upper()] = value
+
+        freq = components.get('FREQ', '').upper()
+        if not freq:
+            return None
+
+        pattern: Dict[str, Any] = {}
+        if freq == 'DAILY':
+            pattern['type'] = 'daily'
+        elif freq == 'WEEKLY':
+            pattern['type'] = 'weekly'
+        else:
+            return None
+
+        try:
+            interval_value = int(components.get('INTERVAL', '1'))
+        except ValueError:
+            interval_value = 1
+        if interval_value < 1:
+            interval_value = 1
+        pattern['interval'] = interval_value
+
+        if freq == 'WEEKLY':
+            byday_value = components.get('BYDAY')
+            if byday_value:
+                days_of_week: List[str] = []
+                for token in byday_value.split(','):
+                    cleaned = token.strip().upper()
+                    if not cleaned:
+                        continue
+                    match = self._RRULE_DAY_PATTERN.match(cleaned)
+                    if match:
+                        day_code = match.group('day')
+                    else:
+                        day_code = cleaned[-2:]
+                    day_name = self._RRULE_WEEKDAY_MAP.get(day_code)
+                    if day_name and day_name not in days_of_week:
+                        days_of_week.append(day_name)
+                if days_of_week:
+                    pattern['daysOfWeek'] = days_of_week
+
+        start_local = start_dt
+        if local_tz and start_dt.tzinfo:
+            start_local = start_dt.astimezone(local_tz)
+        elif local_tz and start_dt.tzinfo is None:
+            start_local = start_dt.replace(tzinfo=local_tz)
+
+        recurrence_range: Dict[str, Any] = {
+            'type': 'noEnd',
+            'startDate': start_local.date().isoformat(),
+        }
+
+        return {'pattern': pattern, 'range': recurrence_range}
