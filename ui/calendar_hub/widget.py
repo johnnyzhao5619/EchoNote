@@ -529,12 +529,25 @@ class CalendarHubWidget(QWidget):
             
             adapter = self.calendar_manager.sync_adapters[provider]
             
-            # Get authorization URL
-            auth_url = adapter.get_authorization_url()
-            
+            # Get authorization request parameters
+            auth_request = adapter.get_authorization_url()
+            if not isinstance(auth_request, dict):
+                raise TypeError(
+                    "Expected authorization request payload with state and code verifier."
+                )
+
+            authorization_url = auth_request.get('authorization_url')
+            state = auth_request.get('state')
+            code_verifier = auth_request.get('code_verifier')
+
+            if not authorization_url or not state or not code_verifier:
+                raise ValueError(
+                    "Authorization request is missing required PKCE parameters."
+                )
+
             # Close parent dialog
             parent_dialog.accept()
-            
+
             # Show OAuth dialog
             from ui.calendar_hub.oauth_dialog import OAuthDialog
 
@@ -542,21 +555,23 @@ class CalendarHubWidget(QWidget):
 
             oauth_dialog = OAuthDialog(
                 provider,
-                auth_url,
+                authorization_url,
                 self.i18n,
                 self,
                 callback_host=callback_host,
-                callback_port=callback_port
+                callback_port=callback_port,
+                state=state,
+                code_verifier=code_verifier
             )
-            
+
             # Connect signals
             oauth_dialog.authorization_complete.connect(
-                lambda code: self._complete_oauth_flow(provider, code)
+                lambda code, verifier: self._complete_oauth_flow(provider, code, verifier)
             )
             oauth_dialog.authorization_failed.connect(
                 lambda error: self._handle_oauth_error(provider, error)
             )
-            
+
             oauth_dialog.exec()
             
         except Exception as e:
@@ -609,20 +624,21 @@ class CalendarHubWidget(QWidget):
 
         return host, port
     
-    def _complete_oauth_flow(self, provider: str, code: str):
+    def _complete_oauth_flow(self, provider: str, code: str, code_verifier: str):
         """
         Complete OAuth authorization flow.
-        
+
         Args:
             provider: Provider name
             code: Authorization code
+            code_verifier: PKCE code verifier tied to the authorization request
         """
         try:
             # Get sync adapter
             adapter = self.calendar_manager.sync_adapters[provider]
-            
+
             # Exchange code for token
-            token_data = adapter.exchange_code_for_token(code)
+            token_data = adapter.exchange_code_for_token(code, code_verifier=code_verifier)
             
             expires_in = token_data.get('expires_in')
             if expires_in is None and token_data.get('expires_at'):

@@ -252,19 +252,29 @@ calendar_hub._refresh_current_view()
 # 1. 获取同步适配器 / Get sync adapter
 adapter = calendar_manager.sync_adapters['google']
 
-# 2. 获取授权 URL / Get authorization URL
-auth_url = adapter.get_authorization_url()
+# 2. 获取授权请求 / Get authorization request
+auth_request = adapter.get_authorization_url()
 
 # 3. 显示 OAuth 对话框 / Show OAuth dialog
-oauth_dialog = OAuthDialog('google', auth_url, i18n, parent)
+oauth_dialog = OAuthDialog(
+    'google',
+    auth_request['authorization_url'],
+    i18n,
+    parent,
+    state=auth_request['state'],
+    code_verifier=auth_request['code_verifier'],
+)
 oauth_dialog.authorization_complete.connect(
-    lambda code: complete_oauth(code)
+    lambda code, verifier: complete_oauth(code, verifier)
 )
 oauth_dialog.exec()
 
 # 4. 完成授权 / Complete authorization
-def complete_oauth(code):
-    token_data = adapter.exchange_code_for_token(code)
+def complete_oauth(code, code_verifier):
+    token_data = adapter.exchange_code_for_token(
+        code,
+        code_verifier=code_verifier,
+    )
     email = token_data.get('email', 'user@example.com')
     calendar_hub.add_connected_account('google', email)
     calendar_manager.sync_external_calendar('google')
@@ -361,10 +371,11 @@ print(f"Source: {event.source}")
 # 检查同步适配器 / Check sync adapters
 print(f"Available adapters: {calendar_manager.sync_adapters.keys()}")
 
-# 检查授权 URL / Check authorization URL
+# 检查授权请求 / Check authorization request
 adapter = calendar_manager.sync_adapters['google']
-auth_url = adapter.get_authorization_url()
-print(f"Auth URL: {auth_url}")
+auth_request = adapter.get_authorization_url()
+print(f"Auth URL: {auth_request['authorization_url']}")
+print(f"State: {auth_request['state']}")
 ```
 
 ---

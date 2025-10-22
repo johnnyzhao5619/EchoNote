@@ -145,11 +145,23 @@ calendar_manager.sync_external_calendar('google')
 OAuth flow integration with calendar sync adapters:
 
 ```python
-# Get authorization URL
-auth_url = adapter.get_authorization_url()
+# Get authorization request payload
+auth_request = adapter.get_authorization_url()
+
+# Launch dialog with state & PKCE verifier
+dialog = OAuthDialog(
+    provider='google',
+    authorization_url=auth_request['authorization_url'],
+    i18n=i18n_manager,
+    state=auth_request['state'],
+    code_verifier=auth_request['code_verifier'],
+)
 
 # Exchange code for token
-token_data = adapter.exchange_code_for_token(code)
+token_data = adapter.exchange_code_for_token(
+    code,
+    code_verifier=auth_request['code_verifier'],
+)
 ```
 
 ## Color Scheme
