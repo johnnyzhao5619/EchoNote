@@ -4,8 +4,12 @@ Base class for external calendar synchronization adapters.
 Defines the interface that all calendar sync adapters must implement.
 """
 
+import base64
+import hashlib
+import secrets
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
+
 from data.database.models import CalendarEvent
 
 
@@ -167,4 +171,25 @@ class CalendarSyncAdapter(ABC):
             'push_events': True,
             'recurrence': True,
             'reminders': True
+        }
+
+    @staticmethod
+    def _generate_state_and_pkce() -> Dict[str, str]:
+        """Generate OAuth state and PKCE parameters."""
+
+        state = secrets.token_urlsafe(16)
+        code_verifier = secrets.token_urlsafe(64)
+
+        while len(code_verifier) < 43:
+            code_verifier += secrets.token_urlsafe(32)
+
+        code_verifier = code_verifier[:128]
+
+        code_challenge_bytes = hashlib.sha256(code_verifier.encode('ascii')).digest()
+        code_challenge = base64.urlsafe_b64encode(code_challenge_bytes).decode('ascii').rstrip('=')
+
+        return {
+            'state': state,
+            'code_verifier': code_verifier,
+            'code_challenge': code_challenge,
         }

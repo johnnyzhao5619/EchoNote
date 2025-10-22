@@ -61,48 +61,63 @@ class OutlookCalendarAdapter(CalendarSyncAdapter):
         self.token_type: Optional[str] = None
         logger.info("OutlookCalendarAdapter initialized")
 
-    def get_authorization_url(self) -> str:
+    def get_authorization_url(self) -> Dict[str, str]:
         """
         Generate OAuth authorization URL.
 
         Returns:
-            Authorization URL for user to visit
+            Dictionary containing authorization URL, state, and PKCE verifier
         """
+        oauth_params = self._generate_state_and_pkce()
+
         params = {
             'client_id': self.client_id,
             'redirect_uri': self.redirect_uri,
             'response_type': 'code',
             'scope': ' '.join(self.SCOPES),
-            'response_mode': 'query'
+            'response_mode': 'query',
+            'state': oauth_params['state'],
+            'code_challenge': oauth_params['code_challenge'],
+            'code_challenge_method': 'S256'
         }
 
         query_string = urlencode(params, doseq=True)
         auth_url = f"{self.AUTH_URL}?{query_string}"
 
         logger.info("Generated Outlook authorization URL: %s", auth_url)
-        return auth_url
+        return {
+            'authorization_url': auth_url,
+            'state': oauth_params['state'],
+            'code_verifier': oauth_params['code_verifier'],
+        }
 
-    def exchange_code_for_token(self, code: str) -> dict:
+    def exchange_code_for_token(self, code: str, code_verifier: Optional[str] = None) -> dict:
         """
         Exchange authorization code for access token.
 
         Args:
             code: Authorization code from OAuth callback
+            code_verifier: PKCE code verifier associated with the authorization request
 
         Returns:
             Token data dictionary
         """
         try:
             with httpx.Client() as client:
+                data = {
+                    'code': code,
+                    'client_id': self.client_id,
+                    'client_secret': self.client_secret,
+                    'redirect_uri': self.redirect_uri,
+                    'grant_type': 'authorization_code'
+                }
+
+                if code_verifier:
+                    data['code_verifier'] = code_verifier
+
                 response = client.post(
                     self.TOKEN_URL,
-                    data={
-                        'code': code,
-                        'client_id': self.client_id,
-                        'client_secret': self.client_secret,
-                        'redirect_uri': self.redirect_uri,
-                        'grant_type': 'authorization_code'
-                    }
+                    data=data
                 )
                 response.raise_for_status()
 
@@ -146,19 +161,18 @@ class OutlookCalendarAdapter(CalendarSyncAdapter):
         try:
             if 'authorization_code' in credentials:
                 return self.exchange_code_for_token(
-                    credentials['authorization_code']
+                    credentials['authorization_code'],
+                    code_verifier=credentials.get('code_verifier')
                 )
             else:
                 # Return authorization URL for user to visit
-                return {
-                    'authorization_url': self.get_authorization_url()
-                }
+                return self.get_authorization_url()
 
         except Exception as e:
             logger.error(f"Authentication failed: {e}")
             raise
 
-    def refresh_access_token(self) -> dict:
+    def refresh_access_token(self, code_verifier: Optional[str] = None) -> dict:
         """
         Refresh the access token using refresh token.
 
@@ -170,14 +184,19 @@ class OutlookCalendarAdapter(CalendarSyncAdapter):
 
         try:
             with httpx.Client() as client:
+                data = {
+                    'refresh_token': self.refresh_token,
+                    'client_id': self.client_id,
+                    'client_secret': self.client_secret,
+                    'grant_type': 'refresh_token'
+                }
+
+                if code_verifier:
+                    data['code_verifier'] = code_verifier
+
                 response = client.post(
                     self.TOKEN_URL,
-                    data={
-                        'refresh_token': self.refresh_token,
-                        'client_id': self.client_id,
-                        'client_secret': self.client_secret,
-                        'grant_type': 'refresh_token'
-                    }
+                    data=data
                 )
                 response.raise_for_status()
 

@@ -20,19 +20,23 @@ A PyQt6 dialog that handles the OAuth 2.0 authorization flow:
 
 - **Signals**:
 
-  - `authorization_complete(str)`: Emitted with authorization code on success
-  - `authorization_failed(str)`: Emitted with error message on failure
+  - `authorization_complete(str, str)`: Emitted with authorization code and PKCE `code_verifier` on success
+  - `authorization_failed(str)`: Emitted with error message on failure (including state validation errors)
 
 - **Usage**:
 
   ```python
+  request = adapter.get_authorization_url()
+
   dialog = OAuthDialog(
       provider='google',
-      authorization_url=auth_url,
+      authorization_url=request['authorization_url'],
       i18n=i18n_manager,
       parent=parent_widget,
       callback_host='localhost',  # optional; inferred from configuration if omitted
-      callback_port=8080          # optional; inferred from configuration if omitted
+      callback_port=8080,         # optional; inferred from configuration if omitted
+      state=request['state'],
+      code_verifier=request['code_verifier'],
   )
 
   dialog.authorization_complete.connect(handle_success)
@@ -49,14 +53,16 @@ The Calendar Hub widget integrates OAuth functionality:
 
   1. User clicks "Add Account" button
   2. Selects provider (Google/Outlook)
-  3. OAuthDialog opens with authorization URL
-  4. User authorizes in browser
-  5. Callback received with authorization code
-  6. Code exchanged for access/refresh tokens
-  7. Tokens stored securely using OAuthManager
-  8. CalendarSyncStatus record created
-  9. Initial calendar sync triggered
-  10. Account badge displayed
+  3. Adapter generates authorization request with PKCE challenge and state token
+  4. OAuthDialog opens with authorization URL and securely caches state/code verifier
+  5. User authorizes in browser
+  6. Callback received with authorization code and state
+  7. OAuthDialog validates state before proceeding
+  8. Code exchanged for access/refresh tokens (PKCE code verifier included)
+  9. Tokens stored securely using OAuthManager
+  10. CalendarSyncStatus record created
+  11. Initial calendar sync triggered
+  12. Account badge displayed
 
 - **Account Management**:
   - Display connected accounts with provider badges
@@ -150,10 +156,11 @@ If you change `callback_port`, update the `redirect_uri` to use the same port an
 
 1. **Token Storage**: All OAuth tokens are encrypted using AES-256 before storage
 2. **File Permissions**: Token file has 0600 permissions (owner read/write only)
-3. **No Password Storage**: Only OAuth tokens are stored, never user passwords
-4. **HTTPS Only**: All API communication uses HTTPS
-5. **Token Expiration**: Tokens are checked for expiration before use
-6. **Revocation**: Tokens can be revoked when disconnecting accounts
+3. **PKCE + State Validation**: Every authorization request includes random `state` and PKCE verifier/challenge values. These are cached in-memory by the dialog and must match the callback before any token exchange occurs.
+4. **No Password Storage**: Only OAuth tokens are stored, never user passwords
+5. **HTTPS Only**: All API communication uses HTTPS
+6. **Token Expiration**: Tokens are checked for expiration before use
+7. **Revocation**: Tokens can be revoked when disconnecting accounts
 
 ## Database Schema
 

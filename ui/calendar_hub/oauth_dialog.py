@@ -7,7 +7,7 @@ calendar services.
 
 import logging
 import webbrowser
-from typing import Optional, Tuple
+from typing import Dict, Optional, Tuple
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 import errno
@@ -40,6 +40,7 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
         # Get authorization code
         code = query_params.get('code', [None])[0]
         error = query_params.get('error', [None])[0]
+        state = query_params.get('state', [None])[0]
         
         # Send response to browser
         html_template = (
@@ -77,7 +78,7 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
         
         # Call callback function
         if self.callback_received:
-            self.callback_received(code, error)
+            self.callback_received(code, error, state)
     
     def log_message(self, format, *args):
         """Suppress default logging."""
@@ -92,9 +93,9 @@ class OAuthDialog(QDialog):
     """
     
     # Signals
-    authorization_complete = pyqtSignal(str)  # authorization_code
+    authorization_complete = pyqtSignal(str, str)  # authorization_code, code_verifier
     authorization_failed = pyqtSignal(str)    # error_message
-    
+
     def __init__(
         self,
         provider: str,
@@ -102,11 +103,14 @@ class OAuthDialog(QDialog):
         i18n: I18nQtManager,
         parent: Optional[QDialog] = None,
         callback_host: Optional[str] = None,
-        callback_port: Optional[int] = None
+        callback_port: Optional[int] = None,
+        *,
+        state: str,
+        code_verifier: str
     ):
         """
         Initialize OAuth dialog.
-        
+
         Args:
             provider: Provider name (google/outlook)
             authorization_url: OAuth authorization URL
@@ -114,9 +118,11 @@ class OAuthDialog(QDialog):
             parent: Parent widget
             callback_host: Hostname for local callback server (optional)
             callback_port: Port for local callback server (optional)
+            state: OAuth state parameter tied to the authorization request
+            code_verifier: PKCE code verifier tied to the authorization request
         """
         super().__init__(parent)
-        
+
         self.provider = provider
         self.authorization_url = authorization_url
         self.i18n = i18n
@@ -125,16 +131,28 @@ class OAuthDialog(QDialog):
             callback_port
         )
 
+        if not state or not code_verifier:
+            raise ValueError("State and code_verifier must be provided for OAuth dialog")
+
+        self.expected_state = state
+        self.code_verifier = code_verifier
+        self._authorization_context: Dict[str, str] = {
+            'provider': provider,
+            'state': state,
+            'code_verifier': code_verifier,
+        }
+
         # OAuth callback server
         self.callback_server: Optional[HTTPServer] = None
         self.callback_thread: Optional[threading.Thread] = None
-        
+
         # Authorization result
         self.auth_code: Optional[str] = None
         self.auth_error: Optional[str] = None
-        
+        self.callback_state: Optional[str] = None
+
         self.setup_ui()
-        
+
         logger.debug(f"OAuthDialog initialized for provider: {provider}")
     
     def setup_ui(self):
@@ -239,7 +257,7 @@ class OAuthDialog(QDialog):
             
             # Open browser
             webbrowser.open(self.authorization_url)
-            
+
             logger.info(f"Opened authorization URL for {self.provider}")
             
         except Exception as e:
@@ -429,18 +447,20 @@ class OAuthDialog(QDialog):
         except Exception as e:
             logger.error(f"Error in callback server: {e}")
     
-    def _on_callback_received(self, code: Optional[str], error: Optional[str]):
+    def _on_callback_received(self, code: Optional[str], error: Optional[str], state: Optional[str]):
         """
         Handle OAuth callback.
-        
+
         Args:
             code: Authorization code (if successful)
             error: Error message (if failed)
+            state: State value returned by the provider
         """
         # Store result
         self.auth_code = code
         self.auth_error = error
-        
+        self.callback_state = state
+
         # Update UI in main thread
         QTimer.singleShot(0, self._process_callback)
     
@@ -448,12 +468,29 @@ class OAuthDialog(QDialog):
         """Process OAuth callback in main thread."""
         try:
             if self.auth_code:
+                if self.callback_state != self.expected_state:
+                    mismatch_message = (
+                        "Authorization state mismatch detected. The flow was cancelled for your safety."
+                    )
+                    self.status_label.setText("Authorization failed: state mismatch")
+                    self.status_label.setStyleSheet("color: red; font-weight: bold;")
+                    self._show_error(mismatch_message)
+                    self.authorization_failed.emit(mismatch_message)
+                    QTimer.singleShot(2000, self._reset_ui)
+                    logger.warning(
+                        "State mismatch for provider %s (expected=%s, received=%s)",
+                        self.provider,
+                        self.expected_state,
+                        self.callback_state
+                    )
+                    return
+
                 # Success
                 self.status_label.setText("Authorization successful!")
                 self.status_label.setStyleSheet("color: green; font-weight: bold;")
-                
+
                 # Emit signal
-                self.authorization_complete.emit(self.auth_code)
+                self.authorization_complete.emit(self.auth_code, self.code_verifier)
                 
                 # Close dialog after short delay
                 QTimer.singleShot(1000, self.accept)

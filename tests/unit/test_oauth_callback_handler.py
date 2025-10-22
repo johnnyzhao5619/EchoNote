@@ -187,9 +187,10 @@ class _I18nStub:
 def test_oauth_callback_handler_error_response():
     received = {}
 
-    def _callback(code, error):
+    def _callback(code, error, state):
         received["code"] = code
         received["error"] = error
+        received["state"] = state
 
     server = HTTPServer(("localhost", 0), OAuthCallbackHandler)
     OAuthCallbackHandler.callback_received = staticmethod(_callback)
@@ -213,7 +214,7 @@ def test_oauth_callback_handler_error_response():
     assert response.status == 400
     assert "Authorization Failed" in body
     assert "access_denied" in body
-    assert received == {"code": None, "error": "access_denied"}
+    assert received == {"code": None, "error": "access_denied", "state": None}
 
 
 def test_oauth_dialog_resolves_port_from_redirect_uri():
@@ -221,7 +222,9 @@ def test_oauth_dialog_resolves_port_from_redirect_uri():
     dialog = OAuthDialog(
         'google',
         'https://example.com/auth?redirect_uri=http://localhost:9090/callback',
-        i18n
+        i18n,
+        state='state-token',
+        code_verifier='verifier-token'
     )
 
     assert dialog.callback_host == 'localhost'
@@ -236,7 +239,9 @@ def test_oauth_dialog_invalid_callback_port_raises():
             'google',
             'https://example.com/auth?redirect_uri=http://localhost:8080/callback',
             i18n,
-            callback_port='invalid'
+            callback_port='invalid',
+            state='state-token',
+            code_verifier='verifier-token'
         )
     except ValueError as exc:
         assert "Invalid callback port" in str(exc)
@@ -256,7 +261,9 @@ def test_oauth_dialog_port_in_use_error():
             'https://example.com/auth?redirect_uri=http://127.0.0.1:8080/callback',
             i18n,
             callback_host='127.0.0.1',
-            callback_port=port
+            callback_port=port,
+            state='state-token',
+            code_verifier='verifier-token'
         )
 
         try:
@@ -265,3 +272,54 @@ def test_oauth_dialog_port_in_use_error():
             assert str(port) in str(exc)
         else:  # pragma: no cover - ensure failure surfaces
             raise AssertionError("Expected ValueError when port is in use")
+
+
+def test_oauth_dialog_state_mismatch_aborts_flow():
+    i18n = _I18nStub()
+    dialog = OAuthDialog(
+        'google',
+        'https://example.com/auth?redirect_uri=http://localhost:8080/callback',
+        i18n,
+        state='expected-state',
+        code_verifier='verifier-token'
+    )
+
+    result = {}
+
+    dialog.authorization_complete.connect(
+        lambda *args: result.setdefault('complete', args)
+    )
+    dialog.authorization_failed.connect(
+        lambda message: result.setdefault('failed', message)
+    )
+
+    dialog._on_callback_received('auth-code', None, 'unexpected-state')
+
+    assert 'complete' not in result
+    assert 'failed' in result
+    assert 'state mismatch' in result['failed']
+
+
+def test_oauth_dialog_emits_code_and_verifier_on_success():
+    i18n = _I18nStub()
+    dialog = OAuthDialog(
+        'google',
+        'https://example.com/auth?redirect_uri=http://localhost:8080/callback',
+        i18n,
+        state='expected-state',
+        code_verifier='verifier-token'
+    )
+
+    captured = {}
+
+    dialog.authorization_complete.connect(
+        lambda code, verifier: captured.setdefault('payload', (code, verifier))
+    )
+    dialog.authorization_failed.connect(
+        lambda message: captured.setdefault('failed', message)
+    )
+
+    dialog._on_callback_received('auth-code', None, 'expected-state')
+
+    assert captured.get('payload') == ('auth-code', 'verifier-token')
+    assert 'failed' not in captured
