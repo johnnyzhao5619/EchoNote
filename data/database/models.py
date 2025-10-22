@@ -8,7 +8,7 @@ import json
 import logging
 import uuid
 from dataclasses import dataclass, field, asdict
-from datetime import datetime
+from datetime import datetime, time, timedelta, timezone
 from typing import List, Optional, Dict, Any, Tuple
 
 from data.database.encryption_helper import (
@@ -231,7 +231,36 @@ class CalendarEvent:
         )
         db_connection.execute(query, params, commit=True)
         logger.debug(f"Saved calendar event: {self.id}")
-    
+
+    def is_all_day_event(self) -> bool:
+        """Determine whether the event spans one or more full days."""
+
+        def _is_date_only(value: Any) -> bool:
+            return isinstance(value, str) and len(value) == 10 and 'T' not in value
+
+        if _is_date_only(self.start_time) and _is_date_only(self.end_time):
+            return True
+
+        try:
+            start_dt = datetime.fromisoformat(self.start_time)
+            end_dt = datetime.fromisoformat(self.end_time)
+        except Exception:  # pragma: no cover - defensive guard
+            return False
+
+        if start_dt.tzinfo:
+            start_dt = start_dt.astimezone(timezone.utc).replace(tzinfo=None)
+        if end_dt.tzinfo:
+            end_dt = end_dt.astimezone(timezone.utc).replace(tzinfo=None)
+
+        if start_dt.time() != time(0, 0) or end_dt.time() != time(0, 0):
+            return False
+
+        delta = end_dt - start_dt
+        if delta <= timedelta(0):
+            return False
+
+        return delta.total_seconds() % (24 * 3600) == 0
+
     @staticmethod
     def get_by_id(db_connection, event_id: str) -> Optional['CalendarEvent']:
         """Get event by ID."""

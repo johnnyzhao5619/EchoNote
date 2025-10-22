@@ -2,6 +2,8 @@
 
 import logging
 
+from datetime import datetime
+
 import httpx
 from typing import Dict, Any, Optional, List
 
@@ -306,15 +308,27 @@ class GoogleCalendarAdapter(OAuthCalendarAdapter):
         """
         google_event = {
             'summary': event.title,
-            'start': {
+        }
+
+        if event.is_all_day_event():
+            def _coerce_date(value: Any) -> str:
+                if isinstance(value, datetime):
+                    return value.date().isoformat()
+                if isinstance(value, str):
+                    return value.split('T', 1)[0]
+                raise TypeError('Unsupported all-day date value')
+
+            google_event['start'] = {'date': _coerce_date(event.start_time)}
+            google_event['end'] = {'date': _coerce_date(event.end_time)}
+        else:
+            google_event['start'] = {
                 'dateTime': event.start_time,
                 'timeZone': 'UTC'
-            },
-            'end': {
+            }
+            google_event['end'] = {
                 'dateTime': event.end_time,
                 'timeZone': 'UTC'
             }
-        }
 
         if event.location:
             google_event['location'] = event.location
