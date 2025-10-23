@@ -199,10 +199,10 @@ class NotificationManager:
             subprocess.run(
                 [
                     "notify-send",
-                    title,
-                    message,
                     f"--urgency={urgency}",
-                    f"--expire-time={duration_ms}"
+                    f"--expire-time={duration_ms}",
+                    title,
+                    message
                 ],
                 capture_output=True,
                 timeout=5,
