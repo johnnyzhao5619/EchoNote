@@ -337,24 +337,43 @@ class FirstRunSetup:
             raise
 
     @staticmethod
-    def _initialize_database(config_dir: Path) -> None:
+    def _initialize_database(config_dir: Path, security_manager: Optional["SecurityManager"] = None) -> None:
         """
         Initialize the database schema.
 
         Args:
             config_dir: User configuration directory
+            security_manager: Optional pre-configured SecurityManager instance
         """
         try:
             # Import here to avoid circular dependencies
             from data.database.connection import DatabaseConnection
+            from data.security.encryption import SecurityManager
+
+            if security_manager is None:
+                security_manager = SecurityManager(str(config_dir))
 
             db_path = config_dir / "data.db"
             logger.info(f"Initializing database at {db_path}")
 
-            db = DatabaseConnection(str(db_path))
+            db_encryption_key = security_manager.encryption_key[:32].hex()
+            db = DatabaseConnection(str(db_path), encryption_key=db_encryption_key)
             db.initialize_schema()
 
-            logger.info("Database initialized successfully")
+            encryption_active = db.is_encryption_enabled()
+            if not encryption_active:
+                logger.warning("Database encryption is not active after initialization; attempting PRAGMA rekey.")
+                rekey_success = db.rekey(db_encryption_key)
+                if rekey_success:
+                    encryption_active = True
+                    logger.info("Database encryption activated via PRAGMA rekey during initialization.")
+                else:
+                    logger.warning("SQLCipher not available; database remains unencrypted after initialization.")
+
+            if encryption_active:
+                logger.info("Database initialized successfully with SQLCipher encryption")
+            else:
+                logger.info("Database initialized without SQLCipher encryption")
 
         except ImportError:
             logger.warning(
