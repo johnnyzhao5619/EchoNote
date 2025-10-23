@@ -25,9 +25,66 @@ def _ensure_soundfile_stub():
 _ensure_soundfile_stub()
 
 
-from tests.unit.test_transcription_manager_failure import _ensure_cryptography_stubs
+def _ensure_psutil_stub():
+    if "psutil" in sys.modules:
+        return
+
+    psutil_module = types.ModuleType("psutil")
+
+    def _virtual_memory():
+        return types.SimpleNamespace(total=8 * 1024 ** 3)
+
+    def _cpu_count(logical: bool | None = True):  # pragma: no cover - simple stub
+        return 8 if logical else 4
+
+    def _disk_usage(_path):  # pragma: no cover - simple stub
+        return types.SimpleNamespace(total=1, used=0, free=1, percent=0.0)
+
+    def _cpu_percent(_interval=None):  # pragma: no cover - simple stub
+        return 0.0
+
+    psutil_module.virtual_memory = _virtual_memory
+    psutil_module.cpu_count = _cpu_count
+    psutil_module.disk_usage = _disk_usage
+    psutil_module.cpu_percent = _cpu_percent
+
+    sys.modules["psutil"] = psutil_module
 
 
+_ensure_psutil_stub()
+
+
+def _ensure_app_config_stub():
+    if "config.app_config" in sys.modules:
+        return
+
+    app_config_module = types.ModuleType("config.app_config")
+
+    class _ConfigManager:
+        def __init__(self, *args, **kwargs):  # noqa: D401, ARG002
+            self._config = {}
+
+    def _get_app_dir():  # noqa: D401
+        return Path.cwd()
+
+    app_config_module.ConfigManager = _ConfigManager  # type: ignore[attr-defined]
+    app_config_module.get_app_dir = _get_app_dir  # type: ignore[attr-defined]
+
+    config_package = sys.modules.setdefault("config", types.ModuleType("config"))
+    setattr(config_package, "app_config", app_config_module)
+    sys.modules["config.app_config"] = app_config_module
+
+
+_ensure_app_config_stub()
+
+
+from tests.unit.test_transcription_manager_failure import (
+    _ensure_cryptography_stubs,
+    _ensure_pyqt_stub,
+)
+
+
+_ensure_pyqt_stub()
 _ensure_cryptography_stubs()
 
 
@@ -140,6 +197,7 @@ from core.timeline.manager import TimelineManager
 from core.timeline.auto_task_scheduler import AutoTaskScheduler
 from data.database.connection import DatabaseConnection
 from data.database.models import CalendarEvent, CalendarEventLink, EventAttachment
+from data.storage.file_manager import FileManager
 from unittest.mock import Mock
 
 from engines.calendar_sync.google_calendar import GoogleCalendarAdapter
@@ -593,6 +651,55 @@ def test_delete_event_stops_when_external_deletion_fails(tmp_path):
     # Event should still exist locally
     remaining = CalendarEvent.get_by_id(db, existing.id)
     assert remaining is not None
+
+    db.close_all()
+
+
+def test_delete_event_cleans_attachments_and_files(tmp_path):
+    db = _create_db(tmp_path)
+    storage_root = tmp_path / "storage"
+    file_manager = FileManager(base_dir=str(storage_root))
+
+    existing = CalendarEvent(
+        title="All Hands",
+        start_time="2024-06-01T09:00:00",
+        end_time="2024-06-01T10:00:00",
+    )
+    existing.save(db)
+
+    file_path = file_manager.save_text_file("hello", "notes.txt")
+    EventAttachment(
+        event_id=existing.id,
+        attachment_type="transcript",
+        file_path=file_path,
+    ).save(db)
+
+    manager = CalendarManager(db, file_manager=file_manager)
+
+    manager.delete_event(existing.id)
+
+    assert CalendarEvent.get_by_id(db, existing.id) is None
+    assert not EventAttachment.get_by_event_id(db, existing.id)
+    assert not Path(file_path).exists()
+
+    db.close_all()
+
+
+def test_delete_event_without_attachments(tmp_path):
+    db = _create_db(tmp_path)
+    manager = CalendarManager(db, file_manager=FileManager(base_dir=str(tmp_path / "storage")))
+
+    existing = CalendarEvent(
+        title="Planning",
+        start_time="2024-06-02T09:00:00",
+        end_time="2024-06-02T10:00:00",
+    )
+    existing.save(db)
+
+    manager.delete_event(existing.id)
+
+    assert CalendarEvent.get_by_id(db, existing.id) is None
+    assert not EventAttachment.get_by_event_id(db, existing.id)
 
     db.close_all()
 
