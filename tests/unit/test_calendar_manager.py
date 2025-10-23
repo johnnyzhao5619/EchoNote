@@ -223,7 +223,33 @@ except Exception:  # pragma: no cover - fallback to local stubs
             "cryptography.hazmat.primitives.kdf.pbkdf2"
         ] = pbkdf2_module
 
+    app_config_module = types.ModuleType("config.app_config")
 
+    class _ConfigManager:
+        def __init__(self, *args, **kwargs):  # noqa: D401, ARG002
+            self._config = {}
+
+    def _get_app_dir():  # noqa: D401
+        return Path.cwd()
+
+    app_config_module.ConfigManager = _ConfigManager  # type: ignore[attr-defined]
+    app_config_module.get_app_dir = _get_app_dir  # type: ignore[attr-defined]
+
+    config_package = sys.modules.setdefault("config", types.ModuleType("config"))
+    setattr(config_package, "app_config", app_config_module)
+    sys.modules["config.app_config"] = app_config_module
+
+
+_ensure_app_config_stub()
+
+
+from tests.unit.test_transcription_manager_failure import (
+    _ensure_cryptography_stubs,
+    _ensure_pyqt_stub,
+)
+
+
+_ensure_pyqt_stub()
 _ensure_cryptography_stubs()
 
 
@@ -403,6 +429,7 @@ from core.timeline.manager import TimelineManager
 from core.timeline.auto_task_scheduler import AutoTaskScheduler
 from data.database.connection import DatabaseConnection
 from data.database.models import CalendarEvent, CalendarEventLink, EventAttachment
+from data.storage.file_manager import FileManager
 from unittest.mock import Mock
 
 from engines.calendar_sync.google_calendar import GoogleCalendarAdapter
@@ -932,6 +959,55 @@ def test_delete_event_stops_when_external_deletion_fails(tmp_path):
     # Event should still exist locally
     remaining = CalendarEvent.get_by_id(db, existing.id)
     assert remaining is not None
+
+    db.close_all()
+
+
+def test_delete_event_cleans_attachments_and_files(tmp_path):
+    db = _create_db(tmp_path)
+    storage_root = tmp_path / "storage"
+    file_manager = FileManager(base_dir=str(storage_root))
+
+    existing = CalendarEvent(
+        title="All Hands",
+        start_time="2024-06-01T09:00:00",
+        end_time="2024-06-01T10:00:00",
+    )
+    existing.save(db)
+
+    file_path = file_manager.save_text_file("hello", "notes.txt")
+    EventAttachment(
+        event_id=existing.id,
+        attachment_type="transcript",
+        file_path=file_path,
+    ).save(db)
+
+    manager = CalendarManager(db, file_manager=file_manager)
+
+    manager.delete_event(existing.id)
+
+    assert CalendarEvent.get_by_id(db, existing.id) is None
+    assert not EventAttachment.get_by_event_id(db, existing.id)
+    assert not Path(file_path).exists()
+
+    db.close_all()
+
+
+def test_delete_event_without_attachments(tmp_path):
+    db = _create_db(tmp_path)
+    manager = CalendarManager(db, file_manager=FileManager(base_dir=str(tmp_path / "storage")))
+
+    existing = CalendarEvent(
+        title="Planning",
+        start_time="2024-06-02T09:00:00",
+        end_time="2024-06-02T10:00:00",
+    )
+    existing.save(db)
+
+    manager.delete_event(existing.id)
+
+    assert CalendarEvent.get_by_id(db, existing.id) is None
+    assert not EventAttachment.get_by_event_id(db, existing.id)
 
     db.close_all()
 

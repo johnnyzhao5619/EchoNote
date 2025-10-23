@@ -15,6 +15,7 @@ from data.database.models import (
     CalendarSyncStatus,
     EventAttachment,
 )
+from data.storage.file_manager import FileManager
 logger = logging.getLogger('echonote.calendar.manager')
 
 
@@ -39,7 +40,8 @@ class CalendarManager:
         self,
         db_connection,
         sync_adapters: Optional[Dict[str, Any]] = None,
-        oauth_manager: Optional['OAuthManager'] = None
+        oauth_manager: Optional['OAuthManager'] = None,
+        file_manager: Optional[FileManager] = None
     ):
         """
         Initialize the calendar manager.
@@ -53,6 +55,7 @@ class CalendarManager:
         self.db = db_connection
         self.sync_adapters = sync_adapters or {}
         self.oauth_manager = oauth_manager
+        self.file_manager = file_manager
         logger.info("CalendarManager initialized")
 
     def create_event(
@@ -332,6 +335,25 @@ class CalendarManager:
                     (event_id,),
                     commit=True,
                 )
+
+            attachments = EventAttachment.get_by_event_id(self.db, event_id)
+            for attachment in attachments:
+                if self.file_manager and attachment.file_path:
+                    try:
+                        self.file_manager.delete_file(attachment.file_path)
+                    except FileNotFoundError:
+                        logger.warning(
+                            "Attachment file already missing: %s",
+                            attachment.file_path,
+                        )
+                    except Exception as exc:  # pragma: no cover - defensive
+                        logger.error(
+                            "Failed to delete attachment file %s: %s",
+                            attachment.file_path,
+                            exc,
+                        )
+                attachment.delete(self.db)
+
             event.delete(self.db)
             logger.info(f"Deleted event: {event_id}")
 

@@ -258,6 +258,15 @@ def _ensure_pyqt_stub():
         def clipboard(cls):  # noqa: D401
             return cls._clipboard
 
+    class _QObject:
+        def __init__(self, *args, **kwargs):  # noqa: D401, ARG002
+            pass
+
+    class _QCoreApplication:
+        @staticmethod
+        def instance():  # noqa: D401
+            return None
+
     class _QTimer:
         @staticmethod
         def singleShot(*args, **kwargs):  # noqa: D401, ARG002
@@ -287,6 +296,8 @@ def _ensure_pyqt_stub():
     qtcore_module.Qt = _Qt  # type: ignore[attr-defined]
     qtcore_module.pyqtSignal = _pyqt_signal  # type: ignore[attr-defined]
     qtcore_module.QTimer = _QTimer  # type: ignore[attr-defined]
+    qtcore_module.QObject = _QObject  # type: ignore[attr-defined]
+    qtcore_module.QCoreApplication = _QCoreApplication  # type: ignore[attr-defined]
 
     qtgui_module.QIcon = _QIcon  # type: ignore[attr-defined]
     qtgui_module.QClipboard = _QClipboard  # type: ignore[attr-defined]
