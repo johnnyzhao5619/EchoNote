@@ -1018,7 +1018,9 @@ class CalendarManager:
 
         Returns:
             Tuple containing normalized start and end datetimes in UTC with
-            timezone information.
+            timezone information. Naive values inherit the timezone from the
+            opposite endpoint when available; otherwise the system local
+            timezone is assumed before converting to UTC.
 
         Raises:
             ValueError: If either value cannot be converted to ``datetime``.
@@ -1044,15 +1046,24 @@ class CalendarManager:
         start_dt = _coerce(start_time, 'start_time')
         end_dt = _coerce(end_time, 'end_time')
 
-        def _ensure_aware(value: datetime, reference: Optional[datetime]) -> datetime:
+        local_tz = datetime.now().astimezone().tzinfo
+
+        def _ensure_aware(
+            value: datetime,
+            reference: Optional[datetime],
+            fallback_tz
+        ) -> datetime:
             if value.tzinfo:
                 return value
             if reference and reference.tzinfo:
                 return value.replace(tzinfo=reference.tzinfo)
-            return value.replace(tzinfo=timezone.utc)
+            return value.replace(tzinfo=fallback_tz)
 
-        start_dt = _ensure_aware(start_dt, end_dt)
-        end_dt = _ensure_aware(end_dt, start_dt)
+        if local_tz is None:  # pragma: no cover - defensive fallback
+            local_tz = timezone.utc
+
+        start_dt = _ensure_aware(start_dt, end_dt, local_tz)
+        end_dt = _ensure_aware(end_dt, start_dt, local_tz)
 
         return (
             start_dt.astimezone(timezone.utc),
