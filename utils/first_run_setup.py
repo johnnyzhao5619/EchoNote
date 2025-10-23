@@ -5,13 +5,13 @@ Handles initialization tasks that need to be performed on first run,
 including a welcome wizard for initial configuration.
 """
 
-import asyncio
 import logging
 import shutil
 from pathlib import Path
 from typing import Optional
 
 from config.app_config import get_app_dir
+from utils.model_download import run_model_download
 
 
 logger = logging.getLogger(__name__)
@@ -277,21 +277,20 @@ class FirstRunSetup:
                 
                 def run_download():
                     """在新线程中运行下载"""
-                    try:
-                        # 创建新的事件循环
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
-                        
-                        # 运行下载
-                        loop.run_until_complete(
-                            model_manager.download_model(recommended_model_name)
+                    success = run_model_download(
+                        model_manager,
+                        recommended_model_name,
+                        logger=logger,
+                        error_message=(
+                            "Download failed in thread for model "
+                            f"{recommended_model_name}"
+                        ),
+                    )
+                    if success:
+                        logger.info(
+                            "Model %s download completed", recommended_model_name
                         )
-                        
-                        loop.close()
-                        logger.info(f"Model {recommended_model_name} download completed")
-                    except Exception as e:
-                        logger.error(f"Download failed in thread: {e}")
-                
+
                 class DownloadRunnable(QRunnable):
                     def run(self):
                         run_download()
@@ -652,36 +651,40 @@ class FirstRunWizard:
                     
                     def run_download():
                         """Run download in thread."""
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
 
-                        try:
-                            loop.run_until_complete(
-                                self.model_manager.download_model(
-                                    self.recommended_model
-                                )
-                            )
+                        def _on_success():
                             self.download_completed = True
-
                             # Update UI in main thread
                             from PyQt6.QtCore import QMetaObject, Qt
+
                             QMetaObject.invokeMethod(
                                 self,
                                 "_on_download_complete",
                                 Qt.ConnectionType.QueuedConnection
                             )
-                        except Exception as e:
-                            logger.error(f"Download failed: {e}")
+
+                        def _on_error(exc: Exception):
                             # Update UI in main thread
                             from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
+
                             QMetaObject.invokeMethod(
                                 self,
                                 "_on_download_error",
                                 Qt.ConnectionType.QueuedConnection,
-                                Q_ARG(str, str(e))
+                                Q_ARG(str, str(exc))
                             )
-                        finally:
-                            loop.close()
+
+                        run_model_download(
+                            self.model_manager,
+                            self.recommended_model,
+                            logger=logger,
+                            on_success=_on_success,
+                            on_error=_on_error,
+                            error_message=(
+                                "Download failed for recommended model "
+                                f"{self.recommended_model}"
+                            ),
+                        )
 
                     class DownloadRunnable(QRunnable):
                         def __init__(self, func):
