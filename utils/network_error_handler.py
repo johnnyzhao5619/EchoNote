@@ -7,6 +7,7 @@
 import logging
 import time
 import socket
+from contextlib import closing
 from functools import wraps
 from typing import Callable, Optional, Any
 import httpx
@@ -31,13 +32,20 @@ def check_network_connectivity(
     Returns:
         网络是否可用
     """
+    sock: Optional[socket.socket] = None
     try:
         socket.setdefaulttimeout(timeout)
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect((host, port))
-        return True
+        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
+            sock.connect((host, port))
+            return True
     except (socket.error, socket.timeout):
         return False
+    finally:
+        if sock is not None:
+            try:
+                sock.close()
+            except OSError:
+                logger.debug("Failed to close socket cleanly", exc_info=True)
 
 
 def get_network_error_message(error: Exception) -> tuple[str, str]:
