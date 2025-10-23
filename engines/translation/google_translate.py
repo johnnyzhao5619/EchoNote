@@ -8,6 +8,11 @@ import logging
 from typing import List
 import httpx
 
+from engines.speech.base import (
+    BASE_LANGUAGE_CODES,
+    CHINESE_LANGUAGE_VARIANTS,
+    combine_languages,
+)
 from engines.translation.base import TranslationEngine
 
 logger = logging.getLogger(__name__)
@@ -17,28 +22,11 @@ class GoogleTranslateEngine(TranslationEngine):
     """Google Translate 引擎实现"""
 
     # Google Translate 支持的主要语言
-    SUPPORTED_LANGUAGES = [
-        'zh', 'zh-CN', 'zh-TW',  # 中文
-        'en',  # 英语
-        'fr',  # 法语
-        'de',  # 德语
-        'es',  # 西班牙语
-        'it',  # 意大利语
-        'ja',  # 日语
-        'ko',  # 韩语
-        'pt',  # 葡萄牙语
-        'ru',  # 俄语
-        'ar',  # 阿拉伯语
-        'hi',  # 印地语
-        'nl',  # 荷兰语
-        'pl',  # 波兰语
-        'tr',  # 土耳其语
-        'vi',  # 越南语
-        'id',  # 印尼语
-        'th',  # 泰语
-        'uk',  # 乌克兰语
-        'sv',  # 瑞典语
-    ]
+    SUPPORTED_LANGUAGES = combine_languages(
+        ("zh",),
+        CHINESE_LANGUAGE_VARIANTS,
+        BASE_LANGUAGE_CODES,
+    )
 
     def __init__(self, api_key: str, max_retries: int = 3):
         """

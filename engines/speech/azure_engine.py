@@ -9,7 +9,13 @@ from typing import Dict, List, Optional
 import numpy as np
 import httpx
 
-from engines.speech.base import SpeechEngine, convert_audio_to_wav_bytes
+from engines.speech.base import (
+    BASE_LANGUAGE_CODES,
+    CLOUD_SPEECH_ADDITIONAL_LANGUAGES,
+    SpeechEngine,
+    combine_languages,
+    convert_audio_to_wav_bytes,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -50,12 +56,11 @@ class AzureEngine(SpeechEngine):
 
     def get_supported_languages(self) -> List[str]:
         """获取支持的语言列表"""
-        # Azure Speech 支持的主要语言
-        return [
-            'zh', 'en', 'fr', 'de', 'es', 'it', 'ja', 'ko', 'pt', 'ru',
-            'ar', 'hi', 'nl', 'pl', 'tr', 'vi', 'id', 'th', 'uk', 'sv',
-            'da', 'no', 'fi', 'cs', 'ro', 'bg', 'el', 'he', 'fa', 'ur'
-        ]
+        # Azure Speech 支持的基础语言及扩展语言
+        return combine_languages(
+            BASE_LANGUAGE_CODES,
+            CLOUD_SPEECH_ADDITIONAL_LANGUAGES,
+        )
 
     def _convert_language_code(self, language: Optional[str]) -> str:
         """

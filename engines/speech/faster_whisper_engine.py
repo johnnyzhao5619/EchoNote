@@ -11,7 +11,12 @@ from typing import Dict, List, Optional
 import numpy as np
 from pathlib import Path
 
-from engines.speech.base import SpeechEngine, ensure_audio_sample_rate
+from engines.speech.base import (
+    BASE_LANGUAGE_CODES,
+    SpeechEngine,
+    ensure_audio_sample_rate,
+    combine_languages,
+)
 from config.app_config import get_app_dir
 
 logger = logging.getLogger(__name__)
@@ -253,11 +258,8 @@ class FasterWhisperEngine(SpeechEngine):
 
     def get_supported_languages(self) -> List[str]:
         """获取支持的语言列表"""
-        # Whisper 支持的主要语言
-        return [
-            'zh', 'en', 'fr', 'de', 'es', 'it', 'ja', 'ko', 'pt', 'ru',
-            'ar', 'hi', 'nl', 'pl', 'tr', 'vi', 'id', 'th', 'uk', 'sv'
-        ]
+        # Whisper 支持的基础语言
+        return combine_languages(BASE_LANGUAGE_CODES)
 
     async def transcribe_file(self, audio_path: str, language: Optional[str] = None, **kwargs) -> Dict:
         """

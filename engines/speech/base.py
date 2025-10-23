@@ -6,10 +6,68 @@
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple
 import io
 import numpy as np
 import soundfile as sf
+
+
+# 基础语言常量，供语音/翻译引擎共享
+BASE_LANGUAGE_CODES: Tuple[str, ...] = (
+    "zh",
+    "en",
+    "fr",
+    "de",
+    "es",
+    "it",
+    "ja",
+    "ko",
+    "pt",
+    "ru",
+    "ar",
+    "hi",
+    "nl",
+    "pl",
+    "tr",
+    "vi",
+    "id",
+    "th",
+    "uk",
+    "sv",
+)
+
+# 云端语音引擎通常额外支持的语言
+CLOUD_SPEECH_ADDITIONAL_LANGUAGES: Tuple[str, ...] = (
+    "da",
+    "no",
+    "fi",
+    "cs",
+    "ro",
+    "bg",
+    "el",
+    "he",
+    "fa",
+    "ur",
+)
+
+# 中文常见地区变体（供翻译等需要精细区分的场景使用）
+CHINESE_LANGUAGE_VARIANTS: Tuple[str, ...] = (
+    "zh-CN",
+    "zh-TW",
+)
+
+
+def combine_languages(*groups: Iterable[str]) -> List[str]:
+    """按顺序合并语言代码，并移除重复项。"""
+
+    seen = set()
+    combined: List[str] = []
+    for group in groups:
+        for code in group:
+            if code not in seen:
+                combined.append(code)
+                seen.add(code)
+    return combined
 
 
 def ensure_audio_sample_rate(
