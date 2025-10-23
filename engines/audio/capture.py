@@ -1,6 +1,4 @@
-"""音频捕获模块
-
-使用 PyAudio 实现音频输入源枚举和实时音频捕获"""
+"""Audio capture module implemented with PyAudio."""
 
 import importlib
 import logging
@@ -13,20 +11,22 @@ logger = logging.getLogger(__name__)
 
 
 class AudioCapture:
-    """音频捕获器"""
+    """High-level wrapper for microphone capture using PyAudio."""
 
     def __init__(self, sample_rate: int = 16000, channels: int = 1,
                  chunk_size: int = 512, gain: float = 1.0):
-        """初始化音频捕获器。
+        """Initialize the capture interface.
 
-        PyAudio 模块仅在需要时导入和初始化，避免在应用启动时
-        强制加载可选依赖。
+        PyAudio is imported and instantiated lazily so the optional dependency
+        is only required when microphone capture is enabled.
 
         Args:
-            sample_rate: 采样率（Hz），默认 16000（Whisper 标准）
-            channels: 声道数，默认 1（单声道）
-            chunk_size: 缓冲区大小（样本数），默认 512（约 32ms @ 16kHz）
-            gain: 增益倍数，默认 1.0
+            sample_rate: Sampling rate in Hz. Defaults to 16 kHz (Whisper
+                baseline).
+            channels: Number of input channels. Defaults to mono.
+            chunk_size: Number of samples per read. Defaults to 512 samples
+                (~32 ms at 16 kHz).
+            gain: Linear gain factor applied to captured audio. Defaults to 1.0.
         """
         self.sample_rate = sample_rate
         self.channels = channels
@@ -42,7 +42,7 @@ class AudioCapture:
         self._pyaudio_module = None
         self._pyaudio_error: Optional[Exception] = None
 
-        # 验证依赖是否存在（不创建实例，避免提前加载底层库）
+        # Check dependency availability without instantiating PyAudio yet.
         self._ensure_module_available()
 
         logger.info(
@@ -54,7 +54,7 @@ class AudioCapture:
         )
 
     def _ensure_module_available(self):
-        """确保可以导入 PyAudio 模块。"""
+        """Ensure that the PyAudio module can be imported."""
         if self._pyaudio_module is not None:
             return self._pyaudio_module
 
@@ -71,7 +71,7 @@ class AudioCapture:
             ) from exc
 
     def _ensure_pyaudio_instance(self):
-        """按需初始化 PyAudio 实例。"""
+        """Create the PyAudio instance on demand."""
         if self.pyaudio is not None:
             return self.pyaudio
 
@@ -90,20 +90,11 @@ class AudioCapture:
         return self.pyaudio
 
     def get_input_devices(self) -> List[Dict]:
-        """
-        枚举所有可用的音频输入设备
-        
+        """Return a list of available audio input devices.
+
         Returns:
-            List[Dict]: 输入设备列表
-            [
-                {
-                    "index": int,
-                    "name": str,
-                    "max_input_channels": int,
-                    "default_sample_rate": float
-                },
-                ...
-            ]
+            List[Dict]: Each entry contains the device ``index``, ``name``,
+            ``max_input_channels``, and ``default_sample_rate``.
         """
         try:
             pyaudio_instance = self._ensure_pyaudio_instance()
@@ -121,7 +112,7 @@ class AudioCapture:
             try:
                 device_info = pyaudio_instance.get_device_info_by_index(i)
                 
-                # 只返回输入设备
+                # Only return devices with input capability.
                 if device_info.get('maxInputChannels', 0) > 0:
                     devices.append({
                         "index": i,
@@ -136,21 +127,11 @@ class AudioCapture:
         return devices
 
     def list_input_devices(self) -> list:
-        """
-        列出所有可用的音频输入设备（别名方法，保持 API 一致性）
-        
-        Returns:
-            list: 输入设备列表
-        """
+        """Alias for :meth:`get_input_devices` kept for API compatibility."""
         return self.get_input_devices()
 
     def get_default_input_device(self) -> Optional[Dict]:
-        """
-        获取默认输入设备
-        
-        Returns:
-            Optional[Dict]: 默认输入设备信息，如果没有则返回 None
-        """
+        """Return the system default input device if available."""
         try:
             pyaudio_instance = self._ensure_pyaudio_instance()
             device_info = pyaudio_instance.get_default_input_device_info()
@@ -164,14 +145,15 @@ class AudioCapture:
             logger.error(f"Failed to get default input device: {e}")
             return None
 
-    def start_capture(self, device_index: Optional[int] = None, 
+    def start_capture(self, device_index: Optional[int] = None,
                      callback: Optional[Callable[[np.ndarray], None]] = None):
-        """
-        开始音频捕获
-        
+        """Start streaming audio from the selected input device.
+
         Args:
-            device_index: 输入设备索引（None 表示使用默认设备）
-            callback: 音频数据回调函数，接收 numpy array 参数
+            device_index: Optional input device index. ``None`` selects the
+                default device.
+            callback: Optional callable invoked with each captured ``numpy``
+                array of samples.
         """
         if self.is_capturing:
             logger.warning("Audio capture is already running")
@@ -181,7 +163,7 @@ class AudioCapture:
         pyaudio_module = self._ensure_module_available()
 
         try:
-            # 打开音频流
+            # Open the input stream in blocking mode.
             self.stream = pyaudio_instance.open(
                 format=pyaudio_module.paInt16,
                 channels=self.channels,
@@ -189,12 +171,12 @@ class AudioCapture:
                 input=True,
                 input_device_index=device_index,
                 frames_per_buffer=self.chunk_size,
-                stream_callback=None  # 使用阻塞模式
+                stream_callback=None  # Use blocking mode.
             )
             
             self.is_capturing = True
             
-            # 启动捕获线程
+            # Launch the capture loop in a dedicated thread.
             self.capture_thread = threading.Thread(
                 target=self._capture_loop,
                 args=(callback,),
@@ -209,30 +191,30 @@ class AudioCapture:
             raise
 
     def _capture_loop(self, callback: Optional[Callable[[np.ndarray], None]]):
-        """音频捕获循环（在独立线程中运行）"""
+        """Capture loop executed on the background thread."""
         logger.info("Audio capture loop started")
         
         while self.is_capturing:
             try:
-                # 读取音频数据
+                # Read raw audio data from the stream.
                 audio_data = self.stream.read(self.chunk_size, exception_on_overflow=False)
                 
-                # 转换为 numpy array
+                # Convert to a numpy array.
                 audio_array = np.frombuffer(audio_data, dtype=np.int16)
                 
-                # 转换为 float32 并归一化到 [-1, 1]
+                # Normalize to float32 samples in the [-1, 1] range.
                 audio_float = audio_array.astype(np.float32) / 32768.0
                 
-                # 应用增益
+                # Apply gain adjustment.
                 audio_float = audio_float * self.gain
                 
-                # 限制幅度到 [-1, 1]
+                # Limit the amplitude to [-1, 1].
                 audio_float = np.clip(audio_float, -1.0, 1.0)
                 
-                # 放入队列
+                # Push into the queue for downstream consumers.
                 self.audio_queue.put(audio_float)
                 
-                # 调用回调函数
+                # Invoke the optional callback.
                 if callback:
                     callback(audio_float)
                     
@@ -243,7 +225,7 @@ class AudioCapture:
         logger.info("Audio capture loop stopped")
 
     def stop_capture(self):
-        """停止音频捕获"""
+        """Stop the capture loop and release stream resources."""
         if not self.is_capturing:
             logger.warning("Audio capture is not running")
             return
@@ -251,17 +233,17 @@ class AudioCapture:
         logger.info("Stopping audio capture...")
         self.is_capturing = False
         
-        # 等待捕获线程结束
+        # Wait for the capture thread to terminate.
         if self.capture_thread:
             self.capture_thread.join(timeout=2.0)
         
-        # 关闭音频流
+        # Stop and close the underlying PyAudio stream.
         if self.stream:
             self.stream.stop_stream()
             self.stream.close()
             self.stream = None
         
-        # 清空队列
+        # Flush remaining audio from the queue.
         while not self.audio_queue.empty():
             try:
                 self.audio_queue.get_nowait()
@@ -271,27 +253,14 @@ class AudioCapture:
         logger.info("Audio capture stopped")
 
     def get_audio_chunk(self, timeout: float = 1.0) -> Optional[np.ndarray]:
-        """
-        从队列中获取音频数据块
-        
-        Args:
-            timeout: 超时时间（秒）
-            
-        Returns:
-            Optional[np.ndarray]: 音频数据，如果超时则返回 None
-        """
+        """Retrieve an audio chunk from the queue with an optional timeout."""
         try:
             return self.audio_queue.get(timeout=timeout)
         except queue.Empty:
             return None
 
     def set_gain(self, gain: float):
-        """
-        设置增益
-        
-        Args:
-            gain: 增益倍数（0.0 - 10.0）
-        """
+        """Update the gain factor applied to captured audio samples."""
         if gain < 0.0 or gain > 10.0:
             logger.warning(f"Gain value {gain} is out of range [0.0, 10.0]")
             gain = np.clip(gain, 0.0, 10.0)
@@ -300,23 +269,18 @@ class AudioCapture:
         logger.info(f"Gain set to {gain}")
 
     def get_volume_level(self) -> float:
-        """
-        获取当前音量级别（RMS）
-        
-        Returns:
-            float: 音量级别（0.0 - 1.0）
-        """
+        """Return the RMS volume estimate for the most recent chunk."""
         if self.audio_queue.empty():
             return 0.0
         
         try:
-            # 获取最新的音频块（不阻塞）
+            # Fetch the most recent audio chunk without blocking.
             audio_chunk = self.audio_queue.get_nowait()
             
-            # 计算 RMS（均方根）
+            # Compute the RMS value.
             rms = np.sqrt(np.mean(audio_chunk ** 2))
             
-            # 放回队列
+            # Return the chunk to the queue.
             self.audio_queue.put(audio_chunk)
             
             return float(rms)
@@ -325,14 +289,14 @@ class AudioCapture:
             return 0.0
 
     def close(self):
-        """关闭音频捕获器并释放资源"""
+        """Close the capture interface and release resources."""
         logger.info("Closing audio capture...")
         
-        # 停止捕获
+        # Stop active capture if running.
         if self.is_capturing:
             self.stop_capture()
         
-        # 终止 PyAudio
+        # Terminate the PyAudio instance.
         if self.pyaudio:
             self.pyaudio.terminate()
             self.pyaudio = None
@@ -340,9 +304,9 @@ class AudioCapture:
         logger.info("Audio capture closed")
 
     def __enter__(self):
-        """上下文管理器入口"""
+        """Context manager entry hook."""
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """上下文管理器出口"""
+        """Context manager exit hook."""
         self.close()

@@ -1,6 +1,7 @@
-"""翻译引擎抽象基类。
+"""Abstract base class for translation engines.
 
-定义所有翻译引擎必须实现的统一接口，并提供统一的资源释放接口。
+Defines the unified interface and lifecycle hooks shared by all translation
+engine implementations.
 """
 
 import inspect
@@ -9,55 +10,36 @@ from typing import List, Dict, Optional
 
 
 class TranslationEngine(ABC):
-    """翻译引擎抽象基类"""
+    """Abstract base class for translation engines."""
 
     @abstractmethod
     def get_name(self) -> str:
-        """
-        获取引擎名称
-
-        Returns:
-            str: 引擎名称（如 'google-translate', 'deepl'）
-        """
+        """Return the engine identifier (e.g., ``"google-translate"``)."""
         pass
 
     @abstractmethod
     def get_supported_languages(self) -> List[str]:
-        """
-        获取引擎支持的语言列表
-
-        Returns:
-            List[str]: 语言代码列表（如 ['zh', 'en', 'fr']）
-        """
+        """Return language codes supported by the engine."""
         pass
 
     @abstractmethod
     async def translate(
         self, text: str, source_lang: str, target_lang: str
     ) -> str:
-        """
-        翻译文本
+        """Translate text from ``source_lang`` into ``target_lang``.
 
         Args:
-            text: 待翻译文本
-            source_lang: 源语言代码（'auto' 表示自动检测）
-            target_lang: 目标语言代码
+            text: Input text to translate.
+            source_lang: Source language code (``"auto"`` triggers detection).
+            target_lang: Target language code.
 
         Returns:
-            str: 翻译后的文本
+            str: Translated text.
         """
         pass
 
     def validate_language(self, lang_code: str) -> bool:
-        """
-        验证语言代码是否支持
-
-        Args:
-            lang_code: 语言代码
-
-        Returns:
-            bool: 是否支持
-        """
+        """Return ``True`` when the language code is supported."""
         if lang_code == 'auto':
             return True
 
@@ -65,12 +47,7 @@ class TranslationEngine(ABC):
         return lang_code in supported
 
     def get_config_schema(self) -> Dict:
-        """
-        获取引擎配置的 JSON Schema
-
-        Returns:
-            Dict: JSON Schema 定义
-        """
+        """Return the JSON schema that describes engine configuration."""
         return {
             'type': 'object',
             'properties': {},
@@ -78,18 +55,20 @@ class TranslationEngine(ABC):
         }
 
     def close(self) -> Optional[object]:
-        """释放翻译引擎使用的资源（可选）。
+        """Release engine resources synchronously (optional).
 
-        默认实现为空操作，子类可以返回协程对象或直接执行清理逻辑。
+        Subclasses may override this method to perform cleanup or return an
+        awaitable for asynchronous finalization.
         Returns:
-            Optional[object]: 如需异步清理，可返回协程对象。
+            Optional[object]: Awaitable cleanup task or ``None``.
         """
         return None
 
     async def aclose(self) -> None:
-        """异步释放翻译引擎使用的资源（可选）。
+        """Asynchronously release engine resources (optional).
 
-        默认会调用 :meth:`close`，并在返回对象可等待时自动等待完成。
+        The default implementation delegates to :meth:`close` and awaits the
+        result when necessary.
         """
         result = self.close()
         if inspect.isawaitable(result):

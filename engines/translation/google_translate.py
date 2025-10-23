@@ -1,8 +1,4 @@
-"""
-Google Translate 翻译引擎实现
-
-使用 Google Cloud Translation API 进行文本翻译
-"""
+"""Google Translate engine implementation using Google Cloud Translation API."""
 
 import logging
 from typing import List, Optional
@@ -19,9 +15,9 @@ logger = logging.getLogger(__name__)
 
 
 class GoogleTranslateEngine(TranslationEngine):
-    """Google Translate 引擎实现"""
+    """Google Translate engine implementation."""
 
-    # Google Translate 支持的主要语言
+    # Primary languages supported by Google Translate.
     SUPPORTED_LANGUAGES = combine_languages(
         ("zh",),
         CHINESE_LANGUAGE_VARIANTS,
@@ -29,19 +25,18 @@ class GoogleTranslateEngine(TranslationEngine):
     )
 
     def __init__(self, api_key: str, max_retries: int = 3):
-        """
-        初始化 Google Translate 引擎
+        """Initialize the Google Translate engine.
 
         Args:
-            api_key: Google Cloud API Key
-            max_retries: 最大重试次数
+            api_key: Google Cloud API key.
+            max_retries: Maximum number of retry attempts.
         """
         self.api_key = api_key
         self.max_retries = max_retries
         base = "https://translation.googleapis.com"
         self.base_url = f"{base}/language/translate/v2"
 
-        # 创建 HTTP 客户端
+        # Create the underlying HTTP client.
         self.client: Optional[httpx.AsyncClient] = httpx.AsyncClient(
             timeout=30.0,
             headers={'Content-Type': 'application/json'}
@@ -50,45 +45,44 @@ class GoogleTranslateEngine(TranslationEngine):
         logger.info("Google Translate engine initialized")
 
     def get_name(self) -> str:
-        """获取引擎名称"""
+        """Return the engine identifier."""
         return "google-translate"
 
     def get_supported_languages(self) -> List[str]:
-        """获取支持的语言列表"""
+        """Return the supported language codes."""
         return self.SUPPORTED_LANGUAGES.copy()
 
     async def translate(
         self, text: str, source_lang: str = 'auto',
         target_lang: str = 'en'
     ) -> str:
-        """
-        翻译文本
+        """Translate text using the Google Cloud Translation API.
 
         Args:
-            text: 待翻译文本
-            source_lang: 源语言代码（'auto' 表示自动检测）
-            target_lang: 目标语言代码
+            text: Input text to translate.
+            source_lang: Source language code. ``"auto"`` enables detection.
+            target_lang: Target language code.
 
         Returns:
-            str: 翻译后的文本
+            str: Translated text.
         """
         if not text or not text.strip():
             return ""
 
-        # 验证目标语言
+        # Validate the target language.
         if not self.validate_language(target_lang):
             msg = f"Unsupported target language: {target_lang}"
             logger.error(msg)
             raise ValueError(msg)
 
-        # 准备请求参数
+        # Prepare request parameters.
         params = {
             'key': self.api_key,
             'q': text,
             'target': target_lang
         }
 
-        # 如果指定了源语言且不是 auto，添加到参数中
+        # Include the explicit source language when provided.
         if source_lang != 'auto':
             if not self.validate_language(source_lang):
                 msg = f"Unsupported source language: {source_lang}"
@@ -96,7 +90,7 @@ class GoogleTranslateEngine(TranslationEngine):
                 raise ValueError(msg)
             params['source'] = source_lang
 
-        # 重试逻辑
+        # Retry loop.
         last_error = None
         for attempt in range(self.max_retries):
             try:
@@ -105,17 +99,17 @@ class GoogleTranslateEngine(TranslationEngine):
                     f"{self.max_retries}"
                 )
 
-                # 发送请求
+                # Send the HTTP request.
                 response = await self.client.post(
                     self.base_url,
                     params=params
                 )
 
-                # 检查响应状态
+                # Inspect the response status code.
                 if response.status_code == 200:
                     data = response.json()
 
-                    # 提取翻译结果
+                    # Extract translation payload.
                     if 'data' in data and 'translations' in data['data']:
                         translations = data['data']['translations']
                         if translations:
@@ -131,7 +125,7 @@ class GoogleTranslateEngine(TranslationEngine):
                     raise ValueError(msg)
 
                 elif response.status_code == 400:
-                    # 客户端错误，不重试
+                    # Client error: do not retry.
                     error_data = response.json()
                     error_msg = error_data.get(
                         'error', {}
@@ -142,7 +136,7 @@ class GoogleTranslateEngine(TranslationEngine):
                     raise ValueError(f"Translation failed: {error_msg}")
 
                 elif response.status_code == 403:
-                    # 认证错误，不重试
+                    # Authentication error: do not retry.
                     logger.error(
                         "Google Translate API authentication failed (403)"
                     )
@@ -150,19 +144,19 @@ class GoogleTranslateEngine(TranslationEngine):
                     raise ValueError(msg)
 
                 elif response.status_code == 429:
-                    # 速率限制，等待后重试
+                    # Rate limit exceeded: apply exponential backoff.
                     logger.warning(
                         "Google Translate API rate limit exceeded (429)"
                     )
                     if attempt < self.max_retries - 1:
                         import asyncio
-                        await asyncio.sleep(2 ** attempt)  # 指数退避
+                        await asyncio.sleep(2 ** attempt)  # Exponential backoff.
                         continue
                     msg = "Translation failed: Rate limit exceeded"
                     raise ValueError(msg)
 
                 else:
-                    # 其他错误，重试
+                    # Other error: retry when attempts remain.
                     logger.warning(
                         f"Google Translate API error "
                         f"({response.status_code})"
@@ -178,7 +172,7 @@ class GoogleTranslateEngine(TranslationEngine):
                     raise ValueError(msg)
 
             except httpx.RequestError as e:
-                # 网络错误，重试
+                # Network error: retry.
                 logger.warning(f"Network error during translation: {e}")
                 last_error = e
                 if attempt < self.max_retries - 1:
@@ -187,11 +181,11 @@ class GoogleTranslateEngine(TranslationEngine):
                     continue
 
             except Exception as e:
-                # 其他错误
+                # Propagate unexpected errors.
                 logger.error(f"Translation error: {e}")
                 raise
 
-        # 所有重试都失败
+        # All retries exhausted.
         if last_error:
             msg = (
                 f"Translation failed after {self.max_retries} "
@@ -203,11 +197,11 @@ class GoogleTranslateEngine(TranslationEngine):
         raise ValueError(msg)
 
     def close(self):
-        """同步关闭底层 HTTP 客户端。"""
+        """Synchronously close the underlying HTTP client."""
         return self.aclose()
 
     async def aclose(self) -> None:
-        """异步关闭底层 HTTP 客户端。"""
+        """Asynchronously close the underlying HTTP client."""
         if self.client is None:
             return
 
@@ -217,27 +211,26 @@ class GoogleTranslateEngine(TranslationEngine):
         try:
             await client.aclose()
         except Exception:
-            # 关闭失败时恢复客户端，方便上层再次尝试
+            # Restore the client so callers can retry closing if needed.
             self.client = client
             raise
         else:
             logger.debug("Google Translate AsyncClient closed")
 
     async def detect_language(self, text: str) -> str:
-        """
-        检测文本语言
+        """Detect the language of the supplied text.
 
         Args:
-            text: 待检测文本
+            text: Text whose language should be detected.
 
         Returns:
-            str: 检测到的语言代码
+            str: Detected language code or ``"unknown"``.
         """
         if not text or not text.strip():
             return "unknown"
 
         try:
-            # 使用 Google Translate API 的语言检测功能
+            # Use the Google Translate API detection endpoint.
             params = {
                 'key': self.api_key,
                 'q': text
@@ -269,7 +262,7 @@ class GoogleTranslateEngine(TranslationEngine):
             return "unknown"
 
     def get_config_schema(self) -> dict:
-        """获取配置 Schema"""
+        """Return the JSON schema describing configuration options."""
         return {
             'type': 'object',
             'properties': {
@@ -282,21 +275,16 @@ class GoogleTranslateEngine(TranslationEngine):
                     'minimum': 1,
                     'maximum': 10,
                     'default': 3,
-                    'description': '最大重试次数'
+                    'description': 'Maximum number of retry attempts'
                 }
             },
             'required': ['api_key']
         }
 
-    async def close(self):
-        """关闭 HTTP 客户端"""
-        await self.client.aclose()
-        logger.info("Google Translate engine closed")
-
     async def __aenter__(self):
-        """异步上下文管理器入口"""
+        """Async context manager entry."""
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """异步上下文管理器出口"""
-        await self.close()
+        """Async context manager exit."""
+        await self.aclose()
