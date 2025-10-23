@@ -434,6 +434,76 @@ class ResourceMonitoringTests(unittest.TestCase):
         self.assertEqual(len(signal_emitted), 1)
         self.assertLess(signal_emitted[0], 500)
 
+    def test_resource_monitor_notification_handlers(self):
+        """Resource monitor signals should trigger notification manager without import errors."""
+        import sys
+        from utils.resource_monitor import ResourceMonitor
+        from PyQt6.QtWidgets import QApplication
+
+        app = QApplication.instance()
+        if app is None:
+            app = QApplication(sys.argv)
+
+        monitor = ResourceMonitor()
+
+        notification_manager = None
+
+        import types
+        import importlib
+
+        ui_module = importlib.import_module('ui')
+        original_common = getattr(ui_module, 'common', None)
+
+        fake_common = types.ModuleType('ui.common')
+        fake_notification = types.ModuleType('ui.common.notification')
+        fake_common.notification = fake_notification
+        fake_notification.get_notification_manager = lambda: None
+
+        with patch.dict(sys.modules, {
+            'ui.common': fake_common,
+            'ui.common.notification': fake_notification
+        }):
+            ui_module.common = fake_common
+            try:
+                with patch('ui.common.notification.get_notification_manager') as mock_get_manager:
+                    manager_mock = Mock()
+                    mock_get_manager.return_value = manager_mock
+
+                    def on_low_memory(available_mb):
+                        nonlocal notification_manager
+                        if notification_manager is None:
+                            from ui.common.notification import get_notification_manager
+                            notification_manager = get_notification_manager()
+                        notification_manager.send_warning(
+                            title="Low memory detected",
+                            message=f"Available: {available_mb:.0f}MB"
+                        )
+
+                    def on_resources_recovered():
+                        nonlocal notification_manager
+                        if notification_manager is None:
+                            from ui.common.notification import get_notification_manager
+                            notification_manager = get_notification_manager()
+                        notification_manager.send_info(
+                            title="Resources recovered",
+                            message="System resources have normalized"
+                        )
+
+                    monitor.low_memory_warning.connect(on_low_memory)
+                    monitor.resources_recovered.connect(on_resources_recovered)
+
+                    monitor.low_memory_warning.emit(256.0)
+                    monitor.resources_recovered.emit()
+
+                    manager_mock.send_warning.assert_called_once()
+                    manager_mock.send_info.assert_called_once()
+                    self.assertEqual(mock_get_manager.call_count, 1)
+            finally:
+                if original_common is None:
+                    delattr(ui_module, 'common')
+                else:
+                    ui_module.common = original_common
+
     @patch('utils.resource_monitor.psutil.virtual_memory')
     def test_resource_monitor_sampling_non_blocking(self, mock_memory):
         """ResourceMonitor sampling should avoid blocking the UI thread."""
