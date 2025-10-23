@@ -8,6 +8,8 @@ import logging
 from typing import Dict, Any, Optional
 from enum import Enum
 
+from engines.speech.base import AUDIO_VIDEO_FORMATS
+
 
 logger = logging.getLogger(__name__)
 
@@ -90,10 +92,7 @@ class ErrorHandler:
     """统一错误处理器"""
     
     # 支持的音频/视频格式
-    SUPPORTED_FORMATS = [
-        'mp3', 'wav', 'm4a', 'flac', 'ogg', 'opus',
-        'mp4', 'avi', 'mkv', 'mov', 'webm'
-    ]
+    SUPPORTED_FORMATS = list(AUDIO_VIDEO_FORMATS)
     
     @staticmethod
     def handle_error(
