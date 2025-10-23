@@ -25,10 +25,273 @@ def _ensure_soundfile_stub():
 _ensure_soundfile_stub()
 
 
-from tests.unit.test_transcription_manager_failure import _ensure_cryptography_stubs
+def _ensure_psutil_stub():
+    if "psutil" in sys.modules:
+        return
+
+    psutil_module = types.ModuleType("psutil")
+
+    class _Process:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def cpu_percent(self, *args, **kwargs):  # noqa: D401 - stub method
+            return 0.0
+
+        def memory_percent(self, *args, **kwargs):  # noqa: D401 - stub method
+            return 0.0
+
+    class _VirtualMemory:
+        percent = 0.0
+
+    def _virtual_memory():  # noqa: D401 - stub function
+        return _VirtualMemory()
+
+    psutil_module.Process = _Process
+    psutil_module.cpu_count = lambda *args, **kwargs: 1  # noqa: E731 - simple stub
+    psutil_module.virtual_memory = _virtual_memory
+
+    sys.modules["psutil"] = psutil_module
+
+
+def _ensure_pyqt6_stub():
+    if "PyQt6" in sys.modules:
+        return
+
+    pyqt6_module = types.ModuleType("PyQt6")
+    qtcore_module = types.ModuleType("PyQt6.QtCore")
+    qtwidgets_module = types.ModuleType("PyQt6.QtWidgets")
+
+    class QObject:  # noqa: D401 - stub class
+        pass
+
+    class QCoreApplication:  # noqa: D401 - stub class
+        def __init__(self, *args, **kwargs):
+            pass
+
+        @staticmethod
+        def instance():  # noqa: D401 - stub method
+            return None
+
+    class QTimer:  # noqa: D401 - stub class
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def start(self, *args, **kwargs):  # noqa: D401 - stub method
+            return None
+
+        def stop(self):  # noqa: D401 - stub method
+            return None
+
+    class _Signal:  # noqa: D401 - stub helper
+        def __init__(self, *args, **kwargs):
+            self._subscribers = []
+
+        def connect(self, callback):  # noqa: D401 - stub method
+            self._subscribers.append(callback)
+
+        def emit(self, *args, **kwargs):  # noqa: D401 - stub method
+            for subscriber in list(self._subscribers):
+                subscriber(*args, **kwargs)
+
+    def pyqtSignal(*args, **kwargs):  # noqa: D401 - stub factory
+        return _Signal()
+
+    class _Qt:  # noqa: D401 - stub namespace
+        AlignCenter = 0
+
+    qtcore_module.Qt = _Qt
+    qtcore_module.QObject = QObject
+    qtcore_module.QCoreApplication = QCoreApplication
+    qtcore_module.QTimer = QTimer
+    qtcore_module.pyqtSignal = pyqtSignal
+
+    class QWidget:  # noqa: D401 - stub class
+        def __init__(self, *args, **kwargs):
+            pass
+
+    class QLayout:  # noqa: D401 - shared stub base
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def addWidget(self, *args, **kwargs):  # noqa: N802,D401 - stub method
+            return None
+
+    class QVBoxLayout(QLayout):
+        pass
+
+    class QHBoxLayout(QLayout):
+        pass
+
+    class QLabel(QWidget):
+        def setText(self, *args, **kwargs):  # noqa: D401 - stub method
+            return None
+
+    class QProgressBar(QWidget):
+        def setValue(self, *args, **kwargs):  # noqa: D401 - stub method
+            return None
+
+    qtwidgets_module.QWidget = QWidget
+    qtwidgets_module.QVBoxLayout = QVBoxLayout
+    qtwidgets_module.QHBoxLayout = QHBoxLayout
+    qtwidgets_module.QLabel = QLabel
+    qtwidgets_module.QProgressBar = QProgressBar
+
+    pyqt6_module.QtCore = qtcore_module
+    pyqt6_module.QtWidgets = qtwidgets_module
+
+    sys.modules["PyQt6"] = pyqt6_module
+    sys.modules["PyQt6.QtCore"] = qtcore_module
+    sys.modules["PyQt6.QtWidgets"] = qtwidgets_module
+
+
+_ensure_psutil_stub()
+_ensure_pyqt6_stub()
+
+
+try:  # pragma: no cover - import guard for optional test helpers
+    from tests.unit.test_transcription_manager_failure import (  # type: ignore
+        _ensure_cryptography_stubs,
+    )
+except Exception:  # pragma: no cover - fallback to local stubs
+    def _ensure_cryptography_stubs():
+        if "cryptography" in sys.modules:
+            return
+
+        cryptography_module = types.ModuleType("cryptography")
+        hazmat_module = types.ModuleType("cryptography.hazmat")
+        primitives_module = types.ModuleType("cryptography.hazmat.primitives")
+        ciphers_module = types.ModuleType(
+            "cryptography.hazmat.primitives.ciphers"
+        )
+        aead_module = types.ModuleType(
+            "cryptography.hazmat.primitives.ciphers.aead"
+        )
+        hashes_module = types.ModuleType("cryptography.hazmat.primitives.hashes")
+        kdf_module = types.ModuleType("cryptography.hazmat.primitives.kdf")
+        pbkdf2_module = types.ModuleType(
+            "cryptography.hazmat.primitives.kdf.pbkdf2"
+        )
+
+        class _DummyAESGCM:
+            def __init__(self, key):  # noqa: D401 - stub init
+                self._key = key
+
+            def encrypt(self, nonce, data, associated_data=None):  # noqa: D401
+                return data
+
+            def decrypt(self, nonce, data, associated_data=None):  # noqa: D401
+                return data
+
+        class _DummySHA256:
+            name = "sha256"
+
+        class _DummyPBKDF2HMAC:
+            def __init__(self, algorithm, length, salt, iterations):
+                self._length = length
+
+            def derive(self, data):  # noqa: D401 - stub method
+                if not data:
+                    return b"\x00" * self._length
+                repeated = (data * ((self._length // len(data)) + 1))[: self._length]
+                return repeated
+
+        aead_module.AESGCM = _DummyAESGCM
+        hashes_module.SHA256 = _DummySHA256
+        pbkdf2_module.PBKDF2HMAC = _DummyPBKDF2HMAC
+
+        cryptography_module.hazmat = hazmat_module
+        hazmat_module.primitives = primitives_module
+        primitives_module.ciphers = ciphers_module
+        primitives_module.hashes = hashes_module
+        primitives_module.kdf = kdf_module
+        ciphers_module.aead = aead_module
+        kdf_module.pbkdf2 = pbkdf2_module
+
+        sys.modules["cryptography"] = cryptography_module
+        sys.modules["cryptography.hazmat"] = hazmat_module
+        sys.modules["cryptography.hazmat.primitives"] = primitives_module
+        sys.modules[
+            "cryptography.hazmat.primitives.ciphers"
+        ] = ciphers_module
+        sys.modules[
+            "cryptography.hazmat.primitives.ciphers.aead"
+        ] = aead_module
+        sys.modules["cryptography.hazmat.primitives.hashes"] = hashes_module
+        sys.modules["cryptography.hazmat.primitives.kdf"] = kdf_module
+        sys.modules[
+            "cryptography.hazmat.primitives.kdf.pbkdf2"
+        ] = pbkdf2_module
 
 
 _ensure_cryptography_stubs()
+
+
+def _ensure_ui_common_stubs():
+    common_module = sys.modules.get("ui.common")
+    if common_module is None:
+        common_module = types.ModuleType("ui.common")
+        sys.modules["ui.common"] = common_module
+
+    notification_module = types.ModuleType("ui.common.notification")
+
+    class _NotificationManager:
+        def send_info(self, *args, **kwargs):  # noqa: D401 - stub method
+            return None
+
+        def send_warning(self, *args, **kwargs):  # noqa: D401 - stub method
+            return None
+
+        def send_success(self, *args, **kwargs):  # noqa: D401 - stub method
+            return None
+
+        def send_error(self, *args, **kwargs):  # noqa: D401 - stub method
+            return None
+
+    _notification_instance = _NotificationManager()
+
+    def _get_notification_manager():  # noqa: D401 - stub factory
+        return _notification_instance
+
+    notification_module.NotificationManager = _NotificationManager
+    notification_module.get_notification_manager = _get_notification_manager
+
+    progress_module = types.ModuleType("ui.common.progress_bar")
+
+    class _ProgressBar:  # noqa: D401 - stub class
+        def show(self, *args, **kwargs):  # noqa: D401 - stub method
+            return None
+
+        def set_progress(self, *args, **kwargs):  # noqa: D401 - stub method
+            return None
+
+    progress_module.ProgressBar = _ProgressBar
+
+    error_dialog_module = types.ModuleType("ui.common.error_dialog")
+
+    class _ErrorDialog:  # noqa: D401 - stub class
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def show(self):  # noqa: D401 - stub method
+            return None
+
+    def _show_error_dialog(*args, **kwargs):  # noqa: D401 - stub function
+        return None
+
+    error_dialog_module.ErrorDialog = _ErrorDialog
+    error_dialog_module.show_error_dialog = _show_error_dialog
+
+    common_module.notification = notification_module
+    common_module.progress_bar = progress_module
+    common_module.error_dialog = error_dialog_module
+
+    sys.modules["ui.common.notification"] = notification_module
+    sys.modules["ui.common.progress_bar"] = progress_module
+    sys.modules["ui.common.error_dialog"] = error_dialog_module
+
+
+_ensure_ui_common_stubs()
 
 
 def _ensure_httpx_stub():
@@ -234,6 +497,43 @@ def test_create_event_accepts_z_timezone_strings(tmp_path):
     db.close_all()
 
 
+def test_create_event_normalizes_mixed_timezone_inputs(tmp_path):
+    db = _create_db(tmp_path)
+    manager = CalendarManager(db)
+
+    event_data = {
+        "title": "Hybrid Timezone Meeting",
+        "event_type": "Event",
+        "start_time": "2024-05-01T09:00:00+02:00",
+        "end_time": "2024-05-01T10:30:00",
+    }
+
+    event_id = manager.create_event(event_data)
+
+    rows = db.execute(
+        "SELECT start_time, end_time FROM calendar_events WHERE id = ?",
+        (event_id,),
+    )
+    assert rows
+    stored_start = rows[0]["start_time"]
+    stored_end = rows[0]["end_time"]
+
+    start_dt = datetime.fromisoformat(stored_start)
+    end_dt = datetime.fromisoformat(stored_end)
+
+    assert start_dt.tzinfo == timezone.utc
+    assert end_dt.tzinfo == timezone.utc
+
+    source_tz = timezone(timedelta(hours=2))
+    expected_start = datetime(2024, 5, 1, 9, 0, tzinfo=source_tz)
+    expected_end = datetime(2024, 5, 1, 10, 30, tzinfo=source_tz)
+
+    assert start_dt.astimezone(source_tz) == expected_start
+    assert end_dt.astimezone(source_tz) == expected_end
+
+    db.close_all()
+
+
 def test_multi_provider_links_are_persisted_and_retrievable(tmp_path):
     db = _create_db(tmp_path)
 
@@ -336,6 +636,45 @@ def test_save_external_event_accepts_z_timezone_strings(tmp_path):
     end_dt = datetime.fromisoformat(event.end_time)
     assert start_dt.tzinfo == timezone.utc
     assert end_dt.tzinfo == timezone.utc
+
+    db.close_all()
+
+
+def test_save_external_event_normalizes_mixed_timezone_inputs(tmp_path):
+    db = _create_db(tmp_path)
+    manager = CalendarManager(db)
+
+    ext_event = {
+        "id": "google-mixed-time",
+        "title": "External Mixed Time",
+        "start_time": "2024-07-02T09:00:00+02:00",
+        "end_time": "2024-07-02T10:45:00",
+    }
+
+    manager._save_external_event(ext_event, "google")
+
+    link = CalendarEventLink.get_by_provider_and_external_id(
+        db,
+        "google",
+        "google-mixed-time",
+    )
+    assert link is not None
+
+    event = CalendarEvent.get_by_id(db, link.event_id)
+    assert event is not None
+
+    start_dt = datetime.fromisoformat(event.start_time)
+    end_dt = datetime.fromisoformat(event.end_time)
+
+    assert start_dt.tzinfo == timezone.utc
+    assert end_dt.tzinfo == timezone.utc
+
+    source_tz = timezone(timedelta(hours=2))
+    expected_start = datetime(2024, 7, 2, 9, 0, tzinfo=source_tz)
+    expected_end = datetime(2024, 7, 2, 10, 45, tzinfo=source_tz)
+
+    assert start_dt.astimezone(source_tz) == expected_start
+    assert end_dt.astimezone(source_tz) == expected_end
 
     db.close_all()
 
