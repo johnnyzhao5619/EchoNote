@@ -370,3 +370,38 @@ def test_google_translate_supported_languages_follow_shared_constants():
     )
 
     assert GoogleTranslateEngine.SUPPORTED_LANGUAGES == expected
+
+
+def test_close_lazy_loaded_translation_engine_releases_resources(monkeypatch):
+    import logging
+    from utils.resource_cleanup import close_lazy_loaded_engine
+
+    engine = GoogleTranslateEngine(api_key="test-key")
+    closed_clients: list[object] = []
+    original_aclose = engine.client.aclose
+
+    async def _fake_aclose(self):  # type: ignore[override]
+        closed_clients.append(self)
+        await original_aclose()
+
+    monkeypatch.setattr(
+        engine.client,
+        "aclose",
+        types.MethodType(_fake_aclose, engine.client),
+    )
+
+    class _InitializedLoader:
+        def __init__(self, instance):
+            self._instance = instance
+
+        def get(self):
+            return self._instance
+
+        def is_initialized(self):
+            return True
+
+    loader = _InitializedLoader(engine)
+
+    close_lazy_loaded_engine('translation engine', loader, logging.getLogger(__name__))
+
+    assert closed_clients, "Expected AsyncClient.aclose to be called"

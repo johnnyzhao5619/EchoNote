@@ -1,11 +1,11 @@
-"""
-翻译引擎抽象基类
+"""翻译引擎抽象基类。
 
-定义所有翻译引擎必须实现的统一接口
+定义所有翻译引擎必须实现的统一接口，并提供统一的资源释放接口。
 """
 
+import inspect
 from abc import ABC, abstractmethod
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 
 class TranslationEngine(ABC):
@@ -76,3 +76,21 @@ class TranslationEngine(ABC):
             'properties': {},
             'required': []
         }
+
+    def close(self) -> Optional[object]:
+        """释放翻译引擎使用的资源（可选）。
+
+        默认实现为空操作，子类可以返回协程对象或直接执行清理逻辑。
+        Returns:
+            Optional[object]: 如需异步清理，可返回协程对象。
+        """
+        return None
+
+    async def aclose(self) -> None:
+        """异步释放翻译引擎使用的资源（可选）。
+
+        默认会调用 :meth:`close`，并在返回对象可等待时自动等待完成。
+        """
+        result = self.close()
+        if inspect.isawaitable(result):
+            await result

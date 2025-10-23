@@ -5,7 +5,7 @@ Google Translate 翻译引擎实现
 """
 
 import logging
-from typing import List
+from typing import List, Optional
 import httpx
 
 from engines.speech.base import (
@@ -42,7 +42,7 @@ class GoogleTranslateEngine(TranslationEngine):
         self.base_url = f"{base}/language/translate/v2"
 
         # 创建 HTTP 客户端
-        self.client = httpx.AsyncClient(
+        self.client: Optional[httpx.AsyncClient] = httpx.AsyncClient(
             timeout=30.0,
             headers={'Content-Type': 'application/json'}
         )
@@ -198,9 +198,30 @@ class GoogleTranslateEngine(TranslationEngine):
                 f"attempts: {last_error}"
             )
             raise ValueError(msg)
+
+        msg = f"Translation failed after {self.max_retries} attempts"
+        raise ValueError(msg)
+
+    def close(self):
+        """同步关闭底层 HTTP 客户端。"""
+        return self.aclose()
+
+    async def aclose(self) -> None:
+        """异步关闭底层 HTTP 客户端。"""
+        if self.client is None:
+            return
+
+        client = self.client
+        self.client = None
+
+        try:
+            await client.aclose()
+        except Exception:
+            # 关闭失败时恢复客户端，方便上层再次尝试
+            self.client = client
+            raise
         else:
-            msg = f"Translation failed after {self.max_retries} attempts"
-            raise ValueError(msg)
+            logger.debug("Google Translate AsyncClient closed")
 
     async def detect_language(self, text: str) -> str:
         """
