@@ -92,7 +92,7 @@ Save to `~/.echonote/config.json`. When both files exist, the user-level configu
 - Protect the `client_secret` and restrict file permissions (use `chmod 600`).
 - Review authorized applications regularly in your Google account settings.
 - Prefer test accounts and minimal scopes during development.
-- If authorization fails, delete `~/.echonote/oauth_tokens.json` to force re-authorization and check `~/.echonote/logs/echonote.log` for details.
+- If authorization fails, delete the encrypted token cache `~/.echonote/oauth_tokens.enc` (this file is stored in an encrypted format; removing it will require you to re-authorize) and check `~/.echonote/logs/echonote.log` for details.
 
 After completing these steps, EchoNote can sync and manage Google Calendar events alongside recording and transcription features.
 
@@ -188,7 +188,7 @@ After completing these steps, EchoNote can sync and manage Google Calendar event
 - 妥善保管 `client_secret`，并为包含凭据的文件设置严格权限（推荐 `chmod 600`）。
 - 定期在 Google 账户设置中检查已授权的应用。
 - 开发时优先使用测试账号与最小化的 API 范围。
-- 遇到授权异常，可删除 `~/.echonote/oauth_tokens.json` 强制重新授权，并查看 `~/.echonote/logs/echonote.log` 获取更多信息。
+- 遇到授权异常，可删除加密的令牌缓存 `~/.echonote/oauth_tokens.enc`（该文件为加密格式，删除后需重新授权），并查看 `~/.echonote/logs/echonote.log` 获取更多信息。
 
 完成以上步骤后，EchoNote 即可使用 Google Calendar 同步、查看事件，并结合录制与转录功能提升日程管理效率。
 
@@ -284,7 +284,7 @@ Enregistrez dans `~/.echonote/config.json`. Lorsque les deux fichiers existent, 
 - Protégez le `client_secret` et limitez les permissions des fichiers (utilisez `chmod 600`).
 - Vérifiez régulièrement les applications autorisées dans votre compte Google.
 - Préférez des comptes de test et des scopes minimaux pendant le développement.
-- En cas d’échec d’autorisation, supprimez `~/.echonote/oauth_tokens.json` pour forcer une nouvelle autorisation et consultez `~/.echonote/logs/echonote.log` pour plus de détails.
+- En cas d’échec d’autorisation, supprimez le cache de jeton chiffré `~/.echonote/oauth_tokens.enc` (ce fichier est stocké sous forme chiffrée ; sa suppression impose une nouvelle autorisation) et consultez `~/.echonote/logs/echonote.log` pour plus de détails.
 
 Après ces étapes, EchoNote peut synchroniser et gérer les événements Google Calendar tout en tirant parti des fonctionnalités d’enregistrement et de transcription.
 
