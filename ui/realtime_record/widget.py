@@ -1326,8 +1326,6 @@ class RealtimeRecordWidget(QWidget):
                     self.signals.error_occurred.emit(error_msg)
                     return
                 
-                # Mark model as used
-                self.model_manager.mark_model_used(selected_model)
                 logger.info(f"Using model: {selected_model}")
 
             # 获取选项

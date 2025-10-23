@@ -68,8 +68,6 @@ class FasterWhisperEngine(SpeechEngine):
                     f"Using ModelManager: model={model_size}, "
                     f"path={model_info.local_path}"
                 )
-                # 标记模型被使用
-                self.model_manager.mark_model_used(model_size)
             else:
                 # 模型未下载，记录警告但不阻止初始化
                 logger.warning(
@@ -95,6 +93,21 @@ class FasterWhisperEngine(SpeechEngine):
             f"model={model_size}, device={device}, compute_type={compute_type}, "
             f"available={self._model_available}"
         )
+
+    def _record_model_usage(self) -> None:
+        """在模型管理器中记录一次模型使用。"""
+        if not self.model_manager:
+            return
+
+        try:
+            self.model_manager.mark_model_used(self.model_size)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Failed to record usage for model '%s': %s",
+                self.model_size,
+                exc,
+                exc_info=True,
+            )
 
     def _load_model(self):
         """延迟加载模型"""
@@ -396,13 +409,16 @@ class FasterWhisperEngine(SpeechEngine):
                     transcribe_info.duration if hasattr(transcribe_info, 'duration') else 0.0
                 )
             }
-            
+
             logger.info(
                 f"Transcription completed: {len(result_segments)} segments, "
                 f"language={transcribe_info.language}"
             )
+
+            # 转录成功后记录模型使用
+            self._record_model_usage()
             return result
-            
+
         except Exception as e:
             logger.error(f"Transcription failed: {e}")
             raise
