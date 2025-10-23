@@ -12,6 +12,8 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Dict
 
+from core.models.registry import get_default_model_names
+
 
 APP_DIR_NAME = ".echonote"
 
@@ -206,11 +208,7 @@ class ConfigManager:
                     )
                 
                 # Validate model name is in supported list
-                valid_models = [
-                    "tiny", "tiny.en", "base", "base.en",
-                    "small", "small.en", "medium", "medium.en",
-                    "large-v1", "large-v2", "large-v3"
-                ]
+                valid_models = list(get_default_model_names())
                 if fw_config["default_model"] not in valid_models:
                     raise ValueError(
                         f"transcription.faster_whisper.default_model must be "

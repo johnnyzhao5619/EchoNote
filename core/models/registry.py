@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 from datetime import datetime
+from functools import lru_cache
 from pathlib import Path
+from types import MappingProxyType
 from typing import Dict, Iterable, List, Optional, Tuple
 
 
@@ -206,3 +208,30 @@ class ModelRegistry:
         """返回默认模型名称。"""
 
         return self._order[0]
+
+
+@lru_cache(maxsize=1)
+def get_default_model_registry() -> "ModelRegistry":
+    """返回缓存的默认模型注册表实例。"""
+
+    return ModelRegistry()
+
+
+@lru_cache(maxsize=1)
+def get_default_model_names() -> Tuple[str, ...]:
+    """返回所有默认模型名称的元组。"""
+
+    registry = get_default_model_registry()
+    return tuple(model.name for model in registry.list_models())
+
+
+@lru_cache(maxsize=1)
+def get_model_size_metadata() -> MappingProxyType:
+    """返回模型尺寸元数据的只读映射。"""
+
+    registry = get_default_model_registry()
+    sizes = {
+        model.name: {"speed": model.speed, "accuracy": model.accuracy}
+        for model in registry.list_models()
+    }
+    return MappingProxyType(sizes)

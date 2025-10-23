@@ -11,6 +11,8 @@ from typing import Dict, List, Optional
 import numpy as np
 from pathlib import Path
 
+from core.models.registry import get_model_size_metadata
+
 from engines.speech.base import (
     BASE_LANGUAGE_CODES,
     SpeechEngine,
@@ -25,14 +27,8 @@ logger = logging.getLogger(__name__)
 class FasterWhisperEngine(SpeechEngine):
     """Faster-Whisper 引擎实现"""
 
-    # 支持的模型大小及其特性
-    MODEL_SIZES = {
-        'tiny': {'speed': 'fastest', 'accuracy': 'low'},
-        'base': {'speed': 'fast', 'accuracy': 'medium'},
-        'small': {'speed': 'medium', 'accuracy': 'good'},
-        'medium': {'speed': 'slow', 'accuracy': 'high'},
-        'large': {'speed': 'slowest', 'accuracy': 'highest'}
-    }
+    # 支持的模型大小及其特性（来自模型注册表）
+    MODEL_SIZES = dict(get_model_size_metadata())
 
     def __init__(self, model_size: str = 'base', device: str = 'auto', 
                  compute_type: str = 'int8', download_root: Optional[str] = None,
@@ -41,7 +37,7 @@ class FasterWhisperEngine(SpeechEngine):
         初始化 Faster-Whisper 引擎
         
         Args:
-            model_size: 模型大小 (tiny/base/small/medium/large)
+            model_size: 模型大小（参见模型注册表定义）
             device: 计算设备 ('cpu', 'cuda', 'auto')
             compute_type: 计算类型 ('int8', 'float16', 'float32')
             download_root: 模型下载根目录（向后兼容，如果提供了 model_manager 则忽略）

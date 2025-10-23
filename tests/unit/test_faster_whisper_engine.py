@@ -33,8 +33,106 @@ if "soundfile" not in sys.modules:
     )
     sys.modules["soundfile"] = soundfile_stub
 
+if "psutil" not in sys.modules:
+    psutil_stub = types.SimpleNamespace(
+        virtual_memory=lambda: types.SimpleNamespace(total=8 * 1024**3),
+        cpu_count=lambda logical=True: 4,
+        disk_usage=lambda _path: types.SimpleNamespace(total=1, used=0, free=1),
+    )
+    sys.modules["psutil"] = psutil_stub
+
+if "PyQt6" not in sys.modules:
+    qtcore_stub = types.SimpleNamespace(
+        QObject=type("QObject", (), {"__init__": lambda self, *args, **kwargs: None}),
+        QCoreApplication=type(
+            "QCoreApplication", (), {"instance": staticmethod(lambda: None)}
+        ),
+        QTimer=type(
+            "QTimer",
+            (),
+            {
+                "singleShot": staticmethod(
+                    lambda _interval, callback: callback() if callback else None
+                )
+            },
+        ),
+        pyqtSignal=lambda *args, **kwargs: types.SimpleNamespace(
+            connect=lambda *_args, **_kwargs: None,
+            emit=lambda *_args, **_kwargs: None,
+        ),
+    )
+    pyqt6_stub = types.SimpleNamespace(QtCore=qtcore_stub)
+    sys.modules["PyQt6"] = pyqt6_stub
+    sys.modules["PyQt6.QtCore"] = qtcore_stub
+
+if "requests" not in sys.modules:
+    requests_stub = types.SimpleNamespace(
+        Session=lambda: types.SimpleNamespace(close=lambda: None),
+        exceptions=types.SimpleNamespace(RequestException=Exception),
+    )
+    sys.modules["requests"] = requests_stub
+
+if "cryptography" not in sys.modules:
+    cryptography_module = types.ModuleType("cryptography")
+    hazmat_module = types.ModuleType("cryptography.hazmat")
+    primitives_module = types.ModuleType("cryptography.hazmat.primitives")
+    ciphers_module = types.ModuleType("cryptography.hazmat.primitives.ciphers")
+    aead_module = types.ModuleType("cryptography.hazmat.primitives.ciphers.aead")
+    hashes_module = types.ModuleType("cryptography.hazmat.primitives.hashes")
+    kdf_module = types.ModuleType("cryptography.hazmat.primitives.kdf")
+    pbkdf2_module = types.ModuleType(
+        "cryptography.hazmat.primitives.kdf.pbkdf2"
+    )
+
+    class _AESGCM:
+        def __init__(self, _key):
+            self._key = _key
+
+        def encrypt(self, _nonce, data, _aad):
+            return data
+
+        def decrypt(self, _nonce, data, _aad):
+            return data
+
+    class _SHA256:
+        def __init__(self):
+            self.name = "sha256"
+
+    class _PBKDF2HMAC:
+        def __init__(self, algorithm, length, salt, iterations):
+            self.length = length
+
+        def derive(self, _data):
+            return b"0" * self.length
+
+    aead_module.AESGCM = _AESGCM
+    ciphers_module.aead = aead_module
+    hashes_module.SHA256 = _SHA256
+    pbkdf2_module.PBKDF2HMAC = _PBKDF2HMAC
+    kdf_module.pbkdf2 = pbkdf2_module
+
+    primitives_module.ciphers = ciphers_module
+    primitives_module.hashes = hashes_module
+    primitives_module.kdf = kdf_module
+    hazmat_module.primitives = primitives_module
+    cryptography_module.hazmat = hazmat_module
+
+    sys.modules["cryptography"] = cryptography_module
+    sys.modules["cryptography.hazmat"] = hazmat_module
+    sys.modules["cryptography.hazmat.primitives"] = primitives_module
+    sys.modules["cryptography.hazmat.primitives.ciphers"] = ciphers_module
+    sys.modules[
+        "cryptography.hazmat.primitives.ciphers.aead"
+    ] = aead_module
+    sys.modules["cryptography.hazmat.primitives.hashes"] = hashes_module
+    sys.modules["cryptography.hazmat.primitives.kdf"] = kdf_module
+    sys.modules[
+        "cryptography.hazmat.primitives.kdf.pbkdf2"
+    ] = pbkdf2_module
+
 import pytest
 
+from core.models.registry import get_default_model_names
 from engines.speech.base import BASE_LANGUAGE_CODES, combine_languages
 from engines.speech.faster_whisper_engine import FasterWhisperEngine
 
@@ -123,6 +221,23 @@ def test_faster_whisper_supported_languages_follow_shared_constants(monkeypatch)
     expected = combine_languages(BASE_LANGUAGE_CODES)
 
     assert engine.get_supported_languages() == expected
+
+
+def test_model_sizes_follow_registry(monkeypatch):
+    """模型枚举应与注册表保持一致。"""
+
+    monkeypatch.setattr(
+        "utils.gpu_detector.GPUDetector.validate_device_config",
+        staticmethod(lambda device, compute_type: ("cpu", "int8", "")),
+    )
+
+    engine = FasterWhisperEngine(model_size="base")
+
+    expected_names = list(get_default_model_names())
+
+    assert list(engine.MODEL_SIZES.keys()) == expected_names
+    schema = engine.get_config_schema()
+    assert schema["properties"]["model_size"]["enum"] == expected_names
 
 
 def test_engine_initialization_does_not_mark_usage(monkeypatch):
