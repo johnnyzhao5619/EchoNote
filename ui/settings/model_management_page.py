@@ -19,6 +19,7 @@ from PyQt6.QtGui import QFont
 from ui.settings.base_page import BaseSettingsPage
 from ui.common.error_dialog import show_error_dialog
 from utils.i18n import I18nQtManager
+from utils.model_download import run_model_download
 from core.models.registry import ModelInfo
 
 logger = logging.getLogger('echonote.ui.settings.model_management')
@@ -777,24 +778,25 @@ class ModelManagementPage(BaseSettingsPage):
             cancel_btn.setVisible(True)
 
         # 启动异步下载（使用 QThreadPool）
-        import asyncio
         
         def run_download():
             """在新线程中运行下载"""
-            try:
-                # 创建新的事件循环
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                
-                # 运行下载
-                loop.run_until_complete(
-                    self.model_manager.download_model(model_name)
+
+            def _log_success():
+                logger.info(
+                    "Model %s download completed via settings page", model_name
                 )
-                
-                loop.close()
-            except Exception as e:
-                logger.error(f"Download failed in thread: {e}")
-                # 错误会通过信号传递，这里不需要额外处理
+
+            run_model_download(
+                self.model_manager,
+                model_name,
+                logger=logger,
+                on_success=_log_success,
+                error_message=(
+                    "Download failed in thread for model "
+                    f"{model_name}"
+                ),
+            )
         
         # 在线程池中执行下载
         from PyQt6.QtCore import QThreadPool, QRunnable
