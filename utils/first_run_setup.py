@@ -652,19 +652,17 @@ class FirstRunWizard:
                     
                     def run_download():
                         """Run download in thread."""
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+
                         try:
-                            loop = asyncio.new_event_loop()
-                            asyncio.set_event_loop(loop)
-                            
                             loop.run_until_complete(
                                 self.model_manager.download_model(
                                     self.recommended_model
                                 )
                             )
-                            
-                            loop.close()
                             self.download_completed = True
-                            
+
                             # Update UI in main thread
                             from PyQt6.QtCore import QMetaObject, Qt
                             QMetaObject.invokeMethod(
@@ -672,18 +670,19 @@ class FirstRunWizard:
                                 "_on_download_complete",
                                 Qt.ConnectionType.QueuedConnection
                             )
-                            
                         except Exception as e:
                             logger.error(f"Download failed: {e}")
                             # Update UI in main thread
-                            from PyQt6.QtCore import QMetaObject, Qt
+                            from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
                             QMetaObject.invokeMethod(
                                 self,
                                 "_on_download_error",
                                 Qt.ConnectionType.QueuedConnection,
-                                Qt.Q_ARG(str, str(e))
+                                Q_ARG(str, str(e))
                             )
-                    
+                        finally:
+                            loop.close()
+
                     class DownloadRunnable(QRunnable):
                         def __init__(self, func):
                             super().__init__()
