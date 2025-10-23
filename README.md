@@ -6,6 +6,8 @@
   <img src="https://img.shields.io/badge/Desktop-Local%20First-0EA5E9.svg" alt="Desktop local-first badge">
 </p>
 
+> 📢 v1.0.0 正式发布，完整变更可查阅 [CHANGELOG](docs/CHANGELOG.md#v100---2025-10-23)。
+
 ## 🌐 Language Overview
 - [English](#english)
 - [中文](#中文)
