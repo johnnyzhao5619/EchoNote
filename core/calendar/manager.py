@@ -1006,7 +1006,10 @@ class CalendarManager:
                 return value
             if isinstance(value, str):
                 try:
-                    return datetime.fromisoformat(value)
+                    text = value.strip()
+                    if text.endswith('Z'):
+                        text = f"{text[:-1]}+00:00"
+                    return datetime.fromisoformat(text)
                 except ValueError as exc:  # pragma: no cover - defensive branch
                     raise ValueError(
                         f"Event {label} must be a datetime instance or ISO 8601 string"

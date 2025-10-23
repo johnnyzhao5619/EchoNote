@@ -206,6 +206,34 @@ def test_create_event_accepts_datetime_objects(tmp_path):
     db.close_all()
 
 
+def test_create_event_accepts_z_timezone_strings(tmp_path):
+    db = _create_db(tmp_path)
+    manager = CalendarManager(db)
+
+    event_data = {
+        "title": "Team Sync",
+        "event_type": "Event",
+        "start_time": "2024-05-01T09:00:00Z",
+        "end_time": "2024-05-01T10:00:00Z",
+    }
+
+    event_id = manager.create_event(event_data)
+
+    assert event_data["start_time"].endswith("+00:00")
+    assert event_data["end_time"].endswith("+00:00")
+
+    rows = db.execute(
+        "SELECT start_time, end_time FROM calendar_events WHERE id = ?",
+        (event_id,),
+    )
+    assert rows
+    row = rows[0]
+    assert row["start_time"] == event_data["start_time"]
+    assert row["end_time"] == event_data["end_time"]
+
+    db.close_all()
+
+
 def test_multi_provider_links_are_persisted_and_retrievable(tmp_path):
     db = _create_db(tmp_path)
 
@@ -274,6 +302,40 @@ def test_multi_provider_links_are_persisted_and_retrievable(tmp_path):
     )
     assert len(post_update_links) == 2
     assert {row["provider"] for row in post_update_links} == {"google", "outlook"}
+
+    db.close_all()
+
+
+def test_save_external_event_accepts_z_timezone_strings(tmp_path):
+    db = _create_db(tmp_path)
+    manager = CalendarManager(db)
+
+    ext_event = {
+        "id": "google-z-time",
+        "title": "External Z Event",
+        "start_time": "2024-07-01T09:00:00Z",
+        "end_time": "2024-07-01T10:00:00Z",
+        "attendees": ["alice@example.com"],
+    }
+
+    manager._save_external_event(ext_event, "google")
+
+    link = CalendarEventLink.get_by_provider_and_external_id(
+        db,
+        "google",
+        "google-z-time",
+    )
+    assert link is not None
+
+    event = CalendarEvent.get_by_id(db, link.event_id)
+    assert event is not None
+    assert event.start_time.endswith("+00:00")
+    assert event.end_time.endswith("+00:00")
+
+    start_dt = datetime.fromisoformat(event.start_time)
+    end_dt = datetime.fromisoformat(event.end_time)
+    assert start_dt.tzinfo == timezone.utc
+    assert end_dt.tzinfo == timezone.utc
 
     db.close_all()
 
