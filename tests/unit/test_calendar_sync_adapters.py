@@ -144,6 +144,48 @@ def test_google_scopes_include_userinfo_permissions(google_adapter):
     assert required_scopes.issubset(scope_value)
 
 
+def test_google_fetch_events_includes_cancelled_entries(monkeypatch, google_adapter):
+    captured_params = []
+
+    class DummyResponse:
+        def __init__(self, payload):
+            self._payload = payload
+
+        def json(self):
+            return self._payload
+
+    payload = {
+        'items': [
+            {
+                'id': 'evt-cancelled',
+                'status': 'cancelled',
+            },
+            {
+                'id': 'evt-active',
+                'status': 'confirmed',
+                'start': {'dateTime': '2024-08-01T09:00:00Z'},
+                'end': {'dateTime': '2024-08-01T10:00:00Z'},
+                'attendees': [],
+            },
+        ],
+        'nextSyncToken': 'sync-token',
+    }
+
+    def fake_api_request(method, url, **kwargs):
+        assert method == 'GET'
+        captured_params.append(kwargs.get('params') or {})
+        return DummyResponse(payload)
+
+    monkeypatch.setattr(google_adapter, 'api_request', fake_api_request)
+
+    result = google_adapter.fetch_events()
+
+    assert captured_params[0]['showDeleted'] is True
+    assert result['deleted'] == ['evt-cancelled']
+    assert [event['id'] for event in result['events']] == ['evt-active']
+    assert result['sync_token'] == 'sync-token'
+
+
 def _normalise_iso_value(value: str) -> str:
     text = value.strip()
     if text.endswith('Z'):
