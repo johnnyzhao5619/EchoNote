@@ -1017,7 +1017,8 @@ class CalendarManager:
             end_time: Event end time as ISO string or ``datetime``
 
         Returns:
-            Tuple containing normalized start and end datetimes.
+            Tuple containing normalized start and end datetimes in UTC with
+            timezone information.
 
         Raises:
             ValueError: If either value cannot be converted to ``datetime``.
@@ -1043,22 +1044,17 @@ class CalendarManager:
         start_dt = _coerce(start_time, 'start_time')
         end_dt = _coerce(end_time, 'end_time')
 
-        if start_dt.tzinfo and end_dt.tzinfo:
-            return (
-                start_dt.astimezone(timezone.utc),
-                end_dt.astimezone(timezone.utc)
-            )
+        def _ensure_aware(value: datetime, reference: Optional[datetime]) -> datetime:
+            if value.tzinfo:
+                return value
+            if reference and reference.tzinfo:
+                return value.replace(tzinfo=reference.tzinfo)
+            return value.replace(tzinfo=timezone.utc)
 
-        if start_dt.tzinfo and not end_dt.tzinfo:
-            return (
-                start_dt.astimezone().replace(tzinfo=None),
-                end_dt
-            )
+        start_dt = _ensure_aware(start_dt, end_dt)
+        end_dt = _ensure_aware(end_dt, start_dt)
 
-        if end_dt.tzinfo and not start_dt.tzinfo:
-            return (
-                start_dt,
-                end_dt.astimezone().replace(tzinfo=None)
-            )
-
-        return start_dt, end_dt
+        return (
+            start_dt.astimezone(timezone.utc),
+            end_dt.astimezone(timezone.utc),
+        )
