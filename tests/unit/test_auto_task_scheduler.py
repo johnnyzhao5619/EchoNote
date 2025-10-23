@@ -440,7 +440,7 @@ def test_scheduler_triggers_reminder_with_timezone(monkeypatch):
 
     from core.timeline.manager import to_local_naive
 
-    now_local = to_local_naive(datetime.now().astimezone())
+    now_local = to_local_naive(FixedDateTime.now())
     event_start_local = to_local_naive(future_event.start_time)
     diff_seconds = (event_start_local - now_local).total_seconds()
     assert scheduler.reminder_minutes * 60 <= diff_seconds <= scheduler.reminder_minutes * 60 + 60
@@ -563,7 +563,7 @@ def test_scheduler_reminder_localized_en(monkeypatch):
 
     from core.timeline.manager import to_local_naive
 
-    now_local = to_local_naive(datetime.now().astimezone())
+    now_local = to_local_naive(FixedDateTime.now())
     event_start_local = to_local_naive(future_event.start_time)
     diff_seconds = (event_start_local - now_local).total_seconds()
     assert scheduler.reminder_minutes * 60 <= diff_seconds <= scheduler.reminder_minutes * 60 + 60
@@ -606,3 +606,113 @@ def test_scheduler_reminder_localized_en(monkeypatch):
         task_list=tasks_str
     )
     assert message == expected_message
+
+
+def test_scheduler_handles_naive_local_event_windows(monkeypatch):
+    reminder_minutes = 5
+
+    from datetime import datetime as real_datetime
+
+    fixed_now = real_datetime.now().astimezone().replace(microsecond=0)
+
+    class FixedDateTime(real_datetime):
+        @classmethod
+        def now(cls, tz=None):
+            if tz is None:
+                return fixed_now
+            return fixed_now.astimezone(tz)
+
+        @classmethod
+        def fromisoformat(cls, date_string):
+            return real_datetime.fromisoformat(date_string)
+
+    monkeypatch.setattr(
+        'core.timeline.auto_task_scheduler.datetime',
+        FixedDateTime
+    )
+
+    reminder_start = fixed_now + timedelta(minutes=reminder_minutes, seconds=10)
+    reminder_start_naive = reminder_start.replace(tzinfo=None).isoformat()
+
+    future_event = CalendarEvent(
+        id='naive-event',
+        title='Local Only Planning',
+        start_time=reminder_start_naive,
+        end_time=(reminder_start + timedelta(hours=1)).replace(tzinfo=None).isoformat(),
+    )
+
+    future_events = [{
+        'event': future_event,
+        'auto_tasks': {
+            'enable_transcription': True,
+            'enable_recording': True,
+        },
+    }]
+
+    timeline_manager = DummyTimelineManager(future_events)
+    recorder = DummyRecorder()
+    notifications = DummyNotificationManager()
+
+    monkeypatch.setattr(
+        'core.timeline.auto_task_scheduler.get_notification_manager',
+        lambda: notifications,
+    )
+
+    reminder_calls = []
+    start_calls = []
+
+    def _capture_reminder(self, event, auto_tasks):
+        reminder_calls.append((event.id, auto_tasks))
+
+    def _capture_start(self, event, auto_tasks):
+        start_calls.append((event.id, auto_tasks))
+        return True
+
+    monkeypatch.setattr(
+        AutoTaskScheduler,
+        '_send_reminder_notification',
+        _capture_reminder
+    )
+    monkeypatch.setattr(
+        AutoTaskScheduler,
+        '_start_auto_tasks',
+        _capture_start
+    )
+
+    i18n = I18nQtManager(default_language='en_US')
+
+    scheduler = AutoTaskScheduler(
+        timeline_manager=timeline_manager,
+        realtime_recorder=recorder,
+        db_connection=None,
+        file_manager=None,
+        reminder_minutes=reminder_minutes,
+        i18n_manager=i18n,
+    )
+
+    scheduler._check_upcoming_events()
+
+    assert reminder_calls == [(future_event.id, future_events[0]['auto_tasks'])]
+    assert future_event.id in scheduler.notified_events
+    assert not start_calls
+
+    from core.timeline.manager import to_local_naive
+
+    now_local = to_local_naive(FixedDateTime.now())
+    event_start_local = to_local_naive(future_event.start_time)
+    diff_seconds = (event_start_local - now_local).total_seconds()
+    assert reminder_minutes * 60 <= diff_seconds <= reminder_minutes * 60 + 60
+
+    near_start = fixed_now + timedelta(seconds=30)
+    future_event.start_time = near_start.replace(tzinfo=None).isoformat()
+
+    scheduler._check_upcoming_events()
+
+    assert start_calls
+    assert start_calls[0][0] == future_event.id
+    assert future_event.id in scheduler.started_events
+
+    now_local = to_local_naive(FixedDateTime.now())
+    event_start_local = to_local_naive(future_event.start_time)
+    diff_seconds = (event_start_local - now_local).total_seconds()
+    assert -60 <= diff_seconds <= 60

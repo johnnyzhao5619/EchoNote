@@ -561,6 +561,51 @@ def test_create_event_normalizes_mixed_timezone_inputs(tmp_path):
     db.close_all()
 
 
+def test_create_event_preserves_local_time_for_naive_inputs(tmp_path):
+    db = _create_db(tmp_path)
+    manager = CalendarManager(db)
+
+    local_now = datetime.now().astimezone()
+    local_tz = local_now.tzinfo
+    assert local_tz is not None
+
+    future_start = (local_now + timedelta(days=1)).replace(
+        hour=9,
+        minute=0,
+        second=0,
+        microsecond=0,
+    )
+    future_end = future_start + timedelta(hours=2)
+
+    event_data = {
+        "title": "Local Only Meeting",
+        "event_type": "Event",
+        "start_time": future_start.replace(tzinfo=None),
+        "end_time": future_end.replace(tzinfo=None),
+    }
+
+    event_id = manager.create_event(event_data)
+
+    rows = db.execute(
+        "SELECT start_time, end_time FROM calendar_events WHERE id = ?",
+        (event_id,),
+    )
+    assert rows
+    stored_start = rows[0]["start_time"]
+    stored_end = rows[0]["end_time"]
+
+    start_dt = datetime.fromisoformat(stored_start)
+    end_dt = datetime.fromisoformat(stored_end)
+
+    assert start_dt.tzinfo == timezone.utc
+    assert end_dt.tzinfo == timezone.utc
+
+    assert start_dt.astimezone(local_tz) == future_start
+    assert end_dt.astimezone(local_tz) == future_end
+
+    db.close_all()
+
+
 def test_multi_provider_links_are_persisted_and_retrievable(tmp_path):
     db = _create_db(tmp_path)
 
