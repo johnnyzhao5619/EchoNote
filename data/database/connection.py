@@ -34,6 +34,7 @@ class DatabaseConnection:
         self.db_path = Path(db_path).expanduser()
         self.encryption_key = encryption_key
         self._local = threading.local()
+        self._encryption_enabled: Optional[bool] = None
         
         # Ensure database directory exists
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -62,7 +63,9 @@ class DatabaseConnection:
             
             # Set row factory for dict-like access
             conn.row_factory = sqlite3.Row
-            
+
+            encryption_applied = False
+
             # Apply encryption if key is provided
             if self.encryption_key:
                 try:
@@ -70,7 +73,9 @@ class DatabaseConnection:
                     conn.execute("PRAGMA key = ?", (self.encryption_key,))
                     # Test if encryption is working
                     conn.execute("SELECT count(*) FROM sqlite_master")
-                    logger.info("Database encryption enabled (SQLCipher)")
+                    encryption_applied = self._check_sqlcipher(conn)
+                    if encryption_applied:
+                        logger.info("Database encryption enabled (SQLCipher)")
                 except sqlite3.OperationalError as e:
                     logger.debug(
                         "PRAGMA key parameter binding failed, attempting quoted fallback: %s",
@@ -82,9 +87,11 @@ class DatabaseConnection:
                         ).fetchone()[0]
                         conn.execute(f"PRAGMA key = {quoted_key}")
                         conn.execute("SELECT count(*) FROM sqlite_master")
-                        logger.info(
-                            "Database encryption enabled (SQLCipher, quoted key fallback)"
-                        )
+                        encryption_applied = self._check_sqlcipher(conn)
+                        if encryption_applied:
+                            logger.info(
+                                "Database encryption enabled (SQLCipher, quoted key fallback)"
+                            )
                     except sqlite3.OperationalError as enc_error:
                         logger.warning(
                             "SQLCipher not available, falling back to unencrypted: %s",
@@ -99,11 +106,41 @@ class DatabaseConnection:
                         )
                         conn.execute("PRAGMA foreign_keys = ON")
                         conn.row_factory = sqlite3.Row
-            
+                        encryption_applied = False
+
+            if self.encryption_key and not encryption_applied:
+                logger.debug(
+                    "Database connection established without active encryption; SQLCipher may be unavailable."
+                )
+
             self._local.connection = conn
+            if self.encryption_key:
+                self._encryption_enabled = encryption_applied
+            else:
+                self._encryption_enabled = False
         
         return self._local.connection
-    
+
+    def _check_sqlcipher(self, conn: sqlite3.Connection) -> bool:
+        """
+        Determine whether SQLCipher encryption is active for the connection.
+
+        Args:
+            conn: SQLite connection to inspect
+
+        Returns:
+            True if SQLCipher reports an active cipher version, False otherwise.
+        """
+        try:
+            cursor = conn.execute("PRAGMA cipher_version")
+            row = cursor.fetchone()
+            if row and row[0]:
+                logger.debug(f"SQLCipher reported cipher version: {row[0]}")
+                return True
+        except sqlite3.OperationalError:
+            logger.debug("SQLCipher PRAGMA not available on this connection.")
+        return False
+
     @contextmanager
     def get_cursor(self, commit: bool = False):
         """
@@ -169,6 +206,42 @@ class DatabaseConnection:
             cursor.executemany(query, params_list)
             return cursor.rowcount
     
+    def is_encryption_enabled(self) -> bool:
+        """Return whether SQLCipher encryption is active for this connection."""
+        if not hasattr(self._local, 'connection') or self._local.connection is None:
+            self._get_connection()
+
+        if self.encryption_key is None:
+            return False
+
+        if self._encryption_enabled is None:
+            self._encryption_enabled = self._check_sqlcipher(self._local.connection)
+
+        return bool(self._encryption_enabled)
+
+    def rekey(self, new_key: str) -> bool:
+        """Attempt to re-encrypt the database with a new SQLCipher key."""
+        conn = self._get_connection()
+
+        try:
+            quoted_key = conn.execute("SELECT quote(?)", (new_key,)).fetchone()[0]
+            conn.execute(f"PRAGMA rekey = {quoted_key}")
+            conn.execute("SELECT count(*) FROM sqlite_master")
+            self._encryption_enabled = self._check_sqlcipher(conn)
+            if self._encryption_enabled:
+                logger.info("Database rekeyed successfully with SQLCipher.")
+                return True
+            logger.warning(
+                "PRAGMA rekey executed but SQLCipher encryption could not be confirmed."
+            )
+        except sqlite3.OperationalError as e:
+            logger.warning(
+                "Failed to rekey database (SQLCipher may be unavailable): %s",
+                e,
+            )
+            self._encryption_enabled = False
+        return False
+
     def execute_script(self, script: str, commit: bool = True):
         """
         Execute a SQL script (multiple statements).
