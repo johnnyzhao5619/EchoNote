@@ -54,6 +54,32 @@ def _ensure_psutil_stub():
     sys.modules["psutil"] = psutil_module
 
 
+def _ensure_app_config_stub():
+    module_name = "config.app_config"
+    if module_name in sys.modules:
+        return
+
+    app_config_module = types.ModuleType(module_name)
+
+    class _ConfigManager:
+        def __init__(self, *args, **kwargs):  # noqa: D401, ARG002
+            self._config = {}
+
+    def _get_app_dir():  # noqa: D401
+        return Path.cwd()
+
+    app_config_module.ConfigManager = _ConfigManager  # type: ignore[attr-defined]
+    app_config_module.get_app_dir = _get_app_dir  # type: ignore[attr-defined]
+
+    config_package = sys.modules.get("config")
+    if config_package is None:
+        config_package = types.ModuleType("config")
+        sys.modules["config"] = config_package
+
+    setattr(config_package, "app_config", app_config_module)
+    sys.modules[module_name] = app_config_module
+
+
 def _ensure_pyqt6_stub():
     if "PyQt6" in sys.modules:
         return
@@ -83,6 +109,10 @@ def _ensure_pyqt6_stub():
         def stop(self):  # noqa: D401 - stub method
             return None
 
+        @staticmethod
+        def singleShot(*args, **kwargs):  # noqa: D401 - stub method
+            return None
+
     class _Signal:  # noqa: D401 - stub helper
         def __init__(self, *args, **kwargs):
             self._subscribers = []
@@ -98,7 +128,9 @@ def _ensure_pyqt6_stub():
         return _Signal()
 
     class _Qt:  # noqa: D401 - stub namespace
-        AlignCenter = 0
+        class AlignmentFlag:
+            AlignCenter = 0
+            AlignRight = 1
 
     qtcore_module.Qt = _Qt
     qtcore_module.QObject = QObject
@@ -117,6 +149,18 @@ def _ensure_pyqt6_stub():
         def addWidget(self, *args, **kwargs):  # noqa: N802,D401 - stub method
             return None
 
+        def addLayout(self, *args, **kwargs):  # noqa: N802,D401 - stub method
+            return None
+
+        def addStretch(self, *args, **kwargs):  # noqa: N802,D401 - stub method
+            return None
+
+        def setSpacing(self, *args, **kwargs):  # noqa: D401 - stub method
+            return None
+
+        def setContentsMargins(self, *args, **kwargs):  # noqa: D401 - stub method
+            return None
+
     class QVBoxLayout(QLayout):
         pass
 
@@ -127,22 +171,104 @@ def _ensure_pyqt6_stub():
         def setText(self, *args, **kwargs):  # noqa: D401 - stub method
             return None
 
+        def setWordWrap(self, *args, **kwargs):  # noqa: D401 - stub method
+            return None
+
+        def setObjectName(self, *args, **kwargs):  # noqa: D401 - stub method
+            return None
+
     class QProgressBar(QWidget):
         def setValue(self, *args, **kwargs):  # noqa: D401 - stub method
             return None
+
+    class QDialog(QWidget):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+
+        def setWindowTitle(self, *args, **kwargs):  # noqa: D401 - stub method
+            return None
+
+        def setMinimumWidth(self, *args, **kwargs):  # noqa: D401 - stub method
+            return None
+
+        def setModal(self, *args, **kwargs):  # noqa: D401 - stub method
+            return None
+
+        def accept(self, *args, **kwargs):  # noqa: D401 - stub method
+            return None
+
+    class QPushButton(QWidget):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.clicked = _Signal()
+
+        def setText(self, *args, **kwargs):  # noqa: D401 - stub method
+            return None
+
+        def setDefault(self, *args, **kwargs):  # noqa: D401 - stub method
+            return None
+
+    class QTextEdit(QWidget):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self._visible = True
+
+        def setPlainText(self, *args, **kwargs):  # noqa: D401 - stub method
+            return None
+
+        def setReadOnly(self, *args, **kwargs):  # noqa: D401 - stub method
+            return None
+
+        def setMaximumHeight(self, *args, **kwargs):  # noqa: D401 - stub method
+            return None
+
+        def setObjectName(self, *args, **kwargs):  # noqa: D401 - stub method
+            return None
+
+        def hide(self):  # noqa: D401 - stub method
+            self._visible = False
+
+        def show(self):  # noqa: D401 - stub method
+            self._visible = True
+
+        def isVisible(self):  # noqa: D401 - stub method
+            return self._visible
+
+    class QClipboard:
+        def setText(self, *args, **kwargs):  # noqa: D401 - stub method
+            return None
+
+    class QApplication:
+        _clipboard = QClipboard()
+
+        @classmethod
+        def clipboard(cls):  # noqa: D401 - stub method
+            return cls._clipboard
+
+    class QIcon:
+        def __init__(self, *args, **kwargs):  # noqa: D401 - stub method
+            pass
 
     qtwidgets_module.QWidget = QWidget
     qtwidgets_module.QVBoxLayout = QVBoxLayout
     qtwidgets_module.QHBoxLayout = QHBoxLayout
     qtwidgets_module.QLabel = QLabel
     qtwidgets_module.QProgressBar = QProgressBar
+    qtwidgets_module.QDialog = QDialog
+    qtwidgets_module.QPushButton = QPushButton
+    qtwidgets_module.QTextEdit = QTextEdit
+    qtwidgets_module.QApplication = QApplication
 
     pyqt6_module.QtCore = qtcore_module
     pyqt6_module.QtWidgets = qtwidgets_module
+    pyqt6_module.QtGui = types.ModuleType("PyQt6.QtGui")
+    pyqt6_module.QtGui.QIcon = QIcon  # type: ignore[attr-defined]
+    pyqt6_module.QtGui.QClipboard = QClipboard  # type: ignore[attr-defined]
 
     sys.modules["PyQt6"] = pyqt6_module
     sys.modules["PyQt6.QtCore"] = qtcore_module
     sys.modules["PyQt6.QtWidgets"] = qtwidgets_module
+    sys.modules["PyQt6.QtGui"] = pyqt6_module.QtGui
 
 
 _ensure_psutil_stub()
@@ -222,23 +348,6 @@ except Exception:  # pragma: no cover - fallback to local stubs
         sys.modules[
             "cryptography.hazmat.primitives.kdf.pbkdf2"
         ] = pbkdf2_module
-
-    app_config_module = types.ModuleType("config.app_config")
-
-    class _ConfigManager:
-        def __init__(self, *args, **kwargs):  # noqa: D401, ARG002
-            self._config = {}
-
-    def _get_app_dir():  # noqa: D401
-        return Path.cwd()
-
-    app_config_module.ConfigManager = _ConfigManager  # type: ignore[attr-defined]
-    app_config_module.get_app_dir = _get_app_dir  # type: ignore[attr-defined]
-
-    config_package = sys.modules.setdefault("config", types.ModuleType("config"))
-    setattr(config_package, "app_config", app_config_module)
-    sys.modules["config.app_config"] = app_config_module
-
 
 _ensure_app_config_stub()
 
