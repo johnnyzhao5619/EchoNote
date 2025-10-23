@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 
+from core.models.registry import get_default_model_names
 from ui.settings.base_page import BaseSettingsPage
 from utils.i18n import I18nQtManager
 
@@ -202,9 +203,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         
         # Model size
         self.model_size_combo = QComboBox()
-        self.model_size_combo.addItems([
-            'tiny', 'base', 'small', 'medium', 'large'
-        ])
+        self.model_size_combo.addItems(list(get_default_model_names()))
         self.model_size_combo.currentTextChanged.connect(self._emit_changed)
         self.model_size_label = QLabel(self.i18n.t('settings.transcription.model_size'))
         whisper_layout.addRow(
