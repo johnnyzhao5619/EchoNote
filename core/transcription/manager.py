@@ -16,7 +16,7 @@ from datetime import datetime
 
 from data.database.connection import DatabaseConnection
 from data.database.models import TranscriptionTask
-from engines.speech.base import SpeechEngine
+from engines.speech.base import SpeechEngine, AUDIO_VIDEO_SUFFIXES
 from core.transcription.task_queue import TaskQueue
 from core.transcription.format_converter import FormatConverter
 from config.app_config import get_app_dir
@@ -24,13 +24,6 @@ from ui.common.notification import get_notification_manager
 
 
 logger = logging.getLogger('echonote.transcription.manager')
-
-
-# Supported audio/video formats
-SUPPORTED_FORMATS = {
-    '.mp3', '.wav', '.m4a', '.flac', '.ogg', '.opus',
-    '.mp4', '.avi', '.mkv', '.mov', '.webm'
-}
 
 
 class TaskNotFoundError(Exception):
@@ -250,10 +243,10 @@ class TranscriptionManager:
             raise FileNotFoundError(f"File not found: {file_path}")
         
         # Validate file format
-        if file_path.suffix.lower() not in SUPPORTED_FORMATS:
+        if file_path.suffix.lower() not in AUDIO_VIDEO_SUFFIXES:
             raise ValueError(
                 f"Unsupported file format: {file_path.suffix}. "
-                f"Supported formats: {', '.join(sorted(SUPPORTED_FORMATS))}"
+                f"Supported formats: {', '.join(sorted(AUDIO_VIDEO_SUFFIXES))}"
             )
         
         # Create task record
@@ -309,7 +302,7 @@ class TranscriptionManager:
         
         # Recursively find all supported audio/video files
         for file_path in folder_path.rglob('*'):
-            if file_path.is_file() and file_path.suffix.lower() in SUPPORTED_FORMATS:
+            if file_path.is_file() and file_path.suffix.lower() in AUDIO_VIDEO_SUFFIXES:
                 try:
                     task_id = self.add_task(str(file_path), options)
                     task_ids.append(task_id)

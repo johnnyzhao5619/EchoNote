@@ -11,6 +11,8 @@ import os
 from pathlib import Path
 
 from engines.speech.base import (
+    AUDIO_VIDEO_FORMATS,
+    AUDIO_VIDEO_FORMAT_SET,
     BASE_LANGUAGE_CODES,
     CLOUD_SPEECH_ADDITIONAL_LANGUAGES,
     SpeechEngine,
@@ -27,10 +29,7 @@ class OpenAIEngine(SpeechEngine):
 
     API_BASE_URL = "https://api.openai.com/v1"
     MAX_FILE_SIZE = 25 * 1024 * 1024  # 25 MB
-    SUPPORTED_FORMATS = [
-        'mp3', 'mp4', 'mpeg', 'mpga', 'm4a',
-        'wav', 'webm', 'flac', 'ogg'
-    ]
+    SUPPORTED_FORMATS = list(AUDIO_VIDEO_FORMATS)
 
     def __init__(
         self,
@@ -133,7 +132,7 @@ class OpenAIEngine(SpeechEngine):
 
         # 检查文件格式
         file_ext = Path(audio_path).suffix.lower().lstrip('.')
-        if file_ext not in self.SUPPORTED_FORMATS:
+        if file_ext not in AUDIO_VIDEO_FORMAT_SET:
             formats = ', '.join(self.SUPPORTED_FORMATS)
             raise ValueError(
                 f"Unsupported file format: .{file_ext}. "

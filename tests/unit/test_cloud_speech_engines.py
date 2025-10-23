@@ -358,6 +358,10 @@ def test_openai_engine_languages_follow_shared_constants():
     asyncio.run(engine.close())
 
 
+def test_openai_engine_supported_formats_follow_shared_constant():
+    assert OpenAIEngine.SUPPORTED_FORMATS == list(speech_base.AUDIO_VIDEO_FORMATS)
+
+
 def test_google_translate_supported_languages_follow_shared_constants():
     expected = speech_base.combine_languages(
         ("zh",),

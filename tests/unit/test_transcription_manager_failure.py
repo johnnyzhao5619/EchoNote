@@ -304,8 +304,17 @@ def _ensure_pyqt_stub():
 _ensure_pyqt_stub()
 
 import config.app_config as app_config_module
+for module_name in [
+    "data",
+    "data.database",
+    "data.database.connection",
+    "data.database.models",
+]:
+    sys.modules.pop(module_name, None)
 import core.transcription.manager as transcription_manager_module
 from core.transcription.manager import TranscriptionManager
+from engines.speech.base import AUDIO_VIDEO_SUFFIXES, AUDIO_VIDEO_FORMATS
+from utils.error_handler import ErrorHandler
 from core.transcription.task_queue import TaskStatus
 from data.database.connection import DatabaseConnection
 from data.database.models import TranscriptionTask
@@ -599,6 +608,39 @@ def test_successful_process_uses_default_save_path(initialized_db, tmp_path):
     refreshed_task = TranscriptionTask.get_by_id(initialized_db, task.id)
     assert refreshed_task is not None
     assert refreshed_task.output_path == str(expected_output)
+
+
+def test_add_task_accepts_all_shared_formats(initialized_db, tmp_path):
+    engine = StubSpeechEngine()
+    manager = TranscriptionManager(initialized_db, engine, config={})
+
+    for index, suffix in enumerate(sorted(AUDIO_VIDEO_SUFFIXES)):
+        audio_file = tmp_path / f"sample_{index}{suffix}"
+        audio_file.write_bytes(b"RIFF")
+
+        try:
+            task_id = manager.add_task(str(audio_file))
+        except ValueError as exc:  # pragma: no cover - 失败时提供详细说明
+            pytest.fail(f"Extension {suffix} should be accepted but raised: {exc}")
+
+        assert isinstance(task_id, str) and task_id
+
+
+def test_add_task_rejects_unsupported_format(initialized_db, tmp_path):
+    engine = StubSpeechEngine()
+    manager = TranscriptionManager(initialized_db, engine, config={})
+
+    unknown_file = tmp_path / "sample.unsupported"
+    unknown_file.write_bytes(b"RIFF")
+
+    with pytest.raises(ValueError) as exc_info:
+        manager.add_task(str(unknown_file))
+
+    assert "Unsupported file format" in str(exc_info.value)
+
+
+def test_error_handler_formats_follow_shared_constant():
+    assert ErrorHandler.SUPPORTED_FORMATS == list(AUDIO_VIDEO_FORMATS)
 
 
 def test_legacy_task_without_output_format_uses_config_default(

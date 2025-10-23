@@ -6,7 +6,7 @@
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple, FrozenSet
 import io
 import numpy as np
 import soundfile as sf
@@ -281,5 +281,33 @@ class SpeechEngine(ABC):
         for field in required_fields:
             if field not in config:
                 return False
-        
+
         return True
+
+
+# 统一的音频/视频扩展名集合（统一为小写且不含前导点）
+AUDIO_VIDEO_FORMATS: Tuple[str, ...] = (
+    "mp3",
+    "wav",
+    "m4a",
+    "flac",
+    "ogg",
+    "opus",
+    "mp4",
+    "avi",
+    "mkv",
+    "mov",
+    "webm",
+    "mpeg",
+    "mpga",
+)
+"""所有语音转写功能需要识别的音视频扩展名。"""
+
+AUDIO_VIDEO_FORMAT_SET: FrozenSet[str] = frozenset(AUDIO_VIDEO_FORMATS)
+"""便于快速判断是否支持的扩展名集合。"""
+
+AUDIO_VIDEO_SUFFIXES: FrozenSet[str] = frozenset(
+    f".{extension}" for extension in AUDIO_VIDEO_FORMAT_SET
+)
+"""带点形式的扩展名集合，用于直接与 ``Path.suffix`` 比较。"""
+
