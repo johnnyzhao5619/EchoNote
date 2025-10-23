@@ -255,7 +255,7 @@ The data layer is anchored by `data/database`:
 Additional support modules:
 - `data/security/encryption.py` and `secrets_manager.py` manage symmetric keys and secure storage.
 - `data/storage/file_manager.py` handles transcript/export paths, cleanup, and disk quotas.
-- `data/test_data_layer.py` contains fixtures to validate schema changes; extend it with regression tests when altering database structure.
+- `tests/data/test_data_layer.py` 提供覆盖数据库 schema、加密及文件存储的集成测试，修改数据层逻辑时请补充相应断言。
 
 When evolving the schema:
 1. Update `schema.sql`.
@@ -362,4 +362,4 @@ For unresolved questions, open a GitHub issue or start a discussion thread so de
 ### 12.2 待跟进的重点事项
 - **实时与批量 UI 待完成交互**：批量转录暂停按钮、实时录制错误/成功提示仍为 TODO，建议补齐用户反馈与状态同步逻辑以避免功能缺失。【F:ui/batch_transcribe/widget.py†L655-L678】【F:ui/realtime_record/widget.py†L1052-L1079】【F:ui/realtime_record/widget.py†L1282-L1306】
 - **时间戳与时区统一策略**：目前数据库保存的 ISO 字符串可能混合无时区和含时区两种格式（例如事件与 OAuth 令牌），后续应制定统一规范（例如统一转换为 UTC 并在 UI 层进行本地化），以免不同模块再度引入比较错误。【F:core/calendar/manager.py†L68-L140】【F:core/timeline/auto_task_scheduler.py†L147-L206】
-- **数据层脚本测试化**：`data/test_data_layer.py` 仍以脚本方式运行并依赖 `print`，建议迁移到 `pytest` 体系，复用现有夹具以保持自动化测试一致性。【F:data/test_data_layer.py†L1-L80】
+- **数据层脚本测试化（已完成）**：数据层验证现已迁移到 `tests/data/test_data_layer.py`，通过 pytest 夹具完成隔离测试并移除遗留脚本依赖。

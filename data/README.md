@@ -16,7 +16,6 @@ data/
 │   └── secrets_manager.py  # Secure file-based secrets helper
 ├── storage/
 │   └── file_manager.py     # Secure file operations for transcripts and recordings
-├── test_data_layer.py      # Targeted tests covering database/security/file primitives
 └── README.md               # This file
 ```
 
@@ -36,7 +35,7 @@ data/
 - **`storage/file_manager.py`**: manages directory creation, secure file permissions, temp file cleanup, and helpers to save/read/delete audio and transcript assets under `~/Documents/EchoNote/`.
 
 ### Tests
-- **`test_data_layer.py`**: quick checks for encryption, OAuth storage, and file manager behaviour. Run with `pytest data/test_data_layer.py` when changing persistence primitives.
+- **`tests/data/test_data_layer.py`**: Pytest 模块覆盖数据库、安全与存储核心流程，直接运行 `pytest` 即可触发。
 
 ## Usage Tips
 - Call `DatabaseConnection.initialize_schema()` once at startup to ensure the schema exists.
