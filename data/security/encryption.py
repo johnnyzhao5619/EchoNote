@@ -49,9 +49,10 @@ class SecurityManager:
             self.config_dir = Path(config_dir).expanduser()
         
         self.config_dir.mkdir(parents=True, exist_ok=True)
-        
-        # File to store the salt
+
+        # File paths for persisted security artifacts
         self.salt_file = self.config_dir / ".salt"
+        self.machine_uuid_file = self.config_dir / ".machine-uuid"
         
         # Initialize or load salt
         self.salt = self._get_or_create_salt()
@@ -68,6 +69,27 @@ class SecurityManager:
         Returns:
             Machine-specific UUID string
         """
+        def _read_persisted_uuid() -> Optional[str]:
+            try:
+                if self.machine_uuid_file.exists():
+                    persisted = self.machine_uuid_file.read_text(encoding="utf-8").strip()
+                    if persisted:
+                        return persisted
+                    logger.warning("Persisted machine UUID file is empty; regenerating fallback.")
+            except Exception as read_error:
+                logger.warning(f"Could not read persisted machine UUID: {read_error}")
+            return None
+
+        def _persist_uuid(value: str) -> None:
+            try:
+                self.machine_uuid_file.write_text(value, encoding="utf-8")
+                try:
+                    os.chmod(self.machine_uuid_file, 0o600)
+                except Exception as chmod_error:
+                    logger.warning(f"Could not set permissions on machine UUID file: {chmod_error}")
+            except Exception as persist_error:
+                logger.warning(f"Could not persist fallback machine UUID: {persist_error}")
+
         try:
             # Try to get machine UUID from various sources
             if os.path.exists('/etc/machine-id'):
@@ -84,8 +106,15 @@ class SecurityManager:
                 return str(mac)
         except Exception as e:
             logger.warning(f"Could not get machine UUID: {e}")
-            # Fallback to a generated UUID (less secure but functional)
-            return str(uuid.uuid4())
+
+        persisted_uuid = _read_persisted_uuid()
+        if persisted_uuid:
+            return persisted_uuid
+
+        # Fallback to a generated UUID (less secure but functional)
+        generated_uuid = str(uuid.uuid4())
+        _persist_uuid(generated_uuid)
+        return generated_uuid
     
     def _get_or_create_salt(self) -> bytes:
         """

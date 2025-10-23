@@ -1,4 +1,7 @@
+import os
+import stat
 import sys
+import uuid
 from pathlib import Path
 
 
@@ -16,6 +19,7 @@ _ensure_cryptography_stubs()
 from data.database.connection import DatabaseConnection
 from data.database.encryption_helper import initialize_encryption_helper
 from data.database.models import CalendarSyncStatus
+from data.security import encryption as encryption_module
 from data.security.encryption import SecurityManager
 
 
@@ -84,3 +88,48 @@ def test_security_manager_password_hashing_migration(tmp_path):
     assert is_valid
     assert migrated is not None and "$" in migrated
     assert not security_manager.verify_password("wrong", legacy_hash)
+
+
+def test_security_manager_persists_fallback_uuid(tmp_path, monkeypatch):
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+
+    fallback_file = config_dir / ".machine-uuid"
+
+    original_exists = encryption_module.os.path.exists
+
+    def fake_exists(path):
+        if path in {"/etc/machine-id", "/var/lib/dbus/machine-id"}:
+            return False
+        return original_exists(path)
+
+    def raise_getnode():
+        raise RuntimeError("no mac address available")
+
+    generated_values: list[str] = []
+
+    def fake_uuid4():
+        if not generated_values:
+            value = uuid.UUID("11111111-1111-1111-1111-111111111111")
+        else:
+            value = uuid.UUID("22222222-2222-2222-2222-222222222222")
+        generated_values.append(str(value))
+        return value
+
+    monkeypatch.setattr(encryption_module.os.path, "exists", fake_exists)
+    monkeypatch.setattr(encryption_module.uuid, "getnode", raise_getnode)
+    monkeypatch.setattr(encryption_module.uuid, "uuid4", fake_uuid4)
+
+    security_manager_first = SecurityManager(str(config_dir))
+
+    secret = "top secret"
+    encrypted = security_manager_first.encrypt(secret)
+
+    assert fallback_file.exists()
+    assert fallback_file.read_text().strip() == generated_values[0]
+    assert stat.S_IMODE(os.stat(fallback_file).st_mode) == 0o600
+
+    security_manager_second = SecurityManager(str(config_dir))
+
+    assert security_manager_second.decrypt(encrypted) == secret
+    assert len(generated_values) == 1
