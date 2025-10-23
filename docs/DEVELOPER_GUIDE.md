@@ -109,6 +109,9 @@ Configuration is managed by `config/app_config.py`.
 - **Application version** is sourced from `ConfigManager`. Update `config/default_config.json` during releases and read the
   value via `ConfigManager().get("version")` instead of hard-coding it in UI or bootstrap code.
 - **User overrides** are persisted to `~/.echonote/app_config.json`.
+- **Resource monitor thresholds** ship as `resource_monitor.low_memory_mb=500` and `resource_monitor.high_cpu_percent=90`.
+  Values outside 64–1_048_576 MB or 1–100% are rejected by `_validate_resource_monitor_config`; surface changes via the
+  settings panel (or edit `app_config.json`) so the runtime warnings align with your deployment budgets.
 - Secrets such as OAuth credentials and encryption keys are stored via `data/security/secrets_manager.py` and encrypted when possible.
 - Engine API keys should be set via the settings UI, which delegates to the `SettingsManager` to persist encrypted values.
 

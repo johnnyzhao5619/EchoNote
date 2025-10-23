@@ -1,13 +1,9 @@
-"""
-Resource monitoring utility for EchoNote.
-
-Monitors system resources (CPU, memory) and provides warnings when
-resources are low.
-"""
+"""Resource monitoring utility for EchoNote."""
 
 import logging
+from typing import Any, Dict, Optional
+
 import psutil
-from typing import Dict, Optional
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
 
@@ -15,9 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class ResourceMonitor(QObject):
-    """
-    Monitors system resources and emits signals when thresholds are exceeded.
-    """
+    """Monitor system resources and emit signals when thresholds are exceeded."""
 
     # Signals
     low_memory_warning = pyqtSignal(float)  # Available memory in MB
@@ -31,7 +25,10 @@ class ResourceMonitor(QObject):
     def __init__(
         self,
         check_interval_ms: int = 30000,  # Check every 30 seconds
-        parent: Optional[QObject] = None
+        parent: Optional[QObject] = None,
+        *,
+        config_manager: Optional[Any] = None,
+        settings_manager: Optional[Any] = None
     ):
         """
         Initialize resource monitor.
@@ -39,8 +36,24 @@ class ResourceMonitor(QObject):
         Args:
             check_interval_ms: Interval between checks in milliseconds
             parent: Parent QObject
+            config_manager: Optional ConfigManager supplying thresholds
+            settings_manager: Optional SettingsManager supplying thresholds
         """
         super().__init__(parent)
+
+        self._threshold_source = settings_manager or config_manager
+        self.low_memory_threshold_mb = self._resolve_threshold(
+            key="resource_monitor.low_memory_mb",
+            default=float(self.LOW_MEMORY_THRESHOLD_MB),
+            minimum=64.0,
+            maximum=1048576.0
+        )
+        self.high_cpu_threshold_percent = self._resolve_threshold(
+            key="resource_monitor.high_cpu_percent",
+            default=float(self.HIGH_CPU_THRESHOLD_PERCENT),
+            minimum=1.0,
+            maximum=100.0
+        )
 
         self.check_interval_ms = check_interval_ms
         self._timer = QTimer(self)
@@ -57,8 +70,11 @@ class ResourceMonitor(QObject):
         self._prime_cpu_percent()
 
         logger.info(
-            f"ResourceMonitor initialized with "
-            f"check_interval={check_interval_ms}ms"
+            "ResourceMonitor initialized with check_interval=%sms, "
+            "low_memory_threshold=%.1fMB, high_cpu_threshold=%.1f%%",
+            check_interval_ms,
+            self.low_memory_threshold_mb,
+            self.high_cpu_threshold_percent
         )
 
     def start(self):
@@ -102,11 +118,12 @@ class ResourceMonitor(QObject):
             )
 
             # Check memory threshold
-            if available_mb < self.LOW_MEMORY_THRESHOLD_MB:
+            if available_mb < self.low_memory_threshold_mb:
                 if not self._low_memory_warned:
                     logger.warning(
-                        f"Low memory warning: {available_mb:.1f}MB available "
-                        f"(threshold: {self.LOW_MEMORY_THRESHOLD_MB}MB)"
+                        "Low memory warning: %.1fMB available (threshold: %.1fMB)",
+                        available_mb,
+                        self.low_memory_threshold_mb
                     )
                     self.low_memory_warning.emit(available_mb)
                     self._low_memory_warned = True
@@ -119,11 +136,12 @@ class ResourceMonitor(QObject):
                     self.resources_recovered.emit()
 
             # Check CPU threshold
-            if cpu_percent > self.HIGH_CPU_THRESHOLD_PERCENT:
+            if cpu_percent > self.high_cpu_threshold_percent:
                 if not self._high_cpu_warned:
                     logger.warning(
-                        f"High CPU warning: {cpu_percent:.1f}% "
-                        f"(threshold: {self.HIGH_CPU_THRESHOLD_PERCENT}%)"
+                        "High CPU warning: %.1f%% (threshold: %.1f%%)",
+                        cpu_percent,
+                        self.high_cpu_threshold_percent
                     )
                     self.high_cpu_warning.emit(cpu_percent)
                     self._high_cpu_warned = True
@@ -232,12 +250,93 @@ class ResourceMonitor(QObject):
 
         return cpu_percent
 
+    def _resolve_threshold(
+        self,
+        *,
+        key: str,
+        default: float,
+        minimum: Optional[float] = None,
+        maximum: Optional[float] = None
+    ) -> float:
+        """Resolve threshold from configuration with fallback to default."""
+
+        value = self._get_config_value(key)
+        if value is None:
+            return default
+
+        try:
+            numeric = float(value)
+        except (TypeError, ValueError):
+            logger.warning(
+                "Invalid value '%s' for %s; using default %.1f",
+                value,
+                key,
+                default
+            )
+            return default
+
+        if minimum is not None and numeric < minimum:
+            logger.warning(
+                "%s=%.1f below minimum %.1f; using default %.1f",
+                key,
+                numeric,
+                minimum,
+                default
+            )
+            return default
+
+        if maximum is not None and numeric > maximum:
+            logger.warning(
+                "%s=%.1f above maximum %.1f; using default %.1f",
+                key,
+                numeric,
+                maximum,
+                default
+            )
+            return default
+
+        return numeric
+
+    def _get_config_value(self, key: str) -> Optional[Any]:
+        """Retrieve a configuration value from the injected settings provider."""
+
+        if self._threshold_source is None:
+            return None
+
+        getter = getattr(self._threshold_source, "get_setting", None)
+        if callable(getter):
+            try:
+                return getter(key)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "Failed to read %s via get_setting: %s", key, exc
+                )
+
+        getter = getattr(self._threshold_source, "get", None)
+        if callable(getter):
+            try:
+                return getter(key)
+            except TypeError:
+                try:
+                    return getter(key, None)
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning(
+                        "Failed to read %s via get(key, default): %s", key, exc
+                    )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Failed to read %s via get: %s", key, exc)
+
+        return None
+
 
 # Singleton instance
 _resource_monitor_instance: Optional[ResourceMonitor] = None
 
 
-def get_resource_monitor() -> ResourceMonitor:
+def get_resource_monitor(
+    config_manager: Optional[Any] = None,
+    settings_manager: Optional[Any] = None
+) -> ResourceMonitor:
     """
     Get the singleton ResourceMonitor instance.
 
@@ -246,5 +345,20 @@ def get_resource_monitor() -> ResourceMonitor:
     """
     global _resource_monitor_instance
     if _resource_monitor_instance is None:
-        _resource_monitor_instance = ResourceMonitor()
+        threshold_source = settings_manager or config_manager
+        if threshold_source is None:
+            from config.app_config import ConfigManager  # Local import to avoid cycles
+
+            threshold_source = ConfigManager()
+            _resource_monitor_instance = ResourceMonitor(
+                config_manager=threshold_source
+            )
+        elif settings_manager is not None:
+            _resource_monitor_instance = ResourceMonitor(
+                settings_manager=settings_manager
+            )
+        else:
+            _resource_monitor_instance = ResourceMonitor(
+                config_manager=config_manager
+            )
     return _resource_monitor_instance

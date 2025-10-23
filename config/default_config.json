@@ -61,6 +61,10 @@
     "reminder_minutes": 5,
     "page_size": 50
   },
+  "resource_monitor": {
+    "low_memory_mb": 500,
+    "high_cpu_percent": 90
+  },
   "ui": {
     "theme": "light",
     "language": "zh_CN"

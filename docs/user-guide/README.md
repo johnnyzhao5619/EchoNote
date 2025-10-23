@@ -262,6 +262,8 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 - **Model Management**: download/verify models, inspect disk usage.
 - **Calendar**: external accounts, sync cadence, conflict policies.
 - **Security**: database encryption, key rotation, OAuth secrets.
+- **Diagnostics**: resource monitor thresholds for low-memory (MB) and high-CPU (%) alerts; tune them to match your machine's
+  headroom.
 
 > **Quick path:** `Settings → Model Management → Available Models → Download`
 
@@ -273,6 +275,7 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 - **模型管理**：下载/校验模型，查看磁盘占用。
 - **日历**：外部账号、同步频率、冲突策略。
 - **安全**：数据库加密、密钥轮换、OAuth 机密。
+- **诊断**：资源监控的低内存（MB）与高 CPU（%）告警阈值，可按照机器可用资源在设置面板中调节。
 
 > **快捷路径：** `设置 → 模型管理 → 可用模型 → 下载`
 
@@ -286,6 +289,20 @@ La configuration est enregistrée dans `~/.echonote/app_config.json` et les jour
 - **Gestion des modèles** : télécharger/vérifier les modèles, surveiller l’espace disque.
 - **Calendrier** : comptes externes, cadence de synchronisation, politiques de conflit.
 - **Sécurité** : chiffrement de la base, rotation des clés, secrets OAuth.
+- **Diagnostics** : seuils du moniteur de ressources pour la mémoire basse (Mo) et l’utilisation CPU élevée (%), à ajuster selon
+  la marge matérielle disponible.
+
+Low-memory warnings fire once available RAM drops below the configured megabytes (500 MB by default). High-CPU warnings emit when
+usage exceeds the configured percentage (default 90%). Use the Settings panel to update `resource_monitor.low_memory_mb` and
+`resource_monitor.high_cpu_percent`—or edit `~/.echonote/app_config.json` directly—for environments with different budgets.
+
+低内存告警会在可用内存低于阈值（默认 500 MB）时触发；高 CPU 告警则在平均占用超过设定百分比（默认 90%）时出现。可通过设置面板调整
+`resource_monitor.low_memory_mb` 与 `resource_monitor.high_cpu_percent`（或直接编辑 `~/.echonote/app_config.json`）以适配您的工作站。
+
+Les alertes de mémoire basse se déclenchent lorsque la RAM disponible passe sous le seuil (500 Mo par défaut). Les alertes CPU se
+déclenchent au-delà du pourcentage configuré (90 % par défaut). Ajustez `resource_monitor.low_memory_mb` et
+`resource_monitor.high_cpu_percent` via le panneau Paramètres ou en modifiant `~/.echonote/app_config.json` pour aligner les
+avertissements sur votre capacité matérielle.
 
 > **Chemin rapide :** `Settings → Model Management → Available Models → Download`
 

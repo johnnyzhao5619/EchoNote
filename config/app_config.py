@@ -84,6 +84,7 @@ class ConfigManager:
             "realtime": dict,
             "calendar": dict,
             "timeline": dict,
+            "resource_monitor": dict,
             "ui": dict,
             "security": dict
         }
@@ -103,6 +104,7 @@ class ConfigManager:
         # Validate nested required fields
         self._validate_database_config()
         self._validate_transcription_config()
+        self._validate_resource_monitor_config()
         self._validate_ui_config()
     
     def _validate_database_config(self) -> None:
@@ -180,7 +182,7 @@ class ConfigManager:
                         "transcription.task_queue.retry_delay must be a "
                         "non-negative number"
                     )
-        
+
         # Validate faster_whisper configuration
         if "faster_whisper" in trans_config:
             fw_config = trans_config["faster_whisper"]
@@ -214,7 +216,40 @@ class ConfigManager:
                         f"transcription.faster_whisper.default_model must be "
                         f"one of {valid_models}"
                     )
-    
+
+    def _validate_resource_monitor_config(self) -> None:
+        """Validate resource monitor configuration."""
+        monitor_config = self._config["resource_monitor"]
+
+        for field in ("low_memory_mb", "high_cpu_percent"):
+            if field not in monitor_config:
+                raise ValueError(
+                    f"Missing required field: resource_monitor.{field}"
+                )
+
+        low_memory_mb = monitor_config["low_memory_mb"]
+        if isinstance(low_memory_mb, bool) or not isinstance(low_memory_mb, (int, float)):
+            raise TypeError(
+                "resource_monitor.low_memory_mb must be a number"
+            )
+
+        if not (64 <= float(low_memory_mb) <= 1048576):
+            raise ValueError(
+                "resource_monitor.low_memory_mb must be between 64 and 1048576 MB"
+            )
+
+        high_cpu_percent = monitor_config["high_cpu_percent"]
+        if (isinstance(high_cpu_percent, bool) or
+                not isinstance(high_cpu_percent, (int, float))):
+            raise TypeError(
+                "resource_monitor.high_cpu_percent must be a number"
+            )
+
+        if not (1 <= float(high_cpu_percent) <= 100):
+            raise ValueError(
+                "resource_monitor.high_cpu_percent must be between 1 and 100"
+            )
+
     def _validate_ui_config(self) -> None:
         """Validate UI configuration."""
         ui_config = self._config["ui"]
