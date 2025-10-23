@@ -93,7 +93,8 @@ class GoogleCalendarAdapter(OAuthCalendarAdapter):
                 params = {
                     'maxResults': 250,
                     'singleEvents': True,
-                    'orderBy': 'startTime'
+                    'orderBy': 'startTime',
+                    'showDeleted': True,
                 }
 
                 # Use sync token for incremental sync
