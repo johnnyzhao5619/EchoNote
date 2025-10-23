@@ -351,6 +351,7 @@ For unresolved questions, open a GitHub issue or start a discussion thread so de
 ## 12. Architecture Review Notes (2025-02)
 
 ### 12.1 已交付的改进
+- **批量暂停与实时录制反馈交互落地**：`BatchTranscribeWidget` 在暂停/恢复时会同步所有任务项的按钮状态并通过状态栏反馈结果，而 `RealtimeRecordWidget` 在录制成功或失败时会更新醒目的状态标签并触发系统通知，这些路径也由单元测试覆盖确保回归安全。【F:ui/batch_transcribe/widget.py†L668-L707】【F:ui/batch_transcribe/widget.py†L886-L907】【F:ui/realtime_record/widget.py†L1126-L1161】【F:ui/realtime_record/widget.py†L1418-L1461】【F:tests/unit/test_realtime_preferences.py†L155-L252】
 - **日历入口数据校验强化**：`CalendarManager.create_event` 现在会验证标题与起止时间、并在必要时统一时区后比较时间顺序，防止脏数据写入数据库并避免后续 UI/自动化流程崩溃。【F:core/calendar/manager.py†L68-L140】【F:core/calendar/manager.py†L603-L655】
 - **OAuth 令牌过期计算更健壮**：刷新逻辑会在有时区信息时使用相同的时区基准计算 `expires_in`，规避天真地减法导致的 `TypeError` 并减少无谓的重试。【F:core/calendar/manager.py†L316-L348】
 - **时间线调度窗口可配置**：自动任务调度器以分钟维度定义前后窗口并转换为天数传递给时间线查询，移除硬编码常数，也新增了针对不同时区的秒数计算辅助方法。【F:core/timeline/auto_task_scheduler.py†L55-L198】【F:core/timeline/auto_task_scheduler.py†L641-L655】
@@ -358,8 +359,7 @@ For unresolved questions, open a GitHub issue or start a discussion thread so de
 - **时间线搜索片段国际化**：`TimelineManager` 现在可注入全局 `I18nQtManager` 或自定义取词回调，所有标题、描述、转录前缀与缺失提示均改用 `timeline.snippet.*` 翻译键，并在英文、中文与法文资源中补充默认值，同时补充了单元测试验证本地化回退逻辑。【F:core/timeline/manager.py†L44-L575】【F:main.py†L596-L601】【F:resources/translations/en_US.json†L143-L149】【F:resources/translations/zh_CN.json†L143-L149】【F:resources/translations/fr_FR.json†L143-L149】【F:tests/unit/test_timeline_manager.py†L37-L458】
 - **提醒通知时间本地化**：`AutoTaskScheduler` 在提醒文案中通过 `to_local_naive` 统一转换事件开始时间，确保含时区字符串以本地时间展示，并补充了针对该场景的单元测试。【F:core/timeline/auto_task_scheduler.py†L240-L287】【F:tests/unit/test_auto_task_scheduler.py†L360-L545】
 - **自动任务通知国际化**：`AutoTaskScheduler` 现在通过共享的 `I18nQtManager` 渲染启动、完成与异常提示文案，并同步更新了多语言资源及回归测试，保证所有桌面通知均可随语言切换即时本地化。【F:core/timeline/auto_task_scheduler.py†L352-L470】【F:main.py†L24-L102】【F:resources/translations/zh_CN.json†L1-L40】【F:tests/unit/test_realtime_recorder_audio_unavailable.py†L300-L380】
+- **数据层脚本测试化**：针对数据库、加解密、OAuth 与文件生命周期的验证已迁移至 `tests/data/test_data_layer.py`，通过 pytest 夹具隔离环境并覆盖关键 CRUD、权限与密钥流程，取代了早期的手工脚本。【F:tests/data/test_data_layer.py†L1-L192】
 
 ### 12.2 待跟进的重点事项
-- **实时与批量 UI 待完成交互**：批量转录暂停按钮、实时录制错误/成功提示仍为 TODO，建议补齐用户反馈与状态同步逻辑以避免功能缺失。【F:ui/batch_transcribe/widget.py†L655-L678】【F:ui/realtime_record/widget.py†L1052-L1079】【F:ui/realtime_record/widget.py†L1282-L1306】
 - **时间戳与时区统一策略**：目前数据库保存的 ISO 字符串可能混合无时区和含时区两种格式（例如事件与 OAuth 令牌），后续应制定统一规范（例如统一转换为 UTC 并在 UI 层进行本地化），以免不同模块再度引入比较错误。【F:core/calendar/manager.py†L68-L140】【F:core/timeline/auto_task_scheduler.py†L147-L206】
-- **数据层脚本测试化（已完成）**：数据层验证现已迁移到 `tests/data/test_data_layer.py`，通过 pytest 夹具完成隔离测试并移除遗留脚本依赖。
