@@ -1147,6 +1147,45 @@ def test_remove_external_event_cleans_single_provider_event(tmp_path):
     db.close_all()
 
 
+def test_remove_external_event_cleans_files_for_single_provider_event(tmp_path):
+    db = _create_db(tmp_path)
+    storage_root = tmp_path / "storage"
+    file_manager = FileManager(base_dir=str(storage_root))
+    manager = CalendarManager(db, file_manager=file_manager)
+
+    single_event = CalendarEvent(
+        title="Google Only",
+        start_time="2024-05-02T09:00:00",
+        end_time="2024-05-02T10:00:00",
+        source="google",
+        is_readonly=True,
+    )
+    single_event.save(db)
+
+    file_path = file_manager.save_text_file("temporary", "attachment.txt")
+
+    EventAttachment(
+        event_id=single_event.id,
+        attachment_type="transcript",
+        file_path=file_path,
+    ).save(db)
+
+    CalendarEventLink(
+        event_id=single_event.id,
+        provider="google",
+        external_id="google-evt-3",
+    ).save(db)
+
+    manager._remove_external_event(single_event.id, "google", "google-evt-3")
+
+    assert CalendarEvent.get_by_id(db, single_event.id) is None
+    assert not CalendarEventLink.list_for_event(db, single_event.id)
+    assert not EventAttachment.get_by_event_id(db, single_event.id)
+    assert not Path(file_path).exists()
+
+    db.close_all()
+
+
 def test_calendar_event_all_day_detection_variants():
     date_only = CalendarEvent(
         title="全天",

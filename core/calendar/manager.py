@@ -942,6 +942,20 @@ class CalendarManager:
             if should_delete_event:
                 attachments = EventAttachment.get_by_event_id(self.db, event_id)
                 for attachment in attachments:
+                    if self.file_manager and attachment.file_path:
+                        try:
+                            self.file_manager.delete_file(attachment.file_path)
+                        except FileNotFoundError:
+                            logger.warning(
+                                "Attachment file already missing: %s",
+                                attachment.file_path,
+                            )
+                        except Exception as exc:  # pragma: no cover - defensive
+                            logger.error(
+                                "Failed to delete attachment file %s: %s",
+                                attachment.file_path,
+                                exc,
+                            )
                     attachment.delete(self.db)
 
                 event.delete(self.db)
