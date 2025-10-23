@@ -10,7 +10,12 @@ import numpy as np
 import os
 from pathlib import Path
 
-from engines.speech.base import SpeechEngine
+from engines.speech.base import (
+    BASE_LANGUAGE_CODES,
+    CLOUD_SPEECH_ADDITIONAL_LANGUAGES,
+    SpeechEngine,
+    combine_languages,
+)
 from utils.http_client import AsyncRetryableHttpClient
 from data.database.models import APIUsage
 
@@ -75,12 +80,11 @@ class OpenAIEngine(SpeechEngine):
 
     def get_supported_languages(self) -> List[str]:
         """获取支持的语言列表"""
-        # OpenAI Whisper 支持的语言
-        return [
-            'zh', 'en', 'fr', 'de', 'es', 'it', 'ja', 'ko', 'pt', 'ru',
-            'ar', 'hi', 'nl', 'pl', 'tr', 'vi', 'id', 'th', 'uk', 'sv',
-            'da', 'no', 'fi', 'cs', 'ro', 'bg', 'el', 'he', 'fa', 'ur'
-        ]
+        # OpenAI Whisper 支持的基础语言及扩展语言
+        return combine_languages(
+            BASE_LANGUAGE_CODES,
+            CLOUD_SPEECH_ADDITIONAL_LANGUAGES,
+        )
 
     async def transcribe_file(
         self,

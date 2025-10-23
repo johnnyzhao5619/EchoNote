@@ -35,6 +35,7 @@ if "soundfile" not in sys.modules:
 
 import pytest
 
+from engines.speech.base import BASE_LANGUAGE_CODES, combine_languages
 from engines.speech.faster_whisper_engine import FasterWhisperEngine
 
 
@@ -107,6 +108,21 @@ def test_faster_whisper_engine_refreshes_availability(monkeypatch, tmp_path):
 
     assert engine.model is not None
     assert engine.model.model_path == model_info.local_path
+
+
+def test_faster_whisper_supported_languages_follow_shared_constants(monkeypatch):
+    """基础语言列表应与共享常量保持一致。"""
+
+    monkeypatch.setattr(
+        "utils.gpu_detector.GPUDetector.validate_device_config",
+        staticmethod(lambda device, compute_type: ("cpu", "int8", "")),
+    )
+
+    engine = FasterWhisperEngine(model_size="base")
+
+    expected = combine_languages(BASE_LANGUAGE_CODES)
+
+    assert engine.get_supported_languages() == expected
 
 
 def test_engine_initialization_does_not_mark_usage(monkeypatch):

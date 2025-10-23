@@ -2,19 +2,136 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import io
 import sys
 import types
 from typing import Any, Dict
+from pathlib import Path
 
-import numpy as np
+try:
+    import numpy as np
+except ModuleNotFoundError:  # pragma: no cover - 最小化依赖环境下的回退实现
+    def _linspace(start: float, stop: float, num: int, dtype: Any | None = None):
+        if num <= 1:
+            return [start]
+        step = (stop - start) / (num - 1)
+        return [start + step * i for i in range(num)]
+
+    def _zeros(count: int, dtype: Any | None = None):
+        return [0.0] * count
+
+    def _vstack(arrays: list[list[float]]):
+        return arrays
+
+    np = types.SimpleNamespace(  # type: ignore[assignment]
+        ndarray=object,
+        linspace=_linspace,
+        zeros=_zeros,
+        float32=float,
+        vstack=_vstack,
+        interp=lambda x, xp, fp: x,
+        clip=lambda data, min_value, max_value: data,
+    )
+    sys.modules["numpy"] = np
 import pytest
-import soundfile as sf
+
+try:
+    import soundfile as sf
+except ModuleNotFoundError:  # pragma: no cover - 最小化依赖环境下的回退实现
+    sf = types.SimpleNamespace(  # type: ignore[assignment]
+        write=lambda *args, **kwargs: None,
+        read=lambda *args, **kwargs: (_zeros(1), 16000),
+        info=lambda *args, **kwargs: types.SimpleNamespace(format="WAV", duration=0.0),
+        SoundFile=None,
+    )
+    sys.modules["soundfile"] = sf
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+if "httpx" not in sys.modules:
+    class _Response:
+        def __init__(self, status_code: int = 200, json_data: Dict[str, Any] | None = None) -> None:
+            self.status_code = status_code
+            self._json_data = json_data or {}
+
+        def json(self) -> Dict[str, Any]:  # pragma: no cover - 仅用于类型占位
+            return dict(self._json_data)
+
+        def raise_for_status(self) -> None:  # pragma: no cover - 仅用于类型占位
+            if self.status_code >= 400:
+                raise _HTTPStatusError(f"HTTP {self.status_code}")
+
+    class _HTTPError(Exception):
+        pass
+
+    class _HTTPStatusError(_HTTPError):
+        pass
+
+    class _ConnectError(_HTTPError):
+        pass
+
+    class _TimeoutException(_HTTPError):
+        pass
+
+    class _NetworkError(_HTTPError):
+        pass
+
+    class _BaseClient:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            self.headers = kwargs.get("headers", {})
+
+        def close(self) -> None:  # pragma: no cover - 仅用于类型占位
+            return None
+
+    class _Client(_BaseClient):
+        def request(self, *args: Any, **kwargs: Any) -> _Response:  # pragma: no cover
+            raise NotImplementedError
+
+    class _AsyncClient(_BaseClient):
+        async def request(self, *args: Any, **kwargs: Any) -> _Response:  # pragma: no cover
+            raise NotImplementedError
+
+        async def post(self, *args: Any, **kwargs: Any) -> _Response:  # pragma: no cover
+            return await self.request(*args, **kwargs)
+
+        async def aclose(self) -> None:
+            return None
+
+    sys.modules["httpx"] = types.SimpleNamespace(
+        AsyncClient=_AsyncClient,
+        Client=_Client,
+        Response=_Response,
+        HTTPError=_HTTPError,
+        HTTPStatusError=_HTTPStatusError,
+        ConnectError=_ConnectError,
+        TimeoutException=_TimeoutException,
+        NetworkError=_NetworkError,
+    )
+
+if "data.database.models" not in sys.modules:
+    data_module = sys.modules.setdefault("data", types.ModuleType("data"))
+    database_module = types.ModuleType("data.database")
+    models_module = types.ModuleType("data.database.models")
+
+    class _APIUsage:  # pragma: no cover - 仅用于导入占位
+        pass
+
+    models_module.APIUsage = _APIUsage
+
+    sys.modules["data.database"] = database_module
+    sys.modules["data.database.models"] = models_module
+    setattr(data_module, "database", database_module)
+    setattr(database_module, "models", models_module)
 
 from engines.speech import base as speech_base
 from engines.speech.azure_engine import AzureEngine
 from engines.speech.google_engine import GoogleEngine
+from engines.speech.openai_engine import OpenAIEngine
+from engines.translation.google_translate import GoogleTranslateEngine
 
 
 def _generate_wav_bytes(sample_rate: int = 16000, frames: int = 320) -> bytes:
@@ -200,3 +317,52 @@ async def test_azure_engine_transcribe_file_converts_mp3(monkeypatch, tmp_path):
     assert captured["headers"]["Content-Type"] == "audio/wav; codecs=audio/pcm; samplerate=16000"
     assert captured["content"] == expected_bytes
     assert captured["params"]["language"] == "en-US"
+
+
+def test_google_engine_languages_follow_shared_constants():
+    engine = GoogleEngine(api_key="test-key")
+
+    expected = speech_base.combine_languages(
+        speech_base.BASE_LANGUAGE_CODES,
+        speech_base.CLOUD_SPEECH_ADDITIONAL_LANGUAGES,
+    )
+
+    assert engine.get_supported_languages() == expected
+
+    asyncio.run(engine.close())
+
+
+def test_azure_engine_languages_follow_shared_constants():
+    engine = AzureEngine(subscription_key="test", region="eastus")
+
+    expected = speech_base.combine_languages(
+        speech_base.BASE_LANGUAGE_CODES,
+        speech_base.CLOUD_SPEECH_ADDITIONAL_LANGUAGES,
+    )
+
+    assert engine.get_supported_languages() == expected
+
+    asyncio.run(engine.close())
+
+
+def test_openai_engine_languages_follow_shared_constants():
+    engine = OpenAIEngine(api_key="test-key")
+
+    expected = speech_base.combine_languages(
+        speech_base.BASE_LANGUAGE_CODES,
+        speech_base.CLOUD_SPEECH_ADDITIONAL_LANGUAGES,
+    )
+
+    assert engine.get_supported_languages() == expected
+
+    asyncio.run(engine.close())
+
+
+def test_google_translate_supported_languages_follow_shared_constants():
+    expected = speech_base.combine_languages(
+        ("zh",),
+        speech_base.CHINESE_LANGUAGE_VARIANTS,
+        speech_base.BASE_LANGUAGE_CODES,
+    )
+
+    assert GoogleTranslateEngine.SUPPORTED_LANGUAGES == expected
