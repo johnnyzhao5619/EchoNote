@@ -48,6 +48,45 @@ def _create_auto_task_scheduler(
     )
 
 
+def _create_resource_monitor_handlers(transcription_manager, i18n, logger):
+    """Create handlers for resource monitor signals."""
+    from ui.common.notification import get_notification_manager
+
+    notification_manager = get_notification_manager()
+
+    def on_low_memory(available_mb):
+        """Handle low memory warning."""
+        logger.warning(
+            f"Low memory detected: {available_mb:.1f}MB available. "
+            f"Pausing transcription tasks."
+        )
+
+        if getattr(transcription_manager, "_running", False):
+            transcription_manager.pause_processing()
+
+        notification_manager.send_warning(
+            title=i18n.t('notification.low_memory.title'),
+            message=i18n.t(
+                'notification.low_memory.message',
+                memory=f"{available_mb:.0f}MB"
+            )
+        )
+
+    def on_resources_recovered():
+        """Handle resources recovered."""
+        logger.info("System resources recovered. Resuming transcription tasks.")
+
+        if getattr(transcription_manager, "_running", False) and transcription_manager.is_paused():
+            transcription_manager.resume_processing()
+
+        notification_manager.send_info(
+            title=i18n.t('notification.resources_recovered.title'),
+            message=i18n.t('notification.resources_recovered.message')
+        )
+
+    return on_low_memory, on_resources_recovered
+
+
 def exception_hook(exctype, value, tb):
     """
     Global exception handler for uncaught exceptions.
@@ -372,43 +411,11 @@ def main():
         managers['resource_monitor'] = resource_monitor
         
         # Connect resource monitor signals to transcription manager
-        def on_low_memory(available_mb):
-            """Handle low memory warning."""
-            logger.warning(
-                f"Low memory detected: {available_mb:.1f}MB available. "
-                f"Pausing transcription tasks."
-            )
-            
-            # Pause transcription tasks
-            if transcription_manager._running:
-                transcription_manager.pause_processing()
-            
-            # Show notification to user
-            from ui.common.notification import Notification
-            Notification.show(
-                title=i18n.t('notification.low_memory.title'),
-                message=i18n.t(
-                    'notification.low_memory.message',
-                    memory=f"{available_mb:.0f}MB"
-                ),
-                notification_type='warning'
-            )
-        
-        def on_resources_recovered():
-            """Handle resources recovered."""
-            logger.info("System resources recovered. Resuming transcription tasks.")
-            
-            # Resume transcription tasks
-            if transcription_manager._running and transcription_manager.is_paused():
-                transcription_manager.resume_processing()
-            
-            # Show notification to user
-            from ui.common.notification import Notification
-            Notification.show(
-                title=i18n.t('notification.resources_recovered.title'),
-                message=i18n.t('notification.resources_recovered.message'),
-                notification_type='info'
-            )
+        on_low_memory, on_resources_recovered = _create_resource_monitor_handlers(
+            transcription_manager=transcription_manager,
+            i18n=i18n,
+            logger=logger,
+        )
         
         # Connect signals
         resource_monitor.low_memory_warning.connect(on_low_memory)
