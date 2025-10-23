@@ -99,6 +99,10 @@ class RealtimeRecorder:
         # 事件循环引用（用于线程安全的队列操作）
         self._event_loop = None
 
+        # 模型使用统计状态
+        self._transcription_succeeded = False
+        self._model_usage_recorded = False
+
         logger.info("RealtimeRecorder initialized")
 
     def _translate(self, key: str, default: str, **kwargs) -> str:
@@ -233,6 +237,8 @@ class RealtimeRecorder:
         self.audio_buffer = AudioBuffer(sample_rate=self.sample_rate)
         self.accumulated_transcription = []
         self.accumulated_translation = []
+        self._transcription_succeeded = False
+        self._model_usage_recorded = False
         with self._marker_lock:
             self.markers = []
 
@@ -413,6 +419,7 @@ class RealtimeRecorder:
                         logger.debug(f"Duplicate transcription detected, skipping: {text[:50]}...")
                     else:
                         self.accumulated_transcription.append(text)
+                        self._transcription_succeeded = True
                         await stream_queue.put(text)
 
                         if self.on_transcription_update:
@@ -656,12 +663,37 @@ class RealtimeRecorder:
             event_id = await self._create_calendar_event(result)
             result['event_id'] = event_id
 
+        self._record_model_usage_if_needed()
+
         logger.info(f"Recording stopped: duration={duration:.2f}s")
 
         # 本次会话完成后清理队列引用
         self._release_session_queues()
 
         return result
+
+    def _record_model_usage_if_needed(self) -> None:
+        """若本次会话成功产生转录结果，则记录模型使用。"""
+        if self._model_usage_recorded or not self._transcription_succeeded:
+            return
+
+        manager = getattr(self.speech_engine, 'model_manager', None)
+        model_name = getattr(self.speech_engine, 'model_size', None)
+
+        if not manager or not model_name:
+            return
+
+        try:
+            manager.mark_model_used(model_name)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Failed to record model usage for real-time session (model=%s): %s",
+                model_name,
+                exc,
+                exc_info=True,
+            )
+        else:
+            self._model_usage_recorded = True
 
     async def _ensure_translation_task_stopped(self) -> None:
         """确保翻译任务在停止录音前已完全退出。"""

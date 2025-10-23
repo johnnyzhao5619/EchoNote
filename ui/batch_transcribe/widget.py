@@ -511,10 +511,7 @@ class BatchTranscribeWidget(QWidget):
                         # Add model path to options
                         options['model_name'] = selected_model
                         options['model_path'] = model_info.local_path
-                        
-                        # Mark model as used
-                        self.model_manager.mark_model_used(selected_model)
-                        
+
                         logger.debug(
                             f"Using model {selected_model} "
                             f"at {model_info.local_path}"

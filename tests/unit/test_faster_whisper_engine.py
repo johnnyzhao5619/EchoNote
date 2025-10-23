@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import sys
 import types
 from dataclasses import dataclass
@@ -51,6 +52,7 @@ class _FakeModelManager:
     def __init__(self, model_info: _FakeModelInfo) -> None:
         self._model_info = model_info
         self._requested_names: list[str] = []
+        self.used_names: list[str] = []
 
     def get_model(self, name: str) -> _FakeModelInfo:
         self._requested_names.append(name)
@@ -58,6 +60,7 @@ class _FakeModelManager:
 
     def mark_model_used(self, name: str) -> None:  # pragma: no cover - 仅保持接口兼容
         self._requested_names.append(f"used:{name}")
+        self.used_names.append(name)
 
 
 def test_faster_whisper_engine_refreshes_availability(monkeypatch, tmp_path):
@@ -104,3 +107,70 @@ def test_faster_whisper_engine_refreshes_availability(monkeypatch, tmp_path):
 
     assert engine.model is not None
     assert engine.model.model_path == model_info.local_path
+
+
+def test_engine_initialization_does_not_mark_usage(monkeypatch):
+    """初始化时不应记录模型使用次数。"""
+
+    monkeypatch.setattr(
+        "utils.gpu_detector.GPUDetector.validate_device_config",
+        staticmethod(lambda device, compute_type: ("cpu", "int8", "")),
+    )
+
+    model_info = _FakeModelInfo(is_downloaded=True, local_path="/tmp/model")
+    manager = _FakeModelManager(model_info)
+
+    FasterWhisperEngine(model_size="base", model_manager=manager)
+
+    assert manager.used_names == []
+
+
+def test_transcribe_file_marks_usage_after_success(monkeypatch, tmp_path):
+    """转录成功后应记录模型使用次数。"""
+
+    monkeypatch.setattr(
+        "utils.gpu_detector.GPUDetector.validate_device_config",
+        staticmethod(lambda device, compute_type: ("cpu", "int8", "")),
+    )
+
+    model_info = _FakeModelInfo(is_downloaded=True, local_path=str(tmp_path / "base"))
+    manager = _FakeModelManager(model_info)
+
+    engine = FasterWhisperEngine(model_size="base", model_manager=manager)
+
+    assert manager.used_names == []
+
+    # 确保模型可用
+    engine._refresh_model_status()
+
+    class _DummyWhisperModel:
+        def __init__(self) -> None:
+            self.model_path = model_info.local_path
+
+        def transcribe(self, *_args, **_kwargs):
+            segments = [
+                types.SimpleNamespace(start=0.0, end=1.0, text="hello world"),
+            ]
+            info = types.SimpleNamespace(language="en", duration=1.0)
+            return iter(segments), info
+
+    engine._load_model = lambda: setattr(engine, "model", _DummyWhisperModel())
+
+    class _DummyLoop:
+        async def run_in_executor(self, _executor, func, *args, **kwargs):
+            return func(*args, **kwargs)
+
+    monkeypatch.setattr(asyncio, "get_event_loop", lambda: _DummyLoop())
+
+    monkeypatch.setattr(
+        sys.modules["soundfile"],
+        "info",
+        lambda *_args, **_kwargs: types.SimpleNamespace(duration=1.0),
+    )
+
+    audio_path = tmp_path / "audio.wav"
+    audio_path.write_bytes(b"data")
+
+    asyncio.run(engine.transcribe_file(str(audio_path)))
+
+    assert manager.used_names == ["base"]
