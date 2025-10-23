@@ -128,6 +128,32 @@ async def test_google_engine_transcribe_file_converts_mp3(monkeypatch, tmp_path)
 
 
 @pytest.mark.asyncio
+async def test_google_engine_transcribe_file_rejects_large_converted_audio(monkeypatch, tmp_path):
+    """当转换后的音频超出同步接口限制时应提前提示。"""
+
+    engine = GoogleEngine(api_key="test-key")
+    audio_path = tmp_path / "oversized.ogg"
+    audio_path.write_bytes(b"small")  # 原始文件小于 10MB
+
+    oversized_bytes = b"0" * (GoogleEngine.MAX_FILE_SIZE + 1)
+
+    def _fake_convert(audio_path_arg: str, target_rate: int):
+        assert audio_path_arg == str(audio_path)
+        assert target_rate == 16000
+        return oversized_bytes, 16000, 16000, "OGG"
+
+    monkeypatch.setattr("engines.speech.google_engine.convert_audio_to_wav_bytes", _fake_convert)
+
+    with pytest.raises(ValueError) as exc_info:
+        await engine.transcribe_file(str(audio_path))
+
+    await engine.close()
+
+    assert "Google Cloud Storage" in str(exc_info.value)
+    assert "asynchronous" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
 async def test_azure_engine_transcribe_file_converts_mp3(monkeypatch, tmp_path):
     """Azure 引擎应发送 16-bit PCM WAV 并声明实际采样率。"""
 

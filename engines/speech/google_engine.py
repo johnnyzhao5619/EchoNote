@@ -125,6 +125,14 @@ class GoogleEngine(SpeechEngine):
             target_rate
         )
 
+        converted_size = len(wav_bytes)
+        if converted_size > self.MAX_FILE_SIZE:
+            raise ValueError(
+                "Converted audio size exceeds synchronous API limit. "
+                "Please upload the audio to Google Cloud Storage, use the asynchronous "
+                "interface, or trim the audio before retrying."
+            )
+
         logger.debug(
             "Google audio prepared: format=%s, original_rate=%s, effective_rate=%s",
             detected_format,
