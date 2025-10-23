@@ -98,6 +98,10 @@ class FasterWhisperEngine(SpeechEngine):
 
     def _load_model(self):
         """延迟加载模型"""
+        # 每次尝试加载前都重新检查模型状态，以反映最新的下载结果
+        if self.model_manager:
+            self._refresh_model_status()
+
         if self.model is None:
             # 首先检查模型是否可用
             if not self._model_available:
@@ -207,11 +211,28 @@ class FasterWhisperEngine(SpeechEngine):
     def is_model_available(self) -> bool:
         """
         检查模型是否可用
-        
+
         Returns:
             bool: 模型是否已下载并可用
         """
+        if self.model_manager:
+            self._refresh_model_status()
+
         return self._model_available
+
+    def _refresh_model_status(self) -> None:
+        """根据 ModelManager 的最新信息刷新模型缓存状态。"""
+        if not self.model_manager:
+            return
+
+        model_info = self.model_manager.get_model(self.model_size)
+        if model_info and model_info.is_downloaded:
+            self._model_available = True
+            if model_info.local_path:
+                self.download_root = str(Path(model_info.local_path).parent)
+        else:
+            self._model_available = False
+            self.download_root = None
     
     def get_name(self) -> str:
         """获取引擎名称"""
