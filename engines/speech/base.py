@@ -46,6 +46,40 @@ CLOUD_SPEECH_ADDITIONAL_LANGUAGES: Tuple[str, ...] = (
     "ur",
 )
 
+# Canonical locale mapping for cloud speech engines.
+CLOUD_SPEECH_LANGUAGE_LOCALE_MAPPING: Dict[str, str] = {
+    "zh": "zh-CN",
+    "en": "en-US",
+    "fr": "fr-FR",
+    "de": "de-DE",
+    "es": "es-ES",
+    "it": "it-IT",
+    "ja": "ja-JP",
+    "ko": "ko-KR",
+    "pt": "pt-BR",
+    "ru": "ru-RU",
+    "ar": "ar-SA",
+    "hi": "hi-IN",
+    "nl": "nl-NL",
+    "pl": "pl-PL",
+    "tr": "tr-TR",
+    "vi": "vi-VN",
+    "id": "id-ID",
+    "th": "th-TH",
+    "uk": "uk-UA",
+    "sv": "sv-SE",
+    "da": "da-DK",
+    "no": "no-NO",
+    "fi": "fi-FI",
+    "cs": "cs-CZ",
+    "ro": "ro-RO",
+    "bg": "bg-BG",
+    "el": "el-GR",
+    "he": "he-IL",
+    "fa": "fa-IR",
+    "ur": "ur-PK",
+}
+
 # Common Chinese locale variants for translation scenarios.
 CHINESE_LANGUAGE_VARIANTS: Tuple[str, ...] = (
     "zh-CN",
