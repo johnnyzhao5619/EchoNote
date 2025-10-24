@@ -67,6 +67,8 @@ EchoNote/
 ### License
 Released under the [MIT License](LICENSE).
 
+> ⚠️ **PyQt6 许可提醒**：UI 层当前依赖 PyQt6。PyQt6 以 GPLv3 发布，若将 EchoNote 作为闭源商业产品分发，则需要购买 Riverbank 商业授权，或确保整体应用在 GPLv3 下发布。若希望保持与 MIT 许可兼容，可评估迁移至 [PySide6](https://doc.qt.io/qtforpython/)（LGPL/MIT 友好许可）或其他兼容框架，并在产品规划中预留相应的合规策略。
+
 ---
 
 ### English

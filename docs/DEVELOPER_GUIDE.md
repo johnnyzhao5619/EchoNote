@@ -72,6 +72,13 @@ Supporting modules under `utils/` provide logging, diagnostics, async helpers, a
 - Git
 - pip / venv tooling
 - Optional runtime dependencies: FFmpeg (media support), PortAudio (microphone capture), CUDA drivers (GPU acceleration)
+- **PyQt6 licensing** – The desktop UI currently targets PyQt6 (GPLv3). Shipping a closed-source/commercial build requires purchasing a Riverbank commercial license or releasing the full stack under GPLv3. Teams that must stay aligned with EchoNote's MIT license should plan for PySide6 or another LGPL/MIT-compatible toolkit and follow the compliance guidelines below.
+
+#### Licensing compliance checklist
+- Confirm the intended distribution model (open-source GPL vs. proprietary) before packaging desktop builds.
+- If the product must remain MIT-compatible, prefer PySide6 (LGPL) or another permissively licensed Qt binding, and document the decision in the release notes.
+- Keep third-party notices up to date (`LICENSE` and `docs/THIRD_PARTY_NOTICES.md` when applicable) so downstream partners can audit dependencies quickly.
+- Raise licensing deviations in architecture/design reviews; contributors must not introduce GPL-only components without prior approval from the maintainers.
 
 Follow the platform-specific instructions in `docs/quick-start/README.md` if you need package manager commands.
 
@@ -229,6 +236,14 @@ UI code under `ui/` follows Qt best practices:
 - Feature-specific packages (`batch_transcribe`, `realtime_record`, `calendar_hub`, `timeline`, `settings`) contain views, dialogs, and presenters dedicated to each domain.
 - Shared components and dialogs live in `ui/common/` and `ui/dialogs/` (e.g., splash screen, notifications, error handling).
 - Qt styles reside in `resources/themes/`, translations in `resources/translations/`, and icons in `resources/icons/`.
+
+#### PyQt6 → PySide6 migration feasibility
+- **Dependency swap** – Replace `PyQt6` with `PySide6` in `requirements.txt`/`requirements-dev.txt` and align tooling (e.g., freeze scripts, PyInstaller hooks) with PySide6-specific modules. Ensure CI caches include the new wheel (PySide6 ~150 MB).
+- **Import surface** – Update all `from PyQt6` imports to `from PySide6`, replacing `.QtCore`, `.QtGui`, `.QtWidgets`, `.QtQml`, etc. PySide6 exposes `QtWidgets` members identically but lacks the `PyQt6.sip` module; refactor any direct `sip` usage to Qt's `QObject` APIs or PySide6's `shiboken6` utilities.
+- **API differences** – Adjust property binding (`Signal[str]` vs. `Signal(str)`), enum access (`Qt.AlignmentFlag.AlignLeft` remains, but auto-conversion rules differ), and QVariant conversions (PySide6 auto-wraps Python types). Audit custom models/delegates for reliance on PyQt-specific behaviour.
+- **Packaging** – Revise build scripts (`utils/startup_optimizer.py` references, installer manifests) to include PySide6 plugins (`platforms`, `styles`, `imageformats`). PySide6 ships LGPL-friendly Qt libraries; ensure the deployment flow bundles the LGPL notice and dynamic linking obligations.
+- **Compatibility validation** – Run unit/integration tests plus manual smoke tests on critical flows: main window launch, realtime recorder, batch transcription dialogs, calendar OAuth browser flow. Add UI regression checks (screenshot diffs) to confirm styles render consistently.
+- **Risk assessment** – Migration is medium risk: wide import changes but limited business logic impact. Schedule at least one release cycle for dual-binding support (feature flag that allows selecting PyQt6 or PySide6) before removing PyQt6.
 
 #### UI/线程与异步事件循环
 - `ui/realtime_record/widget.py` 为实时录制场景专门启动了一个 asyncio 事件循环线程，用于驱动录制/翻译协程。该线程在控件构造时创建，必须在控件关闭时显式停止：调用 `self._async_loop.call_soon_threadsafe(self._async_loop.stop)`，并在同一清理例程里 `join` 线程，防止线程泄漏。
