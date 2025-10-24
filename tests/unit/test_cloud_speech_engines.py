@@ -372,6 +372,41 @@ def test_google_translate_supported_languages_follow_shared_constants():
     assert GoogleTranslateEngine.SUPPORTED_LANGUAGES == expected
 
 
+@pytest.mark.parametrize(
+    "engine_factory",
+    [
+        lambda: GoogleEngine(api_key="test-key"),
+        lambda: AzureEngine(subscription_key="test", region="eastus"),
+    ],
+)
+def test_cloud_speech_language_code_mapping(engine_factory):
+    """云端语音引擎应共享语言代码映射与回退策略。"""
+
+    engine = engine_factory()
+
+    try:
+        expected_mapping = {
+            "da": "da-DK",
+            "no": "no-NO",
+            "fi": "fi-FI",
+            "cs": "cs-CZ",
+            "ro": "ro-RO",
+            "bg": "bg-BG",
+            "el": "el-GR",
+            "he": "he-IL",
+            "fa": "fa-IR",
+            "ur": "ur-PK",
+        }
+
+        for language, locale in expected_mapping.items():
+            assert engine._convert_language_code(language) == locale
+
+        assert engine._convert_language_code(None) == "en-US"
+        assert engine._convert_language_code("xx") == "xx"
+    finally:
+        asyncio.run(engine.close())
+
+
 def test_close_lazy_loaded_translation_engine_releases_resources(monkeypatch):
     import logging
     from utils.resource_cleanup import close_lazy_loaded_engine

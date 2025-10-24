@@ -14,6 +14,7 @@ import base64
 from engines.speech.base import (
     BASE_LANGUAGE_CODES,
     CLOUD_SPEECH_ADDITIONAL_LANGUAGES,
+    CLOUD_SPEECH_LANGUAGE_LOCALE_MAPPING,
     SpeechEngine,
     combine_languages,
     convert_audio_to_wav_bytes,
@@ -73,31 +74,7 @@ class GoogleEngine(SpeechEngine):
         if not language:
             return "en-US"
         
-        # 语言代码映射
-        mapping = {
-            'zh': 'zh-CN',
-            'en': 'en-US',
-            'fr': 'fr-FR',
-            'de': 'de-DE',
-            'es': 'es-ES',
-            'it': 'it-IT',
-            'ja': 'ja-JP',
-            'ko': 'ko-KR',
-            'pt': 'pt-BR',
-            'ru': 'ru-RU',
-            'ar': 'ar-SA',
-            'hi': 'hi-IN',
-            'nl': 'nl-NL',
-            'pl': 'pl-PL',
-            'tr': 'tr-TR',
-            'vi': 'vi-VN',
-            'id': 'id-ID',
-            'th': 'th-TH',
-            'uk': 'uk-UA',
-            'sv': 'sv-SE'
-        }
-        
-        return mapping.get(language, f"{language}-{language.upper()}")
+        return CLOUD_SPEECH_LANGUAGE_LOCALE_MAPPING.get(language, language)
 
     async def transcribe_file(self, audio_path: str, language: Optional[str] = None, **kwargs) -> Dict:
         """
