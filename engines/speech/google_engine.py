@@ -47,7 +47,7 @@ class GoogleEngine(SpeechEngine):
     def __init__(self, api_key: str, timeout: int = 60, max_retries: int = 3):
         """
         初始化 Google 引擎
-        
+
         Args:
             api_key: Google Cloud API Key
             timeout: 请求超时时间（秒）
@@ -56,12 +56,9 @@ class GoogleEngine(SpeechEngine):
         self.api_key = api_key
         self.timeout = timeout
         self.max_retries = max_retries
-        
-        self.client = httpx.AsyncClient(
-            base_url=self.API_BASE_URL,
-            timeout=timeout
-        )
-        
+
+        self.client = httpx.AsyncClient(base_url=self.API_BASE_URL, timeout=timeout)
+
         logger.info("Google Speech-to-Text engine initialized")
 
     def get_name(self) -> str:
@@ -79,22 +76,24 @@ class GoogleEngine(SpeechEngine):
     def _convert_language_code(self, language: Optional[str]) -> str:
         """
         转换语言代码为 Google 格式
-        
+
         Args:
             language: ISO-639-1 语言代码
-            
+
         Returns:
             str: Google 语言代码（如 'zh-CN', 'en-US'）
         """
         if not language:
             return "en-US"
-        
+
         return CLOUD_SPEECH_LANGUAGE_LOCALE_MAPPING.get(language, language)
 
-    async def transcribe_file(self, audio_path: str, language: Optional[str] = None, **kwargs) -> Dict:
+    async def transcribe_file(
+        self, audio_path: str, language: Optional[str] = None, **kwargs
+    ) -> Dict:
         """
         转录音频文件
-        
+
         Args:
             audio_path: 音频文件路径
             language: 源语言代码
@@ -109,17 +108,16 @@ class GoogleEngine(SpeechEngine):
                 f"File size ({file_size} bytes) exceeds maximum ({self.MAX_FILE_SIZE} bytes). "
                 "Consider using Google Cloud Storage for larger files."
             )
-        
-        enable_punctuation = kwargs.get('enable_automatic_punctuation', True)
-        enable_word_offsets = kwargs.get('enable_word_time_offsets', False)
-        sample_rate = kwargs.get('sample_rate')
+
+        enable_punctuation = kwargs.get("enable_automatic_punctuation", True)
+        enable_word_offsets = kwargs.get("enable_word_time_offsets", False)
+        sample_rate = kwargs.get("sample_rate")
 
         logger.info(f"Transcribing file with Google: {audio_path}, language={language}")
 
         target_rate = sample_rate or 16000
         wav_bytes, effective_rate, original_rate, detected_format = convert_audio_to_wav_bytes(
-            audio_path,
-            target_rate
+            audio_path, target_rate
         )
 
         converted_size = len(wav_bytes)
@@ -134,11 +132,11 @@ class GoogleEngine(SpeechEngine):
             "Google audio prepared: format=%s, original_rate=%s, effective_rate=%s",
             detected_format,
             original_rate,
-            effective_rate
+            effective_rate,
         )
 
-        audio_content = base64.b64encode(wav_bytes).decode('utf-8')
-        
+        audio_content = base64.b64encode(wav_bytes).decode("utf-8")
+
         # 准备请求数据
         request_data = {
             "config": {
@@ -146,77 +144,71 @@ class GoogleEngine(SpeechEngine):
                 "sampleRateHertz": effective_rate,
                 "languageCode": self._convert_language_code(language),
                 "enableAutomaticPunctuation": enable_punctuation,
-                "enableWordTimeOffsets": enable_word_offsets
+                "enableWordTimeOffsets": enable_word_offsets,
             },
-            "audio": {
-                "content": audio_content
-            }
+            "audio": {"content": audio_content},
         }
-        
+
         # 发送请求（带重试）
         for attempt in range(self.max_retries):
             try:
                 response = await self.client.post(
-                    f"/speech:recognize?key={self.api_key}",
-                    json=request_data
+                    f"/speech:recognize?key={self.api_key}", json=request_data
                 )
                 response.raise_for_status()
-                
+
                 # 解析响应
                 result_data = response.json()
-                
+
                 # 转换为标准格式
                 segments = []
                 if "results" in result_data:
                     current_time = 0.0
-                    
+
                     for result in result_data["results"]:
                         if "alternatives" in result and result["alternatives"]:
                             alternative = result["alternatives"][0]
                             text = alternative.get("transcript", "").strip()
-                            
+
                             # 如果有词级时间戳，使用它们
                             if "words" in alternative and alternative["words"]:
                                 words = alternative["words"]
-                                start_time = float(words[0].get("startTime", "0s").rstrip('s'))
-                                end_time = float(words[-1].get("endTime", "0s").rstrip('s'))
+                                start_time = float(words[0].get("startTime", "0s").rstrip("s"))
+                                end_time = float(words[-1].get("endTime", "0s").rstrip("s"))
                             else:
                                 # 否则估算时间
                                 duration = len(text.split()) * 0.5  # 假设每个词 0.5 秒
                                 start_time = current_time
                                 end_time = current_time + duration
                                 current_time = end_time
-                            
-                            segments.append({
-                                "start": start_time,
-                                "end": end_time,
-                                "text": text
-                            })
-                
+
+                            segments.append({"start": start_time, "end": end_time, "text": text})
+
                 result = {
                     "segments": segments,
                     "language": language or "unknown",
-                    "duration": segments[-1]["end"] if segments else 0.0
+                    "duration": segments[-1]["end"] if segments else 0.0,
                 }
-                
+
                 logger.info(f"Transcription completed: {len(segments)} segments")
                 return result
-                
+
             except httpx.HTTPStatusError as e:
                 logger.error(f"HTTP error (attempt {attempt + 1}/{self.max_retries}): {e}")
-                
+
                 if e.response.status_code == 429:
                     # 速率限制
                     if attempt < self.max_retries - 1:
                         import asyncio
-                        wait_time = 2 ** attempt
+
+                        wait_time = 2**attempt
                         logger.info(f"Rate limited, waiting {wait_time}s before retry...")
                         await asyncio.sleep(wait_time)
                         continue
-                
+
                 if attempt == self.max_retries - 1:
                     raise
-                    
+
             except Exception as e:
                 logger.error(f"Request failed (attempt {attempt + 1}/{self.max_retries}): {e}")
                 if attempt == self.max_retries - 1:
@@ -227,7 +219,7 @@ class GoogleEngine(SpeechEngine):
         audio_chunk: np.ndarray,
         language: Optional[str] = None,
         sample_rate: Optional[int] = None,
-        **kwargs
+        **kwargs,
     ) -> str:
         """
         实时转录音频流
@@ -241,28 +233,29 @@ class GoogleEngine(SpeechEngine):
         """
         import tempfile
         import soundfile as sf
-        
+
         logger.debug("Transcribing audio stream with Google")
 
         effective_rate = sample_rate if sample_rate and sample_rate > 0 else 16000
 
         # 保存为临时文件
-        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp_file:
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_file:
             tmp_path = tmp_file.name
             sf.write(tmp_path, audio_chunk, effective_rate)
 
         try:
             # 转录临时文件
-            stream_kwargs = {**kwargs, 'sample_rate': effective_rate}
+            stream_kwargs = {**kwargs, "sample_rate": effective_rate}
             result = await self.transcribe_file(tmp_path, language, **stream_kwargs)
-            
+
             # 合并所有段落的文本
             text = " ".join([seg["text"] for seg in result["segments"]])
             return text
-            
+
         finally:
             # 清理临时文件
             import os
+
             os.unlink(tmp_path)
 
     def get_config_schema(self) -> Dict:
@@ -273,22 +266,18 @@ class GoogleEngine(SpeechEngine):
                 "api_key": {
                     "type": "string",
                     "description": "Google Cloud API Key",
-                    "minLength": 1
+                    "minLength": 1,
                 },
-                "timeout": {
-                    "type": "integer",
-                    "default": 60,
-                    "description": "请求超时时间（秒）"
-                },
+                "timeout": {"type": "integer", "default": 60, "description": "请求超时时间（秒）"},
                 "max_retries": {
                     "type": "integer",
                     "default": 3,
                     "minimum": 1,
                     "maximum": 10,
-                    "description": "最大重试次数"
-                }
+                    "description": "最大重试次数",
+                },
             },
-            "required": ["api_key"]
+            "required": ["api_key"],
         }
 
     async def close(self):

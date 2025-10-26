@@ -35,7 +35,7 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from config.app_config import get_app_dir
 
 
-logger = logging.getLogger('echonote.security')
+logger = logging.getLogger("echonote.security")
 
 
 class SecurityManager:
@@ -62,21 +62,21 @@ class SecurityManager:
             self.config_dir = get_app_dir()
         else:
             self.config_dir = Path(config_dir).expanduser()
-        
+
         self.config_dir.mkdir(parents=True, exist_ok=True)
 
         # File paths for persisted security artifacts
         self.salt_file = self.config_dir / ".salt"
         self.machine_uuid_file = self.config_dir / ".machine-uuid"
-        
+
         # Initialize or load salt
         self.salt = self._get_or_create_salt()
-        
+
         # Derive encryption key from machine UUID
         self.encryption_key = self._derive_key()
-        
+
         logger.info("Security manager initialized")
-    
+
     def _get_machine_uuid(self) -> str:
         """
         Get a unique identifier for this machine.
@@ -84,6 +84,7 @@ class SecurityManager:
         Returns:
             Machine-specific UUID string
         """
+
         def _read_persisted_uuid() -> Optional[str]:
             try:
                 if self.machine_uuid_file.exists():
@@ -107,13 +108,13 @@ class SecurityManager:
 
         try:
             # Try to get machine UUID from various sources
-            if os.path.exists('/etc/machine-id'):
+            if os.path.exists("/etc/machine-id"):
                 # Linux
-                with open('/etc/machine-id', 'r') as f:
+                with open("/etc/machine-id", "r") as f:
                     return f.read().strip()
-            elif os.path.exists('/var/lib/dbus/machine-id'):
+            elif os.path.exists("/var/lib/dbus/machine-id"):
                 # Linux alternative
-                with open('/var/lib/dbus/machine-id', 'r') as f:
+                with open("/var/lib/dbus/machine-id", "r") as f:
                     return f.read().strip()
             else:
                 # macOS/Windows - use uuid.getnode() which returns MAC address
@@ -130,7 +131,7 @@ class SecurityManager:
         generated_uuid = str(uuid.uuid4())
         _persist_uuid(generated_uuid)
         return generated_uuid
-    
+
     def _get_or_create_salt(self) -> bytes:
         """
         Get existing salt or create a new one.
@@ -140,32 +141,32 @@ class SecurityManager:
         """
         if self.salt_file.exists():
             try:
-                with open(self.salt_file, 'rb') as f:
+                with open(self.salt_file, "rb") as f:
                     salt = f.read()
                 if len(salt) == 32:
                     logger.debug("Loaded existing salt")
                     return salt
             except Exception as e:
                 logger.warning(f"Could not read salt file: {e}")
-        
+
         # Create new salt
         salt = os.urandom(32)
-        
+
         try:
             # Save salt with restricted permissions
-            with open(self.salt_file, 'wb') as f:
+            with open(self.salt_file, "wb") as f:
                 f.write(salt)
-            
+
             # Set file permissions (owner read/write only)
             os.chmod(self.salt_file, 0o600)
-            
+
             logger.info("Created new salt")
         except Exception as e:
             logger.error(f"Could not save salt file: {e}")
             raise
-        
+
         return salt
-    
+
     def _derive_key(self) -> bytes:
         """
         Derive encryption key from machine UUID and salt.
@@ -174,7 +175,7 @@ class SecurityManager:
             32-byte encryption key for AES-256
         """
         machine_uuid = self._get_machine_uuid()
-        
+
         # Use PBKDF2 to derive key
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
@@ -182,12 +183,12 @@ class SecurityManager:
             salt=self.salt,
             iterations=100000,  # OWASP recommended minimum
         )
-        
-        key = kdf.derive(machine_uuid.encode('utf-8'))
+
+        key = kdf.derive(machine_uuid.encode("utf-8"))
         logger.debug("Derived encryption key")
-        
+
         return key
-    
+
     def encrypt(self, plaintext: str) -> str:
         """
         Encrypt plaintext using AES-256-GCM.
@@ -200,34 +201,32 @@ class SecurityManager:
         """
         if not plaintext:
             return ""
-        
+
         try:
             # Generate random nonce (12 bytes for GCM)
             nonce = os.urandom(12)
-            
+
             # Create AESGCM cipher
             aesgcm = AESGCM(self.encryption_key)
-            
+
             # Encrypt (returns ciphertext + authentication tag)
             ciphertext = aesgcm.encrypt(
-                nonce,
-                plaintext.encode('utf-8'),
-                None  # No additional authenticated data
+                nonce, plaintext.encode("utf-8"), None  # No additional authenticated data
             )
-            
+
             # Combine nonce + ciphertext for storage
             encrypted_data = nonce + ciphertext
-            
+
             # Encode as base64 for safe storage
-            encoded = base64.b64encode(encrypted_data).decode('utf-8')
-            
+            encoded = base64.b64encode(encrypted_data).decode("utf-8")
+
             logger.debug("Data encrypted successfully")
             return encoded
-            
+
         except Exception as e:
             logger.error(f"Encryption failed: {e}")
             raise
-    
+
     def decrypt(self, encrypted_data: str) -> str:
         """
         Decrypt data encrypted with AES-256-GCM.
@@ -240,32 +239,32 @@ class SecurityManager:
         """
         if not encrypted_data:
             return ""
-        
+
         try:
             # Decode from base64
-            encrypted_bytes = base64.b64decode(encrypted_data.encode('utf-8'))
-            
+            encrypted_bytes = base64.b64decode(encrypted_data.encode("utf-8"))
+
             # Extract nonce (first 12 bytes)
             nonce = encrypted_bytes[:12]
-            
+
             # Extract ciphertext + tag (remaining bytes)
             ciphertext = encrypted_bytes[12:]
-            
+
             # Create AESGCM cipher
             aesgcm = AESGCM(self.encryption_key)
-            
+
             # Decrypt and verify authentication tag
             plaintext_bytes = aesgcm.decrypt(nonce, ciphertext, None)
-            
-            plaintext = plaintext_bytes.decode('utf-8')
-            
+
+            plaintext = plaintext_bytes.decode("utf-8")
+
             logger.debug("Data decrypted successfully")
             return plaintext
-            
+
         except Exception as e:
             logger.error(f"Decryption failed: {e}")
             raise
-    
+
     def encrypt_dict(self, data: dict) -> dict:
         """
         Encrypt all string values in a dictionary.
@@ -277,7 +276,7 @@ class SecurityManager:
             Dictionary with encrypted values
         """
         encrypted = {}
-        
+
         for key, value in data.items():
             if isinstance(value, str):
                 encrypted[key] = self.encrypt(value)
@@ -285,9 +284,9 @@ class SecurityManager:
                 encrypted[key] = self.encrypt_dict(value)
             else:
                 encrypted[key] = value
-        
+
         return encrypted
-    
+
     def decrypt_dict(self, encrypted_data: dict) -> dict:
         """
         Decrypt all encrypted string values in a dictionary.
@@ -299,7 +298,7 @@ class SecurityManager:
             Dictionary with decrypted values
         """
         decrypted = {}
-        
+
         for key, value in encrypted_data.items():
             if isinstance(value, str):
                 try:
@@ -311,9 +310,9 @@ class SecurityManager:
                 decrypted[key] = self.decrypt_dict(value)
             else:
                 decrypted[key] = value
-        
+
         return decrypted
-    
+
     def _hash_with_pbkdf2(self, password: str, salt: bytes) -> bytes:
         """Derive a password hash using PBKDF2-HMAC(SHA-256)."""
 
@@ -397,21 +396,21 @@ class SecurityManager:
         if return_new_hash:
             return result, migrated_hash
         return result
-    
+
     def reset_encryption_key(self):
         """
         Reset the encryption key by generating a new salt.
-        
+
         WARNING: This will make all previously encrypted data unrecoverable!
         """
         logger.warning("Resetting encryption key - all encrypted data will be lost!")
-        
+
         # Delete old salt file
         if self.salt_file.exists():
             self.salt_file.unlink()
-        
+
         # Generate new salt and key
         self.salt = self._get_or_create_salt()
         self.encryption_key = self._derive_key()
-        
+
         logger.info("Encryption key reset complete")

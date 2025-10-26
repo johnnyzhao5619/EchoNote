@@ -116,9 +116,7 @@ def combine_languages(*groups: Iterable[str]) -> List[str]:
 
 
 def ensure_audio_sample_rate(
-    audio_chunk: np.ndarray,
-    source_rate: Optional[int],
-    target_rate: Optional[int]
+    audio_chunk: np.ndarray, source_rate: Optional[int], target_rate: Optional[int]
 ) -> Tuple[np.ndarray, Optional[int]]:
     """Ensure the audio data matches the requested sampling rate.
 
@@ -154,8 +152,7 @@ def ensure_audio_sample_rate(
 
 
 def convert_audio_to_wav_bytes(
-    audio_path: str,
-    target_rate: Optional[int] = None
+    audio_path: str, target_rate: Optional[int] = None
 ) -> Tuple[bytes, int, int, str]:
     """Read an audio file and convert it to 16-bit PCM WAV at ``target_rate``.
 
@@ -186,6 +183,7 @@ def convert_audio_to_wav_bytes(
     except RuntimeError:
         try:
             import importlib
+
             librosa = importlib.import_module("librosa")
         except ModuleNotFoundError as exc:  # pragma: no cover - missing librosa is rare
             raise RuntimeError("Unable to decode audio file because librosa is missing.") from exc
@@ -196,10 +194,10 @@ def convert_audio_to_wav_bytes(
         else:
             data = np.transpose(waveform)
         if detected_format == "UNKNOWN":
-            detected_format = Path(audio_path).suffix.lstrip('.').upper() or "UNKNOWN"
+            detected_format = Path(audio_path).suffix.lstrip(".").upper() or "UNKNOWN"
     else:
         if detected_format == "UNKNOWN":
-            detected_format = Path(audio_path).suffix.lstrip('.').upper() or "UNKNOWN"
+            detected_format = Path(audio_path).suffix.lstrip(".").upper() or "UNKNOWN"
 
     if data.ndim != 2 or data.shape[1] == 0:
         raise ValueError("Invalid audio data shape; channel information is missing.")
@@ -215,7 +213,9 @@ def convert_audio_to_wav_bytes(
     mono_audio = mono_audio.astype(np.float32)
 
     desired_rate = target_rate if target_rate and target_rate > 0 else source_rate
-    processed_audio, effective_rate = ensure_audio_sample_rate(mono_audio, source_rate, desired_rate)
+    processed_audio, effective_rate = ensure_audio_sample_rate(
+        mono_audio, source_rate, desired_rate
+    )
 
     if effective_rate is None or effective_rate <= 0:
         raise ValueError("Failed to determine the effective sampling rate after conversion.")
@@ -243,7 +243,9 @@ class SpeechEngine(ABC):
         pass
 
     @abstractmethod
-    async def transcribe_file(self, audio_path: str, language: Optional[str] = None, **kwargs) -> Dict:
+    async def transcribe_file(
+        self, audio_path: str, language: Optional[str] = None, **kwargs
+    ) -> Dict:
         """Transcribe an audio file in batch mode.
 
         Args:
@@ -259,10 +261,7 @@ class SpeechEngine(ABC):
 
     @abstractmethod
     async def transcribe_stream(
-        self,
-        audio_chunk: np.ndarray,
-        language: Optional[str] = None,
-        **kwargs
+        self, audio_chunk: np.ndarray, language: Optional[str] = None, **kwargs
     ) -> str:
         """Transcribe an audio chunk during real-time streaming.
 
@@ -285,8 +284,8 @@ class SpeechEngine(ABC):
         """Validate the provided configuration payload."""
         # Default implementation performs basic validation only.
         schema = self.get_config_schema()
-        required_fields = schema.get('required', [])
-        
+        required_fields = schema.get("required", [])
+
         for field in required_fields:
             if field not in config:
                 return False
@@ -319,4 +318,3 @@ AUDIO_VIDEO_SUFFIXES: FrozenSet[str] = frozenset(
     f".{extension}" for extension in AUDIO_VIDEO_FORMAT_SET
 )
 """Dot-prefixed extensions suitable for comparing with ``Path.suffix``."""
-

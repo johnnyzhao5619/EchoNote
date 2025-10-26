@@ -191,8 +191,8 @@ timeline_widget.event_selected.connect(on_event_selected)
 
 **必需**:
 
-- PyQt6 >= 6.0.0
-- PyQt6-Multimedia >= 6.0.0
+- PySide6 >= 6.0.0
+- PySide6-Multimedia >= 6.0.0
 - core.timeline.manager (TimelineManager)
 - utils.i18n (I18nQtManager)
 

@@ -25,7 +25,7 @@ from typing import Any
 
 def close_lazy_loaded_engine(name: str, loader: Any, logger: logging.Logger) -> None:
     """关闭惰性加载的引擎实例。"""
-    if not loader or not getattr(loader, 'is_initialized', lambda: False)():
+    if not loader or not getattr(loader, "is_initialized", lambda: False)():
         return
 
     try:
@@ -43,7 +43,7 @@ def close_lazy_loaded_engine(name: str, loader: Any, logger: logging.Logger) -> 
 
     attempted = False
 
-    for method_name in ('close', 'aclose'):
+    for method_name in ("close", "aclose"):
         method = getattr(engine, method_name, None)
         if not callable(method):
             continue

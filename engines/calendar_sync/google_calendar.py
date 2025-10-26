@@ -27,7 +27,7 @@ from engines.calendar_sync.base import OAuthCalendarAdapter, OAuthEndpoints
 from data.database.models import CalendarEvent
 
 
-logger = logging.getLogger('echonote.calendar_sync.google')
+logger = logging.getLogger("echonote.calendar_sync.google")
 
 
 class GoogleCalendarAdapter(OAuthCalendarAdapter):
@@ -71,21 +71,21 @@ class GoogleCalendarAdapter(OAuthCalendarAdapter):
         )
         self.logger.info("GoogleCalendarAdapter initialized")
 
-    def build_authorization_params(
-        self, state: str, code_challenge: str
-    ) -> Dict[str, Any]:
+    def build_authorization_params(self, state: str, code_challenge: str) -> Dict[str, Any]:
         params = super().build_authorization_params(state, code_challenge)
-        params.update({
-            'access_type': 'offline',
-            'prompt': 'consent',
-        })
+        params.update(
+            {
+                "access_type": "offline",
+                "prompt": "consent",
+            }
+        )
         return params
 
     def fetch_events(
         self,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
-        last_sync_token: Optional[str] = None
+        last_sync_token: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Fetch events from Google Calendar.
@@ -106,26 +106,26 @@ class GoogleCalendarAdapter(OAuthCalendarAdapter):
 
             while True:
                 params = {
-                    'maxResults': 250,
-                    'singleEvents': True,
-                    'orderBy': 'startTime',
-                    'showDeleted': True,
+                    "maxResults": 250,
+                    "singleEvents": True,
+                    "orderBy": "startTime",
+                    "showDeleted": True,
                 }
 
                 # Use sync token for incremental sync
                 if last_sync_token:
-                    params['syncToken'] = last_sync_token
+                    params["syncToken"] = last_sync_token
                 else:
                     if start_date:
-                        params['timeMin'] = start_date
+                        params["timeMin"] = start_date
                     if end_date:
-                        params['timeMax'] = end_date
+                        params["timeMax"] = end_date
 
                 if page_token:
-                    params['pageToken'] = page_token
+                    params["pageToken"] = page_token
 
                 response = self.api_request(
-                    'GET',
+                    "GET",
                     f"{self.api_base_url}/calendars/primary/events",
                     params=params,
                     timeout=30.0,
@@ -133,13 +133,13 @@ class GoogleCalendarAdapter(OAuthCalendarAdapter):
                 data = response.json()
 
                 # Convert Google events to internal format
-                for item in data.get('items', []):
+                for item in data.get("items", []):
                     event = self._convert_google_event(item)
                     if not event:
                         continue
 
-                    if event.get('deleted'):
-                        event_id = event.get('id')
+                    if event.get("deleted"):
+                        event_id = event.get("id")
                         if event_id:
                             deleted_events.append(event_id)
                         continue
@@ -147,18 +147,14 @@ class GoogleCalendarAdapter(OAuthCalendarAdapter):
                     events.append(event)
 
                 # Check for pagination
-                page_token = data.get('nextPageToken')
+                page_token = data.get("nextPageToken")
                 if not page_token:
-                    new_sync_token = data.get('nextSyncToken')
+                    new_sync_token = data.get("nextSyncToken")
                     break
 
             self.logger.info("Fetched %s events from Google", len(events))
 
-            return {
-                'events': events,
-                'deleted': deleted_events,
-                'sync_token': new_sync_token
-            }
+            return {"events": events, "deleted": deleted_events, "sync_token": new_sync_token}
 
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 410:
@@ -185,14 +181,14 @@ class GoogleCalendarAdapter(OAuthCalendarAdapter):
             google_event = self._convert_to_google_event(event)
 
             response = self.api_request(
-                'POST',
+                "POST",
                 f"{self.api_base_url}/calendars/primary/events",
                 json=google_event,
-                headers={'Content-Type': 'application/json'},
+                headers={"Content-Type": "application/json"},
                 timeout=30.0,
             )
             data = response.json()
-            google_id = data['id']
+            google_id = data["id"]
 
             self.logger.info("Pushed event to Google: %s", google_id)
             return google_id
@@ -210,10 +206,10 @@ class GoogleCalendarAdapter(OAuthCalendarAdapter):
             google_event = self._convert_to_google_event(event)
 
             self.api_request(
-                'PATCH',
+                "PATCH",
                 f"{self.api_base_url}/calendars/primary/events/{external_id}",
                 json=google_event,
-                headers={'Content-Type': 'application/json'},
+                headers={"Content-Type": "application/json"},
                 timeout=30.0,
             )
 
@@ -230,7 +226,7 @@ class GoogleCalendarAdapter(OAuthCalendarAdapter):
 
         try:
             self.api_request(
-                'DELETE',
+                "DELETE",
                 f"{self.api_base_url}/calendars/primary/events/{external_id}",
                 timeout=30.0,
             )
@@ -259,80 +255,77 @@ class GoogleCalendarAdapter(OAuthCalendarAdapter):
         """
         try:
             # Extract start and end times
-            status_value = google_event.get('status')
-            if isinstance(status_value, str) and status_value.lower() == 'cancelled':
-                event_id = google_event.get('id')
+            status_value = google_event.get("status")
+            if isinstance(status_value, str) and status_value.lower() == "cancelled":
+                event_id = google_event.get("id")
                 if event_id:
-                    return {'id': event_id, 'deleted': True}
+                    return {"id": event_id, "deleted": True}
                 return None
 
-            start = google_event.get('start', {})
-            end = google_event.get('end', {})
+            start = google_event.get("start", {})
+            end = google_event.get("end", {})
 
-            start_time = start.get('dateTime') or start.get('date')
-            end_time = end.get('dateTime') or end.get('date')
+            start_time = start.get("dateTime") or start.get("date")
+            end_time = end.get("dateTime") or end.get("date")
 
             if not start_time or not end_time:
                 return None
 
             # Extract attendees
             attendees = [
-                att['email']
-                for att in google_event.get('attendees', [])
-                if 'email' in att
+                att["email"] for att in google_event.get("attendees", []) if "email" in att
             ]
 
             # Extract reminder
             reminder_minutes = None
             reminder_use_default: Optional[bool] = None
-            reminders = google_event.get('reminders', {})
+            reminders = google_event.get("reminders", {})
             if isinstance(reminders, dict):
-                use_default_flag = reminders.get('useDefault')
+                use_default_flag = reminders.get("useDefault")
                 if use_default_flag is True:
                     reminder_use_default = True
                 elif use_default_flag is False:
                     reminder_use_default = False
 
-                overrides = reminders.get('overrides')
+                overrides = reminders.get("overrides")
                 if overrides:
                     override = next(
                         (
-                            item for item in overrides
-                            if isinstance(item, dict) and 'minutes' in item
+                            item
+                            for item in overrides
+                            if isinstance(item, dict) and "minutes" in item
                         ),
-                        None
+                        None,
                     )
                     if override is not None:
-                        reminder_minutes = override.get('minutes')
+                        reminder_minutes = override.get("minutes")
                         reminder_use_default = False
                 elif use_default_flag is False:
                     reminder_minutes = None
 
             return {
-                'id': google_event['id'],
-                'title': google_event.get('summary', 'Untitled'),
-                'event_type': 'Event',
-                'start_time': start_time,
-                'end_time': end_time,
-                'location': google_event.get('location'),
-                'attendees': attendees,
-                'description': google_event.get('description'),
-                'reminder_minutes': reminder_minutes,
-                'reminder_use_default': reminder_use_default,
-                'recurrence_rule': (
-                    google_event.get('recurrence', [None])[0]
-                    if google_event.get('recurrence') else None
-                )
+                "id": google_event["id"],
+                "title": google_event.get("summary", "Untitled"),
+                "event_type": "Event",
+                "start_time": start_time,
+                "end_time": end_time,
+                "location": google_event.get("location"),
+                "attendees": attendees,
+                "description": google_event.get("description"),
+                "reminder_minutes": reminder_minutes,
+                "reminder_use_default": reminder_use_default,
+                "recurrence_rule": (
+                    google_event.get("recurrence", [None])[0]
+                    if google_event.get("recurrence")
+                    else None
+                ),
             }
 
         except Exception as e:
             self.logger.error("Failed to convert Google event: %s", e)
             return None
 
-    def _convert_to_google_event(
-        self,
-        event: CalendarEvent
-    ) -> dict:
+    def _convert_to_google_event(self, event: CalendarEvent) -> dict:
         """
         Convert internal event to Google Calendar format.
 
@@ -345,10 +338,10 @@ class GoogleCalendarAdapter(OAuthCalendarAdapter):
         local_tz = self._get_local_timezone()
 
         def _is_date_only(value: Any) -> bool:
-            return isinstance(value, str) and 'T' not in value and len(value.strip()) == 10
+            return isinstance(value, str) and "T" not in value and len(value.strip()) == 10
 
         is_all_day = False
-        if hasattr(event, 'is_all_day_event'):
+        if hasattr(event, "is_all_day_event"):
             try:
                 is_all_day = event.is_all_day_event()
             except Exception:  # pragma: no cover - defensive guard
@@ -361,11 +354,11 @@ class GoogleCalendarAdapter(OAuthCalendarAdapter):
 
         def _format_google_datetime(dt_value):
             identifier = self._get_timezone_identifier(dt_value)
-            payload = {'dateTime': dt_value.isoformat()}
+            payload = {"dateTime": dt_value.isoformat()}
             if identifier:
-                if identifier == 'UTC':
-                    payload['dateTime'] = dt_value.astimezone(timezone.utc).isoformat()
-                payload['timeZone'] = identifier
+                if identifier == "UTC":
+                    payload["dateTime"] = dt_value.astimezone(timezone.utc).isoformat()
+                payload["timeZone"] = identifier
             return payload
 
         def _format_google_date(dt_value, original_value):
@@ -382,54 +375,41 @@ class GoogleCalendarAdapter(OAuthCalendarAdapter):
             return dt_local.date().isoformat()
 
         google_event = {
-            'summary': event.title,
-            'start': (
-                {'date': _format_google_date(start_dt, event.start_time)}
+            "summary": event.title,
+            "start": (
+                {"date": _format_google_date(start_dt, event.start_time)}
                 if is_all_day
                 else _format_google_datetime(start_dt)
             ),
-            'end': (
-                {'date': _format_google_date(end_dt, event.end_time)}
+            "end": (
+                {"date": _format_google_date(end_dt, event.end_time)}
                 if is_all_day
                 else _format_google_datetime(end_dt)
-            )
+            ),
         }
 
         if event.location:
-            google_event['location'] = event.location
+            google_event["location"] = event.location
 
         if event.description:
-            google_event['description'] = event.description
+            google_event["description"] = event.description
 
         if event.attendees:
-            google_event['attendees'] = [
-                {'email': email} for email in event.attendees
-            ]
+            google_event["attendees"] = [{"email": email} for email in event.attendees]
 
-        use_default_reminder = getattr(event, 'reminder_use_default', None)
+        use_default_reminder = getattr(event, "reminder_use_default", None)
         overrides: Optional[List[Dict[str, Any]]] = None
         if event.reminder_minutes is not None:
-            overrides = [
-                {
-                    'method': 'popup',
-                    'minutes': event.reminder_minutes
-                }
-            ]
+            overrides = [{"method": "popup", "minutes": event.reminder_minutes}]
 
         if use_default_reminder is True:
-            google_event['reminders'] = {'useDefault': True}
+            google_event["reminders"] = {"useDefault": True}
         elif use_default_reminder is False:
-            google_event['reminders'] = {
-                'useDefault': False,
-                'overrides': overrides or []
-            }
+            google_event["reminders"] = {"useDefault": False, "overrides": overrides or []}
         elif overrides is not None:
-            google_event['reminders'] = {
-                'useDefault': False,
-                'overrides': overrides
-            }
+            google_event["reminders"] = {"useDefault": False, "overrides": overrides}
 
         if event.recurrence_rule:
-            google_event['recurrence'] = [event.recurrence_rule]
+            google_event["recurrence"] = [event.recurrence_rule]
 
         return google_event

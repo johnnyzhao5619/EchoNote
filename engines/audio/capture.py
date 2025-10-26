@@ -28,8 +28,9 @@ logger = logging.getLogger(__name__)
 class AudioCapture:
     """High-level wrapper for microphone capture using PyAudio."""
 
-    def __init__(self, sample_rate: int = 16000, channels: int = 1,
-                 chunk_size: int = 512, gain: float = 1.0):
+    def __init__(
+        self, sample_rate: int = 16000, channels: int = 1, chunk_size: int = 512, gain: float = 1.0
+    ):
         """Initialize the capture interface.
 
         PyAudio is imported and instantiated lazily so the optional dependency
@@ -126,18 +127,20 @@ class AudioCapture:
         for i in range(device_count):
             try:
                 device_info = pyaudio_instance.get_device_info_by_index(i)
-                
+
                 # Only return devices with input capability.
-                if device_info.get('maxInputChannels', 0) > 0:
-                    devices.append({
-                        "index": i,
-                        "name": device_info.get('name', 'Unknown'),
-                        "max_input_channels": device_info.get('maxInputChannels', 0),
-                        "default_sample_rate": device_info.get('defaultSampleRate', 0)
-                    })
+                if device_info.get("maxInputChannels", 0) > 0:
+                    devices.append(
+                        {
+                            "index": i,
+                            "name": device_info.get("name", "Unknown"),
+                            "max_input_channels": device_info.get("maxInputChannels", 0),
+                            "default_sample_rate": device_info.get("defaultSampleRate", 0),
+                        }
+                    )
             except Exception as e:
                 logger.warning(f"Failed to get info for device {i}: {e}")
-        
+
         logger.info(f"Found {len(devices)} input devices")
         return devices
 
@@ -151,17 +154,20 @@ class AudioCapture:
             pyaudio_instance = self._ensure_pyaudio_instance()
             device_info = pyaudio_instance.get_default_input_device_info()
             return {
-                "index": device_info.get('index', 0),
-                "name": device_info.get('name', 'Unknown'),
-                "max_input_channels": device_info.get('maxInputChannels', 0),
-                "default_sample_rate": device_info.get('defaultSampleRate', 0)
+                "index": device_info.get("index", 0),
+                "name": device_info.get("name", "Unknown"),
+                "max_input_channels": device_info.get("maxInputChannels", 0),
+                "default_sample_rate": device_info.get("defaultSampleRate", 0),
             }
         except Exception as e:
             logger.error(f"Failed to get default input device: {e}")
             return None
 
-    def start_capture(self, device_index: Optional[int] = None,
-                     callback: Optional[Callable[[np.ndarray], None]] = None):
+    def start_capture(
+        self,
+        device_index: Optional[int] = None,
+        callback: Optional[Callable[[np.ndarray], None]] = None,
+    ):
         """Start streaming audio from the selected input device.
 
         Args:
@@ -173,7 +179,7 @@ class AudioCapture:
         if self.is_capturing:
             logger.warning("Audio capture is already running")
             return
-        
+
         pyaudio_instance = self._ensure_pyaudio_instance()
         pyaudio_module = self._ensure_module_available()
 
@@ -186,21 +192,19 @@ class AudioCapture:
                 input=True,
                 input_device_index=device_index,
                 frames_per_buffer=self.chunk_size,
-                stream_callback=None  # Use blocking mode.
+                stream_callback=None,  # Use blocking mode.
             )
-            
+
             self.is_capturing = True
-            
+
             # Launch the capture loop in a dedicated thread.
             self.capture_thread = threading.Thread(
-                target=self._capture_loop,
-                args=(callback,),
-                daemon=True
+                target=self._capture_loop, args=(callback,), daemon=True
             )
             self.capture_thread.start()
-            
+
             logger.info(f"Audio capture started (device_index={device_index})")
-            
+
         except Exception as e:
             logger.error(f"Failed to start audio capture: {e}")
             raise
@@ -208,35 +212,35 @@ class AudioCapture:
     def _capture_loop(self, callback: Optional[Callable[[np.ndarray], None]]):
         """Capture loop executed on the background thread."""
         logger.info("Audio capture loop started")
-        
+
         while self.is_capturing:
             try:
                 # Read raw audio data from the stream.
                 audio_data = self.stream.read(self.chunk_size, exception_on_overflow=False)
-                
+
                 # Convert to a numpy array.
                 audio_array = np.frombuffer(audio_data, dtype=np.int16)
-                
+
                 # Normalize to float32 samples in the [-1, 1] range.
                 audio_float = audio_array.astype(np.float32) / 32768.0
-                
+
                 # Apply gain adjustment.
                 audio_float = audio_float * self.gain
-                
+
                 # Limit the amplitude to [-1, 1].
                 audio_float = np.clip(audio_float, -1.0, 1.0)
-                
+
                 # Push into the queue for downstream consumers.
                 self.audio_queue.put(audio_float)
-                
+
                 # Invoke the optional callback.
                 if callback:
                     callback(audio_float)
-                    
+
             except Exception as e:
                 if self.is_capturing:
                     logger.error(f"Error in capture loop: {e}")
-        
+
         logger.info("Audio capture loop stopped")
 
     def stop_capture(self):
@@ -244,27 +248,27 @@ class AudioCapture:
         if not self.is_capturing:
             logger.warning("Audio capture is not running")
             return
-        
+
         logger.info("Stopping audio capture...")
         self.is_capturing = False
-        
+
         # Wait for the capture thread to terminate.
         if self.capture_thread:
             self.capture_thread.join(timeout=2.0)
-        
+
         # Stop and close the underlying PyAudio stream.
         if self.stream:
             self.stream.stop_stream()
             self.stream.close()
             self.stream = None
-        
+
         # Flush remaining audio from the queue.
         while not self.audio_queue.empty():
             try:
                 self.audio_queue.get_nowait()
             except queue.Empty:
                 break
-        
+
         logger.info("Audio capture stopped")
 
     def get_audio_chunk(self, timeout: float = 1.0) -> Optional[np.ndarray]:
@@ -279,7 +283,7 @@ class AudioCapture:
         if gain < 0.0 or gain > 10.0:
             logger.warning(f"Gain value {gain} is out of range [0.0, 10.0]")
             gain = np.clip(gain, 0.0, 10.0)
-        
+
         self.gain = gain
         logger.info(f"Gain set to {gain}")
 
@@ -287,30 +291,30 @@ class AudioCapture:
         """Return the RMS volume estimate for the most recent chunk."""
         if self.audio_queue.empty():
             return 0.0
-        
+
         try:
             # Fetch the most recent audio chunk without blocking.
             audio_chunk = self.audio_queue.get_nowait()
-            
+
             # Compute the RMS value.
-            rms = np.sqrt(np.mean(audio_chunk ** 2))
-            
+            rms = np.sqrt(np.mean(audio_chunk**2))
+
             # Return the chunk to the queue.
             self.audio_queue.put(audio_chunk)
-            
+
             return float(rms)
-            
+
         except queue.Empty:
             return 0.0
 
     def close(self):
         """Close the capture interface and release resources."""
         logger.info("Closing audio capture...")
-        
+
         # Stop active capture if running.
         if self.is_capturing:
             self.stop_capture()
-        
+
         # Terminate the PyAudio instance.
         if self.pyaudio:
             self.pyaudio.terminate()

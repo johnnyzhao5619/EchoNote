@@ -329,7 +329,7 @@
 
 1. **定期更新 / Regular Updates**
 
-   - 跟进 PyQt6 版本更新
+   - 跟进 PySide6 版本更新
    - 更新 OAuth 库
    - 添加新的日历服务支持
 

@@ -26,7 +26,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
 
-logger = logging.getLogger('echonote.calendar.sync_scheduler')
+logger = logging.getLogger("echonote.calendar.sync_scheduler")
 
 
 class SyncScheduler:
@@ -54,9 +54,7 @@ class SyncScheduler:
         # Format: {provider: {'attempts': int, 'last_attempt': float}}
         self.retry_state: Dict[str, Dict] = {}
 
-        logger.info(
-            f"SyncScheduler initialized with {interval_minutes}min interval"
-        )
+        logger.info(f"SyncScheduler initialized with {interval_minutes}min interval")
 
     def start(self):
         """
@@ -71,10 +69,10 @@ class SyncScheduler:
             self.scheduler.add_job(
                 func=self._sync_all,
                 trigger=IntervalTrigger(minutes=self.interval_minutes),
-                id='calendar_sync',
-                name='Calendar Sync Job',
+                id="calendar_sync",
+                name="Calendar Sync Job",
                 replace_existing=True,
-                max_instances=1  # Prevent overlapping syncs
+                max_instances=1,  # Prevent overlapping syncs
             )
 
             self.scheduler.start()
@@ -110,18 +108,16 @@ class SyncScheduler:
         waiting for the next scheduled interval.
         """
         if not self.is_running:
-            logger.warning(
-                "Scheduler is not running, cannot trigger manual sync"
-            )
+            logger.warning("Scheduler is not running, cannot trigger manual sync")
             return
 
         try:
             # Add a one-time job
             self.scheduler.add_job(
                 func=self._sync_all,
-                id='calendar_sync_manual',
-                name='Manual Calendar Sync',
-                replace_existing=True
+                id="calendar_sync_manual",
+                name="Manual Calendar Sync",
+                replace_existing=True,
             )
             logger.info("Manual sync triggered")
 
@@ -134,9 +130,7 @@ class SyncScheduler:
 
         Deprecated: Use sync_now() instead.
         """
-        logger.warning(
-            "trigger_sync_now() is deprecated, use sync_now() instead"
-        )
+        logger.warning("trigger_sync_now() is deprecated, use sync_now() instead")
         self.sync_now()
 
     def _sync_all(self):
@@ -153,9 +147,7 @@ class SyncScheduler:
             # Get all active sync adapters
             from data.database.models import CalendarSyncStatus
 
-            active_syncs = CalendarSyncStatus.get_all_active(
-                self.calendar_manager.db
-            )
+            active_syncs = CalendarSyncStatus.get_all_active(self.calendar_manager.db)
 
             if not active_syncs:
                 logger.info("No active calendar syncs configured")
@@ -170,17 +162,14 @@ class SyncScheduler:
 
                 try:
                     logger.info(f"Syncing {provider} calendar...")
-                    self.calendar_manager.sync_external_calendar(
-                        provider
-                    )
+                    self.calendar_manager.sync_external_calendar(provider)
                     success_count += 1
                     logger.info(f"Successfully synced {provider}")
 
                     # Clear retry state on success
                     if provider in self.retry_state:
                         logger.info(
-                            f"Clearing retry state for {provider} "
-                            f"after successful sync"
+                            f"Clearing retry state for {provider} " f"after successful sync"
                         )
                         del self.retry_state[provider]
 
@@ -191,10 +180,7 @@ class SyncScheduler:
                     # Implement retry logic with exponential backoff
                     self._handle_sync_failure(provider)
 
-            logger.info(
-                f"Sync completed: {success_count} succeeded, "
-                f"{error_count} failed"
-            )
+            logger.info(f"Sync completed: {success_count} succeeded, " f"{error_count} failed")
 
         except Exception as e:
             logger.error(f"Error in sync_all: {e}")
@@ -212,14 +198,11 @@ class SyncScheduler:
         """
         # Initialize retry state if not exists
         if provider not in self.retry_state:
-            self.retry_state[provider] = {
-                'attempts': 0,
-                'last_attempt': time.time()
-            }
+            self.retry_state[provider] = {"attempts": 0, "last_attempt": time.time()}
 
         # Increment retry attempts
-        self.retry_state[provider]['attempts'] += 1
-        attempts = self.retry_state[provider]['attempts']
+        self.retry_state[provider]["attempts"] += 1
+        attempts = self.retry_state[provider]["attempts"]
 
         # Maximum 3 retry attempts
         if attempts > 3:
@@ -243,11 +226,11 @@ class SyncScheduler:
             self.scheduler.add_job(
                 func=self._retry_sync,
                 args=[provider],
-                trigger='date',
+                trigger="date",
                 run_date=run_time,
-                id=f'calendar_sync_retry_{provider}',
-                name=f'Retry Sync for {provider} (attempt {attempts}/3)',
-                replace_existing=True
+                id=f"calendar_sync_retry_{provider}",
+                name=f"Retry Sync for {provider} (attempt {attempts}/3)",
+                replace_existing=True,
             )
 
             logger.info(
@@ -270,12 +253,8 @@ class SyncScheduler:
             provider: Provider name to retry
         """
         try:
-            attempts = self.retry_state.get(
-                provider, {}
-            ).get('attempts', 0)
-            logger.info(
-                f"Retrying sync for {provider} (attempt {attempts}/3)"
-            )
+            attempts = self.retry_state.get(provider, {}).get("attempts", 0)
+            logger.info(f"Retrying sync for {provider} (attempt {attempts}/3)")
 
             self.calendar_manager.sync_external_calendar(provider)
             logger.info(f"Retry successful for {provider}")
@@ -286,9 +265,7 @@ class SyncScheduler:
 
             # Remove the retry job after success
             try:
-                self.scheduler.remove_job(
-                    f'calendar_sync_retry_{provider}'
-                )
+                self.scheduler.remove_job(f"calendar_sync_retry_{provider}")
             except Exception:
                 pass  # Job might have already been removed
 
@@ -309,7 +286,7 @@ class SyncScheduler:
             return None
 
         try:
-            job = self.scheduler.get_job('calendar_sync')
+            job = self.scheduler.get_job("calendar_sync")
             if job and job.next_run_time:
                 return job.next_run_time.isoformat()
             return None
@@ -326,8 +303,8 @@ class SyncScheduler:
             Dictionary with scheduler status information
         """
         return {
-            'is_running': self.is_running,
-            'interval_minutes': self.interval_minutes,
-            'next_sync_time': self.get_next_sync_time(),
-            'active_jobs': len(self.scheduler.get_jobs())
+            "is_running": self.is_running,
+            "interval_minutes": self.interval_minutes,
+            "next_sync_time": self.get_next_sync_time(),
+            "active_jobs": len(self.scheduler.get_jobs()),
         }

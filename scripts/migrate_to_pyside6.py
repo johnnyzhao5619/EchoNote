@@ -75,17 +75,13 @@ class PyQt6ToPySide6Migrator:
     IMPORT_PATTERNS = [
         # Pattern 1: from PySide6.Module import ...
         (
-            re.compile(
-                r"^(\s*)from\s+PyQt6\.([A-Za-z]+)\s+import\s+(.+)$", re.MULTILINE
-            ),
+            re.compile(r"^(\s*)from\s+PyQt6\.([A-Za-z]+)\s+import\s+(.+)$", re.MULTILINE),
             r"\1from PySide6.\2 import \3",
             "module_imports",
         ),
         # Pattern 2: import PySide6.Module
         (
-            re.compile(
-                r"^(\s*)import\s+PyQt6\.([A-Za-z]+)(\s+as\s+\w+)?$", re.MULTILINE
-            ),
+            re.compile(r"^(\s*)import\s+PyQt6\.([A-Za-z]+)(\s+as\s+\w+)?$", re.MULTILINE),
             r"\1import PySide6.\2\3",
             "direct_imports",
         ),
@@ -111,15 +107,13 @@ class PyQt6ToPySide6Migrator:
     # Special cases that need manual attention
     SPECIAL_CASES = {
         "QAction": {
-            "from": "from PySide6.QtWidgets import QAction",
+            "from": "from PySide6.QtGui import QAction",
             "to": "from PySide6.QtGui import QAction",
             "note": "QAction moved from QtWidgets to QtGui in PySide6",
         }
     }
 
-    def __init__(
-        self, dry_run: bool = False, backup: bool = True, rollback_on_error: bool = True
-    ):
+    def __init__(self, dry_run: bool = False, backup: bool = True, rollback_on_error: bool = True):
         """Initialize the migrator.
 
         Args:
@@ -136,9 +130,7 @@ class PyQt6ToPySide6Migrator:
 
         # Compile all patterns for better performance
         self.compiled_patterns = []
-        for pattern, replacement, pattern_type in (
-            self.IMPORT_PATTERNS + self.SIGNAL_SLOT_PATTERNS
-        ):
+        for pattern, replacement, pattern_type in self.IMPORT_PATTERNS + self.SIGNAL_SLOT_PATTERNS:
             self.compiled_patterns.append((pattern, replacement, pattern_type))
 
     def setup_backup_directory(self) -> Path:
@@ -244,9 +236,7 @@ class PyQt6ToPySide6Migrator:
         # Handle special cases
         for case_name, case_info in self.SPECIAL_CASES.items():
             if case_info["from"] in modified_content:
-                modified_content = modified_content.replace(
-                    case_info["from"], case_info["to"]
-                )
+                modified_content = modified_content.replace(case_info["from"], case_info["to"])
                 was_modified = True
                 self.stats.add_replacement("special_cases", 1)
                 logger.info(f"{filepath}: Applied special case for {case_name}")
@@ -394,12 +384,9 @@ class PyQt6ToPySide6Migrator:
             },
             "modified_files": self.stats.modified_files,
             "failed_files": [
-                {"file": filepath, "error": error}
-                for filepath, error in self.stats.failed_files
+                {"file": filepath, "error": error} for filepath, error in self.stats.failed_files
             ],
-            "special_cases_applied": self.stats.replacements_by_type.get(
-                "special_cases", 0
-            ),
+            "special_cases_applied": self.stats.replacements_by_type.get("special_cases", 0),
         }
 
         return report
@@ -447,9 +434,7 @@ class PyQt6ToPySide6Migrator:
             self.display_report(report)
 
             # Save report to file
-            report_file = (
-                f"migration_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-            )
+            report_file = f"migration_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
             with open(report_file, "w", encoding="utf-8") as f:
                 json.dump(report, f, indent=2, ensure_ascii=False)
             logger.info(f"Migration report saved to: {report_file}")
@@ -458,9 +443,7 @@ class PyQt6ToPySide6Migrator:
             if success:
                 logger.info("Migration completed successfully!")
             else:
-                logger.error(
-                    f"Migration completed with {self.stats.files_failed} failures"
-                )
+                logger.error(f"Migration completed with {self.stats.files_failed} failures")
 
             return success
 
@@ -543,9 +526,7 @@ Examples:
         help="Disable automatic rollback on errors",
     )
 
-    parser.add_argument(
-        "--verbose", "-v", action="store_true", help="Enable verbose logging"
-    )
+    parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
 
     args = parser.parse_args()
 

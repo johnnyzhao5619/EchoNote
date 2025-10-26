@@ -36,7 +36,7 @@ from data.database.models import CalendarEvent
 from utils.http_client import RetryableHttpClient
 
 
-logger = logging.getLogger('echonote.calendar_sync.base')
+logger = logging.getLogger("echonote.calendar_sync.base")
 
 
 class CalendarSyncAdapter(ABC):
@@ -74,7 +74,7 @@ class CalendarSyncAdapter(ABC):
         self,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
-        last_sync_token: Optional[str] = None
+        last_sync_token: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Fetch events from the external calendar.
@@ -177,7 +177,7 @@ class CalendarSyncAdapter(ABC):
         Returns:
             Provider name (e.g., 'google', 'outlook')
         """
-        return self.__class__.__name__.lower().replace('adapter', '')
+        return self.__class__.__name__.lower().replace("adapter", "")
 
     def get_supported_features(self) -> Dict[str, bool]:
         """
@@ -193,10 +193,10 @@ class CalendarSyncAdapter(ABC):
             }
         """
         return {
-            'incremental_sync': True,
-            'push_events': True,
-            'recurrence': True,
-            'reminders': True
+            "incremental_sync": True,
+            "push_events": True,
+            "recurrence": True,
+            "reminders": True,
         }
 
     @staticmethod
@@ -211,13 +211,13 @@ class CalendarSyncAdapter(ABC):
 
         code_verifier = code_verifier[:128]
 
-        code_challenge_bytes = hashlib.sha256(code_verifier.encode('ascii')).digest()
-        code_challenge = base64.urlsafe_b64encode(code_challenge_bytes).decode('ascii').rstrip('=')
+        code_challenge_bytes = hashlib.sha256(code_verifier.encode("ascii")).digest()
+        code_challenge = base64.urlsafe_b64encode(code_challenge_bytes).decode("ascii").rstrip("=")
 
         return {
-            'state': state,
-            'code_verifier': code_verifier,
-            'code_challenge': code_challenge,
+            "state": state,
+            "code_verifier": code_verifier,
+            "code_challenge": code_challenge,
         }
 
     # ------------------------------------------------------------------
@@ -233,15 +233,12 @@ class CalendarSyncAdapter(ABC):
             3. UTC fallback.
         """
 
-        env_tz = os.getenv('ECHONOTE_LOCAL_TIMEZONE')
+        env_tz = os.getenv("ECHONOTE_LOCAL_TIMEZONE")
         if env_tz and ZoneInfo is not None:
             try:
                 return ZoneInfo(env_tz)
             except ZoneInfoNotFoundError:
-                logger.warning(
-                    "Unknown timezone configured in ECHONOTE_LOCAL_TIMEZONE: %s",
-                    env_tz
-                )
+                logger.warning("Unknown timezone configured in ECHONOTE_LOCAL_TIMEZONE: %s", env_tz)
 
         try:
             system_tz = datetime.now().astimezone().tzinfo
@@ -264,7 +261,7 @@ class CalendarSyncAdapter(ABC):
             dt_value = value
         elif isinstance(value, str):
             text = value.strip()
-            if text.endswith('Z'):
+            if text.endswith("Z"):
                 text = f"{text[:-1]}+00:00"
             try:
                 dt_value = datetime.fromisoformat(text)
@@ -273,9 +270,7 @@ class CalendarSyncAdapter(ABC):
                     "Event datetime must be a datetime instance or ISO 8601 string"
                 ) from exc
         else:  # pragma: no cover - defensive branch
-            raise TypeError(
-                "Event datetime must be provided as datetime instance or ISO string"
-            )
+            raise TypeError("Event datetime must be provided as datetime instance or ISO string")
 
         if dt_value.tzinfo:
             return dt_value
@@ -291,18 +286,18 @@ class CalendarSyncAdapter(ABC):
         if tzinfo_value is None:
             return None
 
-        key = getattr(tzinfo_value, 'key', None)
+        key = getattr(tzinfo_value, "key", None)
         if key:
-            if key in {'UTC', 'Etc/UTC', 'Etc/GMT', 'GMT'}:
-                return 'UTC'
+            if key in {"UTC", "Etc/UTC", "Etc/GMT", "GMT"}:
+                return "UTC"
             return key
 
         if tzinfo_value is timezone.utc:
-            return 'UTC'
+            return "UTC"
 
         tz_name = tzinfo_value.tzname(dt_value)
-        if tz_name in {'UTC', 'GMT', 'Etc/UTC'}:
-            return 'UTC'
+        if tz_name in {"UTC", "GMT", "Etc/UTC"}:
+            return "UTC"
 
         offset = dt_value.utcoffset()
         if offset is None:
@@ -310,9 +305,9 @@ class CalendarSyncAdapter(ABC):
 
         total_minutes = int(offset.total_seconds() // 60)
         if total_minutes == 0:
-            return 'UTC'
+            return "UTC"
 
-        sign = '+' if total_minutes > 0 else '-'
+        sign = "+" if total_minutes > 0 else "-"
         total_minutes = abs(total_minutes)
         hours, minutes = divmod(total_minutes, 60)
         return f"UTC{sign}{hours:02d}:{minutes:02d}"
@@ -321,17 +316,17 @@ class CalendarSyncAdapter(ABC):
     def _timezone_from_identifier(identifier: str) -> tzinfo:
         """Convert timezone identifier to a ``tzinfo`` implementation."""
 
-        if identifier == 'UTC':
+        if identifier == "UTC":
             return timezone.utc
 
-        if identifier.startswith('UTC') and len(identifier) > 3:
-            sign = 1 if identifier[3] == '+' else -1
+        if identifier.startswith("UTC") and len(identifier) > 3:
+            sign = 1 if identifier[3] == "+" else -1
             remainder = identifier[4:]
             try:
-                if ':' in remainder:
-                    hours_text, minutes_text = remainder.split(':', 1)
+                if ":" in remainder:
+                    hours_text, minutes_text = remainder.split(":", 1)
                 else:
-                    hours_text, minutes_text = remainder, '00'
+                    hours_text, minutes_text = remainder, "00"
                 offset = timedelta(
                     hours=int(hours_text) * sign,
                     minutes=int(minutes_text) * sign,
@@ -429,8 +424,8 @@ class OAuthHttpClient:
         if not self.state.access_token:
             raise ValueError("Not authenticated")
 
-        token_type = self.state.token_type or 'Bearer'
-        auth_headers = {'Authorization': f'{token_type} {self.state.access_token}'}
+        token_type = self.state.token_type or "Bearer"
+        auth_headers = {"Authorization": f"{token_type} {self.state.access_token}"}
         if headers:
             auth_headers.update(headers)
 
@@ -484,35 +479,35 @@ class OAuthHttpClient:
         return response.json()
 
     def _apply_token_response(self, token_data: Dict[str, Any]) -> Dict[str, Any]:
-        access_token = token_data['access_token']
+        access_token = token_data["access_token"]
         self.state.access_token = access_token
 
-        refresh_token = token_data.get('refresh_token')
+        refresh_token = token_data.get("refresh_token")
         if refresh_token:
             self.state.refresh_token = refresh_token
 
-        self.state.token_type = self._normalize_token_type(token_data.get('token_type'))
+        self.state.token_type = self._normalize_token_type(token_data.get("token_type"))
 
-        raw_expires_in = token_data.get('expires_in')
+        raw_expires_in = token_data.get("expires_in")
         expires_in = self._normalize_expires_in(raw_expires_in)
         expires_at_ts = datetime.now().timestamp() + expires_in
         expires_at = datetime.fromtimestamp(expires_at_ts).isoformat()
         self.state.expires_at = expires_at
 
         return {
-            'access_token': access_token,
-            'refresh_token': self.state.refresh_token,
-            'expires_in': expires_in,
-            'expires_at': expires_at,
-            'token_type': self.state.token_type,
+            "access_token": access_token,
+            "refresh_token": self.state.refresh_token,
+            "expires_in": expires_in,
+            "expires_at": expires_at,
+            "token_type": self.state.token_type,
         }
 
     def _normalize_token_type(self, token_type: Optional[str]) -> str:
         if not token_type:
-            return 'Bearer'
+            return "Bearer"
         normalized = token_type.strip()
-        if normalized.lower() == 'bearer':
-            return 'Bearer'
+        if normalized.lower() == "bearer":
+            return "Bearer"
         return normalized
 
     def _normalize_expires_in(self, expires_in: Any) -> int:
@@ -548,9 +543,7 @@ class OAuthCalendarAdapter(CalendarSyncAdapter):
         self.scopes = scopes
         self.endpoints = endpoints
 
-        self.logger = logger or logging.getLogger(
-            f"echonote.calendar_sync.{self.get_name()}"
-        )
+        self.logger = logger or logging.getLogger(f"echonote.calendar_sync.{self.get_name()}")
 
         self._oauth_client = OAuthHttpClient(
             endpoints=endpoints,
@@ -574,25 +567,23 @@ class OAuthCalendarAdapter(CalendarSyncAdapter):
 
         self._oauth_client.close()
 
-    def build_authorization_params(
-        self, state: str, code_challenge: str
-    ) -> Dict[str, Any]:
+    def build_authorization_params(self, state: str, code_challenge: str) -> Dict[str, Any]:
         """Base authorization parameters; subclasses may extend."""
 
         return {
-            'client_id': self.client_id,
-            'redirect_uri': self.redirect_uri,
-            'response_type': 'code',
-            'scope': ' '.join(self.scopes),
-            'state': state,
-            'code_challenge': code_challenge,
-            'code_challenge_method': 'S256',
+            "client_id": self.client_id,
+            "redirect_uri": self.redirect_uri,
+            "response_type": "code",
+            "scope": " ".join(self.scopes),
+            "state": state,
+            "code_challenge": code_challenge,
+            "code_challenge_method": "S256",
         }
 
     def get_authorization_url(self) -> Dict[str, str]:
         oauth_params = self._generate_state_and_pkce()
         params = self.build_authorization_params(
-            oauth_params['state'], oauth_params['code_challenge']
+            oauth_params["state"], oauth_params["code_challenge"]
         )
 
         query_string = urlencode(params, doseq=True)
@@ -601,35 +592,33 @@ class OAuthCalendarAdapter(CalendarSyncAdapter):
         self.logger.info("Generated authorization URL: %s", auth_url)
 
         return {
-            'authorization_url': auth_url,
-            'state': oauth_params['state'],
-            'code_verifier': oauth_params['code_verifier'],
+            "authorization_url": auth_url,
+            "state": oauth_params["state"],
+            "code_verifier": oauth_params["code_verifier"],
         }
 
     def authenticate(self, credentials: dict) -> dict:
         try:
-            if 'authorization_code' in credentials:
+            if "authorization_code" in credentials:
                 return self.exchange_code_for_token(
-                    credentials['authorization_code'],
-                    code_verifier=credentials.get('code_verifier'),
+                    credentials["authorization_code"],
+                    code_verifier=credentials.get("code_verifier"),
                 )
             return self.get_authorization_url()
         except Exception as exc:
             self.logger.error("Authentication failed: %s", exc)
             raise
 
-    def exchange_code_for_token(
-        self, code: str, code_verifier: Optional[str] = None
-    ) -> dict:
+    def exchange_code_for_token(self, code: str, code_verifier: Optional[str] = None) -> dict:
         data = {
-            'code': code,
-            'client_id': self.client_id,
-            'client_secret': self.client_secret,
-            'redirect_uri': self.redirect_uri,
-            'grant_type': 'authorization_code',
+            "code": code,
+            "client_id": self.client_id,
+            "client_secret": self.client_secret,
+            "redirect_uri": self.redirect_uri,
+            "grant_type": "authorization_code",
         }
         if code_verifier:
-            data['code_verifier'] = code_verifier
+            data["code_verifier"] = code_verifier
 
         return self._oauth_client.exchange_authorization_code(data)
 
@@ -638,13 +627,13 @@ class OAuthCalendarAdapter(CalendarSyncAdapter):
             raise ValueError("No refresh token available")
 
         data = {
-            'refresh_token': self.refresh_token,
-            'client_id': self.client_id,
-            'client_secret': self.client_secret,
-            'grant_type': 'refresh_token',
+            "refresh_token": self.refresh_token,
+            "client_id": self.client_id,
+            "client_secret": self.client_secret,
+            "grant_type": "refresh_token",
         }
         if code_verifier:
-            data['code_verifier'] = code_verifier
+            data["code_verifier"] = code_verifier
 
         return self._oauth_client.refresh_access_token(data)
 
@@ -663,7 +652,7 @@ class OAuthCalendarAdapter(CalendarSyncAdapter):
         self._oauth_client.revoke(self.endpoints.revoke_url, request_kwargs)
 
     def build_revoke_request(self) -> Dict[str, Any]:
-        return {'params': {'token': self.access_token}}
+        return {"params": {"token": self.access_token}}
 
     # Token state passthroughs ---------------------------------------
     @property

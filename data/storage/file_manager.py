@@ -27,13 +27,13 @@ from typing import Optional, List
 from datetime import datetime
 
 
-logger = logging.getLogger('echonote.storage')
+logger = logging.getLogger("echonote.storage")
 
 
 class FileManager:
     """
     Manages file storage operations with security and organization.
-    
+
     Provides methods for saving, reading, and deleting files with
     proper permission settings and directory management.
     """
@@ -50,12 +50,12 @@ class FileManager:
             self.base_dir = Path.home() / "Documents" / "EchoNote"
         else:
             self.base_dir = Path(base_dir).expanduser()
-        
+
         # Create base directory structure
         self._initialize_directories()
-        
+
         logger.info(f"File manager initialized: {self.base_dir}")
-    
+
     def _initialize_directories(self):
         """Create base directory structure."""
         directories = [
@@ -63,9 +63,9 @@ class FileManager:
             self.base_dir / "Recordings",
             self.base_dir / "Transcripts",
             self.base_dir / "Exports",
-            self.base_dir / "Temp"
+            self.base_dir / "Temp",
         ]
-        
+
         for directory in directories:
             directory.mkdir(parents=True, exist_ok=True)
             # Set directory permissions (owner read/write/execute only)
@@ -92,16 +92,14 @@ class FileManager:
             os.chmod(directory, 0o700)
             logger.debug(f"Set secure permissions for directory: {directory}")
         except (PermissionError, OSError) as e:
-            logger.warning(
-                f"Could not set directory permissions for {directory}: {e}"
-            )
-    
+            logger.warning(f"Could not set directory permissions for {directory}: {e}")
+
     def save_file(
         self,
         content: bytes,
         filename: str,
         subdirectory: Optional[str] = None,
-        overwrite: bool = False
+        overwrite: bool = False,
     ) -> str:
         """
         Save binary content to a file.
@@ -125,36 +123,36 @@ class FileManager:
             self._set_directory_permissions(target_dir)
         else:
             target_dir = self.base_dir
-        
+
         # Create file path
         file_path = target_dir / filename
-        
+
         # Check if file exists
         if file_path.exists() and not overwrite:
             raise FileExistsError(f"File already exists: {file_path}")
-        
+
         try:
             # Write content
-            with open(file_path, 'wb') as f:
+            with open(file_path, "wb") as f:
                 f.write(content)
-            
+
             # Set secure permissions
             self._set_file_permissions(file_path)
-            
+
             logger.info(f"Saved file: {file_path}")
             return str(file_path)
-            
+
         except Exception as e:
             logger.error(f"Failed to save file: {e}")
             raise
-    
+
     def save_text_file(
         self,
         content: str,
         filename: str,
         subdirectory: Optional[str] = None,
         overwrite: bool = False,
-        encoding: str = 'utf-8'
+        encoding: str = "utf-8",
     ) -> str:
         """
         Save text content to a file.
@@ -169,13 +167,8 @@ class FileManager:
         Returns:
             Absolute path to saved file
         """
-        return self.save_file(
-            content.encode(encoding),
-            filename,
-            subdirectory,
-            overwrite
-        )
-    
+        return self.save_file(content.encode(encoding), filename, subdirectory, overwrite)
+
     def read_file(self, file_path: str) -> bytes:
         """
         Read binary content from a file.
@@ -190,22 +183,22 @@ class FileManager:
             FileNotFoundError: If file does not exist
         """
         path = self._resolve_path(file_path)
-        
+
         if not path.exists():
             raise FileNotFoundError(f"File not found: {path}")
-        
+
         try:
-            with open(path, 'rb') as f:
+            with open(path, "rb") as f:
                 content = f.read()
-            
+
             logger.debug(f"Read file: {path}")
             return content
-            
+
         except Exception as e:
             logger.error(f"Failed to read file: {e}")
             raise
-    
-    def read_text_file(self, file_path: str, encoding: str = 'utf-8') -> str:
+
+    def read_text_file(self, file_path: str, encoding: str = "utf-8") -> str:
         """
         Read text content from a file.
 
@@ -218,7 +211,7 @@ class FileManager:
         """
         content = self.read_file(file_path)
         return content.decode(encoding)
-    
+
     def delete_file(self, file_path: str):
         """
         Delete a file.
@@ -230,18 +223,18 @@ class FileManager:
             FileNotFoundError: If file does not exist
         """
         path = self._resolve_path(file_path)
-        
+
         if not path.exists():
             raise FileNotFoundError(f"File not found: {path}")
-        
+
         try:
             path.unlink()
             logger.info(f"Deleted file: {path}")
-            
+
         except Exception as e:
             logger.error(f"Failed to delete file: {e}")
             raise
-    
+
     def move_file(self, source_path: str, dest_path: str, overwrite: bool = False) -> str:
         """
         Move a file to a new location.
@@ -260,30 +253,30 @@ class FileManager:
         """
         source = self._resolve_path(source_path)
         dest = self._resolve_path(dest_path)
-        
+
         if not source.exists():
             raise FileNotFoundError(f"Source file not found: {source}")
-        
+
         if dest.exists() and not overwrite:
             raise FileExistsError(f"Destination file already exists: {dest}")
-        
+
         try:
             # Ensure destination directory exists
             dest.parent.mkdir(parents=True, exist_ok=True)
-            
+
             # Move file
             shutil.move(str(source), str(dest))
-            
+
             # Set secure permissions
             self._set_file_permissions(dest)
-            
+
             logger.info(f"Moved file: {source} -> {dest}")
             return str(dest)
-            
+
         except Exception as e:
             logger.error(f"Failed to move file: {e}")
             raise
-    
+
     def copy_file(self, source_path: str, dest_path: str, overwrite: bool = False) -> str:
         """
         Copy a file to a new location.
@@ -302,30 +295,30 @@ class FileManager:
         """
         source = self._resolve_path(source_path)
         dest = self._resolve_path(dest_path)
-        
+
         if not source.exists():
             raise FileNotFoundError(f"Source file not found: {source}")
-        
+
         if dest.exists() and not overwrite:
             raise FileExistsError(f"Destination file already exists: {dest}")
-        
+
         try:
             # Ensure destination directory exists
             dest.parent.mkdir(parents=True, exist_ok=True)
-            
+
             # Copy file
             shutil.copy2(str(source), str(dest))
-            
+
             # Set secure permissions
             self._set_file_permissions(dest)
-            
+
             logger.info(f"Copied file: {source} -> {dest}")
             return str(dest)
-            
+
         except Exception as e:
             logger.error(f"Failed to copy file: {e}")
             raise
-    
+
     def file_exists(self, file_path: str) -> bool:
         """
         Check if a file exists.
@@ -338,7 +331,7 @@ class FileManager:
         """
         path = self._resolve_path(file_path)
         return path.exists() and path.is_file()
-    
+
     def get_file_size(self, file_path: str) -> int:
         """
         Get file size in bytes.
@@ -353,17 +346,14 @@ class FileManager:
             FileNotFoundError: If file does not exist
         """
         path = self._resolve_path(file_path)
-        
+
         if not path.exists():
             raise FileNotFoundError(f"File not found: {path}")
-        
+
         return path.stat().st_size
-    
+
     def list_files(
-        self,
-        subdirectory: Optional[str] = None,
-        pattern: str = "*",
-        recursive: bool = False
+        self, subdirectory: Optional[str] = None, pattern: str = "*", recursive: bool = False
     ) -> List[str]:
         """
         List files in a directory.
@@ -380,26 +370,23 @@ class FileManager:
             search_dir = self.base_dir / subdirectory
         else:
             search_dir = self.base_dir
-        
+
         if not search_dir.exists():
             return []
-        
+
         if recursive:
             files = search_dir.rglob(pattern)
         else:
             files = search_dir.glob(pattern)
-        
+
         # Filter to only files (not directories)
         file_paths = [str(f) for f in files if f.is_file()]
-        
+
         logger.debug(f"Listed {len(file_paths)} file(s) in {search_dir}")
         return file_paths
-    
+
     def create_unique_filename(
-        self,
-        base_name: str,
-        extension: str,
-        subdirectory: Optional[str] = None
+        self, base_name: str, extension: str, subdirectory: Optional[str] = None
     ) -> str:
         """
         Create a unique filename by adding a counter if needed.
@@ -413,33 +400,33 @@ class FileManager:
             Unique filename (not full path)
         """
         # Ensure extension starts with dot
-        if not extension.startswith('.'):
-            extension = '.' + extension
-        
+        if not extension.startswith("."):
+            extension = "." + extension
+
         # Determine target directory
         if subdirectory:
             target_dir = self.base_dir / subdirectory
         else:
             target_dir = self.base_dir
-        
+
         # Try base name first
         filename = f"{base_name}{extension}"
         file_path = target_dir / filename
-        
+
         if not file_path.exists():
             return filename
-        
+
         # Add counter if file exists
         counter = 1
         while True:
             filename = f"{base_name}_{counter}{extension}"
             file_path = target_dir / filename
-            
+
             if not file_path.exists():
                 return filename
-            
+
             counter += 1
-    
+
     def get_temp_path(self, filename: str) -> str:
         """
         Get path for a temporary file.
@@ -453,7 +440,7 @@ class FileManager:
         temp_dir = self.base_dir / "Temp"
         temp_dir.mkdir(parents=True, exist_ok=True)
         return str(temp_dir / filename)
-    
+
     def cleanup_temp_files(self, older_than_days: int = 7):
         """
         Delete temporary files older than specified days.
@@ -462,13 +449,13 @@ class FileManager:
             older_than_days: Delete files older than this many days
         """
         temp_dir = self.base_dir / "Temp"
-        
+
         if not temp_dir.exists():
             return
-        
+
         cutoff_time = datetime.now().timestamp() - (older_than_days * 86400)
         deleted_count = 0
-        
+
         for file_path in temp_dir.glob("*"):
             if file_path.is_file():
                 if file_path.stat().st_mtime < cutoff_time:
@@ -477,9 +464,9 @@ class FileManager:
                         deleted_count += 1
                     except Exception as e:
                         logger.warning(f"Could not delete temp file {file_path}: {e}")
-        
+
         logger.info(f"Cleaned up {deleted_count} temporary file(s)")
-    
+
     def ensure_directory(self, dir_path: str):
         """
         Ensure a directory exists, creating it if necessary.
@@ -491,7 +478,7 @@ class FileManager:
         path.mkdir(parents=True, exist_ok=True)
         os.chmod(path, 0o700)
         logger.debug(f"Ensured directory exists: {path}")
-    
+
     def set_file_permissions(self, file_path: str, mode: int = 0o600):
         """
         Set file permissions.
@@ -504,13 +491,13 @@ class FileManager:
             FileNotFoundError: If file does not exist
         """
         path = self._resolve_path(file_path)
-        
+
         if not path.exists():
             raise FileNotFoundError(f"File not found: {path}")
-        
+
         os.chmod(path, mode)
         logger.debug(f"Set permissions {oct(mode)} for: {path}")
-    
+
     def _resolve_path(self, file_path: str) -> Path:
         """
         Resolve file path (handle both absolute and relative paths).
@@ -522,9 +509,9 @@ class FileManager:
             Resolved Path object
         """
         path = Path(file_path).expanduser()
-        
+
         # If path is not absolute, treat it as relative to base_dir
         if not path.is_absolute():
             path = self.base_dir / path
-        
+
         return path

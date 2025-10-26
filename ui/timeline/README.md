@@ -59,8 +59,7 @@ Built-in audio player for recordings:
 - **Immediate feedback** when recordings are missing so users understand the failure reason
 - **Instant translation refresh** when the application language changes
 
-
-Uses PyQt6's QMediaPlayer and QAudioOutput.
+Uses PySide6's QMediaPlayer and QAudioOutput.
 
 > ℹ️ If QtMultimedia components are unavailable (e.g., package not installed),
 > the timeline continues to load events, but playback controls are disabled and

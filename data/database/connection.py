@@ -27,13 +27,13 @@ from contextlib import contextmanager
 import threading
 
 
-logger = logging.getLogger('echonote.database')
+logger = logging.getLogger("echonote.database")
 
 
 class DatabaseConnection:
     """
     Manages SQLite database connections with encryption support.
-    
+
     Provides connection pooling, encryption via SQLCipher, and
     thread-safe database access.
     """
@@ -50,12 +50,12 @@ class DatabaseConnection:
         self.encryption_key = encryption_key
         self._local = threading.local()
         self._encryption_enabled: Optional[bool] = None
-        
+
         # Ensure database directory exists
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        
+
         logger.info(f"Database connection manager initialized: {self.db_path}")
-    
+
     def _get_connection(self) -> sqlite3.Connection:
         """
         Get or create a thread-local database connection.
@@ -63,19 +63,17 @@ class DatabaseConnection:
         Returns:
             SQLite connection for the current thread
         """
-        if not hasattr(self._local, 'connection') or self._local.connection is None:
-            logger.debug(f"Creating new database connection for thread {threading.current_thread().name}")
-            
-            # Create connection
-            conn = sqlite3.connect(
-                str(self.db_path),
-                check_same_thread=False,
-                timeout=30.0
+        if not hasattr(self._local, "connection") or self._local.connection is None:
+            logger.debug(
+                f"Creating new database connection for thread {threading.current_thread().name}"
             )
-            
+
+            # Create connection
+            conn = sqlite3.connect(str(self.db_path), check_same_thread=False, timeout=30.0)
+
             # Enable foreign keys
             conn.execute("PRAGMA foreign_keys = ON")
-            
+
             # Set row factory for dict-like access
             conn.row_factory = sqlite3.Row
 
@@ -115,9 +113,7 @@ class DatabaseConnection:
                         # Reconnect without encryption
                         conn.close()
                         conn = sqlite3.connect(
-                            str(self.db_path),
-                            check_same_thread=False,
-                            timeout=30.0
+                            str(self.db_path), check_same_thread=False, timeout=30.0
                         )
                         conn.execute("PRAGMA foreign_keys = ON")
                         conn.row_factory = sqlite3.Row
@@ -133,7 +129,7 @@ class DatabaseConnection:
                 self._encryption_enabled = encryption_applied
             else:
                 self._encryption_enabled = False
-        
+
         return self._local.connection
 
     def _check_sqlcipher(self, conn: sqlite3.Connection) -> bool:
@@ -173,7 +169,7 @@ class DatabaseConnection:
         """
         conn = self._get_connection()
         cursor = conn.cursor()
-        
+
         try:
             yield cursor
             if commit:
@@ -185,7 +181,7 @@ class DatabaseConnection:
             raise
         finally:
             cursor.close()
-    
+
     def execute(self, query: str, params: tuple = None, commit: bool = False):
         """
         Execute a single SQL query.
@@ -204,7 +200,7 @@ class DatabaseConnection:
             else:
                 cursor.execute(query)
             return cursor.fetchall()
-    
+
     def execute_many(self, query: str, params_list: list, commit: bool = True):
         """
         Execute a query with multiple parameter sets.
@@ -220,10 +216,10 @@ class DatabaseConnection:
         with self.get_cursor(commit=commit) as cursor:
             cursor.executemany(query, params_list)
             return cursor.rowcount
-    
+
     def is_encryption_enabled(self) -> bool:
         """Return whether SQLCipher encryption is active for this connection."""
-        if not hasattr(self._local, 'connection') or self._local.connection is None:
+        if not hasattr(self._local, "connection") or self._local.connection is None:
             self._get_connection()
 
         if self.encryption_key is None:
@@ -246,9 +242,7 @@ class DatabaseConnection:
             if self._encryption_enabled:
                 logger.info("Database rekeyed successfully with SQLCipher.")
                 return True
-            logger.warning(
-                "PRAGMA rekey executed but SQLCipher encryption could not be confirmed."
-            )
+            logger.warning("PRAGMA rekey executed but SQLCipher encryption could not be confirmed.")
         except sqlite3.OperationalError as e:
             logger.warning(
                 "Failed to rekey database (SQLCipher may be unavailable): %s",
@@ -275,7 +269,7 @@ class DatabaseConnection:
             conn.rollback()
             logger.error(f"Script execution failed: {e}")
             raise
-    
+
     def initialize_schema(self, schema_path: Optional[str] = None):
         """
         Initialize database schema from SQL file.
@@ -287,19 +281,19 @@ class DatabaseConnection:
             schema_path = Path(__file__).parent / "schema.sql"
         else:
             schema_path = Path(schema_path)
-        
+
         if not schema_path.exists():
             logger.error(f"Schema file not found: {schema_path}")
             raise FileNotFoundError(f"Schema file not found: {schema_path}")
-        
+
         logger.info(f"Initializing database schema from {schema_path}")
-        
-        with open(schema_path, 'r', encoding='utf-8') as f:
+
+        with open(schema_path, "r", encoding="utf-8") as f:
             schema_sql = f.read()
-        
+
         self.execute_script(schema_sql, commit=True)
         logger.info("Database schema initialized successfully")
-    
+
     def get_version(self) -> int:
         """
         Get the current database schema version.
@@ -308,16 +302,14 @@ class DatabaseConnection:
             Schema version number, or 0 if not set
         """
         try:
-            result = self.execute(
-                "SELECT value FROM app_settings WHERE key = 'schema_version'"
-            )
+            result = self.execute("SELECT value FROM app_settings WHERE key = 'schema_version'")
             if result:
-                return int(result[0]['value'])
+                return int(result[0]["value"])
             return 0
         except sqlite3.OperationalError:
             # Table doesn't exist yet
             return 0
-    
+
     def set_version(self, version: int):
         """
         Set the database schema version.
@@ -331,37 +323,37 @@ class DatabaseConnection:
             VALUES ('schema_version', ?, CURRENT_TIMESTAMP)
             """,
             (str(version),),
-            commit=True
+            commit=True,
         )
         logger.info(f"Database schema version set to {version}")
-    
+
     def close(self):
         """Close the database connection for the current thread."""
-        if hasattr(self._local, 'connection') and self._local.connection:
+        if hasattr(self._local, "connection") and self._local.connection:
             self._local.connection.close()
             self._local.connection = None
             logger.debug("Database connection closed")
-    
+
     def close_all(self):
         """
         Close all database connections.
-        
+
         Note: This only closes the connection for the current thread.
         Other threads will close their connections when they exit.
         """
         self.close()
-    
+
     def vacuum(self):
         """
         Optimize database by reclaiming unused space.
-        
+
         Should be called periodically for maintenance.
         """
         logger.info("Running VACUUM on database")
         conn = self._get_connection()
         conn.execute("VACUUM")
         logger.info("VACUUM completed")
-    
+
     def backup(self, backup_path: str):
         """
         Create a backup of the database.
@@ -371,15 +363,15 @@ class DatabaseConnection:
         """
         backup_path = Path(backup_path).expanduser()
         backup_path.parent.mkdir(parents=True, exist_ok=True)
-        
+
         logger.info(f"Creating database backup: {backup_path}")
-        
+
         # Create backup connection
         backup_conn = sqlite3.connect(str(backup_path))
-        
+
         # Copy database
         conn = self._get_connection()
         conn.backup(backup_conn)
-        
+
         backup_conn.close()
         logger.info("Database backup completed successfully")

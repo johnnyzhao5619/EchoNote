@@ -398,7 +398,7 @@ events = calendar_manager.get_events(start_date, end_date)
 ```python
 # 避免频繁刷新 / Avoid frequent refreshes
 # 使用防抖机制 / Use debouncing
-from PyQt6.QtCore import QTimer
+from PySide6.QtCore import QTimer
 
 self.refresh_timer = QTimer()
 self.refresh_timer.setSingleShot(True)

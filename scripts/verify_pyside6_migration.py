@@ -19,9 +19,7 @@ from pathlib import Path
 from typing import Dict, List, Set
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -78,12 +76,8 @@ class VerificationStats:
     def add_issue(self, issue: VerificationIssue):
         """Add an issue to the statistics."""
         self.total_issues += 1
-        self.issues_by_type[issue.issue_type] = (
-            self.issues_by_type.get(issue.issue_type, 0) + 1
-        )
-        self.issues_by_severity[issue.severity] = (
-            self.issues_by_severity.get(issue.severity, 0) + 1
-        )
+        self.issues_by_type[issue.issue_type] = self.issues_by_type.get(issue.issue_type, 0) + 1
+        self.issues_by_severity[issue.severity] = self.issues_by_severity.get(issue.severity, 0) + 1
         self.problematic_files.add(issue.filepath)
 
     def add_clean_file(self, filepath: str):
@@ -156,7 +150,7 @@ class PySide6MigrationVerifier:
         (
             re.compile(r"Signal\s*\[\s*\w+\s*\]"),
             "signal_annotation",
-            "Signal type annotation should use parentheses: Signal(type) not Signal[type]",
+            "Signal type annotation should use parentheses: Signal(type) not Signal(type)",
             "warning",
         ),
         # Mixed imports
@@ -360,9 +354,7 @@ class PySide6MigrationVerifier:
 
         return issues
 
-    def check_text_file(
-        self, filepath: Path, file_type: str
-    ) -> List[VerificationIssue]:
+    def check_text_file(self, filepath: Path, file_type: str) -> List[VerificationIssue]:
         """Check a text file (docs/configs) for PyQt6 references.
 
         Args:
@@ -609,9 +601,7 @@ Examples:
 
     parser.add_argument("paths", nargs="+", help="Files or directories to verify")
 
-    parser.add_argument(
-        "--no-docs", action="store_true", help="Skip checking documentation files"
-    )
+    parser.add_argument("--no-docs", action="store_true", help="Skip checking documentation files")
 
     parser.add_argument(
         "--no-configs", action="store_true", help="Skip checking configuration files"
@@ -633,9 +623,7 @@ Examples:
         help="Show list of clean files in report",
     )
 
-    parser.add_argument(
-        "--verbose", "-v", action="store_true", help="Enable verbose logging"
-    )
+    parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
 
     args = parser.parse_args()
 

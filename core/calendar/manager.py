@@ -31,7 +31,8 @@ from data.database.models import (
     EventAttachment,
 )
 from data.storage.file_manager import FileManager
-logger = logging.getLogger('echonote.calendar.manager')
+
+logger = logging.getLogger("echonote.calendar.manager")
 
 
 if TYPE_CHECKING:
@@ -55,8 +56,8 @@ class CalendarManager:
         self,
         db_connection,
         sync_adapters: Optional[Dict[str, Any]] = None,
-        oauth_manager: Optional['OAuthManager'] = None,
-        file_manager: Optional[FileManager] = None
+        oauth_manager: Optional["OAuthManager"] = None,
+        file_manager: Optional[FileManager] = None,
     ):
         """
         Initialize the calendar manager.
@@ -73,11 +74,7 @@ class CalendarManager:
         self.file_manager = file_manager
         logger.info("CalendarManager initialized")
 
-    def create_event(
-        self,
-        event_data: dict,
-        sync_to: Optional[List[str]] = None
-    ) -> str:
+    def create_event(self, event_data: dict, sync_to: Optional[List[str]] = None) -> str:
         """
         Create a new calendar event.
 
@@ -91,28 +88,20 @@ class CalendarManager:
         """
         try:
             # Basic validation for required fields
-            required_fields = ['title', 'start_time', 'end_time']
-            missing_fields = [
-                field for field in required_fields
-                if not event_data.get(field)
-            ]
+            required_fields = ["title", "start_time", "end_time"]
+            missing_fields = [field for field in required_fields if not event_data.get(field)]
             if missing_fields:
-                raise ValueError(
-                    f"Missing required event fields: {', '.join(missing_fields)}"
-                )
+                raise ValueError(f"Missing required event fields: {', '.join(missing_fields)}")
 
             start_dt, end_dt = self._normalize_event_window(
-                event_data['start_time'],
-                event_data['end_time']
+                event_data["start_time"], event_data["end_time"]
             )
             if start_dt >= end_dt:
-                raise ValueError(
-                    "Event end_time must be later than start_time"
-                )
-            event_data['start_time'] = start_dt.isoformat()
-            event_data['end_time'] = end_dt.isoformat()
+                raise ValueError("Event end_time must be later than start_time")
+            event_data["start_time"] = start_dt.isoformat()
+            event_data["end_time"] = end_dt.isoformat()
 
-            attendees = event_data.get('attendees') or []
+            attendees = event_data.get("attendees") or []
             if not isinstance(attendees, list):
                 if isinstance(attendees, (set, tuple)):
                     attendees = list(attendees)
@@ -121,32 +110,28 @@ class CalendarManager:
 
             # Create local event
             event = CalendarEvent(
-                title=event_data.get('title', ''),
-                event_type=event_data.get('event_type', 'Event'),
-                start_time=event_data.get('start_time', ''),
-                end_time=event_data.get('end_time', ''),
-                location=event_data.get('location'),
+                title=event_data.get("title", ""),
+                event_type=event_data.get("event_type", "Event"),
+                start_time=event_data.get("start_time", ""),
+                end_time=event_data.get("end_time", ""),
+                location=event_data.get("location"),
                 attendees=attendees,
-                description=event_data.get('description'),
-                reminder_minutes=event_data.get('reminder_minutes'),
-                recurrence_rule=event_data.get('recurrence_rule'),
-                source='local',
-                is_readonly=False
+                description=event_data.get("description"),
+                reminder_minutes=event_data.get("reminder_minutes"),
+                recurrence_rule=event_data.get("recurrence_rule"),
+                source="local",
+                is_readonly=False,
             )
 
             event.save(self.db)
-            logger.info(
-                f"Created local event: {event.id} - {event.title}"
-            )
+            logger.info(f"Created local event: {event.id} - {event.title}")
 
             # Sync to external calendars if requested
             if sync_to:
                 for provider in sync_to:
                     if provider in self.sync_adapters:
                         try:
-                            external_id = self._push_to_external(
-                                event, provider
-                            )
+                            external_id = self._push_to_external(event, provider)
                             if external_id:
                                 self._upsert_event_link(
                                     event.id,
@@ -154,19 +139,13 @@ class CalendarManager:
                                     external_id,
                                 )
                                 logger.info(
-                                    f"Synced event {event.id} to "
-                                    f"{provider}: {external_id}"
+                                    f"Synced event {event.id} to " f"{provider}: {external_id}"
                                 )
                         except Exception as e:
-                            logger.error(
-                                f"Failed to sync event to "
-                                f"{provider}: {e}"
-                            )
+                            logger.error(f"Failed to sync event to " f"{provider}: {e}")
                             # Continue with other providers
                     else:
-                        logger.warning(
-                            f"Sync adapter for {provider} not found"
-                        )
+                        logger.warning(f"Sync adapter for {provider} not found")
 
             return event.id
 
@@ -189,49 +168,45 @@ class CalendarManager:
                 raise ValueError(f"Event not found: {event_id}")
 
             if event.is_readonly:
-                raise ValueError(
-                    f"Cannot update readonly event from {event.source}"
-                )
+                raise ValueError(f"Cannot update readonly event from {event.source}")
 
-            if 'start_time' in event_data or 'end_time' in event_data:
+            if "start_time" in event_data or "end_time" in event_data:
                 start_dt, end_dt = self._normalize_event_window(
-                    event_data.get('start_time', event.start_time),
-                    event_data.get('end_time', event.end_time)
+                    event_data.get("start_time", event.start_time),
+                    event_data.get("end_time", event.end_time),
                 )
                 if start_dt >= end_dt:
-                    raise ValueError(
-                        "Event end_time must be later than start_time"
-                    )
-                if 'start_time' in event_data:
-                    event_data['start_time'] = start_dt.isoformat()
-                if 'end_time' in event_data:
-                    event_data['end_time'] = end_dt.isoformat()
+                    raise ValueError("Event end_time must be later than start_time")
+                if "start_time" in event_data:
+                    event_data["start_time"] = start_dt.isoformat()
+                if "end_time" in event_data:
+                    event_data["end_time"] = end_dt.isoformat()
 
             # Update fields
-            if 'title' in event_data:
-                event.title = event_data['title']
-            if 'event_type' in event_data:
-                event.event_type = event_data['event_type']
-            if 'start_time' in event_data:
-                event.start_time = event_data['start_time']
-            if 'end_time' in event_data:
-                event.end_time = event_data['end_time']
-            if 'location' in event_data:
-                event.location = event_data['location']
-            if 'attendees' in event_data:
-                attendees = event_data.get('attendees') or []
+            if "title" in event_data:
+                event.title = event_data["title"]
+            if "event_type" in event_data:
+                event.event_type = event_data["event_type"]
+            if "start_time" in event_data:
+                event.start_time = event_data["start_time"]
+            if "end_time" in event_data:
+                event.end_time = event_data["end_time"]
+            if "location" in event_data:
+                event.location = event_data["location"]
+            if "attendees" in event_data:
+                attendees = event_data.get("attendees") or []
                 if not isinstance(attendees, list):
                     if isinstance(attendees, (set, tuple)):
                         attendees = list(attendees)
                     else:
                         attendees = [attendees]
                 event.attendees = attendees
-            if 'description' in event_data:
-                event.description = event_data['description']
-            if 'reminder_minutes' in event_data:
-                event.reminder_minutes = event_data['reminder_minutes']
-            if 'recurrence_rule' in event_data:
-                event.recurrence_rule = event_data['recurrence_rule']
+            if "description" in event_data:
+                event.description = event_data["description"]
+            if "reminder_minutes" in event_data:
+                event.reminder_minutes = event_data["reminder_minutes"]
+            if "recurrence_rule" in event_data:
+                event.recurrence_rule = event_data["recurrence_rule"]
 
             event.save(self.db)
             logger.info(f"Updated event: {event_id}")
@@ -278,8 +253,7 @@ class CalendarManager:
 
             if sync_failures:
                 raise RuntimeError(
-                    "本地事件已更新，但以下提供商同步失败: "
-                    + ", ".join(sorted(set(sync_failures)))
+                    "本地事件已更新，但以下提供商同步失败: " + ", ".join(sorted(set(sync_failures)))
                 )
 
         except Exception as e:
@@ -300,9 +274,7 @@ class CalendarManager:
                 raise ValueError(f"Event not found: {event_id}")
 
             if event.is_readonly:
-                raise ValueError(
-                    f"Cannot delete readonly event from {event.source}"
-                )
+                raise ValueError(f"Cannot delete readonly event from {event.source}")
 
             links = CalendarEventLink.list_for_event(self.db, event_id)
             sync_failures = []
@@ -393,10 +365,7 @@ class CalendarManager:
             return None
 
     def get_events(
-        self,
-        start_date,
-        end_date,
-        filters: Optional[Dict[str, Any]] = None
+        self, start_date, end_date, filters: Optional[Dict[str, Any]] = None
     ) -> List[CalendarEvent]:
         """
         Query calendar events within a time range with optional filters.
@@ -411,7 +380,7 @@ class CalendarManager:
         """
         try:
             filters = filters or {}
-            
+
             # Convert datetime objects to ISO format strings if needed
             if isinstance(start_date, datetime):
                 start_date = start_date.isoformat()
@@ -420,31 +389,23 @@ class CalendarManager:
 
             # Get events by time range
             events = CalendarEvent.get_by_time_range(
-                self.db,
-                start_date,
-                end_date,
-                source=filters.get('source')
+                self.db, start_date, end_date, source=filters.get("source")
             )
 
             # Apply additional filters
-            if filters.get('event_type'):
+            if filters.get("event_type"):
+                events = [e for e in events if e.event_type == filters["event_type"]]
+
+            if filters.get("keyword"):
+                keyword = filters["keyword"].lower()
                 events = [
-                    e for e in events
-                    if e.event_type == filters['event_type']
+                    e
+                    for e in events
+                    if keyword in e.title.lower()
+                    or (e.description and keyword in e.description.lower())
                 ]
 
-            if filters.get('keyword'):
-                keyword = filters['keyword'].lower()
-                events = [
-                    e for e in events
-                    if keyword in e.title.lower() or
-                    (e.description and keyword in e.description.lower())
-                ]
-
-            logger.debug(
-                f"Retrieved {len(events)} events from "
-                f"{start_date} to {end_date}"
-            )
+            logger.debug(f"Retrieved {len(events)} events from " f"{start_date} to {end_date}")
             return events
 
         except Exception as e:
@@ -460,17 +421,12 @@ class CalendarManager:
         """
         try:
             if provider not in self.sync_adapters:
-                raise ValueError(
-                    f"Sync adapter for {provider} not found"
-                )
+                raise ValueError(f"Sync adapter for {provider} not found")
 
             adapter = self.sync_adapters[provider]
 
             existing_links = self.db.execute(
-                (
-                    "SELECT event_id, external_id FROM calendar_event_links "
-                    "WHERE provider = ?"
-                ),
+                ("SELECT event_id, external_id FROM calendar_event_links " "WHERE provider = ?"),
                 (provider,),
             )
 
@@ -496,39 +452,41 @@ class CalendarManager:
             token_before_refresh: Optional[Dict[str, Any]] = None
             refresh_result: Dict[str, Any] = {}
 
-            if self.oauth_manager and hasattr(adapter, 'refresh_access_token'):
-                if not getattr(adapter, 'refresh_token', None):
+            if self.oauth_manager and hasattr(adapter, "refresh_access_token"):
+                if not getattr(adapter, "refresh_token", None):
                     logger.warning(
-                        "Adapter %s has no refresh_token; skipping token refresh",
-                        provider
+                        "Adapter %s has no refresh_token; skipping token refresh", provider
                     )
                 else:
                     try:
                         token_before_refresh = self.oauth_manager.get_token(provider)
 
-                        def _resolve_expires_in(data: Dict[str, Any], context: str) -> Optional[int]:
-                            expires_in_value = data.get('expires_in')
+                        def _resolve_expires_in(
+                            data: Dict[str, Any], context: str
+                        ) -> Optional[int]:
+                            expires_in_value = data.get("expires_in")
                             if expires_in_value is not None:
                                 return expires_in_value
 
-                            expires_at_value = data.get('expires_at')
+                            expires_at_value = data.get("expires_at")
                             if not expires_at_value:
                                 return None
 
                             try:
                                 expires_at_dt = datetime.fromisoformat(expires_at_value)
-                                current_time = datetime.now(
-                                    expires_at_dt.tzinfo
-                                ) if expires_at_dt.tzinfo else datetime.now()
+                                current_time = (
+                                    datetime.now(expires_at_dt.tzinfo)
+                                    if expires_at_dt.tzinfo
+                                    else datetime.now()
+                                )
                                 resolved = max(
-                                    int((expires_at_dt - current_time).total_seconds()),
-                                    0
+                                    int((expires_at_dt - current_time).total_seconds()), 0
                                 )
                                 logger.debug(
                                     "Derived expires_in=%s from expires_at during %s for %s",
                                     resolved,
                                     context,
-                                    provider
+                                    provider,
                                 )
                                 return resolved
                             except ValueError:
@@ -536,7 +494,7 @@ class CalendarManager:
                                     "Unable to parse expires_at during %s for %s: %s",
                                     context,
                                     provider,
-                                    expires_at_value
+                                    expires_at_value,
                                 )
                                 return None
 
@@ -544,88 +502,73 @@ class CalendarManager:
                             adapter.refresh_token = refresh_token
                             refreshed = adapter.refresh_access_token()
 
-                            new_refresh_token = refreshed.get('refresh_token')
+                            new_refresh_token = refreshed.get("refresh_token")
                             if new_refresh_token:
                                 adapter.refresh_token = new_refresh_token
 
-                            adapter.access_token = refreshed.get('access_token')
-                            adapter.expires_at = refreshed.get('expires_at')
-                            if refreshed.get('token_type'):
-                                setattr(adapter, 'token_type', refreshed.get('token_type'))
+                            adapter.access_token = refreshed.get("access_token")
+                            adapter.expires_at = refreshed.get("expires_at")
+                            if refreshed.get("token_type"):
+                                setattr(adapter, "token_type", refreshed.get("token_type"))
 
-                            resolved_expires_in = _resolve_expires_in(
-                                refreshed,
-                                'refresh callback'
-                            )
+                            resolved_expires_in = _resolve_expires_in(refreshed, "refresh callback")
 
                             refresh_result.clear()
                             refresh_result.update(refreshed)
                             if resolved_expires_in is not None:
-                                refresh_result['expires_in'] = resolved_expires_in
+                                refresh_result["expires_in"] = resolved_expires_in
 
                             return {
-                                'access_token': refreshed.get('access_token'),
-                                'expires_in': resolved_expires_in,
-                                'token_type': refreshed.get('token_type'),
-                                'refresh_token': refreshed.get('refresh_token'),
-                                'expires_at': refreshed.get('expires_at')
+                                "access_token": refreshed.get("access_token"),
+                                "expires_in": resolved_expires_in,
+                                "token_type": refreshed.get("token_type"),
+                                "refresh_token": refreshed.get("refresh_token"),
+                                "expires_at": refreshed.get("expires_at"),
                             }
 
                         token_data = self.oauth_manager.refresh_token_if_needed(
-                            provider,
-                            refresh_callback
+                            provider, refresh_callback
                         )
 
-                        if refresh_result and refresh_result.get('access_token'):
+                        if refresh_result and refresh_result.get("access_token"):
                             expires_in_for_update = _resolve_expires_in(
-                                refresh_result,
-                                'post-refresh update'
+                                refresh_result, "post-refresh update"
                             )
                             self.oauth_manager.update_access_token(
                                 provider,
-                                refresh_result.get('access_token'),
+                                refresh_result.get("access_token"),
                                 expires_in_for_update,
-                                token_type=refresh_result.get('token_type'),
-                                refresh_token=refresh_result.get('refresh_token'),
-                                expires_at=refresh_result.get('expires_at')
+                                token_type=refresh_result.get("token_type"),
+                                refresh_token=refresh_result.get("refresh_token"),
+                                expires_at=refresh_result.get("expires_at"),
                             )
 
                         if token_data:
-                            adapter.access_token = token_data.get('access_token')
-                            adapter.expires_at = token_data.get('expires_at')
+                            adapter.access_token = token_data.get("access_token")
+                            adapter.expires_at = token_data.get("expires_at")
 
-                            refreshed_token = token_data.get('refresh_token')
+                            refreshed_token = token_data.get("refresh_token")
                             if refreshed_token:
                                 adapter.refresh_token = refreshed_token
 
                         if (
                             token_before_refresh
                             and token_data
-                            and token_data.get('access_token')
-                            != token_before_refresh.get('access_token')
+                            and token_data.get("access_token")
+                            != token_before_refresh.get("access_token")
                         ):
-                            logger.info(
-                                "Access token for %s refreshed successfully", provider
-                            )
+                            logger.info("Access token for %s refreshed successfully", provider)
 
                     except ValueError as token_error:
-                        logger.warning(
-                            "Skipping token refresh for %s: %s", provider, token_error
-                        )
+                        logger.warning("Skipping token refresh for %s: %s", provider, token_error)
                     except Exception as token_error:
-                        logger.error(
-                            "Token refresh failed for %s: %s", provider, token_error
-                        )
+                        logger.error("Token refresh failed for %s: %s", provider, token_error)
 
             # Get sync status
-            sync_status = CalendarSyncStatus.get_by_provider(
-                self.db, provider
-            )
+            sync_status = CalendarSyncStatus.get_by_provider(self.db, provider)
 
             if not sync_status:
-                logger.warning(
-                    f"No active sync status for {provider}"
-                )
+                logger.warning(f"No active sync status for {provider}")
                 return
 
             # Fetch events from external calendar
@@ -633,13 +576,13 @@ class CalendarManager:
             result = adapter.fetch_events(
                 start_date=None,  # Fetch all future events
                 end_date=None,
-                last_sync_token=sync_status.sync_token
+                last_sync_token=sync_status.sync_token,
             )
 
-            external_events = result.get('events', [])
-            new_sync_token = result.get('sync_token')
+            external_events = result.get("events", [])
+            new_sync_token = result.get("sync_token")
 
-            deleted_external_ids = set(result.get('deleted', []) or [])
+            deleted_external_ids = set(result.get("deleted", []) or [])
             remote_external_ids: set = set()
 
             # Save external events to local database
@@ -647,20 +590,19 @@ class CalendarManager:
                 if not isinstance(ext_event, dict):
                     continue
 
-                if ext_event.get('deleted'):
-                    if ext_event.get('id'):
-                        deleted_external_ids.add(ext_event['id'])
+                if ext_event.get("deleted"):
+                    if ext_event.get("id"):
+                        deleted_external_ids.add(ext_event["id"])
                     continue
 
-                ext_identifier = ext_event.get('id')
+                ext_identifier = ext_event.get("id")
                 if ext_identifier:
                     remote_external_ids.add(ext_identifier)
 
                 self._save_external_event(ext_event, provider)
 
             removable_ids = (
-                {external_id for external_id in existing_map}
-                - remote_external_ids
+                {external_id for external_id in existing_map} - remote_external_ids
             ) | (deleted_external_ids & set(existing_map.keys()))
 
             for external_id in removable_ids:
@@ -673,21 +615,13 @@ class CalendarManager:
                 sync_status.sync_token = new_sync_token
             sync_status.save(self.db)
 
-            logger.info(
-                f"Synced {len(external_events)} events from {provider}"
-            )
+            logger.info(f"Synced {len(external_events)} events from {provider}")
 
         except Exception as e:
-            logger.error(
-                f"Failed to sync external calendar {provider}: {e}"
-            )
+            logger.error(f"Failed to sync external calendar {provider}: {e}")
             raise
 
-    def _push_to_external(
-        self,
-        event: CalendarEvent,
-        provider: str
-    ) -> Optional[str]:
+    def _push_to_external(self, event: CalendarEvent, provider: str) -> Optional[str]:
         """
         Push a local event to an external calendar.
 
@@ -717,31 +651,24 @@ class CalendarManager:
         try:
             # Check if event already exists
             event: Optional[CalendarEvent] = None
-            ext_identifier = ext_event.get('id')
+            ext_identifier = ext_event.get("id")
 
             if ext_identifier:
                 link = CalendarEventLink.get_by_provider_and_external_id(
-                    self.db,
-                    provider,
-                    ext_identifier
+                    self.db, provider, ext_identifier
                 )
                 if link:
                     event = CalendarEvent.get_by_id(self.db, link.event_id)
 
                 if not event:
                     # Fallback for legacy records relying on calendar_events.external_id
-                    query = (
-                        "SELECT * FROM calendar_events "
-                        "WHERE external_id = ? AND source = ?"
-                    )
-                    result = self.db.execute(
-                        query, (ext_identifier, provider)
-                    )
+                    query = "SELECT * FROM calendar_events " "WHERE external_id = ? AND source = ?"
+                    result = self.db.execute(query, (ext_identifier, provider))
                     if result:
                         event = CalendarEvent.from_db_row(result[0])
 
-            start_value = ext_event.get('start_time')
-            end_value = ext_event.get('end_time')
+            start_value = ext_event.get("start_time")
+            end_value = ext_event.get("end_time")
 
             def _clean_time_value(value: Optional[Any]) -> Optional[Union[str, datetime]]:
                 if isinstance(value, datetime):
@@ -784,7 +711,7 @@ class CalendarManager:
                 except ValueError as exc:
                     logger.warning(
                         "Skipping external event %s due to invalid time window: %s",
-                        ext_identifier or ext_event.get('title'),
+                        ext_identifier or ext_event.get("title"),
                         exc,
                     )
                     if not event:
@@ -797,7 +724,7 @@ class CalendarManager:
             else:
                 logger.warning(
                     "Skipping external event %s without a valid start_time",
-                    ext_identifier or ext_event.get('title'),
+                    ext_identifier or ext_event.get("title"),
                 )
                 if not event:
                     return
@@ -812,8 +739,8 @@ class CalendarManager:
                 return [value]
 
             if event:
-                if 'title' in ext_event:
-                    event.title = ext_event.get('title', event.title)
+                if "title" in ext_event:
+                    event.title = ext_event.get("title", event.title)
 
                 if normalized_start and (start_value is not None or not event.start_time):
                     event.start_time = normalized_start
@@ -834,17 +761,17 @@ class CalendarManager:
                     if update_end:
                         event.end_time = normalized_end
 
-                if 'location' in ext_event:
-                    event.location = ext_event.get('location', event.location)
+                if "location" in ext_event:
+                    event.location = ext_event.get("location", event.location)
 
-                if 'attendees' in ext_event:
-                    event.attendees = _normalize_attendees(ext_event.get('attendees'))
+                if "attendees" in ext_event:
+                    event.attendees = _normalize_attendees(ext_event.get("attendees"))
 
-                if 'description' in ext_event:
-                    event.description = ext_event.get('description', event.description)
+                if "description" in ext_event:
+                    event.description = ext_event.get("description", event.description)
 
-                if 'reminder_use_default' in ext_event:
-                    event.reminder_use_default = ext_event.get('reminder_use_default')
+                if "reminder_use_default" in ext_event:
+                    event.reminder_use_default = ext_event.get("reminder_use_default")
 
                 event.save(self.db)
                 logger.debug(f"Updated external event: {event.id}")
@@ -852,38 +779,35 @@ class CalendarManager:
                 if not (normalized_start and normalized_end):
                     logger.warning(
                         "Skipping external event %s due to missing normalized times",
-                        ext_identifier or ext_event.get('title'),
+                        ext_identifier or ext_event.get("title"),
                     )
                     return
 
                 event = CalendarEvent(
-                    title=ext_event.get('title', ''),
-                    event_type=ext_event.get('event_type', 'Event'),
+                    title=ext_event.get("title", ""),
+                    event_type=ext_event.get("event_type", "Event"),
                     start_time=normalized_start,
                     end_time=normalized_end,
-                    location=ext_event.get('location'),
-                    attendees=_normalize_attendees(ext_event.get('attendees')),
-                    description=ext_event.get('description'),
-                    reminder_minutes=ext_event.get('reminder_minutes'),
-                    reminder_use_default=ext_event.get('reminder_use_default'),
-                    recurrence_rule=ext_event.get('recurrence_rule'),
+                    location=ext_event.get("location"),
+                    attendees=_normalize_attendees(ext_event.get("attendees")),
+                    description=ext_event.get("description"),
+                    reminder_minutes=ext_event.get("reminder_minutes"),
+                    reminder_use_default=ext_event.get("reminder_use_default"),
+                    recurrence_rule=ext_event.get("recurrence_rule"),
                     source=provider,
-                    is_readonly=True  # External events are readonly
+                    is_readonly=True,  # External events are readonly
                 )
                 event.save(self.db)
                 logger.debug(f"Created external event: {event.id}")
 
             if ext_identifier:
                 last_synced = (
-                    ext_event.get('last_synced_at')
-                    or ext_event.get('updated_at')
-                    or ext_event.get('last_modified')
+                    ext_event.get("last_synced_at")
+                    or ext_event.get("updated_at")
+                    or ext_event.get("last_modified")
                 )
                 self._upsert_event_link(
-                    event.id,
-                    provider,
-                    ext_identifier,
-                    last_synced_at=last_synced
+                    event.id, provider, ext_identifier, last_synced_at=last_synced
                 )
 
         except Exception as e:
@@ -924,8 +848,7 @@ class CalendarManager:
 
             if external_id:
                 delete_link_query = (
-                    "DELETE FROM calendar_event_links "
-                    "WHERE provider = ? AND external_id = ?"
+                    "DELETE FROM calendar_event_links " "WHERE provider = ? AND external_id = ?"
                 )
                 self.db.execute(
                     delete_link_query,
@@ -934,8 +857,7 @@ class CalendarManager:
                 )
             elif event_id:
                 delete_link_query = (
-                    "DELETE FROM calendar_event_links "
-                    "WHERE provider = ? AND event_id = ?"
+                    "DELETE FROM calendar_event_links " "WHERE provider = ? AND event_id = ?"
                 )
                 self.db.execute(
                     delete_link_query,
@@ -974,9 +896,7 @@ class CalendarManager:
                     attachment.delete(self.db)
 
                 event.delete(self.db)
-                logger.info(
-                    "Removed local event %s for provider %s", event_id, provider
-                )
+                logger.info("Removed local event %s for provider %s", event_id, provider)
             else:
                 logger.info(
                     "Detached provider %s from event %s; %d other link(s) remain",
@@ -994,11 +914,7 @@ class CalendarManager:
             )
 
     def _upsert_event_link(
-        self,
-        event_id: str,
-        provider: str,
-        external_id: str,
-        last_synced_at: Optional[Any] = None
+        self, event_id: str, provider: str, external_id: str, last_synced_at: Optional[Any] = None
     ) -> None:
         """Persist or refresh the provider mapping for an event."""
 
@@ -1020,10 +936,7 @@ class CalendarManager:
         )
 
         if existing_link and existing_link.external_id != external_id:
-            delete_query = (
-                "DELETE FROM calendar_event_links "
-                "WHERE event_id = ? AND provider = ?"
-            )
+            delete_query = "DELETE FROM calendar_event_links " "WHERE event_id = ? AND provider = ?"
             self.db.execute(delete_query, (event_id, provider), commit=True)
 
         link = CalendarEventLink(
@@ -1036,8 +949,7 @@ class CalendarManager:
 
     @staticmethod
     def _normalize_event_window(
-        start_time: Union[str, datetime],
-        end_time: Union[str, datetime]
+        start_time: Union[str, datetime], end_time: Union[str, datetime]
     ) -> Tuple[datetime, datetime]:
         """Normalize event window datetimes for comparison.
 
@@ -1061,27 +973,21 @@ class CalendarManager:
             if isinstance(value, str):
                 try:
                     text = value.strip()
-                    if text.endswith('Z'):
+                    if text.endswith("Z"):
                         text = f"{text[:-1]}+00:00"
                     return datetime.fromisoformat(text)
                 except ValueError as exc:  # pragma: no cover - defensive branch
                     raise ValueError(
                         f"Event {label} must be a datetime instance or ISO 8601 string"
                     ) from exc
-            raise ValueError(
-                f"Event {label} must be a datetime instance or ISO 8601 string"
-            )
+            raise ValueError(f"Event {label} must be a datetime instance or ISO 8601 string")
 
-        start_dt = _coerce(start_time, 'start_time')
-        end_dt = _coerce(end_time, 'end_time')
+        start_dt = _coerce(start_time, "start_time")
+        end_dt = _coerce(end_time, "end_time")
 
         local_tz = datetime.now().astimezone().tzinfo
 
-        def _ensure_aware(
-            value: datetime,
-            reference: Optional[datetime],
-            fallback_tz
-        ) -> datetime:
+        def _ensure_aware(value: datetime, reference: Optional[datetime], fallback_tz) -> datetime:
             if value.tzinfo:
                 return value
             if reference and reference.tzinfo:

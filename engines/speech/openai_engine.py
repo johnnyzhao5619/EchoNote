@@ -52,7 +52,7 @@ class OpenAIEngine(SpeechEngine):
         db_connection=None,
         timeout: int = 60,
         max_retries: int = 3,
-        base_url: Optional[str] = None
+        base_url: Optional[str] = None,
     ):
         """
         初始化 OpenAI 引擎
@@ -78,15 +78,10 @@ class OpenAIEngine(SpeechEngine):
             max_retries=max_retries,
             timeout=timeout,
             base_url=self.base_url,
-            headers={
-                "Authorization": f"Bearer {api_key}"
-            }
+            headers={"Authorization": f"Bearer {api_key}"},
         )
 
-        logger.info(
-            f"OpenAI engine initialized: "
-            f"timeout={timeout}s, max_retries={max_retries}"
-        )
+        logger.info(f"OpenAI engine initialized: " f"timeout={timeout}s, max_retries={max_retries}")
 
     def get_name(self) -> str:
         """获取引擎名称"""
@@ -101,10 +96,7 @@ class OpenAIEngine(SpeechEngine):
         )
 
     async def transcribe_file(
-        self,
-        audio_path: str,
-        language: Optional[str] = None,
-        **kwargs
+        self, audio_path: str, language: Optional[str] = None, **kwargs
     ) -> Dict:
         """
         转录音频文件
@@ -134,7 +126,7 @@ class OpenAIEngine(SpeechEngine):
         # 检查文件是否存在
         if not os.path.exists(audio_path):
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
-        
+
         # 检查文件大小
         file_size = Path(audio_path).stat().st_size
         if file_size > self.MAX_FILE_SIZE:
@@ -146,17 +138,16 @@ class OpenAIEngine(SpeechEngine):
             )
 
         # 检查文件格式
-        file_ext = Path(audio_path).suffix.lower().lstrip('.')
+        file_ext = Path(audio_path).suffix.lower().lstrip(".")
         if file_ext not in AUDIO_VIDEO_FORMAT_SET:
-            formats = ', '.join(self.SUPPORTED_FORMATS)
+            formats = ", ".join(self.SUPPORTED_FORMATS)
             raise ValueError(
-                f"Unsupported file format: .{file_ext}. "
-                f"Supported formats: {formats}"
+                f"Unsupported file format: .{file_ext}. " f"Supported formats: {formats}"
             )
 
-        prompt = kwargs.get('prompt', '')
-        temperature = kwargs.get('temperature', 0)
-        progress_callback = kwargs.get('progress_callback')
+        prompt = kwargs.get("prompt", "")
+        temperature = kwargs.get("temperature", 0)
+        progress_callback = kwargs.get("progress_callback")
 
         logger.info(
             f"Transcribing file with OpenAI: {audio_path}, "
@@ -174,7 +165,7 @@ class OpenAIEngine(SpeechEngine):
         data = {
             "model": "whisper-1",
             "response_format": "verbose_json",
-            "timestamp_granularities": ["segment"]
+            "timestamp_granularities": ["segment"],
         }
 
         if language:
@@ -186,7 +177,7 @@ class OpenAIEngine(SpeechEngine):
 
         try:
             # 发送请求（AsyncRetryableHttpClient 会自动处理重试）
-            with open(audio_path, 'rb') as f:
+            with open(audio_path, "rb") as f:
                 file_name = Path(audio_path).name
                 mime_type = f"audio/{file_ext}"
                 files = {"file": (file_name, f, mime_type)}
@@ -199,11 +190,7 @@ class OpenAIEngine(SpeechEngine):
                     except Exception as e:
                         logger.error(f"Error in progress callback: {e}")
 
-                response = await self.client.post(
-                    "/audio/transcriptions",
-                    files=files,
-                    data=data
-                )
+                response = await self.client.post("/audio/transcriptions", files=files, data=data)
 
             # 调用进度回调（处理中）
             if progress_callback:
@@ -220,29 +207,23 @@ class OpenAIEngine(SpeechEngine):
             segments = []
             if "segments" in result_data:
                 for seg in result_data["segments"]:
-                    segments.append({
-                        "start": seg["start"],
-                        "end": seg["end"],
-                        "text": seg["text"].strip()
-                    })
+                    segments.append(
+                        {"start": seg["start"], "end": seg["end"], "text": seg["text"].strip()}
+                    )
             else:
                 # 如果没有段落信息，创建单个段落
-                segments.append({
-                    "start": 0.0,
-                    "end": result_data.get("duration", 0.0),
-                    "text": result_data.get("text", "").strip()
-                })
+                segments.append(
+                    {
+                        "start": 0.0,
+                        "end": result_data.get("duration", 0.0),
+                        "text": result_data.get("text", "").strip(),
+                    }
+                )
 
             duration = result_data.get("duration", 0.0)
-            detected_language = result_data.get(
-                "language", language or "unknown"
-            )
+            detected_language = result_data.get("language", language or "unknown")
 
-            result = {
-                "segments": segments,
-                "language": detected_language,
-                "duration": duration
-            }
+            result = {"segments": segments, "language": detected_language, "duration": duration}
 
             # 记录使用量到数据库
             if self.db_connection and duration > 0:
@@ -250,12 +231,11 @@ class OpenAIEngine(SpeechEngine):
                     usage = APIUsage(
                         engine="openai",
                         duration_seconds=duration,
-                        cost=self._calculate_cost(duration)
+                        cost=self._calculate_cost(duration),
                     )
                     usage.save(self.db_connection)
                     logger.debug(
-                        f"Recorded API usage: duration={duration:.2f}s, "
-                        f"cost=${usage.cost:.4f}"
+                        f"Recorded API usage: duration={duration:.2f}s, " f"cost=${usage.cost:.4f}"
                     )
                 except Exception as e:
                     logger.error(f"Failed to record API usage: {e}")
@@ -278,18 +258,15 @@ class OpenAIEngine(SpeechEngine):
             # 提供更友好的错误信息
             if "401" in str(e):
                 raise ValueError(
-                    "Invalid API key. "
-                    "Please check your OpenAI API key in Settings."
+                    "Invalid API key. " "Please check your OpenAI API key in Settings."
                 )
             elif "429" in str(e):
                 raise ValueError(
-                    "Rate limit exceeded. "
-                    "Please try again later or upgrade your OpenAI plan."
+                    "Rate limit exceeded. " "Please try again later or upgrade your OpenAI plan."
                 )
             elif "500" in str(e) or "502" in str(e) or "503" in str(e):
                 raise ValueError(
-                    "OpenAI service is temporarily unavailable. "
-                    "Please try again later."
+                    "OpenAI service is temporarily unavailable. " "Please try again later."
                 )
             else:
                 raise
@@ -314,7 +291,7 @@ class OpenAIEngine(SpeechEngine):
         audio_chunk: np.ndarray,
         language: Optional[str] = None,
         sample_rate: Optional[int] = None,
-        **kwargs
+        **kwargs,
     ) -> str:
         """
         实时转录音频流
@@ -339,8 +316,7 @@ class OpenAIEngine(SpeechEngine):
 
         if len(audio_chunk) < effective_rate:
             logger.debug(
-                f"Audio chunk too short ({len(audio_chunk)} samples), "
-                "skipping transcription"
+                f"Audio chunk too short ({len(audio_chunk)} samples), " "skipping transcription"
             )
             return ""
 
@@ -351,9 +327,7 @@ class OpenAIEngine(SpeechEngine):
         )
 
         # 保存为临时文件
-        with tempfile.NamedTemporaryFile(
-            suffix='.wav', delete=False
-        ) as tmp_file:
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_file:
             tmp_path = tmp_file.name
 
         try:
@@ -361,7 +335,7 @@ class OpenAIEngine(SpeechEngine):
             sf.write(tmp_path, audio_chunk, effective_rate)
 
             # 转录临时文件
-            stream_kwargs = {**kwargs, 'sample_rate': effective_rate}
+            stream_kwargs = {**kwargs, "sample_rate": effective_rate}
             result = await self.transcribe_file(tmp_path, language, **stream_kwargs)
 
             # 合并所有段落的文本
@@ -380,34 +354,24 @@ class OpenAIEngine(SpeechEngine):
                 if os.path.exists(tmp_path):
                     os.unlink(tmp_path)
             except Exception as e:
-                logger.warning(
-                    f"Failed to delete temp file {tmp_path}: {e}"
-                )
+                logger.warning(f"Failed to delete temp file {tmp_path}: {e}")
 
     def get_config_schema(self) -> Dict:
         """获取配置 Schema"""
         return {
             "type": "object",
             "properties": {
-                "api_key": {
-                    "type": "string",
-                    "description": "OpenAI API Key",
-                    "minLength": 1
-                },
-                "timeout": {
-                    "type": "integer",
-                    "default": 60,
-                    "description": "请求超时时间（秒）"
-                },
+                "api_key": {"type": "string", "description": "OpenAI API Key", "minLength": 1},
+                "timeout": {"type": "integer", "default": 60, "description": "请求超时时间（秒）"},
                 "max_retries": {
                     "type": "integer",
                     "default": 3,
                     "minimum": 1,
                     "maximum": 10,
-                    "description": "最大重试次数"
-                }
+                    "description": "最大重试次数",
+                },
             },
-            "required": ["api_key"]
+            "required": ["api_key"],
         }
 
     async def close(self):

@@ -26,6 +26,7 @@ from typing import Any, Dict
 
 try:
     from PySide6.QtCore import QObject, Signal
+
     QT_AVAILABLE = True
 except ImportError:
     QT_AVAILABLE = False
@@ -50,8 +51,7 @@ LANGUAGE_OPTION_KEYS = [
 class I18nManager:
     """Basic translation manager without Qt dependencies."""
 
-    def __init__(self, translations_dir: str = None,
-                 default_language: str = "zh_CN"):
+    def __init__(self, translations_dir: str = None, default_language: str = "zh_CN"):
         """
         Initialize the translation manager.
 
@@ -60,9 +60,7 @@ class I18nManager:
             default_language: Default language code (zh_CN, en_US, fr_FR)
         """
         if translations_dir is None:
-            translations_dir = (
-                Path(__file__).parent.parent / "resources" / "translations"
-            )
+            translations_dir = Path(__file__).parent.parent / "resources" / "translations"
         else:
             translations_dir = Path(translations_dir)
 
@@ -81,18 +79,14 @@ class I18nManager:
         translation_file = self.translations_dir / f"{language}.json"
 
         try:
-            with open(translation_file, 'r', encoding='utf-8') as f:
+            with open(translation_file, "r", encoding="utf-8") as f:
                 self.translations = json.load(f)
             logger.info(f"Loaded translations for language: {language}")
         except FileNotFoundError:
-            logger.error(
-                f"Translation file not found: {translation_file}"
-            )
+            logger.error(f"Translation file not found: {translation_file}")
             self.translations = {}
         except json.JSONDecodeError as e:
-            logger.error(
-                f"Invalid JSON in translation file {translation_file}: {e}"
-            )
+            logger.error(f"Invalid JSON in translation file {translation_file}: {e}")
             self.translations = {}
 
     def t(self, key: str, **kwargs) -> str:
@@ -109,7 +103,7 @@ class I18nManager:
             Translated string with parameters substituted
         """
         # Navigate nested keys
-        keys = key.split('.')
+        keys = key.split(".")
         value = self.translations
 
         for k in keys:
@@ -117,25 +111,20 @@ class I18nManager:
                 value = value[k]
             else:
                 logger.warning(
-                    f"Translation key not found: {key} "
-                    f"(language: {self.current_language})"
+                    f"Translation key not found: {key} " f"(language: {self.current_language})"
                 )
                 return key
 
         # Ensure we have a string
         if not isinstance(value, str):
-            logger.warning(
-                f"Translation value is not a string: {key}"
-            )
+            logger.warning(f"Translation value is not a string: {key}")
             return key
 
         # Substitute parameters
         try:
             return value.format(**kwargs)
         except KeyError as e:
-            logger.warning(
-                f"Missing parameter in translation: {e} for key {key}"
-            )
+            logger.warning(f"Missing parameter in translation: {e} for key {key}")
             return value
 
     def change_language(self, language: str) -> None:
@@ -166,13 +155,13 @@ class I18nManager:
 
 
 if QT_AVAILABLE:
+
     class I18nQtManager(QObject, I18nManager):
         """Translation manager with Qt Signal support."""
 
         language_changed = Signal(str)
 
-        def __init__(self, translations_dir: str = None,
-                     default_language: str = "zh_CN"):
+        def __init__(self, translations_dir: str = None, default_language: str = "zh_CN"):
             """
             Initialize the Qt-enabled translation manager.
 
@@ -195,6 +184,7 @@ if QT_AVAILABLE:
 
             I18nManager.change_language(self, language)
             self.language_changed.emit(language)
+
 else:
     # If Qt is not available, use the basic manager
     I18nQtManager = I18nManager  # type: ignore

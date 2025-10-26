@@ -43,7 +43,7 @@ class ResourceMonitor(QObject):
         parent: Optional[QObject] = None,
         *,
         config_manager: Optional[Any] = None,
-        settings_manager: Optional[Any] = None
+        settings_manager: Optional[Any] = None,
     ):
         """
         Initialize resource monitor.
@@ -61,13 +61,13 @@ class ResourceMonitor(QObject):
             key="resource_monitor.low_memory_mb",
             default=float(self.LOW_MEMORY_THRESHOLD_MB),
             minimum=64.0,
-            maximum=1048576.0
+            maximum=1048576.0,
         )
         self.high_cpu_threshold_percent = self._resolve_threshold(
             key="resource_monitor.high_cpu_percent",
             default=float(self.HIGH_CPU_THRESHOLD_PERCENT),
             minimum=1.0,
-            maximum=100.0
+            maximum=100.0,
         )
 
         self.check_interval_ms = check_interval_ms
@@ -89,7 +89,7 @@ class ResourceMonitor(QObject):
             "low_memory_threshold=%.1fMB, high_cpu_threshold=%.1f%%",
             check_interval_ms,
             self.low_memory_threshold_mb,
-            self.high_cpu_threshold_percent
+            self.high_cpu_threshold_percent,
         )
 
     def start(self):
@@ -128,8 +128,7 @@ class ResourceMonitor(QObject):
             self._last_cpu_percent = cpu_percent
 
             logger.debug(
-                f"Resources: Memory={available_mb:.1f}MB available, "
-                f"CPU={cpu_percent:.1f}%"
+                f"Resources: Memory={available_mb:.1f}MB available, " f"CPU={cpu_percent:.1f}%"
             )
 
             # Check memory threshold
@@ -138,15 +137,13 @@ class ResourceMonitor(QObject):
                     logger.warning(
                         "Low memory warning: %.1fMB available (threshold: %.1fMB)",
                         available_mb,
-                        self.low_memory_threshold_mb
+                        self.low_memory_threshold_mb,
                     )
                     self.low_memory_warning.emit(available_mb)
                     self._low_memory_warned = True
             else:
                 if self._low_memory_warned:
-                    logger.info(
-                        f"Memory recovered: {available_mb:.1f}MB available"
-                    )
+                    logger.info(f"Memory recovered: {available_mb:.1f}MB available")
                     self._low_memory_warned = False
                     self.resources_recovered.emit()
 
@@ -156,7 +153,7 @@ class ResourceMonitor(QObject):
                     logger.warning(
                         "High CPU warning: %.1f%% (threshold: %.1f%%)",
                         cpu_percent,
-                        self.high_cpu_threshold_percent
+                        self.high_cpu_threshold_percent,
                     )
                     self.high_cpu_warning.emit(cpu_percent)
                     self._high_cpu_warned = True
@@ -190,20 +187,20 @@ class ResourceMonitor(QObject):
             cpu_percent = self._get_cpu_percent()
 
             return {
-                'memory_available_mb': memory.available / (1024 * 1024),
-                'memory_used_percent': memory.percent,
-                'memory_total_mb': memory.total / (1024 * 1024),
-                'cpu_percent': cpu_percent,
-                'cpu_count': psutil.cpu_count()
+                "memory_available_mb": memory.available / (1024 * 1024),
+                "memory_used_percent": memory.percent,
+                "memory_total_mb": memory.total / (1024 * 1024),
+                "cpu_percent": cpu_percent,
+                "cpu_count": psutil.cpu_count(),
             }
         except Exception as e:
             logger.error(f"Error getting resource stats: {e}")
             return {
-                'memory_available_mb': 0,
-                'memory_used_percent': 0,
-                'memory_total_mb': 0,
-                'cpu_percent': 0,
-                'cpu_count': 0
+                "memory_available_mb": 0,
+                "memory_used_percent": 0,
+                "memory_total_mb": 0,
+                "cpu_percent": 0,
+                "cpu_count": 0,
             }
 
     def get_last_check_stats(self) -> Dict[str, float]:
@@ -213,10 +210,7 @@ class ResourceMonitor(QObject):
         Returns:
             Dict with last check stats
         """
-        return {
-            'memory_available_mb': self._last_memory_mb,
-            'cpu_percent': self._last_cpu_percent
-        }
+        return {"memory_available_mb": self._last_memory_mb, "cpu_percent": self._last_cpu_percent}
 
     def is_low_memory(self) -> bool:
         """Check if system is currently in low memory state."""
@@ -271,7 +265,7 @@ class ResourceMonitor(QObject):
         key: str,
         default: float,
         minimum: Optional[float] = None,
-        maximum: Optional[float] = None
+        maximum: Optional[float] = None,
     ) -> float:
         """Resolve threshold from configuration with fallback to default."""
 
@@ -282,31 +276,18 @@ class ResourceMonitor(QObject):
         try:
             numeric = float(value)
         except (TypeError, ValueError):
-            logger.warning(
-                "Invalid value '%s' for %s; using default %.1f",
-                value,
-                key,
-                default
-            )
+            logger.warning("Invalid value '%s' for %s; using default %.1f", value, key, default)
             return default
 
         if minimum is not None and numeric < minimum:
             logger.warning(
-                "%s=%.1f below minimum %.1f; using default %.1f",
-                key,
-                numeric,
-                minimum,
-                default
+                "%s=%.1f below minimum %.1f; using default %.1f", key, numeric, minimum, default
             )
             return default
 
         if maximum is not None and numeric > maximum:
             logger.warning(
-                "%s=%.1f above maximum %.1f; using default %.1f",
-                key,
-                numeric,
-                maximum,
-                default
+                "%s=%.1f above maximum %.1f; using default %.1f", key, numeric, maximum, default
             )
             return default
 
@@ -323,9 +304,7 @@ class ResourceMonitor(QObject):
             try:
                 return getter(key)
             except Exception as exc:  # noqa: BLE001
-                logger.warning(
-                    "Failed to read %s via get_setting: %s", key, exc
-                )
+                logger.warning("Failed to read %s via get_setting: %s", key, exc)
 
         getter = getattr(self._threshold_source, "get", None)
         if callable(getter):
@@ -335,9 +314,7 @@ class ResourceMonitor(QObject):
                 try:
                     return getter(key, None)
                 except Exception as exc:  # noqa: BLE001
-                    logger.warning(
-                        "Failed to read %s via get(key, default): %s", key, exc
-                    )
+                    logger.warning("Failed to read %s via get(key, default): %s", key, exc)
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Failed to read %s via get: %s", key, exc)
 
@@ -349,8 +326,7 @@ _resource_monitor_instance: Optional[ResourceMonitor] = None
 
 
 def get_resource_monitor(
-    config_manager: Optional[Any] = None,
-    settings_manager: Optional[Any] = None
+    config_manager: Optional[Any] = None, settings_manager: Optional[Any] = None
 ) -> ResourceMonitor:
     """
     Get the singleton ResourceMonitor instance.
@@ -365,15 +341,9 @@ def get_resource_monitor(
             from config.app_config import ConfigManager  # Local import to avoid cycles
 
             threshold_source = ConfigManager()
-            _resource_monitor_instance = ResourceMonitor(
-                config_manager=threshold_source
-            )
+            _resource_monitor_instance = ResourceMonitor(config_manager=threshold_source)
         elif settings_manager is not None:
-            _resource_monitor_instance = ResourceMonitor(
-                settings_manager=settings_manager
-            )
+            _resource_monitor_instance = ResourceMonitor(settings_manager=settings_manager)
         else:
-            _resource_monitor_instance = ResourceMonitor(
-                config_manager=config_manager
-            )
+            _resource_monitor_instance = ResourceMonitor(config_manager=config_manager)
     return _resource_monitor_instance

@@ -23,8 +23,13 @@ import logging
 from typing import Optional, Dict, Any
 
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-    QLabel, QProgressBar, QMenu
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QPushButton,
+    QLabel,
+    QProgressBar,
+    QMenu,
 )
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QAction
@@ -32,7 +37,7 @@ from PySide6.QtGui import QAction
 from utils.i18n import I18nQtManager
 
 
-logger = logging.getLogger('echonote.ui.batch_transcribe.task_item')
+logger = logging.getLogger("echonote.ui.batch_transcribe.task_item")
 
 
 class TaskItem(QWidget):
@@ -52,10 +57,7 @@ class TaskItem(QWidget):
     retry_clicked = Signal(str)  # task_id
 
     def __init__(
-        self,
-        task_data: Dict[str, Any],
-        i18n: I18nQtManager,
-        parent: Optional[QWidget] = None
+        self, task_data: Dict[str, Any], i18n: I18nQtManager, parent: Optional[QWidget] = None
     ):
         """
         Initialize task item widget.
@@ -68,7 +70,7 @@ class TaskItem(QWidget):
         super().__init__(parent)
 
         self.task_data = task_data
-        self.task_id = task_data['id']
+        self.task_id = task_data["id"]
         self.i18n = i18n
         self._processing_paused = False
 
@@ -91,7 +93,8 @@ class TaskItem(QWidget):
         layout.setSpacing(8)
 
         # Set background and border
-        self.setStyleSheet("""
+        self.setStyleSheet(
+            """
             TaskItem {
                 background-color: #f5f5f5;
                 border: 1px solid #ddd;
@@ -100,7 +103,8 @@ class TaskItem(QWidget):
             TaskItem:hover {
                 background-color: #eeeeee;
             }
-        """)
+        """
+        )
 
         # Top row: filename and status
         top_layout = QHBoxLayout()
@@ -164,18 +168,14 @@ class TaskItem(QWidget):
         # Start button
         start_btn = QPushButton()
         start_btn.setObjectName("start_btn")
-        start_btn.clicked.connect(lambda: self.start_clicked.emit(
-            self.task_id
-        ))
+        start_btn.clicked.connect(lambda: self.start_clicked.emit(self.task_id))
         actions_layout.addWidget(start_btn)
         self.start_btn = start_btn
 
         # Pause button
         pause_btn = QPushButton()
         pause_btn.setObjectName("pause_btn")
-        pause_btn.clicked.connect(lambda: self.pause_clicked.emit(
-            self.task_id
-        ))
+        pause_btn.clicked.connect(lambda: self.pause_clicked.emit(self.task_id))
         pause_btn.setVisible(False)
         actions_layout.addWidget(pause_btn)
         self.pause_btn = pause_btn
@@ -183,27 +183,21 @@ class TaskItem(QWidget):
         # Cancel button
         cancel_btn = QPushButton()
         cancel_btn.setObjectName("cancel_btn")
-        cancel_btn.clicked.connect(lambda: self.cancel_clicked.emit(
-            self.task_id
-        ))
+        cancel_btn.clicked.connect(lambda: self.cancel_clicked.emit(self.task_id))
         actions_layout.addWidget(cancel_btn)
         self.cancel_btn = cancel_btn
 
         # Delete button
         delete_btn = QPushButton()
         delete_btn.setObjectName("delete_btn")
-        delete_btn.clicked.connect(lambda: self.delete_clicked.emit(
-            self.task_id
-        ))
+        delete_btn.clicked.connect(lambda: self.delete_clicked.emit(self.task_id))
         actions_layout.addWidget(delete_btn)
         self.delete_btn = delete_btn
 
         # View button
         view_btn = QPushButton()
         view_btn.setObjectName("view_btn")
-        view_btn.clicked.connect(lambda: self.view_clicked.emit(
-            self.task_id
-        ))
+        view_btn.clicked.connect(lambda: self.view_clicked.emit(self.task_id))
         view_btn.setVisible(False)
         actions_layout.addWidget(view_btn)
         self.view_btn = view_btn
@@ -211,9 +205,7 @@ class TaskItem(QWidget):
         # Export button
         export_btn = QPushButton()
         export_btn.setObjectName("export_btn")
-        export_btn.clicked.connect(lambda: self.export_clicked.emit(
-            self.task_id
-        ))
+        export_btn.clicked.connect(lambda: self.export_clicked.emit(self.task_id))
         export_btn.setVisible(False)
         actions_layout.addWidget(export_btn)
         self.export_btn = export_btn
@@ -221,9 +213,7 @@ class TaskItem(QWidget):
         # Retry button
         retry_btn = QPushButton()
         retry_btn.setObjectName("retry_btn")
-        retry_btn.clicked.connect(lambda: self.retry_clicked.emit(
-            self.task_id
-        ))
+        retry_btn.clicked.connect(lambda: self.retry_clicked.emit(self.task_id))
         retry_btn.setVisible(False)
         actions_layout.addWidget(retry_btn)
         self.retry_btn = retry_btn
@@ -234,7 +224,7 @@ class TaskItem(QWidget):
 
         # Update translations
         self.update_translations()
-        
+
         # Set minimum height to ensure all content is visible
         self.setMinimumHeight(150)
 
@@ -244,25 +234,13 @@ class TaskItem(QWidget):
         """Update all UI text with current language translations."""
         try:
             # Update button labels
-            self.start_btn.setText(
-                self.i18n.t('batch_transcribe.actions.start')
-            )
+            self.start_btn.setText(self.i18n.t("batch_transcribe.actions.start"))
             self._update_pause_button_text()
-            self.cancel_btn.setText(
-                self.i18n.t('batch_transcribe.actions.cancel')
-            )
-            self.delete_btn.setText(
-                self.i18n.t('common.delete')
-            )
-            self.view_btn.setText(
-                self.i18n.t('batch_transcribe.actions.view')
-            )
-            self.export_btn.setText(
-                self.i18n.t('batch_transcribe.actions.export')
-            )
-            self.retry_btn.setText(
-                self.i18n.t('batch_transcribe.actions.retry')
-            )
+            self.cancel_btn.setText(self.i18n.t("batch_transcribe.actions.cancel"))
+            self.delete_btn.setText(self.i18n.t("common.delete"))
+            self.view_btn.setText(self.i18n.t("batch_transcribe.actions.view"))
+            self.export_btn.setText(self.i18n.t("batch_transcribe.actions.export"))
+            self.retry_btn.setText(self.i18n.t("batch_transcribe.actions.retry"))
 
             # Update textual elements that depend on translations
             self._update_status_label()
@@ -278,6 +256,7 @@ class TaskItem(QWidget):
     def sizeHint(self):
         """Return the recommended size for this widget."""
         from PySide6.QtCore import QSize
+
         # Return a fixed size to ensure consistent layout
         return QSize(800, 150)
 
@@ -294,15 +273,13 @@ class TaskItem(QWidget):
             self._update_status_label()
 
             # Update progress bar
-            status = self.task_data.get('status', 'pending')
-            progress = self.task_data.get('progress', 0)
+            status = self.task_data.get("status", "pending")
+            progress = self.task_data.get("progress", 0)
 
-            if status == 'processing':
+            if status == "processing":
                 self.progress_bar.setVisible(True)
                 self.progress_bar.setValue(int(progress))
-                logger.debug(
-                    f"Task {self.task_id} progress bar set to {int(progress)}%"
-                )
+                logger.debug(f"Task {self.task_id} progress bar set to {int(progress)}%")
             else:
                 self.progress_bar.setVisible(False)
 
@@ -319,23 +296,23 @@ class TaskItem(QWidget):
 
     def _update_status_label(self):
         """Update status label with translated text and styling."""
-        status = self.task_data.get('status', 'pending')
+        status = self.task_data.get("status", "pending")
 
         # Get translated status text
-        status_key = f'batch_transcribe.status.{status}'
+        status_key = f"batch_transcribe.status.{status}"
         status_text = self.i18n.t(status_key)
 
         # Apply styling based on status
-        if status == 'pending':
+        if status == "pending":
             style = "color: #666; font-weight: bold;"
             icon = "⏳"
-        elif status == 'processing':
+        elif status == "processing":
             style = "color: #1976d2; font-weight: bold;"
             icon = "⚙️"
-        elif status == 'completed':
+        elif status == "completed":
             style = "color: #388e3c; font-weight: bold;"
             icon = "✓"
-        elif status == 'failed':
+        elif status == "failed":
             style = "color: #d32f2f; font-weight: bold;"
             icon = "✗"
         else:
@@ -347,58 +324,40 @@ class TaskItem(QWidget):
 
     def _update_filename_label(self):
         """Update filename label with fallback translation if needed."""
-        file_name = self.task_data.get('file_name')
+        file_name = self.task_data.get("file_name")
         if not file_name:
-            file_name = self.i18n.t('batch_transcribe.info.unknown')
+            file_name = self.i18n.t("batch_transcribe.info.unknown")
         self.filename_label.setText(f"📄 {file_name}")
 
     def _update_info_label(self):
         """Update informational label with translated text."""
         info_parts = []
 
-        file_size = self.task_data.get('file_size')
+        file_size = self.task_data.get("file_size")
         if file_size:
             size_mb = file_size / (1024 * 1024)
-            info_parts.append(
-                self.i18n.t(
-                    'batch_transcribe.info.size',
-                    size=f"{size_mb:.1f} MB"
-                )
-            )
+            info_parts.append(self.i18n.t("batch_transcribe.info.size", size=f"{size_mb:.1f} MB"))
 
-        duration = self.task_data.get('audio_duration')
+        duration = self.task_data.get("audio_duration")
         if duration:
             minutes = int(duration // 60)
             seconds = int(duration % 60)
             info_parts.append(
-                self.i18n.t(
-                    'batch_transcribe.info.duration',
-                    duration=f"{minutes}:{seconds:02d}"
-                )
+                self.i18n.t("batch_transcribe.info.duration", duration=f"{minutes}:{seconds:02d}")
             )
 
-        language = self.task_data.get('language')
+        language = self.task_data.get("language")
         if language:
-            info_parts.append(
-                self.i18n.t(
-                    'batch_transcribe.info.language',
-                    language=language
-                )
-            )
+            info_parts.append(self.i18n.t("batch_transcribe.info.language", language=language))
 
         self.info_label.setText(" | ".join(info_parts))
 
     def _update_error_label(self):
         """Update error label text and visibility with translations."""
-        status = self.task_data.get('status', 'pending')
-        error_msg = self.task_data.get('error_message')
-        if error_msg and status == 'failed':
-            self.error_label.setText(
-                self.i18n.t(
-                    'batch_transcribe.info.error',
-                    error=error_msg
-                )
-            )
+        status = self.task_data.get("status", "pending")
+        error_msg = self.task_data.get("error_message")
+        if error_msg and status == "failed":
+            self.error_label.setText(self.i18n.t("batch_transcribe.info.error", error=error_msg))
             self.error_label.setVisible(True)
         else:
             self.error_label.setVisible(False)
@@ -420,20 +379,20 @@ class TaskItem(QWidget):
         self.retry_btn.setVisible(False)
 
         # Show buttons based on status
-        if status == 'pending':
+        if status == "pending":
             # Tasks start automatically when added to queue
             # Only show cancel and delete buttons
             self.cancel_btn.setVisible(True)
             self.delete_btn.setVisible(True)
-        elif status == 'processing':
+        elif status == "processing":
             self.cancel_btn.setVisible(True)
             self.pause_btn.setVisible(True)
             self._update_pause_button_text()
-        elif status == 'completed':
+        elif status == "completed":
             self.view_btn.setVisible(True)
             self.export_btn.setVisible(True)
             self.delete_btn.setVisible(True)
-        elif status == 'failed':
+        elif status == "failed":
             self.retry_btn.setVisible(True)
             self.delete_btn.setVisible(True)
 
@@ -445,22 +404,22 @@ class TaskItem(QWidget):
         self._processing_paused = paused
         self._update_pause_button_text()
 
-        status = self.task_data.get('status', 'pending')
-        if status == 'processing':
+        status = self.task_data.get("status", "pending")
+        if status == "processing":
             self.pause_btn.setVisible(True)
 
     def _update_pause_button_text(self):
         """Update pause button text based on processing state."""
         action_key = (
-            'batch_transcribe.actions.resume'
+            "batch_transcribe.actions.resume"
             if self._processing_paused
-            else 'batch_transcribe.actions.pause'
+            else "batch_transcribe.actions.pause"
         )
         try:
             self.pause_btn.setText(self.i18n.t(action_key))
         except Exception:
             # Fallback to default text in case translation missing
-            self.pause_btn.setText('Resume' if self._processing_paused else 'Pause')
+            self.pause_btn.setText("Resume" if self._processing_paused else "Pause")
 
     def update_task_data(self, task_data: Dict[str, Any]):
         """
@@ -483,67 +442,37 @@ class TaskItem(QWidget):
             # Create context menu
             menu = QMenu(self)
 
-            status = self.task_data.get('status', 'pending')
+            status = self.task_data.get("status", "pending")
 
             # Add actions based on status
-            if status == 'pending':
-                start_action = QAction(
-                    self.i18n.t('batch_transcribe.actions.start'),
-                    self
-                )
-                start_action.triggered.connect(
-                    lambda: self.start_clicked.emit(self.task_id)
-                )
+            if status == "pending":
+                start_action = QAction(self.i18n.t("batch_transcribe.actions.start"), self)
+                start_action.triggered.connect(lambda: self.start_clicked.emit(self.task_id))
                 menu.addAction(start_action)
 
-            elif status == 'processing':
-                cancel_action = QAction(
-                    self.i18n.t('batch_transcribe.actions.cancel'),
-                    self
-                )
-                cancel_action.triggered.connect(
-                    lambda: self.cancel_clicked.emit(self.task_id)
-                )
+            elif status == "processing":
+                cancel_action = QAction(self.i18n.t("batch_transcribe.actions.cancel"), self)
+                cancel_action.triggered.connect(lambda: self.cancel_clicked.emit(self.task_id))
                 menu.addAction(cancel_action)
 
-            elif status == 'completed':
-                view_action = QAction(
-                    self.i18n.t('batch_transcribe.actions.view'),
-                    self
-                )
-                view_action.triggered.connect(
-                    lambda: self.view_clicked.emit(self.task_id)
-                )
+            elif status == "completed":
+                view_action = QAction(self.i18n.t("batch_transcribe.actions.view"), self)
+                view_action.triggered.connect(lambda: self.view_clicked.emit(self.task_id))
                 menu.addAction(view_action)
 
-                export_action = QAction(
-                    self.i18n.t('batch_transcribe.actions.export'),
-                    self
-                )
-                export_action.triggered.connect(
-                    lambda: self.export_clicked.emit(self.task_id)
-                )
+                export_action = QAction(self.i18n.t("batch_transcribe.actions.export"), self)
+                export_action.triggered.connect(lambda: self.export_clicked.emit(self.task_id))
                 menu.addAction(export_action)
 
-            elif status == 'failed':
-                retry_action = QAction(
-                    self.i18n.t('batch_transcribe.actions.retry'),
-                    self
-                )
-                retry_action.triggered.connect(
-                    lambda: self.retry_clicked.emit(self.task_id)
-                )
+            elif status == "failed":
+                retry_action = QAction(self.i18n.t("batch_transcribe.actions.retry"), self)
+                retry_action.triggered.connect(lambda: self.retry_clicked.emit(self.task_id))
                 menu.addAction(retry_action)
 
             # Always show delete
             menu.addSeparator()
-            delete_action = QAction(
-                self.i18n.t('common.delete'),
-                self
-            )
-            delete_action.triggered.connect(
-                lambda: self.delete_clicked.emit(self.task_id)
-            )
+            delete_action = QAction(self.i18n.t("common.delete"), self)
+            delete_action.triggered.connect(lambda: self.delete_clicked.emit(self.task_id))
             menu.addAction(delete_action)
 
             # Show menu

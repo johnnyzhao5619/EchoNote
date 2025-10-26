@@ -38,9 +38,7 @@ class TranslationEngine(ABC):
         pass
 
     @abstractmethod
-    async def translate(
-        self, text: str, source_lang: str, target_lang: str
-    ) -> str:
+    async def translate(self, text: str, source_lang: str, target_lang: str) -> str:
         """Translate text from ``source_lang`` into ``target_lang``.
 
         Args:
@@ -55,7 +53,7 @@ class TranslationEngine(ABC):
 
     def validate_language(self, lang_code: str) -> bool:
         """Return ``True`` when the language code is supported."""
-        if lang_code == 'auto':
+        if lang_code == "auto":
             return True
 
         supported = self.get_supported_languages()
@@ -63,11 +61,7 @@ class TranslationEngine(ABC):
 
     def get_config_schema(self) -> Dict:
         """Return the JSON schema that describes engine configuration."""
-        return {
-            'type': 'object',
-            'properties': {},
-            'required': []
-        }
+        return {"type": "object", "properties": {}, "required": []}
 
     def close(self) -> Optional[object]:
         """Release engine resources synchronously (optional).

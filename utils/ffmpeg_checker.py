@@ -25,86 +25,80 @@ import platform
 from typing import Optional, Tuple
 
 
-logger = logging.getLogger('echonote.utils.ffmpeg_checker')
+logger = logging.getLogger("echonote.utils.ffmpeg_checker")
 
 
 class FFmpegChecker:
     """
     Utility class to check ffmpeg/ffprobe availability.
-    
+
     Provides methods to check installation status and get installation
     instructions for different platforms.
     """
-    
+
     def __init__(self):
         """Initialize FFmpeg checker."""
         self._ffmpeg_available = None
         self._ffprobe_available = None
         self._version = None
-    
+
     def is_ffmpeg_available(self) -> bool:
         """
         Check if ffmpeg is available.
-        
+
         Returns:
             True if ffmpeg is installed and accessible, False otherwise
         """
         if self._ffmpeg_available is None:
-            self._ffmpeg_available = self._check_command('ffmpeg')
+            self._ffmpeg_available = self._check_command("ffmpeg")
         return self._ffmpeg_available
-    
+
     def is_ffprobe_available(self) -> bool:
         """
         Check if ffprobe is available.
-        
+
         Returns:
             True if ffprobe is installed and accessible, False otherwise
         """
         if self._ffprobe_available is None:
-            self._ffprobe_available = self._check_command('ffprobe')
+            self._ffprobe_available = self._check_command("ffprobe")
         return self._ffprobe_available
-    
+
     def get_version(self) -> Optional[str]:
         """
         Get ffmpeg version string.
-        
+
         Returns:
             Version string if available, None otherwise
         """
         if self._version is None and self.is_ffmpeg_available():
             try:
                 result = subprocess.run(
-                    ['ffmpeg', '-version'],
-                    capture_output=True,
-                    text=True,
-                    timeout=5
+                    ["ffmpeg", "-version"], capture_output=True, text=True, timeout=5
                 )
                 if result.returncode == 0:
                     # Extract version from first line
-                    first_line = result.stdout.split('\n')[0]
+                    first_line = result.stdout.split("\n")[0]
                     self._version = first_line
                     logger.debug(f"FFmpeg version: {self._version}")
             except Exception as e:
                 logger.warning(f"Could not get ffmpeg version: {e}")
-        
+
         return self._version
-    
+
     def _check_command(self, command: str) -> bool:
         """
         Check if a command is available.
-        
+
         Args:
             command: Command name to check
-        
+
         Returns:
             True if command is available, False otherwise
         """
         try:
             result = subprocess.run(
-                [command, '-version'],
-                capture_output=True,
-                text=True,
-                timeout=5
+                [command, "-version"], capture_output=True, text=True, timeout=5
             )
             available = result.returncode == 0
             logger.debug(f"{command} available: {available}")
@@ -115,7 +109,7 @@ class FFmpegChecker:
         except Exception as e:
             logger.warning(f"Error checking {command}: {e}")
             return False
-    
+
     def get_installation_instructions(self, i18n=None) -> Tuple[str, str]:
         """
         Get installation instructions for current platform.
@@ -131,7 +125,7 @@ class FFmpegChecker:
 
         if system == "Darwin":  # macOS
             if i18n:
-                title = i18n.t('ffmpeg.dialog_title', platform='macOS')
+                title = i18n.t("ffmpeg.dialog_title", platform="macOS")
                 instructions = (
                     f"{i18n.t('ffmpeg.detected_system', system='macOS')}\n\n"
                     f"{i18n.t('ffmpeg.purpose')}\n\n"
@@ -161,28 +155,24 @@ class FFmpegChecker:
                     "注意：没有 FFmpeg，您仍然可以处理 WAV、MP3、FLAC 等纯音频格式。"
                 )
 
-
         elif system == "Linux":
             # Try to detect Linux distribution
             distro_info = ""
             try:
                 result = subprocess.run(
-                    ['cat', '/etc/os-release'],
-                    capture_output=True,
-                    text=True,
-                    timeout=2
+                    ["cat", "/etc/os-release"], capture_output=True, text=True, timeout=2
                 )
                 if result.returncode == 0:
-                    for line in result.stdout.split('\n'):
-                        if line.startswith('PRETTY_NAME='):
-                            distro_info = line.split('=')[1].strip('"')
+                    for line in result.stdout.split("\n"):
+                        if line.startswith("PRETTY_NAME="):
+                            distro_info = line.split("=")[1].strip('"')
                             break
             except Exception:
                 pass
 
             if i18n:
-                title = i18n.t('ffmpeg.dialog_title', platform='Linux')
-                system_info = i18n.t('ffmpeg.detected_system', system='Linux')
+                title = i18n.t("ffmpeg.dialog_title", platform="Linux")
+                system_info = i18n.t("ffmpeg.detected_system", system="Linux")
                 if distro_info:
                     system_info += f" ({distro_info})"
 
@@ -229,7 +219,6 @@ class FFmpegChecker:
                     "注意：没有 FFmpeg，您仍然可以处理 WAV、MP3、FLAC 等纯音频格式。"
                 )
 
-
         elif system == "Windows":
             # Try to detect Windows version
             windows_version = ""
@@ -239,8 +228,8 @@ class FFmpegChecker:
                 pass
 
             if i18n:
-                title = i18n.t('ffmpeg.dialog_title', platform='Windows')
-                system_info = i18n.t('ffmpeg.detected_system', system='Windows')
+                title = i18n.t("ffmpeg.dialog_title", platform="Windows")
+                system_info = i18n.t("ffmpeg.detected_system", system="Windows")
                 if windows_version:
                     system_info += f" {windows_version}"
 
@@ -297,10 +286,9 @@ class FFmpegChecker:
                     "注意：没有 FFmpeg，您仍然可以处理 WAV、MP3、FLAC 等纯音频格式。"
                 )
 
-
         else:
             if i18n:
-                title = i18n.t('ffmpeg.dialog_title', platform=system)
+                title = i18n.t("ffmpeg.dialog_title", platform=system)
                 instructions = (
                     f"{i18n.t('ffmpeg.detected_system', system=system)}\n\n"
                     f"{i18n.t('ffmpeg.purpose')}\n\n"
@@ -325,11 +313,11 @@ class FFmpegChecker:
                 )
 
         return title, instructions
-    
+
     def get_status_message(self) -> str:
         """
         Get a status message about ffmpeg availability.
-        
+
         Returns:
             Status message string
         """
@@ -345,21 +333,21 @@ class FFmpegChecker:
             return "ffprobe 已安装，但 FFmpeg 不可用"
         else:
             return "FFmpeg 未安装"
-    
+
     def check_and_log(self) -> bool:
         """
         Check ffmpeg availability and log the result.
-        
+
         Returns:
             True if both ffmpeg and ffprobe are available, False otherwise
         """
         # Log system information
         system = platform.system()
         logger.info(f"System platform: {system}")
-        
+
         ffmpeg_ok = self.is_ffmpeg_available()
         ffprobe_ok = self.is_ffprobe_available()
-        
+
         if ffmpeg_ok and ffprobe_ok:
             version = self.get_version()
             logger.info(f"✓ FFmpeg is available: {version}")
@@ -367,18 +355,17 @@ class FFmpegChecker:
             return True
         else:
             logger.warning(
-                f"✗ FFmpeg availability check: ffmpeg={ffmpeg_ok}, "
-                f"ffprobe={ffprobe_ok}"
+                f"✗ FFmpeg availability check: ffmpeg={ffmpeg_ok}, " f"ffprobe={ffprobe_ok}"
             )
             logger.warning(
                 "Video format support will be limited without FFmpeg. "
                 "Only pure audio formats (WAV, MP3, FLAC) will be fully supported."
             )
-            
+
             # Log installation hint
             title, _ = self.get_installation_instructions()
             logger.info(f"Installation guide: {title}")
-            
+
             return False
 
 
@@ -389,7 +376,7 @@ _checker = None
 def get_ffmpeg_checker() -> FFmpegChecker:
     """
     Get the global FFmpeg checker instance.
-    
+
     Returns:
         FFmpegChecker instance
     """

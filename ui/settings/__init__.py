@@ -25,12 +25,12 @@ from ui.settings.appearance_page import AppearanceSettingsPage
 from ui.settings.language_page import LanguageSettingsPage
 
 __all__ = [
-    'SettingsWidget',
-    'BaseSettingsPage',
-    'TranscriptionSettingsPage',
-    'RealtimeSettingsPage',
-    'CalendarSettingsPage',
-    'TimelineSettingsPage',
-    'AppearanceSettingsPage',
-    'LanguageSettingsPage',
+    "SettingsWidget",
+    "BaseSettingsPage",
+    "TranscriptionSettingsPage",
+    "RealtimeSettingsPage",
+    "CalendarSettingsPage",
+    "TimelineSettingsPage",
+    "AppearanceSettingsPage",
+    "LanguageSettingsPage",
 ]

@@ -43,21 +43,16 @@ class GPUDetector:
                 'coreml': bool
             }
         """
-        devices = {
-            'cpu': True,  # CPU is always available
-            'cuda': False,
-            'coreml': False
-        }
+        devices = {"cpu": True, "cuda": False, "coreml": False}  # CPU is always available
 
         # Check CUDA availability
         try:
             import torch
+
             if torch.cuda.is_available():
-                devices['cuda'] = True
+                devices["cuda"] = True
                 cuda_device_count = torch.cuda.device_count()
-                logger.info(
-                    f"CUDA is available with {cuda_device_count} device(s)"
-                )
+                logger.info(f"CUDA is available with {cuda_device_count} device(s)")
 
                 # Log GPU details
                 for i in range(cuda_device_count):
@@ -66,9 +61,7 @@ class GPUDetector:
             else:
                 logger.info("CUDA is not available")
         except ImportError:
-            logger.warning(
-                "torch is not installed, CUDA detection skipped"
-            )
+            logger.warning("torch is not installed, CUDA detection skipped")
         except Exception as e:
             logger.warning(f"Error detecting CUDA: {e}")
 
@@ -78,16 +71,11 @@ class GPUDetector:
             system = platform.system()
 
             # CoreML is available on Apple Silicon (arm64)
-            if system == 'Darwin' and processor == 'arm':
-                devices['coreml'] = True
-                logger.info(
-                    "CoreML is available (Apple Silicon detected)"
-                )
+            if system == "Darwin" and processor == "arm":
+                devices["coreml"] = True
+                logger.info("CoreML is available (Apple Silicon detected)")
             else:
-                logger.info(
-                    f"CoreML not available "
-                    f"(system={system}, processor={processor})"
-                )
+                logger.info(f"CoreML not available " f"(system={system}, processor={processor})")
         except Exception as e:
             logger.warning(f"Error detecting CoreML: {e}")
 
@@ -106,23 +94,20 @@ class GPUDetector:
         devices = GPUDetector.detect_available_devices()
 
         # Priority: CUDA > CoreML > CPU
-        if devices['cuda']:
+        if devices["cuda"]:
             # CUDA with float16 for best performance
             logger.info("Recommending CUDA with float16")
-            return ('cuda', 'float16')
-        elif devices['coreml']:
+            return ("cuda", "float16")
+        elif devices["coreml"]:
             # CoreML optimization is automatic in faster-whisper
             # on Apple Silicon
             # Use CPU device with int8 (CoreML will be used internally)
-            logger.info(
-                "Recommending CPU with int8 "
-                "(CoreML will be used automatically)"
-            )
-            return ('cpu', 'int8')
+            logger.info("Recommending CPU with int8 " "(CoreML will be used automatically)")
+            return ("cpu", "int8")
         else:
             # CPU with int8 for best CPU performance
             logger.info("Recommending CPU with int8")
-            return ('cpu', 'int8')
+            return ("cpu", "int8")
 
     @staticmethod
     def get_device_display_name(device: str) -> str:
@@ -135,18 +120,11 @@ class GPUDetector:
         Returns:
             Display name
         """
-        display_names = {
-            'cpu': 'CPU',
-            'cuda': 'CUDA (NVIDIA GPU)',
-            'auto': 'Auto (Recommended)'
-        }
+        display_names = {"cpu": "CPU", "cuda": "CUDA (NVIDIA GPU)", "auto": "Auto (Recommended)"}
         return display_names.get(device, device.upper())
 
     @staticmethod
-    def validate_device_config(
-        device: str,
-        compute_type: str
-    ) -> Tuple[str, str, str]:
+    def validate_device_config(device: str, compute_type: str) -> Tuple[str, str, str]:
         """
         Validate and adjust device configuration.
 
@@ -162,39 +140,33 @@ class GPUDetector:
         warning = ""
 
         # Handle 'auto' device
-        if device == 'auto':
+        if device == "auto":
             device, compute_type = GPUDetector.get_recommended_device()
-            logger.info(
-                f"Auto-selected device: {device}, "
-                f"compute_type: {compute_type}"
-            )
+            logger.info(f"Auto-selected device: {device}, " f"compute_type: {compute_type}")
             return (device, compute_type, "")
 
         # Validate CUDA request
-        if device == 'cuda':
-            if not devices['cuda']:
+        if device == "cuda":
+            if not devices["cuda"]:
                 # CUDA not available, fallback to CPU
                 warning = "CUDA is not available. Falling back to CPU."
                 logger.warning(warning)
-                device = 'cpu'
-                compute_type = 'int8'
+                device = "cpu"
+                compute_type = "int8"
             else:
                 # CUDA available, ensure compatible compute type
-                if compute_type not in ['float16', 'float32']:
+                if compute_type not in ["float16", "float32"]:
                     logger.info(
-                        f"Adjusting compute_type from {compute_type} "
-                        f"to float16 for CUDA"
+                        f"Adjusting compute_type from {compute_type} " f"to float16 for CUDA"
                     )
-                    compute_type = 'float16'
+                    compute_type = "float16"
 
         # Validate CPU request
-        if device == 'cpu':
+        if device == "cpu":
             # CPU works with any compute type, but int8 is recommended
-            if compute_type not in ['int8', 'float16', 'float32']:
-                logger.info(
-                    f"Invalid compute_type {compute_type}, using int8"
-                )
-                compute_type = 'int8'
+            if compute_type not in ["int8", "float16", "float32"]:
+                logger.info(f"Invalid compute_type {compute_type}, using int8")
+                compute_type = "int8"
 
         return (device, compute_type, warning)
 
@@ -207,18 +179,19 @@ class GPUDetector:
             List of (device_id, display_name) tuples
         """
         devices = GPUDetector.detect_available_devices()
-        options = [('auto', 'Auto (Recommended)')]
+        options = [("auto", "Auto (Recommended)")]
 
         # CPU is always available
-        options.append(('cpu', 'CPU'))
+        options.append(("cpu", "CPU"))
 
         # Add CUDA if available
-        if devices['cuda']:
+        if devices["cuda"]:
             try:
                 import torch
+
                 gpu_name = torch.cuda.get_device_name(0)
-                options.append(('cuda', f'CUDA ({gpu_name})'))
+                options.append(("cuda", f"CUDA ({gpu_name})"))
             except Exception:
-                options.append(('cuda', 'CUDA (NVIDIA GPU)'))
+                options.append(("cuda", "CUDA (NVIDIA GPU)"))
 
         return options

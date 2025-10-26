@@ -8,7 +8,7 @@ The OAuth implementation for EchoNote's Calendar Hub provides secure authenticat
 
 ### 1. OAuthDialog (`oauth_dialog.py`)
 
-A PyQt6 dialog that handles the OAuth 2.0 authorization flow:
+A PySide6 dialog that handles the OAuth 2.0 authorization flow:
 
 - **Features**:
 

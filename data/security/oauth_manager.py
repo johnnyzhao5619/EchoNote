@@ -29,13 +29,13 @@ from data.security.encryption import SecurityManager
 from config.app_config import get_app_dir
 
 
-logger = logging.getLogger('echonote.security.oauth')
+logger = logging.getLogger("echonote.security.oauth")
 
 
 class OAuthManager:
     """
     Manages OAuth tokens with encrypted storage and automatic refresh.
-    
+
     Stores tokens securely using the SecurityManager and handles
     token expiration detection and refresh logic.
     """
@@ -50,65 +50,66 @@ class OAuthManager:
                        Defaults to ~/.echonote
         """
         self.security_manager = security_manager
-        
+
         if config_dir is None:
             self.config_dir = get_app_dir()
         else:
             self.config_dir = Path(config_dir).expanduser()
-        
+
         self.config_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # File to store encrypted tokens
         self.tokens_file = self.config_dir / "oauth_tokens.enc"
-        
+
         # In-memory cache of tokens
         self._tokens_cache: Dict[str, Dict[str, Any]] = {}
-        
+
         # Load existing tokens
         self._load_tokens()
-        
+
         logger.info("OAuth manager initialized")
-    
+
     def _load_tokens(self):
         """Load tokens from encrypted storage."""
         if not self.tokens_file.exists():
             logger.debug("No existing OAuth tokens file")
             self._tokens_cache = {}
             return
-        
+
         try:
-            with open(self.tokens_file, 'r', encoding='utf-8') as f:
+            with open(self.tokens_file, "r", encoding="utf-8") as f:
                 encrypted_data = json.load(f)
-            
+
             # Decrypt the tokens
             self._tokens_cache = self.security_manager.decrypt_dict(encrypted_data)
-            
+
             logger.info(f"Loaded {len(self._tokens_cache)} OAuth token(s)")
-            
+
         except Exception as e:
             logger.error(f"Failed to load OAuth tokens: {e}")
             self._tokens_cache = {}
-    
+
     def _save_tokens(self):
         """Save tokens to encrypted storage."""
         try:
             # Encrypt the tokens
             encrypted_data = self.security_manager.encrypt_dict(self._tokens_cache)
-            
+
             # Save to file
-            with open(self.tokens_file, 'w', encoding='utf-8') as f:
+            with open(self.tokens_file, "w", encoding="utf-8") as f:
                 json.dump(encrypted_data, f, indent=2)
-            
+
             # Set file permissions (owner read/write only)
             import os
+
             os.chmod(self.tokens_file, 0o600)
-            
+
             logger.debug("OAuth tokens saved successfully")
-            
+
         except Exception as e:
             logger.error(f"Failed to save OAuth tokens: {e}")
             raise
-    
+
     def store_token(
         self,
         provider: str,
@@ -117,7 +118,7 @@ class OAuthManager:
         expires_in: Optional[int] = None,
         token_type: str = "Bearer",
         scope: Optional[str] = None,
-        **extra_data
+        **extra_data,
     ):
         """
         Store OAuth token for a provider.
@@ -172,9 +173,9 @@ class OAuthManager:
             "Provider %s token persisted with expires_in=%s (expires_at=%s)",
             provider,
             expires_in,
-            expires_at
+            expires_at,
         )
-    
+
     def get_token(self, provider: str) -> Optional[Dict[str, Any]]:
         """
         Get OAuth token for a provider.
@@ -186,14 +187,14 @@ class OAuthManager:
             Token data dictionary or None if not found
         """
         token_data = self._tokens_cache.get(provider)
-        
+
         if token_data:
             logger.debug(f"Retrieved OAuth token for provider: {provider}")
         else:
             logger.debug(f"No OAuth token found for provider: {provider}")
-        
+
         return token_data
-    
+
     def get_access_token(self, provider: str) -> Optional[str]:
         """
         Get access token for a provider.
@@ -205,8 +206,8 @@ class OAuthManager:
             Access token string or None if not found
         """
         token_data = self.get_token(provider)
-        return token_data.get('access_token') if token_data else None
-    
+        return token_data.get("access_token") if token_data else None
+
     def get_refresh_token(self, provider: str) -> Optional[str]:
         """
         Get refresh token for a provider.
@@ -218,8 +219,8 @@ class OAuthManager:
             Refresh token string or None if not found
         """
         token_data = self.get_token(provider)
-        return token_data.get('refresh_token') if token_data else None
-    
+        return token_data.get("refresh_token") if token_data else None
+
     def is_token_expired(self, provider: str, buffer_seconds: int = 300) -> bool:
         """
         Check if a token is expired or will expire soon.
@@ -233,31 +234,31 @@ class OAuthManager:
             True if token is expired or will expire soon
         """
         token_data = self.get_token(provider)
-        
+
         if not token_data:
             return True
-        
-        expires_at = token_data.get('expires_at')
+
+        expires_at = token_data.get("expires_at")
         if not expires_at:
             # No expiration time set, assume token is valid
             return False
-        
+
         try:
             expiration = datetime.fromisoformat(expires_at)
             now = datetime.now()
-            
+
             # Check if expired or will expire within buffer time
             is_expired = (expiration - now).total_seconds() <= buffer_seconds
-            
+
             if is_expired:
                 logger.debug(f"Token for {provider} is expired or expiring soon")
-            
+
             return is_expired
-            
+
         except Exception as e:
             logger.error(f"Error checking token expiration: {e}")
             return True
-    
+
     def update_access_token(
         self,
         provider: str,
@@ -266,7 +267,7 @@ class OAuthManager:
         *,
         token_type: Optional[str] = None,
         refresh_token: Optional[str] = None,
-        expires_at: Optional[str] = None
+        expires_at: Optional[str] = None,
     ):
         """
         Update only the access token (e.g., after refresh).
@@ -277,32 +278,30 @@ class OAuthManager:
             expires_in: Token expiration time in seconds (optional)
         """
         token_data = self._tokens_cache.get(provider)
-        
+
         if not token_data:
             logger.warning(f"Cannot update token for {provider}: no existing token")
             return
-        
+
         # Update access token
-        token_data['access_token'] = access_token
-        
+        token_data["access_token"] = access_token
+
         # Update expiration time
         if expires_in is not None:
-            computed_expires_at = (
-                datetime.now() + timedelta(seconds=expires_in)
-            ).isoformat()
-            token_data['expires_at'] = computed_expires_at
-            token_data['expires_in'] = expires_in
+            computed_expires_at = (datetime.now() + timedelta(seconds=expires_in)).isoformat()
+            token_data["expires_at"] = computed_expires_at
+            token_data["expires_in"] = expires_in
         elif expires_at is not None:
-            token_data['expires_at'] = expires_at
+            token_data["expires_at"] = expires_at
 
         if token_type:
-            token_data['token_type'] = token_type
+            token_data["token_type"] = token_type
 
         if refresh_token:
-            token_data['refresh_token'] = refresh_token
+            token_data["refresh_token"] = refresh_token
 
         # Update stored_at timestamp
-        token_data['stored_at'] = datetime.now().isoformat()
+        token_data["stored_at"] = datetime.now().isoformat()
 
         self._tokens_cache[provider] = token_data
         self._save_tokens()
@@ -311,10 +310,10 @@ class OAuthManager:
         logger.debug(
             "Provider %s token updated with expires_in=%s (expires_at=%s)",
             provider,
-            token_data.get('expires_in'),
-            token_data.get('expires_at')
+            token_data.get("expires_in"),
+            token_data.get("expires_at"),
         )
-    
+
     def delete_token(self, provider: str):
         """
         Delete OAuth token for a provider.
@@ -328,7 +327,7 @@ class OAuthManager:
             logger.info(f"Deleted OAuth token for provider: {provider}")
         else:
             logger.debug(f"No token to delete for provider: {provider}")
-    
+
     def has_token(self, provider: str) -> bool:
         """
         Check if a token exists for a provider.
@@ -340,7 +339,7 @@ class OAuthManager:
             True if token exists
         """
         return provider in self._tokens_cache
-    
+
     def list_providers(self) -> list:
         """
         Get list of providers with stored tokens.
@@ -349,25 +348,22 @@ class OAuthManager:
             List of provider names
         """
         return list(self._tokens_cache.keys())
-    
+
     def clear_all_tokens(self):
         """
         Delete all stored OAuth tokens.
-        
+
         WARNING: This will require re-authentication for all providers!
         """
         logger.warning("Clearing all OAuth tokens")
-        
+
         self._tokens_cache = {}
         self._save_tokens()
-        
+
         logger.info("All OAuth tokens cleared")
-    
+
     def refresh_token_if_needed(
-        self,
-        provider: str,
-        refresh_callback,
-        buffer_seconds: int = 300
+        self, provider: str, refresh_callback, buffer_seconds: int = 300
     ) -> Dict[str, Any]:
         """
         Check if token is expired and refresh if needed.
@@ -396,7 +392,7 @@ class OAuthManager:
                     'access_token': response['access_token'],
                     'expires_in': response['expires_in']
                 }
-            
+
             token = oauth_manager.refresh_token_if_needed(
                 'google',
                 my_refresh_callback
@@ -405,43 +401,43 @@ class OAuthManager:
         # Check if token exists
         if not self.has_token(provider):
             raise ValueError(f"No token found for provider: {provider}")
-        
+
         # Check if token is expired or will expire soon
         if not self.is_token_expired(provider, buffer_seconds):
             logger.debug(f"Token for {provider} is still valid, no refresh needed")
             return self.get_token(provider)
-        
+
         # Token is expired or expiring soon, try to refresh
         refresh_token = self.get_refresh_token(provider)
         if not refresh_token:
             raise ValueError(f"No refresh token available for {provider}")
-        
+
         logger.info(f"Refreshing token for {provider}")
-        
+
         try:
             # Call the refresh callback
             new_token_data = refresh_callback(refresh_token)
-            
-            if not new_token_data or 'access_token' not in new_token_data:
+
+            if not new_token_data or "access_token" not in new_token_data:
                 raise ValueError("Refresh callback did not return valid token data")
-            
+
             # Update the access token
             self.update_access_token(
                 provider,
-                new_token_data['access_token'],
-                new_token_data.get('expires_in'),
-                token_type=new_token_data.get('token_type'),
-                refresh_token=new_token_data.get('refresh_token'),
-                expires_at=new_token_data.get('expires_at')
+                new_token_data["access_token"],
+                new_token_data.get("expires_in"),
+                token_type=new_token_data.get("token_type"),
+                refresh_token=new_token_data.get("refresh_token"),
+                expires_at=new_token_data.get("expires_at"),
             )
-            
+
             logger.info(f"Successfully refreshed token for {provider}")
             return self.get_token(provider)
-            
+
         except Exception as e:
             logger.error(f"Failed to refresh token for {provider}: {e}")
             raise
-    
+
     def get_token_info(self, provider: str) -> Optional[Dict[str, Any]]:
         """
         Get non-sensitive information about a token.
@@ -453,16 +449,16 @@ class OAuthManager:
             Dictionary with token metadata (no actual tokens)
         """
         token_data = self.get_token(provider)
-        
+
         if not token_data:
             return None
-        
+
         return {
-            'provider': provider,
-            'token_type': token_data.get('token_type'),
-            'scope': token_data.get('scope'),
-            'expires_at': token_data.get('expires_at'),
-            'stored_at': token_data.get('stored_at'),
-            'has_refresh_token': bool(token_data.get('refresh_token')),
-            'is_expired': self.is_token_expired(provider)
+            "provider": provider,
+            "token_type": token_data.get("token_type"),
+            "scope": token_data.get("scope"),
+            "expires_at": token_data.get("expires_at"),
+            "stored_at": token_data.get("stored_at"),
+            "has_refresh_token": bool(token_data.get("refresh_token")),
+            "is_expired": self.is_token_expired(provider),
         }

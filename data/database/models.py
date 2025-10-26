@@ -26,13 +26,10 @@ from dataclasses import dataclass, field, asdict
 from datetime import datetime, time, timedelta, timezone
 from typing import List, Optional, Dict, Any, Tuple
 
-from data.database.encryption_helper import (
-    encrypt_sensitive_field,
-    decrypt_sensitive_field
-)
+from data.database.encryption_helper import encrypt_sensitive_field, decrypt_sensitive_field
 
 
-logger = logging.getLogger('echonote.database.models')
+logger = logging.getLogger("echonote.database.models")
 
 
 def generate_uuid() -> str:
@@ -48,7 +45,7 @@ def current_timestamp() -> str:
 @dataclass
 class TranscriptionTask:
     """Model for transcription tasks."""
-    
+
     id: str = field(default_factory=generate_uuid)
     file_path: str = ""
     file_name: str = ""
@@ -64,28 +61,28 @@ class TranscriptionTask:
     created_at: str = field(default_factory=current_timestamp)
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
-    
+
     @classmethod
-    def from_db_row(cls, row) -> 'TranscriptionTask':
+    def from_db_row(cls, row) -> "TranscriptionTask":
         """Create instance from database row."""
         return cls(
-            id=row['id'],
-            file_path=row['file_path'],
-            file_name=row['file_name'],
-            file_size=row['file_size'],
-            audio_duration=row['audio_duration'],
-            status=row['status'],
-            progress=row['progress'],
-            language=row['language'],
-            engine=row['engine'],
-            output_format=row['output_format'],
-            output_path=row['output_path'],
-            error_message=row['error_message'],
-            created_at=row['created_at'],
-            started_at=row['started_at'],
-            completed_at=row['completed_at']
+            id=row["id"],
+            file_path=row["file_path"],
+            file_name=row["file_name"],
+            file_size=row["file_size"],
+            audio_duration=row["audio_duration"],
+            status=row["status"],
+            progress=row["progress"],
+            language=row["language"],
+            engine=row["engine"],
+            output_format=row["output_format"],
+            output_path=row["output_path"],
+            error_message=row["error_message"],
+            created_at=row["created_at"],
+            started_at=row["started_at"],
+            completed_at=row["completed_at"],
         )
-    
+
     def save(self, db_connection):
         """Save or update task in database."""
         query = """
@@ -96,25 +93,36 @@ class TranscriptionTask:
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         params = (
-            self.id, self.file_path, self.file_name, self.file_size,
-            self.audio_duration, self.status, self.progress, self.language,
-            self.engine, self.output_format, self.output_path,
-            self.error_message, self.created_at, self.started_at, self.completed_at
+            self.id,
+            self.file_path,
+            self.file_name,
+            self.file_size,
+            self.audio_duration,
+            self.status,
+            self.progress,
+            self.language,
+            self.engine,
+            self.output_format,
+            self.output_path,
+            self.error_message,
+            self.created_at,
+            self.started_at,
+            self.completed_at,
         )
         db_connection.execute(query, params, commit=True)
         logger.debug(f"Saved transcription task: {self.id}")
-    
+
     @staticmethod
-    def get_by_id(db_connection, task_id: str) -> Optional['TranscriptionTask']:
+    def get_by_id(db_connection, task_id: str) -> Optional["TranscriptionTask"]:
         """Get task by ID."""
         query = "SELECT * FROM transcription_tasks WHERE id = ?"
         result = db_connection.execute(query, (task_id,))
         if result:
             return TranscriptionTask.from_db_row(result[0])
         return None
-    
+
     @staticmethod
-    def get_all(db_connection, status: Optional[str] = None) -> List['TranscriptionTask']:
+    def get_all(db_connection, status: Optional[str] = None) -> List["TranscriptionTask"]:
         """Get all tasks, optionally filtered by status."""
         if status:
             query = "SELECT * FROM transcription_tasks WHERE status = ? ORDER BY created_at DESC"
@@ -122,9 +130,9 @@ class TranscriptionTask:
         else:
             query = "SELECT * FROM transcription_tasks ORDER BY created_at DESC"
             result = db_connection.execute(query)
-        
+
         return [TranscriptionTask.from_db_row(row) for row in result]
-    
+
     def delete(self, db_connection):
         """Delete task from database."""
         query = "DELETE FROM transcription_tasks WHERE id = ?"
@@ -135,7 +143,7 @@ class TranscriptionTask:
 @dataclass
 class CalendarEvent:
     """Model for calendar events."""
-    
+
     id: str = field(default_factory=generate_uuid)
     title: str = ""
     event_type: str = "Event"  # Event/Task/Appointment
@@ -152,18 +160,16 @@ class CalendarEvent:
     is_readonly: bool = False
     created_at: str = field(default_factory=current_timestamp)
     updated_at: str = field(default_factory=current_timestamp)
-    
+
     @classmethod
-    def from_db_row(cls, row) -> 'CalendarEvent':
+    def from_db_row(cls, row) -> "CalendarEvent":
         """Create instance from database row."""
         attendees: List[str] = []
-        if row['attendees']:
+        if row["attendees"]:
             try:
-                loaded = json.loads(row['attendees'])
+                loaded = json.loads(row["attendees"])
             except json.JSONDecodeError:
-                logger.warning(
-                    "Failed to decode attendees for event %s", row.get('id')
-                )
+                logger.warning("Failed to decode attendees for event %s", row.get("id"))
                 loaded = []
 
             if isinstance(loaded, list):
@@ -176,32 +182,32 @@ class CalendarEvent:
                 attendees = [loaded]
         reminder_use_default = None
         try:
-            row_keys = row.keys() if hasattr(row, 'keys') else []
+            row_keys = row.keys() if hasattr(row, "keys") else []
         except Exception:  # pragma: no cover - defensive guard
             row_keys = []
-        if row_keys and 'reminder_use_default' in row_keys:
-            value = row['reminder_use_default']
+        if row_keys and "reminder_use_default" in row_keys:
+            value = row["reminder_use_default"]
             reminder_use_default = bool(value) if value is not None else None
 
         return cls(
-            id=row['id'],
-            title=row['title'],
-            event_type=row['event_type'],
-            start_time=row['start_time'],
-            end_time=row['end_time'],
-            location=row['location'],
+            id=row["id"],
+            title=row["title"],
+            event_type=row["event_type"],
+            start_time=row["start_time"],
+            end_time=row["end_time"],
+            location=row["location"],
             attendees=attendees,
-            description=row['description'],
-            reminder_minutes=row['reminder_minutes'],
+            description=row["description"],
+            reminder_minutes=row["reminder_minutes"],
             reminder_use_default=reminder_use_default,
-            recurrence_rule=row['recurrence_rule'],
-            source=row['source'],
-            external_id=row['external_id'],
-            is_readonly=bool(row['is_readonly']),
-            created_at=row['created_at'],
-            updated_at=row['updated_at']
+            recurrence_rule=row["recurrence_rule"],
+            source=row["source"],
+            external_id=row["external_id"],
+            is_readonly=bool(row["is_readonly"]),
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
         )
-    
+
     def save(self, db_connection):
         """Save or update event in database."""
         self.updated_at = current_timestamp()
@@ -227,9 +233,7 @@ class CalendarEvent:
         self.attendees = attendees_value
 
         reminder_use_default_value = (
-            None
-            if self.reminder_use_default is None
-            else int(self.reminder_use_default)
+            None if self.reminder_use_default is None else int(self.reminder_use_default)
         )
         attendees_json = json.dumps(self.attendees)
 
@@ -282,7 +286,7 @@ class CalendarEvent:
         """Determine whether the event spans one or more full days."""
 
         def _is_date_only(value: Any) -> bool:
-            return isinstance(value, str) and len(value) == 10 and 'T' not in value
+            return isinstance(value, str) and len(value) == 10 and "T" not in value
 
         if _is_date_only(self.start_time) and _is_date_only(self.end_time):
             return True
@@ -308,21 +312,18 @@ class CalendarEvent:
         return delta.total_seconds() % (24 * 3600) == 0
 
     @staticmethod
-    def get_by_id(db_connection, event_id: str) -> Optional['CalendarEvent']:
+    def get_by_id(db_connection, event_id: str) -> Optional["CalendarEvent"]:
         """Get event by ID."""
         query = "SELECT * FROM calendar_events WHERE id = ?"
         result = db_connection.execute(query, (event_id,))
         if result:
             return CalendarEvent.from_db_row(result[0])
         return None
-    
+
     @staticmethod
     def get_by_time_range(
-        db_connection,
-        start_time: str,
-        end_time: str,
-        source: Optional[str] = None
-    ) -> List['CalendarEvent']:
+        db_connection, start_time: str, end_time: str, source: Optional[str] = None
+    ) -> List["CalendarEvent"]:
         """Get events within a time range."""
         if source:
             query = """
@@ -338,32 +339,32 @@ class CalendarEvent:
                 ORDER BY start_time
             """
             result = db_connection.execute(query, (end_time, start_time))
-        
+
         return [CalendarEvent.from_db_row(row) for row in result]
-    
+
     @staticmethod
     def search(
         db_connection,
         keyword: Optional[str] = None,
         event_type: Optional[str] = None,
-        source: Optional[str] = None
-    ) -> List['CalendarEvent']:
+        source: Optional[str] = None,
+    ) -> List["CalendarEvent"]:
         """Search events by various criteria."""
         conditions = []
         params = []
-        
+
         if keyword:
             conditions.append("(title LIKE ? OR description LIKE ?)")
             params.extend([f"%{keyword}%", f"%{keyword}%"])
-        
+
         if event_type:
             conditions.append("event_type = ?")
             params.append(event_type)
-        
+
         if source:
             conditions.append("source = ?")
             params.append(source)
-        
+
         where_clause = " AND ".join(conditions) if conditions else "1=1"
         query = f"""
             SELECT * FROM calendar_events
@@ -407,8 +408,8 @@ class CalendarEvent:
 
         row = result[0]
         if isinstance(row, dict):
-            min_start = row.get('min_start')
-            max_end = row.get('max_end')
+            min_start = row.get("min_start")
+            max_end = row.get("max_end")
         else:
             min_start, max_end = row[0], row[1]
 
@@ -416,7 +417,7 @@ class CalendarEvent:
             return None
 
         return min_start, max_end
-    
+
     def delete(self, db_connection):
         """Delete event from database."""
         query = "DELETE FROM calendar_events WHERE id = ?"
@@ -434,13 +435,13 @@ class CalendarEventLink:
     last_synced_at: Optional[str] = None
 
     @classmethod
-    def from_db_row(cls, row) -> 'CalendarEventLink':
+    def from_db_row(cls, row) -> "CalendarEventLink":
         """Create an instance from database row."""
         return cls(
-            event_id=row['event_id'],
-            provider=row['provider'],
-            external_id=row['external_id'],
-            last_synced_at=row['last_synced_at']
+            event_id=row["event_id"],
+            provider=row["provider"],
+            external_id=row["external_id"],
+            last_synced_at=row["last_synced_at"],
         )
 
     def save(self, db_connection):
@@ -458,28 +459,16 @@ class CalendarEventLink:
                 event_id = excluded.event_id,
                 last_synced_at = excluded.last_synced_at
         """
-        params = (
-            self.event_id,
-            self.provider,
-            self.external_id,
-            timestamp
-        )
+        params = (self.event_id, self.provider, self.external_id, timestamp)
         db_connection.execute(query, params, commit=True)
-        logger.debug(
-            "Saved calendar event link: %s/%s", self.provider, self.external_id
-        )
+        logger.debug("Saved calendar event link: %s/%s", self.provider, self.external_id)
 
     @staticmethod
     def get_by_provider_and_external_id(
-        db_connection,
-        provider: str,
-        external_id: str
-    ) -> Optional['CalendarEventLink']:
+        db_connection, provider: str, external_id: str
+    ) -> Optional["CalendarEventLink"]:
         """Lookup a link by provider and external identifier."""
-        query = (
-            "SELECT * FROM calendar_event_links "
-            "WHERE provider = ? AND external_id = ?"
-        )
+        query = "SELECT * FROM calendar_event_links " "WHERE provider = ? AND external_id = ?"
         result = db_connection.execute(query, (provider, external_id))
         if result:
             return CalendarEventLink.from_db_row(result[0])
@@ -487,29 +476,19 @@ class CalendarEventLink:
 
     @staticmethod
     def get_by_event_and_provider(
-        db_connection,
-        event_id: str,
-        provider: str
-    ) -> Optional['CalendarEventLink']:
+        db_connection, event_id: str, provider: str
+    ) -> Optional["CalendarEventLink"]:
         """Lookup an existing link for a provider and event."""
-        query = (
-            "SELECT * FROM calendar_event_links "
-            "WHERE event_id = ? AND provider = ?"
-        )
+        query = "SELECT * FROM calendar_event_links " "WHERE event_id = ? AND provider = ?"
         result = db_connection.execute(query, (event_id, provider))
         if result:
             return CalendarEventLink.from_db_row(result[0])
         return None
 
     @staticmethod
-    def list_for_event(
-        db_connection,
-        event_id: str
-    ) -> List['CalendarEventLink']:
+    def list_for_event(db_connection, event_id: str) -> List["CalendarEventLink"]:
         """Return all provider links for a given event."""
-        query = (
-            "SELECT * FROM calendar_event_links WHERE event_id = ?"
-        )
+        query = "SELECT * FROM calendar_event_links WHERE event_id = ?"
         rows = db_connection.execute(query, (event_id,))
         return [CalendarEventLink.from_db_row(row) for row in rows]
 
@@ -517,26 +496,26 @@ class CalendarEventLink:
 @dataclass
 class EventAttachment:
     """Model for event attachments."""
-    
+
     id: str = field(default_factory=generate_uuid)
     event_id: str = ""
     attachment_type: str = ""  # recording/transcript
     file_path: str = ""
     file_size: Optional[int] = None
     created_at: str = field(default_factory=current_timestamp)
-    
+
     @classmethod
-    def from_db_row(cls, row) -> 'EventAttachment':
+    def from_db_row(cls, row) -> "EventAttachment":
         """Create instance from database row."""
         return cls(
-            id=row['id'],
-            event_id=row['event_id'],
-            attachment_type=row['attachment_type'],
-            file_path=row['file_path'],
-            file_size=row['file_size'],
-            created_at=row['created_at']
+            id=row["id"],
+            event_id=row["event_id"],
+            attachment_type=row["attachment_type"],
+            file_path=row["file_path"],
+            file_size=row["file_size"],
+            created_at=row["created_at"],
         )
-    
+
     def save(self, db_connection):
         """Save attachment in database."""
         query = """
@@ -545,30 +524,31 @@ class EventAttachment:
             ) VALUES (?, ?, ?, ?, ?, ?)
         """
         params = (
-            self.id, self.event_id, self.attachment_type,
-            self.file_path, self.file_size, self.created_at
+            self.id,
+            self.event_id,
+            self.attachment_type,
+            self.file_path,
+            self.file_size,
+            self.created_at,
         )
         db_connection.execute(query, params, commit=True)
         logger.debug(f"Saved event attachment: {self.id}")
-    
+
     @staticmethod
-    def get_by_event_id(db_connection, event_id: str) -> List['EventAttachment']:
+    def get_by_event_id(db_connection, event_id: str) -> List["EventAttachment"]:
         """Get all attachments for an event."""
         query = "SELECT * FROM event_attachments WHERE event_id = ? ORDER BY created_at"
         result = db_connection.execute(query, (event_id,))
         return [EventAttachment.from_db_row(row) for row in result]
 
     @staticmethod
-    def get_by_event_ids(
-        db_connection,
-        event_ids: List[str]
-    ) -> Dict[str, List['EventAttachment']]:
+    def get_by_event_ids(db_connection, event_ids: List[str]) -> Dict[str, List["EventAttachment"]]:
         """Get attachments for multiple events in a single query."""
         if not event_ids:
             return {}
 
         unique_ids = list(dict.fromkeys(event_ids))
-        placeholders = ', '.join(['?'] * len(unique_ids))
+        placeholders = ", ".join(["?"] * len(unique_ids))
         query = (
             "SELECT * FROM event_attachments "
             "WHERE event_id IN (" + placeholders + ") "
@@ -576,7 +556,7 @@ class EventAttachment:
         )
         rows = db_connection.execute(query, tuple(unique_ids))
 
-        attachments_map: Dict[str, List['EventAttachment']] = {}
+        attachments_map: Dict[str, List["EventAttachment"]] = {}
         for row in rows:
             attachment = EventAttachment.from_db_row(row)
             attachments_map.setdefault(attachment.event_id, []).append(attachment)
@@ -592,14 +572,11 @@ class EventAttachment:
     ) -> Optional[Tuple[str, str]]:
         """Return bounds for events that have transcript-like attachments."""
 
-        attachment_conditions = [
-            "attachment_type IN ('transcript', 'translation')"
-        ]
+        attachment_conditions = ["attachment_type IN ('transcript', 'translation')"]
         attachment_params: List[Any] = []
 
-        subquery = (
-            "SELECT DISTINCT event_id FROM event_attachments "
-            "WHERE " + " AND ".join(attachment_conditions)
+        subquery = "SELECT DISTINCT event_id FROM event_attachments " "WHERE " + " AND ".join(
+            attachment_conditions
         )
 
         if limit:
@@ -633,8 +610,8 @@ class EventAttachment:
 
         row = result[0]
         if isinstance(row, dict):
-            min_start = row.get('min_start')
-            max_end = row.get('max_end')
+            min_start = row.get("min_start")
+            max_end = row.get("max_end")
         else:
             min_start, max_end = row[0], row[1]
 
@@ -642,7 +619,7 @@ class EventAttachment:
             return None
 
         return min_start, max_end
-    
+
     def delete(self, db_connection):
         """Delete attachment from database."""
         query = "DELETE FROM event_attachments WHERE id = ?"
@@ -653,7 +630,7 @@ class EventAttachment:
 @dataclass
 class AutoTaskConfig:
     """Model for automatic task configurations."""
-    
+
     id: str = field(default_factory=generate_uuid)
     event_id: str = ""
     enable_transcription: bool = False
@@ -662,21 +639,21 @@ class AutoTaskConfig:
     enable_translation: bool = False
     translation_target_language: Optional[str] = None
     created_at: str = field(default_factory=current_timestamp)
-    
+
     @classmethod
-    def from_db_row(cls, row) -> 'AutoTaskConfig':
+    def from_db_row(cls, row) -> "AutoTaskConfig":
         """Create instance from database row."""
         return cls(
-            id=row['id'],
-            event_id=row['event_id'],
-            enable_transcription=bool(row['enable_transcription']),
-            enable_recording=bool(row['enable_recording']),
-            transcription_language=row['transcription_language'],
-            enable_translation=bool(row['enable_translation']),
-            translation_target_language=row['translation_target_language'],
-            created_at=row['created_at']
+            id=row["id"],
+            event_id=row["event_id"],
+            enable_transcription=bool(row["enable_transcription"]),
+            enable_recording=bool(row["enable_recording"]),
+            transcription_language=row["transcription_language"],
+            enable_translation=bool(row["enable_translation"]),
+            translation_target_language=row["translation_target_language"],
+            created_at=row["created_at"],
         )
-    
+
     def save(self, db_connection):
         """Save configuration in database."""
         query = """
@@ -687,16 +664,20 @@ class AutoTaskConfig:
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """
         params = (
-            self.id, self.event_id, int(self.enable_transcription),
-            int(self.enable_recording), self.transcription_language,
-            int(self.enable_translation), self.translation_target_language,
-            self.created_at
+            self.id,
+            self.event_id,
+            int(self.enable_transcription),
+            int(self.enable_recording),
+            self.transcription_language,
+            int(self.enable_translation),
+            self.translation_target_language,
+            self.created_at,
         )
         db_connection.execute(query, params, commit=True)
         logger.debug(f"Saved auto task config: {self.id}")
-    
+
     @staticmethod
-    def get_by_event_id(db_connection, event_id: str) -> Optional['AutoTaskConfig']:
+    def get_by_event_id(db_connection, event_id: str) -> Optional["AutoTaskConfig"]:
         """Get configuration for an event."""
         query = "SELECT * FROM auto_task_configs WHERE event_id = ?"
         result = db_connection.execute(query, (event_id,))
@@ -705,10 +686,7 @@ class AutoTaskConfig:
         return None
 
     @staticmethod
-    def get_by_event_ids(
-        db_connection,
-        event_ids: List[str]
-    ) -> List['AutoTaskConfig']:
+    def get_by_event_ids(db_connection, event_ids: List[str]) -> List["AutoTaskConfig"]:
         """Get configurations for multiple events in a single query."""
         if not event_ids:
             return []
@@ -716,14 +694,11 @@ class AutoTaskConfig:
         # Preserve caller order while removing duplicates to avoid redundant
         # placeholders in the IN clause.
         unique_ids = list(dict.fromkeys(event_ids))
-        placeholders = ', '.join(['?'] * len(unique_ids))
-        query = (
-            "SELECT * FROM auto_task_configs "
-            f"WHERE event_id IN ({placeholders})"
-        )
+        placeholders = ", ".join(["?"] * len(unique_ids))
+        query = "SELECT * FROM auto_task_configs " f"WHERE event_id IN ({placeholders})"
         result = db_connection.execute(query, tuple(unique_ids))
         return [AutoTaskConfig.from_db_row(row) for row in result]
-    
+
     def delete(self, db_connection):
         """Delete configuration from database."""
         query = "DELETE FROM auto_task_configs WHERE id = ?"
@@ -734,7 +709,7 @@ class AutoTaskConfig:
 @dataclass
 class CalendarSyncStatus:
     """Model for calendar sync status."""
-    
+
     id: str = field(default_factory=generate_uuid)
     provider: str = ""  # google/outlook
     user_email: Optional[str] = None
@@ -743,24 +718,24 @@ class CalendarSyncStatus:
     is_active: bool = True
     created_at: str = field(default_factory=current_timestamp)
     updated_at: str = field(default_factory=current_timestamp)
-    
+
     @classmethod
-    def from_db_row(cls, row) -> 'CalendarSyncStatus':
+    def from_db_row(cls, row) -> "CalendarSyncStatus":
         """Create instance from database row."""
         # Decrypt sync_token if present
-        sync_token = decrypt_sensitive_field(row['sync_token'])
-        
+        sync_token = decrypt_sensitive_field(row["sync_token"])
+
         return cls(
-            id=row['id'],
-            provider=row['provider'],
-            user_email=row['user_email'],
-            last_sync_time=row['last_sync_time'],
+            id=row["id"],
+            provider=row["provider"],
+            user_email=row["user_email"],
+            last_sync_time=row["last_sync_time"],
             sync_token=sync_token,
-            is_active=bool(row['is_active']),
-            created_at=row['created_at'],
-            updated_at=row['updated_at']
+            is_active=bool(row["is_active"]),
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
         )
-    
+
     def save(self, db_connection):
         """Save sync status in database."""
         now = current_timestamp()
@@ -781,7 +756,7 @@ class CalendarSyncStatus:
                       AND id != ?
                       AND is_active = 1
                     """,
-                    (now, self.provider, self.id)
+                    (now, self.provider, self.id),
                 )
             cursor.execute(
                 """
@@ -798,18 +773,14 @@ class CalendarSyncStatus:
                     encrypted_sync_token,
                     int(self.is_active),
                     self.created_at,
-                    self.updated_at
-                )
+                    self.updated_at,
+                ),
             )
 
-        logger.debug(
-            "Saved calendar sync status: %s (active=%s)",
-            self.id,
-            self.is_active
-        )
-    
+        logger.debug("Saved calendar sync status: %s (active=%s)", self.id, self.is_active)
+
     @staticmethod
-    def get_by_provider(db_connection, provider: str) -> Optional['CalendarSyncStatus']:
+    def get_by_provider(db_connection, provider: str) -> Optional["CalendarSyncStatus"]:
         """Get sync status for a provider."""
         query = (
             "SELECT * FROM calendar_sync_status "
@@ -820,14 +791,14 @@ class CalendarSyncStatus:
         if result:
             return CalendarSyncStatus.from_db_row(result[0])
         return None
-    
+
     @staticmethod
-    def get_all_active(db_connection) -> List['CalendarSyncStatus']:
+    def get_all_active(db_connection) -> List["CalendarSyncStatus"]:
         """Get all active sync statuses."""
         query = "SELECT * FROM calendar_sync_status WHERE is_active = 1"
         result = db_connection.execute(query)
         return [CalendarSyncStatus.from_db_row(row) for row in result]
-    
+
     def delete(self, db_connection):
         """Delete sync status from database."""
         query = "DELETE FROM calendar_sync_status WHERE id = ?"
@@ -838,24 +809,24 @@ class CalendarSyncStatus:
 @dataclass
 class APIUsage:
     """Model for API usage tracking."""
-    
+
     id: str = field(default_factory=generate_uuid)
     engine: str = ""  # openai/google/azure
     duration_seconds: float = 0.0
     cost: Optional[float] = None
     timestamp: str = field(default_factory=current_timestamp)
-    
+
     @classmethod
-    def from_db_row(cls, row) -> 'APIUsage':
+    def from_db_row(cls, row) -> "APIUsage":
         """Create instance from database row."""
         return cls(
-            id=row['id'],
-            engine=row['engine'],
-            duration_seconds=row['duration_seconds'],
-            cost=row['cost'],
-            timestamp=row['timestamp']
+            id=row["id"],
+            engine=row["engine"],
+            duration_seconds=row["duration_seconds"],
+            cost=row["cost"],
+            timestamp=row["timestamp"],
         )
-    
+
     def save(self, db_connection):
         """Save usage record in database."""
         query = """
@@ -865,7 +836,7 @@ class APIUsage:
         params = (self.id, self.engine, self.duration_seconds, self.cost, self.timestamp)
         db_connection.execute(query, params, commit=True)
         logger.debug(f"Saved API usage record: {self.id}")
-    
+
     @staticmethod
     def get_monthly_usage(db_connection, engine: str, year: int, month: int) -> Dict[str, Any]:
         """Get monthly usage statistics for an engine."""
@@ -880,22 +851,22 @@ class APIUsage:
             AND strftime('%m', timestamp) = ?
         """
         result = db_connection.execute(query, (engine, str(year), f"{month:02d}"))
-        
+
         if result:
             row = result[0]
             return {
-                'count': row['count'],
-                'total_duration': row['total_duration'] or 0.0,
-                'total_cost': row['total_cost'] or 0.0
+                "count": row["count"],
+                "total_duration": row["total_duration"] or 0.0,
+                "total_cost": row["total_cost"] or 0.0,
             }
-        
-        return {'count': 0, 'total_duration': 0.0, 'total_cost': 0.0}
+
+        return {"count": 0, "total_duration": 0.0, "total_cost": 0.0}
 
 
 @dataclass
 class ModelUsageStats:
     """Model for Whisper model usage statistics."""
-    
+
     id: str = field(default_factory=generate_uuid)
     model_name: str = ""
     usage_count: int = 0
@@ -903,24 +874,24 @@ class ModelUsageStats:
     total_transcription_duration: float = 0.0
     created_at: str = field(default_factory=current_timestamp)
     updated_at: str = field(default_factory=current_timestamp)
-    
+
     @classmethod
-    def from_db_row(cls, row) -> 'ModelUsageStats':
+    def from_db_row(cls, row) -> "ModelUsageStats":
         """Create instance from database row."""
         return cls(
-            id=row['id'],
-            model_name=row['model_name'],
-            usage_count=row['usage_count'],
-            last_used=row['last_used'],
-            total_transcription_duration=row['total_transcription_duration'],
-            created_at=row['created_at'],
-            updated_at=row['updated_at']
+            id=row["id"],
+            model_name=row["model_name"],
+            usage_count=row["usage_count"],
+            last_used=row["last_used"],
+            total_transcription_duration=row["total_transcription_duration"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
         )
-    
+
     def save(self, db_connection):
         """Save or update model usage stats in database."""
         self.updated_at = current_timestamp()
-        
+
         query = """
             INSERT OR REPLACE INTO model_usage_stats (
                 id, model_name, usage_count, last_used,
@@ -928,37 +899,38 @@ class ModelUsageStats:
             ) VALUES (?, ?, ?, ?, ?, ?, ?)
         """
         params = (
-            self.id, self.model_name, self.usage_count, self.last_used,
-            self.total_transcription_duration, self.created_at, self.updated_at
+            self.id,
+            self.model_name,
+            self.usage_count,
+            self.last_used,
+            self.total_transcription_duration,
+            self.created_at,
+            self.updated_at,
         )
         db_connection.execute(query, params, commit=True)
         logger.debug(f"Saved model usage stats: {self.model_name}")
-    
+
     @staticmethod
-    def get_by_model_name(db_connection, model_name: str) -> Optional['ModelUsageStats']:
+    def get_by_model_name(db_connection, model_name: str) -> Optional["ModelUsageStats"]:
         """Get usage stats for a specific model."""
         query = "SELECT * FROM model_usage_stats WHERE model_name = ?"
         result = db_connection.execute(query, (model_name,))
         if result:
             return ModelUsageStats.from_db_row(result[0])
         return None
-    
+
     @staticmethod
-    def get_all(db_connection) -> List['ModelUsageStats']:
+    def get_all(db_connection) -> List["ModelUsageStats"]:
         """Get all model usage statistics."""
         query = "SELECT * FROM model_usage_stats ORDER BY usage_count DESC"
         result = db_connection.execute(query)
         return [ModelUsageStats.from_db_row(row) for row in result]
-    
+
     @staticmethod
-    def increment_usage(
-        db_connection,
-        model_name: str,
-        transcription_duration: float = 0.0
-    ):
+    def increment_usage(db_connection, model_name: str, transcription_duration: float = 0.0):
         """Increment usage count for a model."""
         stats = ModelUsageStats.get_by_model_name(db_connection, model_name)
-        
+
         if stats:
             # Update existing stats
             stats.usage_count += 1
@@ -971,12 +943,12 @@ class ModelUsageStats:
                 model_name=model_name,
                 usage_count=1,
                 last_used=current_timestamp(),
-                total_transcription_duration=transcription_duration
+                total_transcription_duration=transcription_duration,
             )
             stats.save(db_connection)
-        
+
         logger.debug(f"Incremented usage for model: {model_name}")
-    
+
     def delete(self, db_connection):
         """Delete model usage stats from database."""
         query = "DELETE FROM model_usage_stats WHERE id = ?"

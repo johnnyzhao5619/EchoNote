@@ -24,9 +24,20 @@ from datetime import datetime
 from typing import Dict
 
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QMessageBox,
-    QPushButton, QProgressBar, QFrame, QComboBox, QCheckBox,
-    QSpinBox, QDialog, QFormLayout, QDialogButtonBox
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QProgressBar,
+    QFrame,
+    QComboBox,
+    QCheckBox,
+    QSpinBox,
+    QDialog,
+    QFormLayout,
+    QDialogButtonBox,
 )
 from PySide6.QtCore import Slot
 from PySide6.QtGui import QFont
@@ -37,7 +48,7 @@ from utils.i18n import I18nQtManager
 from utils.model_download import run_model_download
 from core.models.registry import ModelInfo
 
-logger = logging.getLogger('echonote.ui.settings.model_management')
+logger = logging.getLogger("echonote.ui.settings.model_management")
 
 
 class ModelManagementPage(BaseSettingsPage):
@@ -61,18 +72,10 @@ class ModelManagementPage(BaseSettingsPage):
 
         # 连接模型管理器的信号
         self.model_manager.models_updated.connect(self._refresh_model_list)
-        self.model_manager.downloader.download_progress.connect(
-            self._update_download_progress
-        )
-        self.model_manager.downloader.download_completed.connect(
-            self._on_download_completed
-        )
-        self.model_manager.downloader.download_failed.connect(
-            self._on_download_failed
-        )
-        self.model_manager.model_validation_failed.connect(
-            self._on_validation_failed
-        )
+        self.model_manager.downloader.download_progress.connect(self._update_download_progress)
+        self.model_manager.downloader.download_completed.connect(self._on_download_completed)
+        self.model_manager.downloader.download_failed.connect(self._on_download_failed)
+        self.model_manager.model_validation_failed.connect(self._on_validation_failed)
 
         # 连接语言切换信号
         self.i18n.language_changed.connect(self.update_translations)
@@ -85,7 +88,7 @@ class ModelManagementPage(BaseSettingsPage):
     def setup_ui(self):
         """设置 UI 布局"""
         # 页面标题
-        self.title_label = QLabel(self.i18n.t('settings.model_management.title'))
+        self.title_label = QLabel(self.i18n.t("settings.model_management.title"))
         title_font = QFont()
         title_font.setPointSize(14)
         title_font.setBold(True)
@@ -93,9 +96,7 @@ class ModelManagementPage(BaseSettingsPage):
         self.content_layout.addWidget(self.title_label)
 
         # 页面描述
-        self.desc_label = QLabel(
-            self.i18n.t('settings.model_management.description')
-        )
+        self.desc_label = QLabel(self.i18n.t("settings.model_management.description"))
         self.desc_label.setWordWrap(True)
         self.desc_label.setObjectName("description_label")
         self.content_layout.addWidget(self.desc_label)
@@ -112,17 +113,13 @@ class ModelManagementPage(BaseSettingsPage):
         section_font = QFont()
         section_font.setPointSize(12)
         section_font.setBold(True)
-        
-        self.downloaded_title = QLabel(
-            self.i18n.t('settings.model_management.downloaded_models')
-        )
+
+        self.downloaded_title = QLabel(self.i18n.t("settings.model_management.downloaded_models"))
         self.downloaded_title.setFont(section_font)
         self.content_layout.addWidget(self.downloaded_title)
-        
+
         self.downloaded_models_container = QWidget()
-        self.downloaded_models_layout = QVBoxLayout(
-            self.downloaded_models_container
-        )
+        self.downloaded_models_layout = QVBoxLayout(self.downloaded_models_container)
         self.downloaded_models_layout.setContentsMargins(0, 0, 0, 0)
         self.downloaded_models_layout.setSpacing(10)
         self.content_layout.addWidget(self.downloaded_models_container)
@@ -130,16 +127,12 @@ class ModelManagementPage(BaseSettingsPage):
         self.add_spacing(20)
 
         # 可下载模型区域
-        self.available_title = QLabel(
-            self.i18n.t('settings.model_management.available_models')
-        )
+        self.available_title = QLabel(self.i18n.t("settings.model_management.available_models"))
         self.available_title.setFont(section_font)
         self.content_layout.addWidget(self.available_title)
-        
+
         self.available_models_container = QWidget()
-        self.available_models_layout = QVBoxLayout(
-            self.available_models_container
-        )
+        self.available_models_layout = QVBoxLayout(self.available_models_container)
         self.available_models_layout.setContentsMargins(0, 0, 0, 0)
         self.available_models_layout.setSpacing(10)
         self.content_layout.addWidget(self.available_models_container)
@@ -155,30 +148,24 @@ class ModelManagementPage(BaseSettingsPage):
     def update_translations(self):
         """更新所有 UI 文本以响应语言切换"""
         logger.debug("Updating translations for model management page")
-        
+
         # 更新页面标题和描述
-        if hasattr(self, 'title_label'):
-            self.title_label.setText(
-                self.i18n.t('settings.model_management.title')
-            )
-        if hasattr(self, 'desc_label'):
-            self.desc_label.setText(
-                self.i18n.t('settings.model_management.description')
-            )
-        
+        if hasattr(self, "title_label"):
+            self.title_label.setText(self.i18n.t("settings.model_management.title"))
+        if hasattr(self, "desc_label"):
+            self.desc_label.setText(self.i18n.t("settings.model_management.description"))
+
         # 更新区域标题
-        if hasattr(self, 'downloaded_title'):
+        if hasattr(self, "downloaded_title"):
             self.downloaded_title.setText(
-                self.i18n.t('settings.model_management.downloaded_models')
+                self.i18n.t("settings.model_management.downloaded_models")
             )
-        if hasattr(self, 'available_title'):
-            self.available_title.setText(
-                self.i18n.t('settings.model_management.available_models')
-            )
-        
+        if hasattr(self, "available_title"):
+            self.available_title.setText(self.i18n.t("settings.model_management.available_models"))
+
         # 刷新整个模型列表，这会重新创建所有卡片并使用新的翻译
         self._refresh_model_list()
-        
+
         logger.debug("Translations updated for model management page")
 
     @Slot()
@@ -253,43 +240,29 @@ class ModelManagementPage(BaseSettingsPage):
         header_layout.addStretch()
 
         # 配置按钮
-        config_btn = QPushButton(
-            self.i18n.t('settings.model_management.configure')
-        )
+        config_btn = QPushButton(self.i18n.t("settings.model_management.configure"))
         config_btn.setMaximumWidth(80)
-        config_btn.clicked.connect(
-            lambda: self._on_config_clicked(model.name)
-        )
+        config_btn.clicked.connect(lambda: self._on_config_clicked(model.name))
         header_layout.addWidget(config_btn)
 
         # 删除按钮
-        delete_btn = QPushButton(
-            self.i18n.t('settings.model_management.delete')
-        )
+        delete_btn = QPushButton(self.i18n.t("settings.model_management.delete"))
         delete_btn.setMaximumWidth(80)
         delete_btn.setStyleSheet("QPushButton { color: #d32f2f; }")
-        delete_btn.clicked.connect(
-            lambda: self._on_delete_clicked(model.name)
-        )
-        
+        delete_btn.clicked.connect(lambda: self._on_delete_clicked(model.name))
+
         # 检查模型是否正在使用（如果 ModelManager 支持此功能）
-        if hasattr(self.model_manager, 'is_model_in_use'):
+        if hasattr(self.model_manager, "is_model_in_use"):
             if self.model_manager.is_model_in_use(model.name):
                 delete_btn.setEnabled(False)
-                delete_btn.setToolTip(
-                    self.i18n.t('settings.model_management.model_in_use')
-                )
-        
+                delete_btn.setToolTip(self.i18n.t("settings.model_management.model_in_use"))
+
         header_layout.addWidget(delete_btn)
 
         # 查看详情按钮
-        details_btn = QPushButton(
-            self.i18n.t('settings.model_management.view_details')
-        )
+        details_btn = QPushButton(self.i18n.t("settings.model_management.view_details"))
         details_btn.setMaximumWidth(80)
-        details_btn.clicked.connect(
-            lambda: self._on_view_details_clicked(model.name)
-        )
+        details_btn.clicked.connect(lambda: self._on_view_details_clicked(model.name))
         header_layout.addWidget(details_btn)
 
         layout.addLayout(header_layout)
@@ -298,10 +271,7 @@ class ModelManagementPage(BaseSettingsPage):
         features_layout = QHBoxLayout()
 
         # 大小
-        size_text = (
-            f"{self.i18n.t('settings.model_management.size')}: "
-            f"{model.size_mb} MB"
-        )
+        size_text = f"{self.i18n.t('settings.model_management.size')}: " f"{model.size_mb} MB"
         size_label = QLabel(size_text)
         features_layout.addWidget(size_label)
 
@@ -329,10 +299,7 @@ class ModelManagementPage(BaseSettingsPage):
         stats_layout = QHBoxLayout()
 
         # 使用次数
-        usage_text = self.i18n.t(
-            'settings.model_management.usage_count',
-            count=model.usage_count
-        )
+        usage_text = self.i18n.t("settings.model_management.usage_count", count=model.usage_count)
         usage_label = QLabel(usage_text)
         usage_label.setStyleSheet("color: #666;")
         stats_layout.addWidget(usage_label)
@@ -341,15 +308,12 @@ class ModelManagementPage(BaseSettingsPage):
         if model.last_used:
             last_used_text = self._format_relative_time(model.last_used)
             last_used_label = QLabel(
-                f"{self.i18n.t('settings.model_management.last_used')}: "
-                f"{last_used_text}"
+                f"{self.i18n.t('settings.model_management.last_used')}: " f"{last_used_text}"
             )
             last_used_label.setStyleSheet("color: #666;")
             stats_layout.addWidget(last_used_label)
         else:
-            never_used_label = QLabel(
-                self.i18n.t('settings.model_management.never_used')
-            )
+            never_used_label = QLabel(self.i18n.t("settings.model_management.never_used"))
             never_used_label.setStyleSheet("color: #666;")
             stats_layout.addWidget(never_used_label)
 
@@ -390,14 +354,10 @@ class ModelManagementPage(BaseSettingsPage):
         header_layout.addStretch()
 
         # 下载按钮
-        download_btn = QPushButton(
-            self.i18n.t('settings.model_management.download')
-        )
+        download_btn = QPushButton(self.i18n.t("settings.model_management.download"))
         download_btn.setObjectName(f"download_btn_{model.name}")
         download_btn.setMaximumWidth(100)
-        download_btn.clicked.connect(
-            lambda: self._on_download_clicked(model.name)
-        )
+        download_btn.clicked.connect(lambda: self._on_download_clicked(model.name))
         header_layout.addWidget(download_btn)
 
         layout.addLayout(header_layout)
@@ -406,10 +366,7 @@ class ModelManagementPage(BaseSettingsPage):
         features_layout = QHBoxLayout()
 
         # 大小
-        size_text = (
-            f"{self.i18n.t('settings.model_management.size')}: "
-            f"{model.size_mb} MB"
-        )
+        size_text = f"{self.i18n.t('settings.model_management.size')}: " f"{model.size_mb} MB"
         size_label = QLabel(size_text)
         features_layout.addWidget(size_label)
 
@@ -437,11 +394,9 @@ class ModelManagementPage(BaseSettingsPage):
         lang_layout = QHBoxLayout()
 
         if "multi" in model.languages:
-            lang_text = self.i18n.t('settings.model_management.multilingual')
+            lang_text = self.i18n.t("settings.model_management.multilingual")
         else:
-            lang_text = self.i18n.t(
-                'settings.model_management.english_only'
-            )
+            lang_text = self.i18n.t("settings.model_management.english_only")
 
         lang_label = QLabel(lang_text)
         lang_label.setStyleSheet("color: #666;")
@@ -459,15 +414,11 @@ class ModelManagementPage(BaseSettingsPage):
         layout.addWidget(progress_bar)
 
         # 取消下载按钮（初始隐藏）
-        cancel_btn = QPushButton(
-            self.i18n.t('settings.model_management.cancel_download')
-        )
+        cancel_btn = QPushButton(self.i18n.t("settings.model_management.cancel_download"))
         cancel_btn.setObjectName(f"cancel_btn_{model.name}")
         cancel_btn.setVisible(False)
         cancel_btn.setMaximumWidth(100)
-        cancel_btn.clicked.connect(
-            lambda: self._on_cancel_download_clicked(model.name)
-        )
+        cancel_btn.clicked.connect(lambda: self._on_cancel_download_clicked(model.name))
         layout.addWidget(cancel_btn)
 
         return card
@@ -483,10 +434,10 @@ class ModelManagementPage(BaseSettingsPage):
             翻译后的速度描述
         """
         speed_map = {
-            "fastest": self.i18n.t('settings.model_management.speed_fastest'),
-            "fast": self.i18n.t('settings.model_management.speed_fast'),
-            "medium": self.i18n.t('settings.model_management.speed_medium'),
-            "slow": self.i18n.t('settings.model_management.speed_slow')
+            "fastest": self.i18n.t("settings.model_management.speed_fastest"),
+            "fast": self.i18n.t("settings.model_management.speed_fast"),
+            "medium": self.i18n.t("settings.model_management.speed_medium"),
+            "slow": self.i18n.t("settings.model_management.speed_slow"),
         }
         return speed_map.get(speed, speed)
 
@@ -501,9 +452,9 @@ class ModelManagementPage(BaseSettingsPage):
             翻译后的准确度描述
         """
         accuracy_map = {
-            "low": self.i18n.t('settings.model_management.accuracy_low'),
-            "medium": self.i18n.t('settings.model_management.accuracy_medium'),
-            "high": self.i18n.t('settings.model_management.accuracy_high')
+            "low": self.i18n.t("settings.model_management.accuracy_low"),
+            "medium": self.i18n.t("settings.model_management.accuracy_medium"),
+            "high": self.i18n.t("settings.model_management.accuracy_high"),
         }
         return accuracy_map.get(accuracy, accuracy)
 
@@ -521,24 +472,15 @@ class ModelManagementPage(BaseSettingsPage):
         diff = now - dt
 
         if diff.days > 0:
-            return self.i18n.t(
-                'settings.model_management.days_ago',
-                days=diff.days
-            )
+            return self.i18n.t("settings.model_management.days_ago", days=diff.days)
         elif diff.seconds >= 3600:
             hours = diff.seconds // 3600
-            return self.i18n.t(
-                'settings.model_management.hours_ago',
-                hours=hours
-            )
+            return self.i18n.t("settings.model_management.hours_ago", hours=hours)
         elif diff.seconds >= 60:
             minutes = diff.seconds // 60
-            return self.i18n.t(
-                'settings.model_management.minutes_ago',
-                minutes=minutes
-            )
+            return self.i18n.t("settings.model_management.minutes_ago", minutes=minutes)
         else:
-            return self.i18n.t('settings.model_management.just_now')
+            return self.i18n.t("settings.model_management.just_now")
 
     def _on_config_clicked(self, model_name: str):
         """
@@ -556,12 +498,7 @@ class ModelManagementPage(BaseSettingsPage):
             return
 
         # 创建并显示配置对话框
-        dialog = ModelConfigDialog(
-            model,
-            self.settings_manager,
-            self.i18n,
-            self
-        )
+        dialog = ModelConfigDialog(model, self.settings_manager, self.i18n, self)
         if dialog.exec():
             # 配置已保存
             logger.info(f"Configuration saved for model: {model_name}")
@@ -584,27 +521,21 @@ class ModelManagementPage(BaseSettingsPage):
         # 显示确认对话框
         msg_box = QMessageBox(self)
         msg_box.setIcon(QMessageBox.Icon.Warning)
-        msg_box.setWindowTitle(
-            self.i18n.t('settings.model_management.delete_confirm_title')
-        )
+        msg_box.setWindowTitle(self.i18n.t("settings.model_management.delete_confirm_title"))
 
         # 构建确认消息
         confirm_text = self.i18n.t(
-            'settings.model_management.delete_confirm_message',
+            "settings.model_management.delete_confirm_message",
             model=model.full_name,
-            size=model.size_mb
+            size=model.size_mb,
         )
-        warning_text = self.i18n.t(
-            'settings.model_management.delete_warning'
-        )
+        warning_text = self.i18n.t("settings.model_management.delete_warning")
 
         msg_box.setText(confirm_text)
         msg_box.setInformativeText(warning_text)
 
         # 添加按钮
-        msg_box.setStandardButtons(
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
+        msg_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         msg_box.setDefaultButton(QMessageBox.StandardButton.No)
 
         # 显示对话框
@@ -631,11 +562,10 @@ class ModelManagementPage(BaseSettingsPage):
                 # 显示成功通知
                 QMessageBox.information(
                     self,
-                    self.i18n.t('settings.model_management.delete_success_title'),
+                    self.i18n.t("settings.model_management.delete_success_title"),
                     self.i18n.t(
-                        'settings.model_management.delete_success_message',
-                        model=model_name
-                    )
+                        "settings.model_management.delete_success_message", model=model_name
+                    ),
                 )
 
                 # 刷新模型列表
@@ -644,47 +574,47 @@ class ModelManagementPage(BaseSettingsPage):
                 logger.info(f"Model deleted successfully: {model_name}")
             else:
                 # 删除失败 - 使用错误对话框
-                error_title = self.i18n.t('settings.model_management.delete_error_title')
+                error_title = self.i18n.t("settings.model_management.delete_error_title")
                 error_message = self.i18n.t(
-                    'settings.model_management.delete_error_message',
-                    model=model_name
+                    "settings.model_management.delete_error_message", model=model_name
                 )
-                
+
                 # 提供解决建议
-                suggestions = self.i18n.t('settings.model_management.delete_suggestion')
+                suggestions = self.i18n.t("settings.model_management.delete_suggestion")
                 error_message += f"\n\n{suggestions}"
-                
+
                 show_error_dialog(
                     title=error_title,
                     message=error_message,
                     details=None,
                     i18n=self.i18n,
-                    parent=self
+                    parent=self,
                 )
 
         except Exception as e:
             logger.error(f"Error deleting model {model_name}: {e}", exc_info=True)
-            
+
             # 使用错误对话框显示详细错误
-            error_title = self.i18n.t('settings.model_management.delete_error_title')
+            error_title = self.i18n.t("settings.model_management.delete_error_title")
             error_message = self.i18n.t(
-                'settings.model_management.delete_error_message',
-                model=model_name
+                "settings.model_management.delete_error_message", model=model_name
             )
-            
+
             # 根据错误类型提供建议
             suggestions = self._get_delete_error_suggestions(str(e))
             if suggestions:
-                error_message += f"\n\n{self.i18n.t('settings.model_management.suggestions')}:\n{suggestions}"
-            
+                error_message += (
+                    f"\n\n{self.i18n.t('settings.model_management.suggestions')}:\n{suggestions}"
+                )
+
             show_error_dialog(
                 title=error_title,
                 message=error_message,
                 details=str(e),
                 i18n=self.i18n,
-                parent=self
+                parent=self,
             )
-    
+
     def _get_delete_error_suggestions(self, error: str) -> str:
         """
         根据删除错误消息提供解决建议
@@ -696,18 +626,18 @@ class ModelManagementPage(BaseSettingsPage):
             解决建议文本
         """
         error_lower = error.lower()
-        
+
         # 文件被占用
-        if any(keyword in error_lower for keyword in ['in use', 'being used', 'locked']):
-            return self.i18n.t('settings.model_management.delete_suggestion_in_use')
-        
+        if any(keyword in error_lower for keyword in ["in use", "being used", "locked"]):
+            return self.i18n.t("settings.model_management.delete_suggestion_in_use")
+
         # 权限错误
-        if any(keyword in error_lower for keyword in ['permission', 'access', 'denied']):
-            return self.i18n.t('settings.model_management.delete_suggestion_permission')
-        
+        if any(keyword in error_lower for keyword in ["permission", "access", "denied"]):
+            return self.i18n.t("settings.model_management.delete_suggestion_permission")
+
         # 通用建议
-        return self.i18n.t('settings.model_management.delete_suggestion_general')
-    
+        return self.i18n.t("settings.model_management.delete_suggestion_general")
+
     @Slot(str, str)
     def _on_validation_failed(self, model_name: str, error_message: str):
         """
@@ -718,24 +648,19 @@ class ModelManagementPage(BaseSettingsPage):
             error_message: 错误消息
         """
         logger.warning(f"Model validation failed for {model_name}: {error_message}")
-        
+
         # 显示错误对话框
-        error_title = self.i18n.t('settings.model_management.validation_error_title')
+        error_title = self.i18n.t("settings.model_management.validation_error_title")
         error_msg = self.i18n.t(
-            'settings.model_management.validation_error_message',
-            model=model_name
+            "settings.model_management.validation_error_message", model=model_name
         )
-        
+
         # 提供解决建议
-        suggestions = self.i18n.t('settings.model_management.validation_suggestion')
+        suggestions = self.i18n.t("settings.model_management.validation_suggestion")
         error_msg += f"\n\n{suggestions}"
-        
+
         show_error_dialog(
-            title=error_title,
-            message=error_msg,
-            details=error_message,
-            i18n=self.i18n,
-            parent=self
+            title=error_title, message=error_msg, details=error_message, i18n=self.i18n, parent=self
         )
 
     def _on_view_details_clicked(self, model_name: str):
@@ -777,9 +702,7 @@ class ModelManagementPage(BaseSettingsPage):
         download_btn = card.findChild(QPushButton, f"download_btn_{model_name}")
         if download_btn:
             download_btn.setEnabled(False)
-            download_btn.setText(
-                self.i18n.t('settings.model_management.downloading')
-            )
+            download_btn.setText(self.i18n.t("settings.model_management.downloading"))
 
         # 显示进度条
         progress_bar = card.findChild(QProgressBar, f"progress_bar_{model_name}")
@@ -793,33 +716,28 @@ class ModelManagementPage(BaseSettingsPage):
             cancel_btn.setVisible(True)
 
         # 启动异步下载（使用 QThreadPool）
-        
+
         def run_download():
             """在新线程中运行下载"""
 
             def _log_success():
-                logger.info(
-                    "Model %s download completed via settings page", model_name
-                )
+                logger.info("Model %s download completed via settings page", model_name)
 
             run_model_download(
                 self.model_manager,
                 model_name,
                 logger=logger,
                 on_success=_log_success,
-                error_message=(
-                    "Download failed in thread for model "
-                    f"{model_name}"
-                ),
+                error_message=("Download failed in thread for model " f"{model_name}"),
             )
-        
+
         # 在线程池中执行下载
         from PySide6.QtCore import QThreadPool, QRunnable
-        
+
         class DownloadRunnable(QRunnable):
             def run(self):
                 run_download()
-        
+
         QThreadPool.globalInstance().start(DownloadRunnable())
 
     def _on_cancel_download_clicked(self, model_name: str):
@@ -834,13 +752,10 @@ class ModelManagementPage(BaseSettingsPage):
         # 确认取消
         reply = QMessageBox.question(
             self,
-            self.i18n.t('settings.model_management.cancel_download_title'),
-            self.i18n.t(
-                'settings.model_management.cancel_download_confirm',
-                model=model_name
-            ),
+            self.i18n.t("settings.model_management.cancel_download_title"),
+            self.i18n.t("settings.model_management.cancel_download_confirm", model=model_name),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No
+            QMessageBox.StandardButton.No,
         )
 
         if reply == QMessageBox.StandardButton.Yes:
@@ -852,30 +767,19 @@ class ModelManagementPage(BaseSettingsPage):
                 card = self.model_cards[model_name]
 
                 # 重新启用下载按钮
-                download_btn = card.findChild(
-                    QPushButton,
-                    f"download_btn_{model_name}"
-                )
+                download_btn = card.findChild(QPushButton, f"download_btn_{model_name}")
                 if download_btn:
                     download_btn.setEnabled(True)
-                    download_btn.setText(
-                        self.i18n.t('settings.model_management.download')
-                    )
+                    download_btn.setText(self.i18n.t("settings.model_management.download"))
 
                 # 隐藏进度条
-                progress_bar = card.findChild(
-                    QProgressBar,
-                    f"progress_bar_{model_name}"
-                )
+                progress_bar = card.findChild(QProgressBar, f"progress_bar_{model_name}")
                 if progress_bar:
                     progress_bar.setVisible(False)
                     progress_bar.setValue(0)
 
                 # 隐藏取消按钮
-                cancel_btn = card.findChild(
-                    QPushButton,
-                    f"cancel_btn_{model_name}"
-                )
+                cancel_btn = card.findChild(QPushButton, f"cancel_btn_{model_name}")
                 if cancel_btn:
                     cancel_btn.setVisible(False)
 
@@ -917,8 +821,7 @@ class ModelManagementPage(BaseSettingsPage):
         # 推荐标题
         title_label = QLabel(
             self.i18n.t(
-                'settings.model_management.recommendation_title',
-                model=recommended_model.full_name
+                "settings.model_management.recommendation_title", model=recommended_model.full_name
             )
         )
         title_font = QFont()
@@ -940,8 +843,7 @@ class ModelManagementPage(BaseSettingsPage):
 
         # 大小
         size_text = (
-            f"{self.i18n.t('settings.model_management.size')}: "
-            f"{recommended_model.size_mb} MB"
+            f"{self.i18n.t('settings.model_management.size')}: " f"{recommended_model.size_mb} MB"
         )
         size_label = QLabel(size_text)
         size_label.setStyleSheet("font-weight: bold;")
@@ -970,13 +872,9 @@ class ModelManagementPage(BaseSettingsPage):
         layout.addLayout(features_layout)
 
         # 一键下载按钮
-        download_btn = QPushButton(
-            self.i18n.t('settings.model_management.download_recommended')
-        )
+        download_btn = QPushButton(self.i18n.t("settings.model_management.download_recommended"))
         download_btn.setMaximumWidth(200)
-        download_btn.clicked.connect(
-            lambda: self._on_download_recommended(recommended_model_name)
-        )
+        download_btn.clicked.connect(lambda: self._on_download_recommended(recommended_model_name))
         layout.addWidget(download_btn)
 
         # 添加到推荐容器
@@ -997,45 +895,29 @@ class ModelManagementPage(BaseSettingsPage):
         """
         # 从 ModelManager 获取系统信息
         system_info = self.model_manager.get_recommendation_context()
-        memory_gb = system_info['memory_gb']
-        has_gpu = system_info['has_gpu']
+        memory_gb = system_info["memory_gb"]
+        has_gpu = system_info["has_gpu"]
 
         # 根据推荐的模型生成理由
-        if model_name in ['tiny', 'tiny.en']:
+        if model_name in ["tiny", "tiny.en"]:
             if memory_gb < 8:
-                return self.i18n.t(
-                    'settings.model_management.recommendation_reason_low_memory'
-                )
+                return self.i18n.t("settings.model_management.recommendation_reason_low_memory")
             else:
-                return self.i18n.t(
-                    'settings.model_management.recommendation_reason_fast'
-                )
-        elif model_name in ['base', 'base.en']:
-            return self.i18n.t(
-                'settings.model_management.recommendation_reason_balanced'
-            )
-        elif model_name in ['small', 'small.en']:
+                return self.i18n.t("settings.model_management.recommendation_reason_fast")
+        elif model_name in ["base", "base.en"]:
+            return self.i18n.t("settings.model_management.recommendation_reason_balanced")
+        elif model_name in ["small", "small.en"]:
             if has_gpu:
-                return self.i18n.t(
-                    'settings.model_management.recommendation_reason_gpu_small'
-                )
+                return self.i18n.t("settings.model_management.recommendation_reason_gpu_small")
             else:
-                return self.i18n.t(
-                    'settings.model_management.recommendation_reason_medium_memory'
-                )
-        elif model_name in ['medium', 'medium.en']:
+                return self.i18n.t("settings.model_management.recommendation_reason_medium_memory")
+        elif model_name in ["medium", "medium.en"]:
             if has_gpu:
-                return self.i18n.t(
-                    'settings.model_management.recommendation_reason_gpu_medium'
-                )
+                return self.i18n.t("settings.model_management.recommendation_reason_gpu_medium")
             else:
-                return self.i18n.t(
-                    'settings.model_management.recommendation_reason_high_memory'
-                )
+                return self.i18n.t("settings.model_management.recommendation_reason_high_memory")
         else:  # large models
-            return self.i18n.t(
-                'settings.model_management.recommendation_reason_best_quality'
-            )
+            return self.i18n.t("settings.model_management.recommendation_reason_best_quality")
 
     def _on_download_recommended(self, model_name: str):
         """
@@ -1048,12 +930,7 @@ class ModelManagementPage(BaseSettingsPage):
         self._on_download_clicked(model_name)
 
     @Slot(str, int, float)
-    def _update_download_progress(
-        self,
-        model_name: str,
-        progress: int,
-        speed: float
-    ):
+    def _update_download_progress(self, model_name: str, progress: int, speed: float):
         """
         更新下载进度
 
@@ -1062,10 +939,7 @@ class ModelManagementPage(BaseSettingsPage):
             progress: 进度百分比 (0-100)
             speed: 下载速度 (MB/s)
         """
-        logger.debug(
-            f"Download progress for {model_name}: "
-            f"{progress}% at {speed:.2f} MB/s"
-        )
+        logger.debug(f"Download progress for {model_name}: " f"{progress}% at {speed:.2f} MB/s")
 
         # 获取模型卡片
         if model_name not in self.model_cards:
@@ -1080,9 +954,7 @@ class ModelManagementPage(BaseSettingsPage):
 
             # 设置进度条文本（显示速度和百分比）
             if speed > 0:
-                progress_bar.setFormat(
-                    f"{progress}% ({speed:.1f} MB/s)"
-                )
+                progress_bar.setFormat(f"{progress}% ({speed:.1f} MB/s)")
             else:
                 progress_bar.setFormat(f"{progress}%")
 
@@ -1099,11 +971,8 @@ class ModelManagementPage(BaseSettingsPage):
         # 显示成功通知
         QMessageBox.information(
             self,
-            self.i18n.t('settings.model_management.download_success_title'),
-            self.i18n.t(
-                'settings.model_management.download_success_message',
-                model=model_name
-            )
+            self.i18n.t("settings.model_management.download_success_title"),
+            self.i18n.t("settings.model_management.download_success_message", model=model_name),
         )
 
         # 刷新模型列表（会自动将模型移到已下载区域）
@@ -1125,67 +994,53 @@ class ModelManagementPage(BaseSettingsPage):
             card = self.model_cards[model_name]
 
             # 重新启用下载按钮
-            download_btn = card.findChild(
-                QPushButton,
-                f"download_btn_{model_name}"
-            )
+            download_btn = card.findChild(QPushButton, f"download_btn_{model_name}")
             if download_btn:
                 download_btn.setEnabled(True)
-                download_btn.setText(
-                    self.i18n.t('settings.model_management.download')
-                )
+                download_btn.setText(self.i18n.t("settings.model_management.download"))
 
             # 隐藏进度条
-            progress_bar = card.findChild(
-                QProgressBar,
-                f"progress_bar_{model_name}"
-            )
+            progress_bar = card.findChild(QProgressBar, f"progress_bar_{model_name}")
             if progress_bar:
                 progress_bar.setVisible(False)
                 progress_bar.setValue(0)
 
             # 隐藏取消按钮
-            cancel_btn = card.findChild(
-                QPushButton,
-                f"cancel_btn_{model_name}"
-            )
+            cancel_btn = card.findChild(QPushButton, f"cancel_btn_{model_name}")
             if cancel_btn:
                 cancel_btn.setVisible(False)
 
         # 显示错误对话框
-        error_title = self.i18n.t('settings.model_management.download_error_title')
+        error_title = self.i18n.t("settings.model_management.download_error_title")
         error_message = self.i18n.t(
-            'settings.model_management.download_error_message',
-            model=model_name
+            "settings.model_management.download_error_message", model=model_name
         )
-        
+
         # 提供解决建议
         suggestions = self._get_error_suggestions(error)
         if suggestions:
-            error_message += f"\n\n{self.i18n.t('settings.model_management.suggestions')}:\n{suggestions}"
-        
+            error_message += (
+                f"\n\n{self.i18n.t('settings.model_management.suggestions')}:\n{suggestions}"
+            )
+
         # 显示错误对话框，包含详细错误信息
         show_error_dialog(
-            title=error_title,
-            message=error_message,
-            details=error,
-            i18n=self.i18n,
-            parent=self
+            title=error_title, message=error_message, details=error, i18n=self.i18n, parent=self
         )
-        
+
         # 询问是否重试
         retry_reply = QMessageBox.question(
             self,
-            self.i18n.t('settings.model_management.retry_title'),
-            self.i18n.t('settings.model_management.retry_message'),
+            self.i18n.t("settings.model_management.retry_title"),
+            self.i18n.t("settings.model_management.retry_message"),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.Yes
+            QMessageBox.StandardButton.Yes,
         )
-        
+
         if retry_reply == QMessageBox.StandardButton.Yes:
             logger.info(f"Retrying download for model: {model_name}")
             self._on_download_clicked(model_name)
-    
+
     def _get_error_suggestions(self, error: str) -> str:
         """
         根据错误消息提供解决建议
@@ -1197,21 +1052,24 @@ class ModelManagementPage(BaseSettingsPage):
             解决建议文本
         """
         error_lower = error.lower()
-        
+
         # 网络错误
-        if any(keyword in error_lower for keyword in ['network', 'connection', 'timeout', 'unreachable']):
-            return self.i18n.t('settings.model_management.suggestion_network')
-        
+        if any(
+            keyword in error_lower
+            for keyword in ["network", "connection", "timeout", "unreachable"]
+        ):
+            return self.i18n.t("settings.model_management.suggestion_network")
+
         # 磁盘空间不足
-        if any(keyword in error_lower for keyword in ['disk', 'space', 'storage', 'insufficient']):
-            return self.i18n.t('settings.model_management.suggestion_disk_space')
-        
+        if any(keyword in error_lower for keyword in ["disk", "space", "storage", "insufficient"]):
+            return self.i18n.t("settings.model_management.suggestion_disk_space")
+
         # 权限错误
-        if any(keyword in error_lower for keyword in ['permission', 'access', 'denied']):
-            return self.i18n.t('settings.model_management.suggestion_permission')
-        
+        if any(keyword in error_lower for keyword in ["permission", "access", "denied"]):
+            return self.i18n.t("settings.model_management.suggestion_permission")
+
         # 通用建议
-        return self.i18n.t('settings.model_management.suggestion_general')
+        return self.i18n.t("settings.model_management.suggestion_general")
 
     def load_settings(self):
         """加载设置（模型管理页面不需要加载设置）"""
@@ -1235,7 +1093,7 @@ class ModelDetailsDialog(QDialog):
             parent: 父控件
         """
         super().__init__(parent)
-        
+
         from PySide6.QtWidgets import QGridLayout
         from pathlib import Path
         import subprocess
@@ -1243,10 +1101,8 @@ class ModelDetailsDialog(QDialog):
 
         self.model = model
         self.i18n = i18n
-        
-        self.setWindowTitle(
-            i18n.t('settings.model_management.details_title')
-        )
+
+        self.setWindowTitle(i18n.t("settings.model_management.details_title"))
         self.setMinimumWidth(500)
         self.setMinimumHeight(400)
 
@@ -1276,10 +1132,7 @@ class ModelDetailsDialog(QDialog):
         row = 0
 
         # 模型名称
-        info_layout.addWidget(
-            QLabel(i18n.t('settings.model_management.model_name') + ':'),
-            row, 0
-        )
+        info_layout.addWidget(QLabel(i18n.t("settings.model_management.model_name") + ":"), row, 0)
         info_layout.addWidget(QLabel(model.name), row, 1)
         row += 1
 
@@ -1293,37 +1146,31 @@ class ModelDetailsDialog(QDialog):
             version = "v3"
 
         info_layout.addWidget(
-            QLabel(i18n.t('settings.model_management.model_version') + ':'),
-            row, 0
+            QLabel(i18n.t("settings.model_management.model_version") + ":"), row, 0
         )
         info_layout.addWidget(QLabel(version), row, 1)
         row += 1
 
         # 支持的语言
         info_layout.addWidget(
-            QLabel(i18n.t('settings.model_management.supported_languages') + ':'),
-            row, 0
+            QLabel(i18n.t("settings.model_management.supported_languages") + ":"), row, 0
         )
         if "multi" in model.languages:
-            lang_text = i18n.t('settings.model_management.multilingual')
+            lang_text = i18n.t("settings.model_management.multilingual")
         else:
-            lang_text = i18n.t('settings.model_management.english_only')
+            lang_text = i18n.t("settings.model_management.english_only")
         info_layout.addWidget(QLabel(lang_text), row, 1)
         row += 1
 
         # 模型大小
-        info_layout.addWidget(
-            QLabel(i18n.t('settings.model_management.model_size') + ':'),
-            row, 0
-        )
+        info_layout.addWidget(QLabel(i18n.t("settings.model_management.model_size") + ":"), row, 0)
         info_layout.addWidget(QLabel(f"{model.size_mb} MB"), row, 1)
         row += 1
 
         # 模型文件路径
         if model.local_path:
             info_layout.addWidget(
-                QLabel(i18n.t('settings.model_management.model_path') + ':'),
-                row, 0
+                QLabel(i18n.t("settings.model_management.model_path") + ":"), row, 0
             )
             path_label = QLabel(model.local_path)
             path_label.setWordWrap(True)
@@ -1336,17 +1183,13 @@ class ModelDetailsDialog(QDialog):
                 model_path = Path(model.local_path)
                 if model_path.exists():
                     actual_size_mb = sum(
-                        f.stat().st_size for f in model_path.rglob('*') if f.is_file()
+                        f.stat().st_size for f in model_path.rglob("*") if f.is_file()
                     ) / (1024 * 1024)
 
                     info_layout.addWidget(
-                        QLabel(i18n.t('settings.model_management.disk_usage') + ':'),
-                        row, 0
+                        QLabel(i18n.t("settings.model_management.disk_usage") + ":"), row, 0
                     )
-                    info_layout.addWidget(
-                        QLabel(f"{actual_size_mb:.1f} MB"),
-                        row, 1
-                    )
+                    info_layout.addWidget(QLabel(f"{actual_size_mb:.1f} MB"), row, 1)
                     row += 1
             except Exception as e:
                 logger.error(f"Error calculating disk usage: {e}")
@@ -1354,32 +1197,24 @@ class ModelDetailsDialog(QDialog):
         # 下载日期
         if model.download_date:
             info_layout.addWidget(
-                QLabel(i18n.t('settings.model_management.download_date') + ':'),
-                row, 0
+                QLabel(i18n.t("settings.model_management.download_date") + ":"), row, 0
             )
-            date_str = model.download_date.strftime('%Y-%m-%d %H:%M:%S')
+            date_str = model.download_date.strftime("%Y-%m-%d %H:%M:%S")
             info_layout.addWidget(QLabel(date_str), row, 1)
             row += 1
 
         # 最后使用日期
-        info_layout.addWidget(
-            QLabel(i18n.t('settings.model_management.last_used') + ':'),
-            row, 0
-        )
+        info_layout.addWidget(QLabel(i18n.t("settings.model_management.last_used") + ":"), row, 0)
         if model.last_used:
-            last_used_str = model.last_used.strftime('%Y-%m-%d %H:%M:%S')
+            last_used_str = model.last_used.strftime("%Y-%m-%d %H:%M:%S")
             info_layout.addWidget(QLabel(last_used_str), row, 1)
         else:
-            info_layout.addWidget(
-                QLabel(i18n.t('settings.model_management.never_used')),
-                row, 1
-            )
+            info_layout.addWidget(QLabel(i18n.t("settings.model_management.never_used")), row, 1)
         row += 1
 
         # 使用次数
         info_layout.addWidget(
-            QLabel(i18n.t('settings.model_management.usage_count_label') + ':'),
-            row, 0
+            QLabel(i18n.t("settings.model_management.usage_count_label") + ":"), row, 0
         )
         info_layout.addWidget(QLabel(str(model.usage_count)), row, 1)
         row += 1
@@ -1395,16 +1230,14 @@ class ModelDetailsDialog(QDialog):
 
         # 在文件管理器中显示按钮
         if model.local_path:
-            show_in_explorer_btn = QPushButton(
-                i18n.t('settings.model_management.show_in_explorer')
-            )
+            show_in_explorer_btn = QPushButton(i18n.t("settings.model_management.show_in_explorer"))
             show_in_explorer_btn.clicked.connect(
                 lambda: self._on_show_in_explorer(model.local_path)
             )
             button_layout.addWidget(show_in_explorer_btn)
 
         # 关闭按钮
-        close_btn = QPushButton(i18n.t('settings.model_management.close'))
+        close_btn = QPushButton(i18n.t("settings.model_management.close"))
         close_btn.setDefault(True)
         close_btn.clicked.connect(self.accept)
         button_layout.addWidget(close_btn)
@@ -1448,13 +1281,7 @@ class ModelDetailsDialog(QDialog):
 class ModelConfigDialog(QDialog):
     """模型配置对话框"""
 
-    def __init__(
-        self,
-        model: ModelInfo,
-        settings_manager,
-        i18n: I18nQtManager,
-        parent=None
-    ):
+    def __init__(self, model: ModelInfo, settings_manager, i18n: I18nQtManager, parent=None):
         """
         初始化模型配置对话框
 
@@ -1465,17 +1292,12 @@ class ModelConfigDialog(QDialog):
             parent: 父控件
         """
         super().__init__(parent)
-        
+
         self.model = model
         self.settings_manager = settings_manager
         self.i18n = i18n
-        
-        self.setWindowTitle(
-            i18n.t(
-                'settings.model_management.config_title',
-                model=model.full_name
-            )
-        )
+
+        self.setWindowTitle(i18n.t("settings.model_management.config_title", model=model.full_name))
         self.setMinimumWidth(450)
 
         layout = QVBoxLayout(self)
@@ -1483,9 +1305,7 @@ class ModelConfigDialog(QDialog):
         layout.setContentsMargins(20, 20, 20, 20)
 
         # 标题
-        title_label = QLabel(
-            i18n.t('settings.model_management.config_description')
-        )
+        title_label = QLabel(i18n.t("settings.model_management.config_description"))
         title_label.setWordWrap(True)
         layout.addWidget(title_label)
 
@@ -1494,49 +1314,40 @@ class ModelConfigDialog(QDialog):
         form_layout.setSpacing(10)
 
         # 计算设备选择
-        device_label = QLabel(
-            i18n.t('settings.model_management.compute_device') + ':'
-        )
+        device_label = QLabel(i18n.t("settings.model_management.compute_device") + ":")
         device_combo = QComboBox()
-        device_combo.addItems(['cpu', 'cuda', 'auto'])
+        device_combo.addItems(["cpu", "cuda", "auto"])
 
         # 检查 CUDA 是否可用
         cuda_available = False
         try:
             import torch
+
             cuda_available = torch.cuda.is_available()
         except:
             pass
 
         if not cuda_available:
             # 禁用 CUDA 选项
-            cuda_index = device_combo.findText('cuda')
+            cuda_index = device_combo.findText("cuda")
             if cuda_index >= 0:
                 device_combo.model().item(cuda_index).setEnabled(False)
 
         form_layout.addRow(device_label, device_combo)
 
         # 计算精度选择
-        compute_type_label = QLabel(
-            i18n.t('settings.model_management.compute_precision') + ':'
-        )
+        compute_type_label = QLabel(i18n.t("settings.model_management.compute_precision") + ":")
         compute_type_combo = QComboBox()
-        compute_type_combo.addItems(['int8', 'float16', 'float32'])
+        compute_type_combo.addItems(["int8", "float16", "float32"])
         form_layout.addRow(compute_type_label, compute_type_combo)
 
         # VAD 过滤（批量转录）
-        vad_label = QLabel(
-            i18n.t('settings.model_management.enable_vad') + ':'
-        )
-        vad_checkbox = QCheckBox(
-            i18n.t('settings.model_management.vad_description')
-        )
+        vad_label = QLabel(i18n.t("settings.model_management.enable_vad") + ":")
+        vad_checkbox = QCheckBox(i18n.t("settings.model_management.vad_description"))
         form_layout.addRow(vad_label, vad_checkbox)
 
         # VAD 静音阈值
-        vad_threshold_label = QLabel(
-            i18n.t('settings.model_management.vad_threshold') + ':'
-        )
+        vad_threshold_label = QLabel(i18n.t("settings.model_management.vad_threshold") + ":")
         vad_threshold_spin = QSpinBox()
         vad_threshold_spin.setMinimum(100)
         vad_threshold_spin.setMaximum(5000)
@@ -1557,42 +1368,34 @@ class ModelConfigDialog(QDialog):
         layout.addLayout(form_layout)
 
         # 加载当前配置
-        config_key = f'transcription.model_configs.{model.name}'
+        config_key = f"transcription.model_configs.{model.name}"
 
         # 设备
-        current_device = settings_manager.get_setting(
-            f'{config_key}.device'
-        ) or 'cpu'
+        current_device = settings_manager.get_setting(f"{config_key}.device") or "cpu"
         device_index = device_combo.findText(current_device)
         if device_index >= 0:
             device_combo.setCurrentIndex(device_index)
 
         # 计算精度
-        current_compute_type = settings_manager.get_setting(
-            f'{config_key}.compute_type'
-        ) or 'int8'
+        current_compute_type = settings_manager.get_setting(f"{config_key}.compute_type") or "int8"
         compute_type_index = compute_type_combo.findText(current_compute_type)
         if compute_type_index >= 0:
             compute_type_combo.setCurrentIndex(compute_type_index)
 
         # VAD 设置
-        current_vad_enabled = settings_manager.get_setting(
-            f'{config_key}.vad_filter'
-        )
+        current_vad_enabled = settings_manager.get_setting(f"{config_key}.vad_filter")
         if current_vad_enabled is None:
             current_vad_enabled = False
         vad_checkbox.setChecked(current_vad_enabled)
 
-        current_vad_threshold = settings_manager.get_setting(
-            f'{config_key}.vad_threshold_ms'
-        ) or 500
+        current_vad_threshold = (
+            settings_manager.get_setting(f"{config_key}.vad_threshold_ms") or 500
+        )
         vad_threshold_spin.setValue(current_vad_threshold)
 
         # 提示信息
         if not cuda_available:
-            cuda_note = QLabel(
-                i18n.t('settings.model_management.cuda_not_available')
-            )
+            cuda_note = QLabel(i18n.t("settings.model_management.cuda_not_available"))
             cuda_note.setWordWrap(True)
             cuda_note.setStyleSheet("color: #ff9800; font-style: italic;")
             layout.addWidget(cuda_note)
@@ -1605,42 +1408,34 @@ class ModelConfigDialog(QDialog):
         button_layout.addStretch()
 
         # 取消按钮
-        cancel_btn = QPushButton(i18n.t('settings.model_management.cancel'))
+        cancel_btn = QPushButton(i18n.t("settings.model_management.cancel"))
         cancel_btn.clicked.connect(self.reject)
         button_layout.addWidget(cancel_btn)
 
         # 保存按钮
-        save_btn = QPushButton(i18n.t('settings.model_management.save'))
+        save_btn = QPushButton(i18n.t("settings.model_management.save"))
         save_btn.setDefault(True)
 
         def save_config():
             # 验证配置
             selected_device = device_combo.currentText()
 
-            if selected_device == 'cuda' and not cuda_available:
+            if selected_device == "cuda" and not cuda_available:
                 QMessageBox.warning(
                     self,
-                    i18n.t('settings.model_management.validation_error'),
-                    i18n.t('settings.model_management.cuda_not_available')
+                    i18n.t("settings.model_management.validation_error"),
+                    i18n.t("settings.model_management.cuda_not_available"),
                 )
                 return
 
             # 保存配置
+            settings_manager.set_setting(f"{config_key}.device", selected_device)
             settings_manager.set_setting(
-                f'{config_key}.device',
-                selected_device
+                f"{config_key}.compute_type", compute_type_combo.currentText()
             )
+            settings_manager.set_setting(f"{config_key}.vad_filter", vad_checkbox.isChecked())
             settings_manager.set_setting(
-                f'{config_key}.compute_type',
-                compute_type_combo.currentText()
-            )
-            settings_manager.set_setting(
-                f'{config_key}.vad_filter',
-                vad_checkbox.isChecked()
-            )
-            settings_manager.set_setting(
-                f'{config_key}.vad_threshold_ms',
-                vad_threshold_spin.value()
+                f"{config_key}.vad_threshold_ms", vad_threshold_spin.value()
             )
 
             # 保存到磁盘

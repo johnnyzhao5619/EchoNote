@@ -22,7 +22,4 @@ Provides real-time audio recording with live transcription and translation.
 from core.realtime.recorder import RealtimeRecorder
 from core.realtime.audio_buffer import AudioBuffer
 
-__all__ = [
-    'RealtimeRecorder',
-    'AudioBuffer'
-]
+__all__ = ["RealtimeRecorder", "AudioBuffer"]

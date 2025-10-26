@@ -218,10 +218,10 @@ class ModelManager(QObject):
         return self._registry.default_model()
 
     def get_recommendation_context(self) -> Dict[str, float]:
-        memory_gb = round(psutil.virtual_memory().total / (1024 ** 3), 1)
+        memory_gb = round(psutil.virtual_memory().total / (1024**3), 1)
         cpu_count = psutil.cpu_count(logical=False) or psutil.cpu_count()
         disk_usage = psutil.disk_usage(str(self._models_dir))
-        free_disk_gb = round(disk_usage.free / (1024 ** 3), 1)
+        free_disk_gb = round(disk_usage.free / (1024**3), 1)
 
         devices = GPUDetector.detect_available_devices()
 
@@ -245,8 +245,7 @@ class ModelManager(QObject):
         with self._lock:
             base_models = self._registry.list_models()
             usage_stats = {
-                stat.model_name: stat
-                for stat in ModelUsageStats.get_all(self._database)
+                stat.model_name: stat for stat in ModelUsageStats.get_all(self._database)
             }
 
             self._model_cache.clear()
@@ -281,9 +280,7 @@ class ModelManager(QObject):
 
             missing = self._collect_missing_files(Path(model.local_path), model)
             if missing:
-                message = (
-                    f"Missing files: {', '.join(missing)}"
-                )
+                message = f"Missing files: {', '.join(missing)}"
                 logger.warning(f"Model {model.name} validation failed: {message}")
                 self.model_validation_failed.emit(model.name, message)
 

@@ -180,13 +180,13 @@ def test_timeline_load():
 ### 核心依赖
 
 ```python
-# PyQt6 组件
-from PyQt6.QtWidgets import (
+# PySide6 组件
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QScrollArea, QLineEdit,
     QComboBox, QPushButton, QLabel, QFrame
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer
-from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
+from PySide6.QtCore import Qt, Signal, QTimer
+from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 
 # 业务逻辑
 from core.timeline.manager import TimelineManager
@@ -285,7 +285,7 @@ A: 在 `create_header()` 中添加新的 QComboBox，并在 `_on_filter_changed(
 
 ## 参考资料
 
-- [PyQt6 Documentation](https://www.riverbankcomputing.com/static/Docs/PyQt6/)
+- [PySide6 Documentation](https://doc.qt.io/qtforpython/)
 - [Qt Multimedia](https://doc.qt.io/qt-6/qtmultimedia-index.html)
 - [Material Design Guidelines](https://material.io/design)
 - [EchoNote Design Document](../../.kiro/specs/echonote-core/design.md)

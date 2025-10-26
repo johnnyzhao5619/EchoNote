@@ -69,7 +69,7 @@ class FirstRunSetup:
             logger.info(f"Created config directory: {config_dir}")
 
             # Create subdirectories
-            subdirs = ['logs', 'models']
+            subdirs = ["logs", "models"]
             for subdir in subdirs:
                 subdir_path = config_dir / subdir
                 subdir_path.mkdir(exist_ok=True)
@@ -91,11 +91,7 @@ class FirstRunSetup:
             raise
 
     @staticmethod
-    def show_model_recommendation_dialog(
-        model_manager,
-        i18n,
-        parent=None
-    ) -> bool:
+    def show_model_recommendation_dialog(model_manager, i18n, parent=None) -> bool:
         """
         Show model recommendation dialog on first run.
 
@@ -111,45 +107,39 @@ class FirstRunSetup:
             # Check if any models are already downloaded
             downloaded_models = model_manager.get_downloaded_models()
             if downloaded_models:
-                logger.info(
-                    "Models already downloaded, "
-                    "skipping recommendation dialog"
-                )
+                logger.info("Models already downloaded, " "skipping recommendation dialog")
                 return False
 
             # Get recommended model
             recommended_model_name = model_manager.recommend_model()
-            recommended_model = model_manager.get_model(
-                recommended_model_name
-            )
+            recommended_model = model_manager.get_model(recommended_model_name)
 
             if not recommended_model:
                 logger.warning(
-                    f"Could not get info for recommended model: "
-                    f"{recommended_model_name}"
+                    f"Could not get info for recommended model: " f"{recommended_model_name}"
                 )
                 return False
 
             # Import here to avoid circular dependencies
             from PySide6.QtWidgets import (
-                QDialog, QVBoxLayout, QHBoxLayout, QLabel,
-                QPushButton, QWidget
+                QDialog,
+                QVBoxLayout,
+                QHBoxLayout,
+                QLabel,
+                QPushButton,
+                QWidget,
             )
             from PySide6.QtCore import Qt
 
             # Create dialog
             dialog = QDialog(parent)
-            dialog.setWindowTitle(
-                i18n.t('settings.model_management.first_run_title')
-            )
+            dialog.setWindowTitle(i18n.t("settings.model_management.first_run_title"))
             dialog.setMinimumWidth(500)
 
             layout = QVBoxLayout(dialog)
 
             # Title
-            title_label = QLabel(
-                i18n.t('settings.model_management.first_run_welcome')
-            )
+            title_label = QLabel(i18n.t("settings.model_management.first_run_welcome"))
             title_label.setWordWrap(True)
             title_font = title_label.font()
             title_font.setPointSize(14)
@@ -162,8 +152,8 @@ class FirstRunSetup:
 
             # Recommendation message
             recommendation_text = i18n.t(
-                'settings.model_management.first_run_recommendation',
-                model_name=recommended_model.full_name
+                "settings.model_management.first_run_recommendation",
+                model_name=recommended_model.full_name,
             )
             recommendation_label = QLabel(recommendation_text)
             recommendation_label.setWordWrap(True)
@@ -185,9 +175,7 @@ class FirstRunSetup:
             info_layout = QVBoxLayout(info_card)
 
             # Model name
-            model_name_label = QLabel(
-                f"<b>{recommended_model.full_name}</b>"
-            )
+            model_name_label = QLabel(f"<b>{recommended_model.full_name}</b>")
             model_name_label.setStyleSheet("color: #1a1a1a; font-size: 14px;")
             info_layout.addWidget(model_name_label)
 
@@ -212,31 +200,21 @@ class FirstRunSetup:
 
             # Reason for recommendation
             system_info = model_manager.get_recommendation_context()
-            memory_gb = system_info['memory_gb']
-            has_gpu = system_info['has_gpu']
+            memory_gb = system_info["memory_gb"]
+            has_gpu = system_info["has_gpu"]
 
             reason_parts = []
             if memory_gb < 8:
-                reason_parts.append(
-                    i18n.t('settings.model_management.reason_low_memory')
-                )
+                reason_parts.append(i18n.t("settings.model_management.reason_low_memory"))
             elif memory_gb < 16:
-                reason_parts.append(
-                    i18n.t('settings.model_management.reason_medium_memory')
-                )
+                reason_parts.append(i18n.t("settings.model_management.reason_medium_memory"))
             else:
-                reason_parts.append(
-                    i18n.t('settings.model_management.reason_high_memory')
-                )
+                reason_parts.append(i18n.t("settings.model_management.reason_high_memory"))
 
             if has_gpu:
-                reason_parts.append(
-                    i18n.t('settings.model_management.reason_gpu_available')
-                )
+                reason_parts.append(i18n.t("settings.model_management.reason_gpu_available"))
             else:
-                reason_parts.append(
-                    i18n.t('settings.model_management.reason_no_gpu')
-                )
+                reason_parts.append(i18n.t("settings.model_management.reason_no_gpu"))
 
             reason_text = " ".join(reason_parts)
             reason_label = QLabel(reason_text)
@@ -252,16 +230,12 @@ class FirstRunSetup:
             button_layout.addStretch()
 
             # Later button
-            later_button = QPushButton(
-                i18n.t('settings.model_management.download_later')
-            )
+            later_button = QPushButton(i18n.t("settings.model_management.download_later"))
             later_button.clicked.connect(dialog.reject)
             button_layout.addWidget(later_button)
 
             # Download button
-            download_button = QPushButton(
-                i18n.t('settings.model_management.download_now')
-            )
+            download_button = QPushButton(i18n.t("settings.model_management.download_now"))
             download_button.setDefault(True)
             download_button.setStyleSheet(
                 "QPushButton { "
@@ -284,12 +258,11 @@ class FirstRunSetup:
 
             if result == QDialog.DialogCode.Accepted:
                 logger.info(
-                    f"User chose to download recommended model: "
-                    f"{recommended_model_name}"
+                    f"User chose to download recommended model: " f"{recommended_model_name}"
                 )
                 # Start download in a separate thread with its own event loop
                 from PySide6.QtCore import QThreadPool, QRunnable
-                
+
                 def run_download():
                     """在新线程中运行下载"""
                     success = run_model_download(
@@ -297,19 +270,16 @@ class FirstRunSetup:
                         recommended_model_name,
                         logger=logger,
                         error_message=(
-                            "Download failed in thread for model "
-                            f"{recommended_model_name}"
+                            "Download failed in thread for model " f"{recommended_model_name}"
                         ),
                     )
                     if success:
-                        logger.info(
-                            "Model %s download completed", recommended_model_name
-                        )
+                        logger.info("Model %s download completed", recommended_model_name)
 
                 class DownloadRunnable(QRunnable):
                     def run(self):
                         run_download()
-                
+
                 QThreadPool.globalInstance().start(DownloadRunnable())
                 return True
             else:
@@ -317,9 +287,7 @@ class FirstRunSetup:
                 return False
 
         except Exception as e:
-            logger.error(
-                f"Error showing model recommendation dialog: {e}"
-            )
+            logger.error(f"Error showing model recommendation dialog: {e}")
             return False
 
     @staticmethod
@@ -332,17 +300,12 @@ class FirstRunSetup:
         """
         try:
             # Get the default config file path
-            default_config = (
-                Path(__file__).parent.parent / "config" /
-                "default_config.json"
-            )
+            default_config = Path(__file__).parent.parent / "config" / "default_config.json"
             user_config = config_dir / "app_config.json"
 
             if not user_config.exists():
                 shutil.copy(default_config, user_config)
-                logger.info(
-                    f"Copied default configuration to {user_config}"
-                )
+                logger.info(f"Copied default configuration to {user_config}")
             else:
                 logger.info("User configuration already exists, skipping")
 
@@ -351,7 +314,9 @@ class FirstRunSetup:
             raise
 
     @staticmethod
-    def _initialize_database(config_dir: Path, security_manager: Optional["SecurityManager"] = None) -> None:
+    def _initialize_database(
+        config_dir: Path, security_manager: Optional["SecurityManager"] = None
+    ) -> None:
         """
         Initialize the database schema.
 
@@ -376,13 +341,19 @@ class FirstRunSetup:
 
             encryption_active = db.is_encryption_enabled()
             if not encryption_active:
-                logger.warning("Database encryption is not active after initialization; attempting PRAGMA rekey.")
+                logger.warning(
+                    "Database encryption is not active after initialization; attempting PRAGMA rekey."
+                )
                 rekey_success = db.rekey(db_encryption_key)
                 if rekey_success:
                     encryption_active = True
-                    logger.info("Database encryption activated via PRAGMA rekey during initialization.")
+                    logger.info(
+                        "Database encryption activated via PRAGMA rekey during initialization."
+                    )
                 else:
-                    logger.warning("SQLCipher not available; database remains unencrypted after initialization.")
+                    logger.warning(
+                        "SQLCipher not available; database remains unencrypted after initialization."
+                    )
 
             if encryption_active:
                 logger.info("Database initialized successfully with SQLCipher encryption")
@@ -399,221 +370,220 @@ class FirstRunSetup:
             raise
 
 
-
-
 class FirstRunWizard:
     """
     Welcome wizard for first-time users.
-    
+
     Guides users through initial setup including language selection,
     theme selection, and model download.
     """
-    
+
     @staticmethod
     def show_wizard(config_manager, model_manager, i18n, parent=None):
         """
         Show the first run wizard.
-        
+
         Args:
             config_manager: ConfigManager instance
             model_manager: ModelManager instance
             i18n: I18nQtManager instance
             parent: Parent widget
-            
+
         Returns:
             True if wizard was completed, False if cancelled
         """
         try:
             from PySide6.QtWidgets import (
-                QWizard, QWizardPage, QVBoxLayout, QHBoxLayout,
-                QLabel, QComboBox, QRadioButton, QButtonGroup,
-                QPushButton, QProgressBar, QWidget, QFileDialog
+                QWizard,
+                QWizardPage,
+                QVBoxLayout,
+                QHBoxLayout,
+                QLabel,
+                QComboBox,
+                QRadioButton,
+                QButtonGroup,
+                QPushButton,
+                QProgressBar,
+                QWidget,
+                QFileDialog,
             )
             from PySide6.QtCore import Qt, QThread, Signal
             from PySide6.QtGui import QFont
-            
+
             class WelcomePage(QWizardPage):
                 """Welcome page with introduction."""
-                
+
                 def __init__(self, i18n):
                     super().__init__()
                     self.i18n = i18n
-                    self.setTitle(i18n.t('wizard.welcome.title'))
-                    
+                    self.setTitle(i18n.t("wizard.welcome.title"))
+
                     layout = QVBoxLayout()
-                    
+
                     # Welcome message
-                    welcome_label = QLabel(
-                        i18n.t('wizard.welcome.message')
-                    )
+                    welcome_label = QLabel(i18n.t("wizard.welcome.message"))
                     welcome_label.setWordWrap(True)
                     font = welcome_label.font()
                     font.setPointSize(12)
                     welcome_label.setFont(font)
                     layout.addWidget(welcome_label)
-                    
+
                     layout.addSpacing(20)
-                    
+
                     # Features list
-                    features_label = QLabel(
-                        i18n.t('wizard.welcome.features')
-                    )
+                    features_label = QLabel(i18n.t("wizard.welcome.features"))
                     features_label.setWordWrap(True)
                     layout.addWidget(features_label)
-                    
+
                     layout.addStretch()
-                    
+
                     self.setLayout(layout)
-            
+
             class LanguagePage(QWizardPage):
                 """Language selection page."""
-                
+
                 def __init__(self, i18n, config_manager):
                     super().__init__()
                     self.i18n = i18n
                     self.config_manager = config_manager
-                    self.setTitle(i18n.t('wizard.language.title'))
-                    self.setSubTitle(i18n.t('wizard.language.subtitle'))
-                    
+                    self.setTitle(i18n.t("wizard.language.title"))
+                    self.setSubTitle(i18n.t("wizard.language.subtitle"))
+
                     layout = QVBoxLayout()
-                    
+
                     # Language selection
-                    lang_label = QLabel(i18n.t('wizard.language.select'))
+                    lang_label = QLabel(i18n.t("wizard.language.select"))
                     layout.addWidget(lang_label)
-                    
+
                     self.language_combo = QComboBox()
                     self.language_combo.addItem("中文（简体）", "zh_CN")
                     self.language_combo.addItem("English", "en_US")
                     self.language_combo.addItem("Français", "fr_FR")
-                    
+
                     # Set current language
-                    current_lang = config_manager.get('ui.language', 'zh_CN')
+                    current_lang = config_manager.get("ui.language", "zh_CN")
                     index = self.language_combo.findData(current_lang)
                     if index >= 0:
                         self.language_combo.setCurrentIndex(index)
-                    
+
                     layout.addWidget(self.language_combo)
-                    
+
                     layout.addSpacing(20)
-                    
+
                     # Info message
-                    info_label = QLabel(i18n.t('wizard.language.info'))
+                    info_label = QLabel(i18n.t("wizard.language.info"))
                     info_label.setWordWrap(True)
                     info_label.setStyleSheet("color: #666;")
                     layout.addWidget(info_label)
-                    
+
                     layout.addStretch()
-                    
+
                     self.setLayout(layout)
-                    
+
                     # Register field for wizard
                     self.registerField("language", self.language_combo)
-                
+
                 def get_selected_language(self):
                     """Get the selected language code."""
                     return self.language_combo.currentData()
-            
+
             class ThemePage(QWizardPage):
                 """Theme selection page."""
-                
+
                 def __init__(self, i18n, config_manager):
                     super().__init__()
                     self.i18n = i18n
                     self.config_manager = config_manager
-                    self.setTitle(i18n.t('wizard.theme.title'))
-                    self.setSubTitle(i18n.t('wizard.theme.subtitle'))
-                    
+                    self.setTitle(i18n.t("wizard.theme.title"))
+                    self.setSubTitle(i18n.t("wizard.theme.subtitle"))
+
                     layout = QVBoxLayout()
-                    
+
                     # Theme selection
-                    theme_label = QLabel(i18n.t('wizard.theme.select'))
+                    theme_label = QLabel(i18n.t("wizard.theme.select"))
                     layout.addWidget(theme_label)
-                    
+
                     layout.addSpacing(10)
-                    
+
                     # Radio buttons for themes
                     self.theme_group = QButtonGroup()
-                    
-                    self.light_radio = QRadioButton(
-                        i18n.t('settings.theme.light')
-                    )
-                    self.dark_radio = QRadioButton(
-                        i18n.t('settings.theme.dark')
-                    )
-                    self.system_radio = QRadioButton(
-                        i18n.t('settings.theme.system')
-                    )
-                    
+
+                    self.light_radio = QRadioButton(i18n.t("settings.theme.light"))
+                    self.dark_radio = QRadioButton(i18n.t("settings.theme.dark"))
+                    self.system_radio = QRadioButton(i18n.t("settings.theme.system"))
+
                     self.theme_group.addButton(self.light_radio, 0)
                     self.theme_group.addButton(self.dark_radio, 1)
                     self.theme_group.addButton(self.system_radio, 2)
-                    
+
                     # Set current theme
-                    current_theme = config_manager.get('ui.theme', 'light')
-                    if current_theme == 'light':
+                    current_theme = config_manager.get("ui.theme", "light")
+                    if current_theme == "light":
                         self.light_radio.setChecked(True)
-                    elif current_theme == 'dark':
+                    elif current_theme == "dark":
                         self.dark_radio.setChecked(True)
                     else:
                         self.system_radio.setChecked(True)
-                    
+
                     layout.addWidget(self.light_radio)
                     layout.addWidget(self.dark_radio)
                     layout.addWidget(self.system_radio)
-                    
+
                     layout.addSpacing(20)
-                    
+
                     # Info message
-                    info_label = QLabel(i18n.t('wizard.theme.info'))
+                    info_label = QLabel(i18n.t("wizard.theme.info"))
                     info_label.setWordWrap(True)
                     info_label.setStyleSheet("color: #666;")
                     layout.addWidget(info_label)
-                    
+
                     layout.addStretch()
-                    
+
                     self.setLayout(layout)
-                
+
                 def get_selected_theme(self):
                     """Get the selected theme."""
                     if self.light_radio.isChecked():
-                        return 'light'
+                        return "light"
                     elif self.dark_radio.isChecked():
-                        return 'dark'
+                        return "dark"
                     else:
-                        return 'system'
-            
+                        return "system"
+
             class ModelDownloadPage(QWizardPage):
                 """Model download page."""
-                
+
                 def __init__(self, i18n, model_manager):
                     super().__init__()
                     self.i18n = i18n
                     self.model_manager = model_manager
                     self.download_started = False
                     self.download_completed = False
-                    
-                    self.setTitle(i18n.t('wizard.model.title'))
-                    self.setSubTitle(i18n.t('wizard.model.subtitle'))
-                    
+
+                    self.setTitle(i18n.t("wizard.model.title"))
+                    self.setSubTitle(i18n.t("wizard.model.subtitle"))
+
                     layout = QVBoxLayout()
-                    
+
                     # Recommendation
                     recommended_model = model_manager.recommend_model()
-                    recommended_info = model_manager.get_model(
-                        recommended_model
-                    )
-                    
+                    recommended_info = model_manager.get_model(recommended_model)
+
                     rec_label = QLabel(
                         i18n.t(
-                            'wizard.model.recommendation',
-                            model=recommended_info.full_name if recommended_info else recommended_model
+                            "wizard.model.recommendation",
+                            model=(
+                                recommended_info.full_name
+                                if recommended_info
+                                else recommended_model
+                            ),
                         )
                     )
                     rec_label.setWordWrap(True)
                     layout.addWidget(rec_label)
-                    
+
                     layout.addSpacing(10)
-                    
+
                     # Model info
                     if recommended_info:
                         info_text = (
@@ -626,63 +596,55 @@ class FirstRunWizard:
                         )
                         info_label = QLabel(info_text)
                         info_label.setStyleSheet(
-                            "background-color: #f0f0f0; "
-                            "padding: 10px; "
-                            "border-radius: 5px;"
+                            "background-color: #f0f0f0; " "padding: 10px; " "border-radius: 5px;"
                         )
                         layout.addWidget(info_label)
-                    
+
                     layout.addSpacing(20)
-                    
+
                     # Download button
-                    self.download_button = QPushButton(
-                        i18n.t('wizard.model.download_now')
-                    )
-                    self.download_button.clicked.connect(
-                        self._start_download
-                    )
+                    self.download_button = QPushButton(i18n.t("wizard.model.download_now"))
+                    self.download_button.clicked.connect(self._start_download)
                     layout.addWidget(self.download_button)
-                    
+
                     # Progress bar
                     self.progress_bar = QProgressBar()
                     self.progress_bar.setVisible(False)
                     layout.addWidget(self.progress_bar)
-                    
+
                     # Status label
                     self.status_label = QLabel("")
                     self.status_label.setWordWrap(True)
                     layout.addWidget(self.status_label)
-                    
+
                     layout.addSpacing(10)
-                    
+
                     # Skip info
-                    skip_label = QLabel(i18n.t('wizard.model.skip_info'))
+                    skip_label = QLabel(i18n.t("wizard.model.skip_info"))
                     skip_label.setWordWrap(True)
                     skip_label.setStyleSheet("color: #666; font-size: 10pt;")
                     layout.addWidget(skip_label)
-                    
+
                     layout.addStretch()
-                    
+
                     self.setLayout(layout)
-                    
+
                     self.recommended_model = recommended_model
-                
+
                 def _start_download(self):
                     """Start model download."""
                     if self.download_started:
                         return
-                    
+
                     self.download_started = True
                     self.download_button.setEnabled(False)
                     self.progress_bar.setVisible(True)
                     self.progress_bar.setRange(0, 0)  # Indeterminate
-                    self.status_label.setText(
-                        self.i18n.t('wizard.model.downloading')
-                    )
-                    
+                    self.status_label.setText(self.i18n.t("wizard.model.downloading"))
+
                     # Start download in thread
                     from PySide6.QtCore import QThreadPool, QRunnable
-                    
+
                     def run_download():
                         """Run download in thread."""
 
@@ -692,9 +654,7 @@ class FirstRunWizard:
                             from PySide6.QtCore import QMetaObject, Qt
 
                             QMetaObject.invokeMethod(
-                                self,
-                                "_on_download_complete",
-                                Qt.ConnectionType.QueuedConnection
+                                self, "_on_download_complete", Qt.ConnectionType.QueuedConnection
                             )
 
                         def _on_error(exc: Exception):
@@ -705,7 +665,7 @@ class FirstRunWizard:
                                 self,
                                 "_on_download_error",
                                 Qt.ConnectionType.QueuedConnection,
-                                Q_ARG(str, str(exc))
+                                Q_ARG(str, str(exc)),
                             )
 
                         run_model_download(
@@ -715,8 +675,7 @@ class FirstRunWizard:
                             on_success=_on_success,
                             on_error=_on_error,
                             error_message=(
-                                "Download failed for recommended model "
-                                f"{self.recommended_model}"
+                                "Download failed for recommended model " f"{self.recommended_model}"
                             ),
                         )
 
@@ -724,105 +683,97 @@ class FirstRunWizard:
                         def __init__(self, func):
                             super().__init__()
                             self.func = func
-                        
+
                         def run(self):
                             self.func()
-                    
-                    QThreadPool.globalInstance().start(
-                        DownloadRunnable(run_download)
-                    )
-                
+
+                    QThreadPool.globalInstance().start(DownloadRunnable(run_download))
+
                 def _on_download_complete(self):
                     """Handle download completion."""
                     self.progress_bar.setRange(0, 100)
                     self.progress_bar.setValue(100)
-                    self.status_label.setText(
-                        self.i18n.t('wizard.model.download_complete')
-                    )
+                    self.status_label.setText(self.i18n.t("wizard.model.download_complete"))
                     self.status_label.setStyleSheet("color: green;")
-                    
+
                     # Enable next button
                     wizard = self.wizard()
                     if wizard:
                         wizard.button(QWizard.WizardButton.NextButton).setEnabled(True)
-                
+
                 def _on_download_error(self, error_msg):
                     """Handle download error."""
                     self.progress_bar.setVisible(False)
                     self.status_label.setText(
-                        self.i18n.t('wizard.model.download_error', error=error_msg)
+                        self.i18n.t("wizard.model.download_error", error=error_msg)
                     )
                     self.status_label.setStyleSheet("color: red;")
                     self.download_button.setEnabled(True)
                     self.download_started = False
-            
+
             class CompletePage(QWizardPage):
                 """Completion page."""
-                
+
                 def __init__(self, i18n):
                     super().__init__()
                     self.i18n = i18n
-                    self.setTitle(i18n.t('wizard.complete.title'))
-                    
+                    self.setTitle(i18n.t("wizard.complete.title"))
+
                     layout = QVBoxLayout()
-                    
+
                     # Completion message
-                    complete_label = QLabel(
-                        i18n.t('wizard.complete.message')
-                    )
+                    complete_label = QLabel(i18n.t("wizard.complete.message"))
                     complete_label.setWordWrap(True)
                     font = complete_label.font()
                     font.setPointSize(12)
                     complete_label.setFont(font)
                     layout.addWidget(complete_label)
-                    
+
                     layout.addSpacing(20)
-                    
+
                     # Next steps
-                    next_steps_label = QLabel(
-                        i18n.t('wizard.complete.next_steps')
-                    )
+                    next_steps_label = QLabel(i18n.t("wizard.complete.next_steps"))
                     next_steps_label.setWordWrap(True)
                     layout.addWidget(next_steps_label)
-                    
+
                     layout.addStretch()
-                    
+
                     self.setLayout(layout)
-            
+
             # Create wizard
             wizard = QWizard(parent)
-            wizard.setWindowTitle(i18n.t('wizard.title'))
+            wizard.setWindowTitle(i18n.t("wizard.title"))
             wizard.setWizardStyle(QWizard.WizardStyle.ModernStyle)
             wizard.setMinimumSize(600, 450)
-            
+
             # Add pages
             welcome_page = WelcomePage(i18n)
             language_page = LanguagePage(i18n, config_manager)
             theme_page = ThemePage(i18n, config_manager)
             model_page = ModelDownloadPage(i18n, model_manager)
             complete_page = CompletePage(i18n)
-            
+
             wizard.addPage(welcome_page)
             wizard.addPage(language_page)
             wizard.addPage(theme_page)
             wizard.addPage(model_page)
             wizard.addPage(complete_page)
-            
+
             # Show wizard
             result = wizard.exec()
-            
+
             if result == QWizard.DialogCode.Accepted:
                 # Save settings
                 selected_language = language_page.get_selected_language()
                 selected_theme = theme_page.get_selected_theme()
-                
-                config_manager.set('ui.language', selected_language)
-                config_manager.set('ui.theme', selected_theme)
+
+                config_manager.set("ui.language", selected_language)
+                config_manager.set("ui.theme", selected_theme)
                 config_manager.save()
-                
+
                 # Apply language change
                 i18n.set_language(selected_language)
-                
+
                 logger.info(
                     f"First run wizard completed: "
                     f"language={selected_language}, theme={selected_theme}"
@@ -831,7 +782,7 @@ class FirstRunWizard:
             else:
                 logger.info("First run wizard cancelled")
                 return False
-                
+
         except Exception as e:
             logger.error(f"Error showing first run wizard: {e}")
             return False

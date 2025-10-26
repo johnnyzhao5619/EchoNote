@@ -118,8 +118,8 @@ from datetime import datetime
 from typing import Optional, List, Dict
 
 # Third-party
-from PyQt6.QtWidgets import QWidget, QVBoxLayout
-from PyQt6.QtCore import pyqtSignal
+from PySide6.QtWidgets import QWidget, QVBoxLayout
+from PySide6.QtCore import Signal
 import numpy as np
 import httpx
 
@@ -137,7 +137,7 @@ from core.transcription.manager import TranscriptionManager
 from engines.speech.base import SpeechEngine
 
 # Acceptable - Module import for many items
-from PyQt6 import QtWidgets, QtCore, QtGui
+from PySide6 import QtWidgets, QtCore, QtGui
 
 # Bad - Wildcard imports
 from core.transcription.manager import *

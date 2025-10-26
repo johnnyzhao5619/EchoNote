@@ -32,7 +32,7 @@ Main widget for real-time recording interface.
 **Usage:**
 
 ```python
-from PyQt6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication
 from ui.realtime_record import RealtimeRecordWidget
 from config.app_config import ConfigManager
 from core.settings.manager import SettingsManager
@@ -112,7 +112,7 @@ visualizer.show()
 ## Integration with Main Window
 
 ```python
-from PyQt6.QtWidgets import QMainWindow, QStackedWidget
+from PySide6.QtWidgets import QMainWindow, QStackedWidget
 from ui.realtime_record import RealtimeRecordWidget
 
 class MainWindow(QMainWindow):

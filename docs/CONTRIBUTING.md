@@ -56,7 +56,7 @@ Before you begin, ensure you have:
 - Python 3.8 or higher
 - Git
 - A GitHub account
-- Basic knowledge of Python and PyQt6
+- Basic knowledge of Python and PySide6
 
 ### Setting Up Your Development Environment
 
@@ -229,7 +229,7 @@ import sys
 from datetime import datetime
 
 # Third-party
-from PyQt6.QtWidgets import QWidget
+from PySide6.QtWidgets import QWidget
 import numpy as np
 
 # Local

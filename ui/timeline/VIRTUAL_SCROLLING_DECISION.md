@@ -167,7 +167,7 @@ def _on_scroll(self, value: int):
 - RAM: 16GB
 - OS: macOS 13.0
 - Python: 3.11
-- PyQt6: 6.5.0
+- PySide6: 6.5.0
 
 ### 测试结果
 
@@ -246,7 +246,7 @@ class TimelineModel(QAbstractListModel):
 ## 参考资料
 
 - [Qt Virtual Scrolling Best Practices](https://doc.qt.io/qt-6/model-view-programming.html)
-- [PyQt6 Performance Optimization](https://www.riverbankcomputing.com/static/Docs/PyQt6/performance.html)
+- [PySide6 Performance Optimization](https://doc.qt.io/qtforpython/tutorials/performance/performance.html)
 - [Lazy Loading Patterns](https://refactoring.guru/design-patterns/lazy-initialization)
 
 ---

@@ -259,7 +259,7 @@ This implementation satisfies the following requirements from the design documen
 
 ### 依赖关系 / Dependencies
 
-- **PyQt6**: UI 框架 / UI framework
+- **PySide6**: UI 框架 / UI framework
 - **CalendarManager**: 业务逻辑管理器 / Business logic manager
 - **I18nQtManager**: 国际化管理器 / Internationalization manager
 - **OAuth Adapters**: 外部日历同步适配器 / External calendar sync adapters

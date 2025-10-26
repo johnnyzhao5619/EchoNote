@@ -145,7 +145,7 @@ def validate_api_key(key: str, provider: str) -> Tuple[bool, str]:
         # Azure keys are typically 32 characters hex
         if len(key) != 32:
             return False, "Azure API key must be 32 characters"
-        if not re.match(r'^[a-fA-F0-9]{32}$', key):
+        if not re.match(r"^[a-fA-F0-9]{32}$", key):
             return False, "Azure API key must be hexadecimal"
 
     else:
@@ -173,7 +173,7 @@ def validate_email(email: str) -> Tuple[bool, str]:
         return False, "Email cannot be empty"
 
     # Basic email regex pattern
-    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
 
     if not re.match(pattern, email):
         return False, "Invalid email format"
@@ -199,20 +199,17 @@ def validate_url(url: str) -> Tuple[bool, str]:
 
     # URL regex pattern
     pattern = (
-        r'^https?://'  # http:// or https://
-        r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+'
-        r'(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|'  # domain
-        r'localhost|'  # localhost
-        r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'  # IP
-        r'(?::\d+)?'  # optional port
-        r'(?:/?|[/?]\S+)$'
+        r"^https?://"  # http:// or https://
+        r"(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+"
+        r"(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|"  # domain
+        r"localhost|"  # localhost
+        r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})"  # IP
+        r"(?::\d+)?"  # optional port
+        r"(?:/?|[/?]\S+)$"
     )
 
     if not re.match(pattern, url, re.IGNORECASE):
-        return (
-            False,
-            "Invalid URL format (must start with http:// or https://)"
-        )
+        return (False, "Invalid URL format (must start with http:// or https://)")
 
     return True, ""
 
@@ -237,15 +234,13 @@ def validate_language_code(code: str) -> Tuple[bool, str]:
     valid_codes = ["zh_CN", "en_US", "fr_FR"]
 
     if code not in valid_codes:
-        return (
-            False,
-            f"Invalid language code. Must be one of: {', '.join(valid_codes)}"
-        )
+        return (False, f"Invalid language code. Must be one of: {', '.join(valid_codes)}")
 
     return True, ""
 
 
 # Convenience functions that return only boolean
+
 
 def is_valid_concurrent_tasks(value: int) -> bool:
     """Check if concurrent tasks value is valid."""

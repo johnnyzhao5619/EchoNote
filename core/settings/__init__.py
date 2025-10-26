@@ -17,4 +17,4 @@
 
 from .manager import SettingsManager
 
-__all__ = ['SettingsManager']
+__all__ = ["SettingsManager"]

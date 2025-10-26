@@ -27,9 +27,6 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Dict
 
-from core.models.registry import get_default_model_names
-
-
 APP_DIR_NAME = ".echonote"
 
 
@@ -46,9 +43,7 @@ class ConfigManager:
 
     def __init__(self):
         """Initialize the configuration manager."""
-        self.default_config_path = (
-            Path(__file__).parent / "default_config.json"
-        )
+        self.default_config_path = Path(__file__).parent / "default_config.json"
         self.user_config_dir = get_app_dir()
         self.user_config_path = self.user_config_dir / "app_config.json"
         self._config: Dict[str, Any] = {}
@@ -58,20 +53,14 @@ class ConfigManager:
     def _load_config(self) -> None:
         """Load configuration from user config or default config."""
         try:
-            logger.info(
-                f"Loading default configuration from "
-                f"{self.default_config_path}"
-            )
-            with open(self.default_config_path, 'r', encoding='utf-8') as f:
+            logger.info(f"Loading default configuration from " f"{self.default_config_path}")
+            with open(self.default_config_path, "r", encoding="utf-8") as f:
                 self._default_config = json.load(f)
 
             user_config: Dict[str, Any] = {}
             if self.user_config_path.exists():
-                logger.info(
-                    f"Loading user configuration from "
-                    f"{self.user_config_path}"
-                )
-                with open(self.user_config_path, 'r', encoding='utf-8') as f:
+                logger.info(f"Loading user configuration from " f"{self.user_config_path}")
+                with open(self.user_config_path, "r", encoding="utf-8") as f:
                     user_config = json.load(f)
 
             self._config = self._deep_merge(self._default_config, user_config)
@@ -89,7 +78,7 @@ class ConfigManager:
         except Exception as e:
             logger.error(f"Error loading configuration: {e}")
             raise
-    
+
     def _validate_config(self) -> None:
         """Validate required configuration fields and types."""
         required_fields = {
@@ -101,14 +90,12 @@ class ConfigManager:
             "timeline": dict,
             "resource_monitor": dict,
             "ui": dict,
-            "security": dict
+            "security": dict,
         }
 
         for field, expected_type in required_fields.items():
             if field not in self._config:
-                raise ValueError(
-                    f"Missing required configuration field: {field}"
-                )
+                raise ValueError(f"Missing required configuration field: {field}")
             if not isinstance(self._config[field], expected_type):
                 raise TypeError(
                     f"Configuration field '{field}' must be of type "
@@ -121,7 +108,7 @@ class ConfigManager:
         self._validate_transcription_config()
         self._validate_resource_monitor_config()
         self._validate_ui_config()
-    
+
     def _validate_database_config(self) -> None:
         """Validate database configuration."""
         db_config = self._config["database"]
@@ -129,43 +116,31 @@ class ConfigManager:
             raise ValueError("Missing required field: database.path")
         if "encryption_enabled" not in db_config:
             raise ValueError("Missing required field: database.encryption_enabled")
-    
+
     def _validate_transcription_config(self) -> None:
         """Validate transcription configuration."""
         trans_config = self._config["transcription"]
-        required = [
-            "default_engine",
-            "default_output_format",
-            "max_concurrent_tasks"
-        ]
+        required = ["default_engine", "default_output_format", "max_concurrent_tasks"]
         for field in required:
             if field not in trans_config:
-                raise ValueError(
-                    f"Missing required field: transcription.{field}"
-                )
+                raise ValueError(f"Missing required field: transcription.{field}")
 
         # Validate max_concurrent_tasks range
         max_concurrent = trans_config["max_concurrent_tasks"]
-        if (not isinstance(max_concurrent, int) or
-                not (1 <= max_concurrent <= 5)):
+        if not isinstance(max_concurrent, int) or not (1 <= max_concurrent <= 5):
             raise ValueError(
-                "transcription.max_concurrent_tasks must be an "
-                "integer between 1 and 5"
+                "transcription.max_concurrent_tasks must be an " "integer between 1 and 5"
             )
 
         if "max_retries" in trans_config:
             max_retries = trans_config["max_retries"]
             if not isinstance(max_retries, int) or max_retries < 0:
-                raise ValueError(
-                    "transcription.max_retries must be a non-negative integer"
-                )
+                raise ValueError("transcription.max_retries must be a non-negative integer")
 
         if "retry_delay" in trans_config:
             retry_delay = trans_config["retry_delay"]
             if not isinstance(retry_delay, (int, float)) or retry_delay < 0:
-                raise ValueError(
-                    "transcription.retry_delay must be a non-negative number"
-                )
+                raise ValueError("transcription.retry_delay must be a non-negative number")
 
         if "task_queue" in trans_config:
             task_queue_config = trans_config["task_queue"]
@@ -174,8 +149,7 @@ class ConfigManager:
 
             if "max_concurrent_tasks" in task_queue_config:
                 tq_concurrent = task_queue_config["max_concurrent_tasks"]
-                if (not isinstance(tq_concurrent, int) or
-                        not (1 <= tq_concurrent <= 5)):
+                if not isinstance(tq_concurrent, int) or not (1 <= tq_concurrent <= 5):
                     raise ValueError(
                         "transcription.task_queue.max_concurrent_tasks must be "
                         "an integer between 1 and 5"
@@ -185,30 +159,25 @@ class ConfigManager:
                 tq_retries = task_queue_config["max_retries"]
                 if not isinstance(tq_retries, int) or tq_retries < 0:
                     raise ValueError(
-                        "transcription.task_queue.max_retries must be a "
-                        "non-negative integer"
+                        "transcription.task_queue.max_retries must be a " "non-negative integer"
                     )
 
             if "retry_delay" in task_queue_config:
                 tq_retry_delay = task_queue_config["retry_delay"]
-                if (not isinstance(tq_retry_delay, (int, float)) or
-                        tq_retry_delay < 0):
+                if not isinstance(tq_retry_delay, (int, float)) or tq_retry_delay < 0:
                     raise ValueError(
-                        "transcription.task_queue.retry_delay must be a "
-                        "non-negative number"
+                        "transcription.task_queue.retry_delay must be a " "non-negative number"
                     )
 
         # Validate faster_whisper configuration
         if "faster_whisper" in trans_config:
             fw_config = trans_config["faster_whisper"]
-            
+
             # Validate model_dir
             if "model_dir" in fw_config:
                 if not isinstance(fw_config["model_dir"], str):
-                    raise TypeError(
-                        "transcription.faster_whisper.model_dir must be a string"
-                    )
-            
+                    raise TypeError("transcription.faster_whisper.model_dir must be a string")
+
             # Validate auto_download_recommended
             if "auto_download_recommended" in fw_config:
                 if not isinstance(fw_config["auto_download_recommended"], bool):
@@ -216,15 +185,16 @@ class ConfigManager:
                         "transcription.faster_whisper.auto_download_recommended "
                         "must be a boolean"
                     )
-            
+
             # Validate default_model
             if "default_model" in fw_config:
                 if not isinstance(fw_config["default_model"], str):
-                    raise TypeError(
-                        "transcription.faster_whisper.default_model must be a string"
-                    )
-                
+                    raise TypeError("transcription.faster_whisper.default_model must be a string")
+
                 # Validate model name is in supported list
+                # Import here to avoid circular dependency
+                from core.models.registry import get_default_model_names
+
                 valid_models = list(get_default_model_names())
                 if fw_config["default_model"] not in valid_models:
                     raise ValueError(
@@ -238,32 +208,21 @@ class ConfigManager:
 
         for field in ("low_memory_mb", "high_cpu_percent"):
             if field not in monitor_config:
-                raise ValueError(
-                    f"Missing required field: resource_monitor.{field}"
-                )
+                raise ValueError(f"Missing required field: resource_monitor.{field}")
 
         low_memory_mb = monitor_config["low_memory_mb"]
         if isinstance(low_memory_mb, bool) or not isinstance(low_memory_mb, (int, float)):
-            raise TypeError(
-                "resource_monitor.low_memory_mb must be a number"
-            )
+            raise TypeError("resource_monitor.low_memory_mb must be a number")
 
         if not (64 <= float(low_memory_mb) <= 1048576):
-            raise ValueError(
-                "resource_monitor.low_memory_mb must be between 64 and 1048576 MB"
-            )
+            raise ValueError("resource_monitor.low_memory_mb must be between 64 and 1048576 MB")
 
         high_cpu_percent = monitor_config["high_cpu_percent"]
-        if (isinstance(high_cpu_percent, bool) or
-                not isinstance(high_cpu_percent, (int, float))):
-            raise TypeError(
-                "resource_monitor.high_cpu_percent must be a number"
-            )
+        if isinstance(high_cpu_percent, bool) or not isinstance(high_cpu_percent, (int, float)):
+            raise TypeError("resource_monitor.high_cpu_percent must be a number")
 
         if not (1 <= float(high_cpu_percent) <= 100):
-            raise ValueError(
-                "resource_monitor.high_cpu_percent must be between 1 and 100"
-            )
+            raise ValueError("resource_monitor.high_cpu_percent must be between 1 and 100")
 
     def _validate_ui_config(self) -> None:
         """Validate UI configuration."""
@@ -281,10 +240,8 @@ class ConfigManager:
         # Validate language value
         valid_languages = ["zh_CN", "en_US", "fr_FR"]
         if ui_config["language"] not in valid_languages:
-            raise ValueError(
-                f"ui.language must be one of {valid_languages}"
-            )
-    
+            raise ValueError(f"ui.language must be one of {valid_languages}")
+
     def get(self, key: str, default: Any = None) -> Any:
         """
         Get a configuration value by key.
@@ -298,7 +255,7 @@ class ConfigManager:
         Returns:
             Configuration value or default
         """
-        keys = key.split('.')
+        keys = key.split(".")
         value = self._config
 
         for k in keys:
@@ -308,7 +265,7 @@ class ConfigManager:
                 return default
 
         return value
-    
+
     def set(self, key: str, value: Any) -> None:
         """
         Set a configuration value by key.
@@ -319,7 +276,7 @@ class ConfigManager:
             key: Configuration key (supports dot notation)
             value: Value to set
         """
-        keys = key.split('.')
+        keys = key.split(".")
         config = self._config
 
         # Navigate to the parent of the target key
@@ -330,7 +287,7 @@ class ConfigManager:
 
         # Set the value
         config[keys[-1]] = value
-    
+
     def save(self) -> None:
         """Save the current configuration to the user config file."""
         try:
@@ -341,11 +298,12 @@ class ConfigManager:
             self._validate_config()
 
             # Write configuration to file
-            with open(self.user_config_path, 'w', encoding='utf-8') as f:
+            with open(self.user_config_path, "w", encoding="utf-8") as f:
                 json.dump(self._config, f, indent=2, ensure_ascii=False)
-            
+
             # Set secure file permissions (owner read/write only)
             import os
+
             try:
                 os.chmod(self.user_config_path, 0o600)
                 logger.debug(f"Set secure permissions for config file")
@@ -357,7 +315,7 @@ class ConfigManager:
         except Exception as e:
             logger.error(f"Error saving configuration: {e}")
             raise
-    
+
     def get_all(self) -> Dict[str, Any]:
         """
         Get the entire configuration dictionary.

@@ -24,13 +24,13 @@ from typing import Optional
 from data.security.encryption import SecurityManager
 
 
-logger = logging.getLogger('echonote.database.encryption')
+logger = logging.getLogger("echonote.database.encryption")
 
 
 class DatabaseEncryptionHelper:
     """
     Helper class for encrypting/decrypting sensitive database fields.
-    
+
     Uses SecurityManager for encryption and provides convenience methods
     for model classes to encrypt/decrypt specific fields.
     """
@@ -44,7 +44,7 @@ class DatabaseEncryptionHelper:
         """
         self.security_manager = security_manager
         logger.info("Database encryption helper initialized")
-    
+
     def encrypt_field(self, value: Optional[str]) -> Optional[str]:
         """
         Encrypt a field value.
@@ -57,7 +57,7 @@ class DatabaseEncryptionHelper:
         """
         if value is None or value == "":
             return value
-        
+
         try:
             encrypted = self.security_manager.encrypt(value)
             logger.debug("Field encrypted successfully")
@@ -65,7 +65,7 @@ class DatabaseEncryptionHelper:
         except Exception as e:
             logger.error(f"Failed to encrypt field: {e}")
             raise
-    
+
     def decrypt_field(self, encrypted_value: Optional[str]) -> Optional[str]:
         """
         Decrypt a field value.
@@ -78,7 +78,7 @@ class DatabaseEncryptionHelper:
         """
         if encrypted_value is None or encrypted_value == "":
             return encrypted_value
-        
+
         try:
             decrypted = self.security_manager.decrypt(encrypted_value)
             logger.debug("Field decrypted successfully")
@@ -87,7 +87,7 @@ class DatabaseEncryptionHelper:
             logger.warning(f"Failed to decrypt field (may be unencrypted): {e}")
             # Return original value if decryption fails (backward compatibility)
             return encrypted_value
-    
+
     def is_encrypted(self, value: Optional[str]) -> bool:
         """
         Check if a value appears to be encrypted.
@@ -100,7 +100,7 @@ class DatabaseEncryptionHelper:
         """
         if not value:
             return False
-        
+
         try:
             # Try to decrypt - if it works, it's encrypted
             self.security_manager.decrypt(value)

@@ -21,11 +21,11 @@ from ui.calendar_hub.event_dialog import EventDialog
 from ui.calendar_hub.oauth_dialog import OAuthDialog, OAuthResultDialog
 
 __all__ = [
-    'CalendarHubWidget',
-    'MonthView',
-    'WeekView',
-    'DayView',
-    'EventDialog',
-    'OAuthDialog',
-    'OAuthResultDialog'
+    "CalendarHubWidget",
+    "MonthView",
+    "WeekView",
+    "DayView",
+    "EventDialog",
+    "OAuthDialog",
+    "OAuthResultDialog",
 ]

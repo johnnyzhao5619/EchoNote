@@ -25,8 +25,17 @@ from concurrent.futures import Future
 from typing import Dict, Optional, Set
 
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
-    QSlider, QCheckBox, QPushButton, QPlainTextEdit, QGroupBox, QListWidget
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QComboBox,
+    QSlider,
+    QCheckBox,
+    QPushButton,
+    QPlainTextEdit,
+    QGroupBox,
+    QListWidget,
 )
 from PySide6.QtCore import Qt, QTimer, Signal, QObject, QThread
 import threading
@@ -54,10 +63,10 @@ class RealtimeRecorderSignals(QObject):
 
     # Signal emitted when audio data is available (for visualization)
     audio_data_available = Signal(object)  # np.ndarray
-    
+
     # Signal emitted when recording starts (for UI update)
     recording_started = Signal()
-    
+
     # Signal emitted when recording stops (for UI update)
     recording_stopped = Signal()
 
@@ -83,7 +92,7 @@ class RealtimeRecordWidget(QWidget):
         i18n_manager,
         settings_manager: Optional[object] = None,
         model_manager=None,
-        parent=None
+        parent=None,
     ):
         """
         初始化实时录制界面
@@ -119,7 +128,7 @@ class RealtimeRecordWidget(QWidget):
         self._buffer_lock = threading.Lock()
 
         # 记录实时录制首选项
-        self._recording_format = 'wav'
+        self._recording_format = "wav"
         self._auto_save_enabled = True
         self._refresh_recording_preferences()
 
@@ -127,25 +136,18 @@ class RealtimeRecordWidget(QWidget):
         try:
             self._notification_manager = get_notification_manager()
         except Exception as exc:  # noqa: BLE001
-            logger.warning(
-                "Notification manager unavailable: %s", exc, exc_info=True
-            )
+            logger.warning("Notification manager unavailable: %s", exc, exc_info=True)
             self._notification_manager = None
 
         # Connect model manager signals if available
         if self.model_manager:
             self.model_manager.models_updated.connect(self._update_model_list)
 
-        if self.settings_manager and hasattr(self.settings_manager, 'setting_changed'):
+        if self.settings_manager and hasattr(self.settings_manager, "setting_changed"):
             try:
-                self.settings_manager.setting_changed.connect(
-                    self._on_settings_changed
-                )
+                self.settings_manager.setting_changed.connect(self._on_settings_changed)
             except Exception as exc:  # noqa: BLE001
-                logger.warning(
-                    "Failed to connect to settings_manager.setting_changed: %s",
-                    exc
-                )
+                logger.warning("Failed to connect to settings_manager.setting_changed: %s", exc)
 
         # 设置回调函数
         self.recorder.set_callbacks(
@@ -153,41 +155,31 @@ class RealtimeRecordWidget(QWidget):
             on_translation=self._on_translation,
             on_error=self._on_error,
             on_audio_data=self._on_audio_data,
-            on_marker=self._on_marker
+            on_marker=self._on_marker,
         )
 
         # 连接信号到槽（使用 QueuedConnection 确保线程安全）
         self.signals.transcription_updated.connect(
-            self._update_transcription_display,
-            Qt.ConnectionType.QueuedConnection
+            self._update_transcription_display, Qt.ConnectionType.QueuedConnection
         )
         self.signals.translation_updated.connect(
-            self._update_translation_display,
-            Qt.ConnectionType.QueuedConnection
+            self._update_translation_display, Qt.ConnectionType.QueuedConnection
         )
-        self.signals.error_occurred.connect(
-            self._show_error,
-            Qt.ConnectionType.QueuedConnection
-        )
+        self.signals.error_occurred.connect(self._show_error, Qt.ConnectionType.QueuedConnection)
         self.signals.status_changed.connect(
-            self._update_status_display,
-            Qt.ConnectionType.QueuedConnection
+            self._update_status_display, Qt.ConnectionType.QueuedConnection
         )
         self.signals.recording_started.connect(
-            self._on_recording_started,
-            Qt.ConnectionType.QueuedConnection
+            self._on_recording_started, Qt.ConnectionType.QueuedConnection
         )
         self.signals.recording_stopped.connect(
-            self._on_recording_stopped,
-            Qt.ConnectionType.QueuedConnection
+            self._on_recording_stopped, Qt.ConnectionType.QueuedConnection
         )
         self.signals.recording_succeeded.connect(
-            self._on_recording_succeeded,
-            Qt.ConnectionType.QueuedConnection
+            self._on_recording_succeeded, Qt.ConnectionType.QueuedConnection
         )
         self.signals.marker_added.connect(
-            self._append_marker_item,
-            Qt.ConnectionType.QueuedConnection
+            self._append_marker_item, Qt.ConnectionType.QueuedConnection
         )
 
         # 状态更新定时器
@@ -209,36 +201,29 @@ class RealtimeRecordWidget(QWidget):
 
     def _refresh_recording_preferences(self) -> None:
         """加载录音格式与保存策略设置。"""
-        if self.settings_manager and hasattr(
-            self.settings_manager, 'get_realtime_preferences'
-        ):
+        if self.settings_manager and hasattr(self.settings_manager, "get_realtime_preferences"):
             try:
                 preferences = self.settings_manager.get_realtime_preferences()
-                self._recording_format = preferences.get('recording_format', 'wav')
-                self._auto_save_enabled = bool(
-                    preferences.get('auto_save', True)
-                )
+                self._recording_format = preferences.get("recording_format", "wav")
+                self._auto_save_enabled = bool(preferences.get("auto_save", True))
                 return
             except Exception as exc:  # noqa: BLE001
-                logger.warning(
-                    "Failed to refresh realtime preferences: %s", exc,
-                    exc_info=True
-                )
+                logger.warning("Failed to refresh realtime preferences: %s", exc, exc_info=True)
 
         # 设置管理器不可用或读取失败时退回到默认值
-        self._recording_format = 'wav'
+        self._recording_format = "wav"
         self._auto_save_enabled = True
 
     def _on_settings_changed(self, key: str, _value: object) -> None:
         """当设置变更时刷新实时录制首选项。"""
-        if key in {'realtime.recording_format', 'realtime.auto_save'}:
+        if key in {"realtime.recording_format", "realtime.auto_save"}:
             self._refresh_recording_preferences()
-    
+
     def _init_async_loop(self):
         """初始化异步事件循环"""
         import asyncio
         import threading
-        
+
         def run_loop():
             """在独立线程中运行事件循环"""
             self._async_loop = asyncio.new_event_loop()
@@ -250,17 +235,18 @@ class RealtimeRecordWidget(QWidget):
                 logger.info("Async event loop stopping")
                 self._async_loop.close()
                 logger.info("Async event loop stopped")
-        
+
         self._async_thread = threading.Thread(target=run_loop, daemon=True)
         self._async_thread.start()
-        
+
         # 等待事件循环初始化
         import time
+
         for _ in range(10):
             if self._async_loop is not None:
                 break
             time.sleep(0.1)
-        
+
         if self._async_loop is None:
             raise RuntimeError("Failed to initialize async event loop")
 
@@ -364,12 +350,12 @@ class RealtimeRecordWidget(QWidget):
 
         # 音频可视化组件
         from ui.realtime_record.audio_visualizer import AudioVisualizer
+
         self.audio_visualizer = AudioVisualizer()
         self.audio_visualizer.setMinimumHeight(50)
         self.audio_visualizer.setMaximumHeight(70)
         self.signals.audio_data_available.connect(
-            self.audio_visualizer.update_audio_data,
-            Qt.ConnectionType.QueuedConnection
+            self.audio_visualizer.update_audio_data, Qt.ConnectionType.QueuedConnection
         )
         layout.addWidget(self.audio_visualizer)
 
@@ -420,13 +406,9 @@ class RealtimeRecordWidget(QWidget):
 
         # 启用翻译复选框
         self.enable_translation_checkbox = QCheckBox()
-        self.enable_translation_checkbox.setObjectName(
-            "enable_translation_checkbox"
-        )
-        self.enable_translation_checkbox.stateChanged.connect(
-            self._on_translation_toggled
-        )
-        
+        self.enable_translation_checkbox.setObjectName("enable_translation_checkbox")
+        self.enable_translation_checkbox.stateChanged.connect(self._on_translation_toggled)
+
         # 检查翻译引擎是否可用
         if not self.recorder.translation_engine:
             tooltip = self.i18n.t("realtime_record.translation_disabled_tooltip")
@@ -434,7 +416,7 @@ class RealtimeRecordWidget(QWidget):
             self.enable_translation_checkbox.setToolTip(tooltip)
         else:
             self.enable_translation_checkbox.setToolTip("")
-        
+
         layout.addWidget(self.enable_translation_checkbox)
 
         layout.addSpacing(10)
@@ -459,7 +441,7 @@ class RealtimeRecordWidget(QWidget):
             self.target_lang_combo.setToolTip(tooltip)
         else:
             self.target_lang_combo.setToolTip("")
-        
+
         layout.addWidget(self.target_lang_combo)
 
         layout.addStretch()
@@ -500,9 +482,7 @@ class RealtimeRecordWidget(QWidget):
 
         # 录制时长显示
         self.duration_value_label = QLabel("00:00:00")
-        self.duration_value_label.setStyleSheet(
-            "font-size: 16px; font-weight: bold;"
-        )
+        self.duration_value_label.setStyleSheet("font-size: 16px; font-weight: bold;")
         layout.addWidget(self.duration_value_label)
 
         layout.addStretch()
@@ -566,9 +546,7 @@ class RealtimeRecordWidget(QWidget):
         self.markers_list.setObjectName("markers_list")
         self.markers_list.setAlternatingRowColors(True)
         self.markers_list.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.markers_list.setSelectionMode(
-            QListWidget.SelectionMode.NoSelection
-        )
+        self.markers_list.setSelectionMode(QListWidget.SelectionMode.NoSelection)
         markers_layout.addWidget(self.markers_list)
 
         markers_group.setLayout(markers_layout)
@@ -585,22 +563,14 @@ class RealtimeRecordWidget(QWidget):
 
         # 导出转录按钮
         self.export_transcription_button = QPushButton()
-        self.export_transcription_button.setObjectName(
-            "export_transcription_button"
-        )
-        self.export_transcription_button.clicked.connect(
-            self._export_transcription
-        )
+        self.export_transcription_button.setObjectName("export_transcription_button")
+        self.export_transcription_button.clicked.connect(self._export_transcription)
         layout.addWidget(self.export_transcription_button)
 
         # 导出翻译按钮
         self.export_translation_button = QPushButton()
-        self.export_translation_button.setObjectName(
-            "export_translation_button"
-        )
-        self.export_translation_button.clicked.connect(
-            self._export_translation
-        )
+        self.export_translation_button.setObjectName("export_translation_button")
+        self.export_translation_button.clicked.connect(self._export_translation)
         layout.addWidget(self.export_translation_button)
 
         # 保存录音按钮
@@ -618,10 +588,7 @@ class RealtimeRecordWidget(QWidget):
         """填充音频输入设备列表"""
         if self.audio_capture is None:
             self.input_combo.clear()
-            self.input_combo.addItem(
-                self.i18n.t("realtime_record.audio_unavailable_short"),
-                None
-            )
+            self.input_combo.addItem(self.i18n.t("realtime_record.audio_unavailable_short"), None)
             return
 
         try:
@@ -630,17 +597,11 @@ class RealtimeRecordWidget(QWidget):
             self.input_combo.clear()
 
             if not devices:
-                self.input_combo.addItem(
-                    self.i18n.t("realtime_record.no_input_devices"),
-                    None
-                )
+                self.input_combo.addItem(self.i18n.t("realtime_record.no_input_devices"), None)
                 return
 
             for device in devices:
-                self.input_combo.addItem(
-                    device['name'],
-                    device['index']
-                )
+                self.input_combo.addItem(device["name"], device["index"])
 
             logger.info(f"Populated {len(devices)} input devices")
 
@@ -650,13 +611,13 @@ class RealtimeRecordWidget(QWidget):
 
     def _update_audio_availability(self):
         """根据音频捕获可用性调整 UI 状态"""
-        if hasattr(self.recorder, 'audio_capture'):
+        if hasattr(self.recorder, "audio_capture"):
             self.audio_capture = self.recorder.audio_capture
 
-        previous_state = getattr(self, '_audio_available', False)
+        previous_state = getattr(self, "_audio_available", False)
 
         available = False
-        if hasattr(self.recorder, 'audio_input_available'):
+        if hasattr(self.recorder, "audio_input_available"):
             try:
                 available = bool(self.recorder.audio_input_available())
             except Exception as exc:  # noqa: BLE001
@@ -668,31 +629,26 @@ class RealtimeRecordWidget(QWidget):
 
         tooltip = self.i18n.t("realtime_record.audio_unavailable_tooltip")
         guide_text = self.i18n.t(
-            "realtime_record.audio_unavailable_message",
-            command="pip install pyaudio"
+            "realtime_record.audio_unavailable_message", command="pip install pyaudio"
         )
         short_text = self.i18n.t("realtime_record.audio_unavailable_short")
 
-        record_button = getattr(self, 'record_button', None)
+        record_button = getattr(self, "record_button", None)
         if record_button:
             record_button.setEnabled(self._audio_available)
-            record_button.setToolTip('' if self._audio_available else tooltip)
+            record_button.setToolTip("" if self._audio_available else tooltip)
 
-        add_marker_button = getattr(self, 'add_marker_button', None)
+        add_marker_button = getattr(self, "add_marker_button", None)
         if add_marker_button:
-            add_marker_button.setEnabled(
-                self._audio_available and self.recorder.is_recording
-            )
-            add_marker_button.setToolTip(
-                '' if self._audio_available else tooltip
-            )
+            add_marker_button.setEnabled(self._audio_available and self.recorder.is_recording)
+            add_marker_button.setToolTip("" if self._audio_available else tooltip)
 
-        for widget_name in ('input_combo', 'gain_slider', 'gain_value_label', 'audio_visualizer'):
+        for widget_name in ("input_combo", "gain_slider", "gain_value_label", "audio_visualizer"):
             widget = getattr(self, widget_name, None)
             if widget:
                 widget.setEnabled(self._audio_available)
 
-        if hasattr(self, 'audio_unavailable_label'):
+        if hasattr(self, "audio_unavailable_label"):
             if self._audio_available:
                 self.audio_unavailable_label.setVisible(False)
                 self.audio_unavailable_label.clear()
@@ -700,7 +656,7 @@ class RealtimeRecordWidget(QWidget):
                 self.audio_unavailable_label.setText(guide_text)
                 self.audio_unavailable_label.setVisible(True)
 
-        if not self._audio_available and hasattr(self, 'input_combo'):
+        if not self._audio_available and hasattr(self, "input_combo"):
             self.input_combo.clear()
             self.input_combo.addItem(short_text, None)
         elif self._audio_available and not previous_state:
@@ -709,40 +665,37 @@ class RealtimeRecordWidget(QWidget):
 
     def _update_model_list(self):
         """Update model combo box with downloaded models."""
-        if not self.model_manager or not hasattr(self, 'model_combo'):
+        if not self.model_manager or not hasattr(self, "model_combo"):
             return
-        
+
         try:
             # Save current selection
             current_model = self.model_combo.currentText()
-            
+
             # Clear combo box
             self.model_combo.clear()
-            
+
             # Get downloaded models
             downloaded_models = self.model_manager.get_downloaded_models()
-            
+
             if not downloaded_models:
                 # No models available - show guide
-                self.model_combo.addItem(
-                    self.i18n.t("realtime_record.no_models_available"),
-                    None
-                )
+                self.model_combo.addItem(self.i18n.t("realtime_record.no_models_available"), None)
                 self.model_combo.setEnabled(False)
                 self._show_download_guide()
                 logger.warning("No models downloaded")
             else:
                 # Enable combo box
                 self.model_combo.setEnabled(True)
-                
+
                 # Hide download guide if it exists
-                if hasattr(self, '_download_guide_widget'):
+                if hasattr(self, "_download_guide_widget"):
                     self._download_guide_widget.hide()
-                
+
                 # Add downloaded models
                 for model in downloaded_models:
                     self.model_combo.addItem(model.name, model.name)
-                
+
                 # Restore previous selection or select default
                 if current_model:
                     index = self.model_combo.findText(current_model)
@@ -757,44 +710,40 @@ class RealtimeRecordWidget(QWidget):
                         index = self.model_combo.findText(default_model)
                         if index >= 0:
                             self.model_combo.setCurrentIndex(index)
-                
+
                 logger.info(f"Updated model list: {len(downloaded_models)} models")
-        
+
         except Exception as e:
             logger.error(f"Failed to update model list: {e}")
 
     def _show_download_guide(self):
         """Show download guide when no models are available."""
-        if hasattr(self, '_download_guide_widget'):
+        if hasattr(self, "_download_guide_widget"):
             self._download_guide_widget.show()
             return
-        
+
         # Create download guide widget
         from PySide6.QtWidgets import QFrame, QLabel, QPushButton
-        
+
         guide_widget = QFrame()
         guide_widget.setObjectName("download_guide")
         guide_widget.setFrameStyle(QFrame.Shape.StyledPanel)
         guide_layout = QHBoxLayout(guide_widget)
-        
+
         # Warning icon and message
         warning_label = QLabel("⚠️")
         warning_label.setStyleSheet("font-size: 20px;")
         guide_layout.addWidget(warning_label)
-        
-        message_label = QLabel(
-            self.i18n.t("realtime_record.no_models_message")
-        )
+
+        message_label = QLabel(self.i18n.t("realtime_record.no_models_message"))
         message_label.setWordWrap(True)
         guide_layout.addWidget(message_label, 1)
-        
+
         # Download button
-        download_button = QPushButton(
-            self.i18n.t("realtime_record.go_to_download")
-        )
+        download_button = QPushButton(self.i18n.t("realtime_record.go_to_download"))
         download_button.clicked.connect(self._navigate_to_model_management)
         guide_layout.addWidget(download_button)
-        
+
         # Insert guide widget after language group
         language_group = self.findChild(QGroupBox, "language_group")
         if language_group:
@@ -805,7 +754,7 @@ class RealtimeRecordWidget(QWidget):
                     if parent_layout.itemAt(i).widget() == language_group:
                         parent_layout.insertWidget(i + 1, guide_widget)
                         break
-        
+
         self._download_guide_widget = guide_widget
         logger.info("Download guide displayed")
 
@@ -814,13 +763,13 @@ class RealtimeRecordWidget(QWidget):
         try:
             # Find main window and navigate to settings
             main_window = self.window()
-            if hasattr(main_window, 'show_page'):
-                main_window.show_page('settings')
-                
+            if hasattr(main_window, "show_page"):
+                main_window.show_page("settings")
+
                 # Try to switch to model management page in settings
-                settings_widget = main_window.pages.get('settings')
-                if settings_widget and hasattr(settings_widget, 'show_page'):
-                    settings_widget.show_page('model_management')
+                settings_widget = main_window.pages.get("settings")
+                if settings_widget and hasattr(settings_widget, "show_page"):
+                    settings_widget.show_page("model_management")
                     logger.info("Navigated to model management page")
         except Exception as e:
             logger.error(f"Failed to navigate to model management: {e}")
@@ -828,7 +777,7 @@ class RealtimeRecordWidget(QWidget):
     def _update_ui_text(self):
         """更新 UI 文本（用于语言切换）"""
         # 标题
-        if hasattr(self, 'title_label'):
+        if hasattr(self, "title_label"):
             self.title_label.setText(self.i18n.t("realtime_record.title"))
 
         # 音频输入组
@@ -857,49 +806,35 @@ class RealtimeRecordWidget(QWidget):
 
         source_lang_label = self.findChild(QLabel, "source_lang_label")
         if source_lang_label:
-            source_lang_label.setText(
-                self.i18n.t("realtime_record.source_language") + ":"
-            )
+            source_lang_label.setText(self.i18n.t("realtime_record.source_language") + ":")
 
         target_lang_label = self.findChild(QLabel, "target_lang_label")
         if target_lang_label:
-            target_lang_label.setText(
-                self.i18n.t("realtime_record.target_language") + ":"
-            )
+            target_lang_label.setText(self.i18n.t("realtime_record.target_language") + ":")
 
-        if hasattr(self, 'source_lang_combo'):
+        if hasattr(self, "source_lang_combo"):
             for index, (_, label_key) in enumerate(self.LANGUAGE_OPTIONS):
                 if index < self.source_lang_combo.count():
-                    self.source_lang_combo.setItemText(
-                        index, self.i18n.t(label_key)
-                    )
+                    self.source_lang_combo.setItemText(index, self.i18n.t(label_key))
 
-        if hasattr(self, 'target_lang_combo'):
+        if hasattr(self, "target_lang_combo"):
             for index, (_, label_key) in enumerate(self.LANGUAGE_OPTIONS):
                 if index < self.target_lang_combo.count():
-                    self.target_lang_combo.setItemText(
-                        index, self.i18n.t(label_key)
-                    )
+                    self.target_lang_combo.setItemText(index, self.i18n.t(label_key))
 
-        enable_translation_checkbox = self.findChild(
-            QCheckBox, "enable_translation_checkbox"
-        )
+        enable_translation_checkbox = self.findChild(QCheckBox, "enable_translation_checkbox")
         if enable_translation_checkbox:
             text = self.i18n.t("realtime_record.enable_translation")
             enable_translation_checkbox.setText(text)
             translation_tooltip = ""
             if not self.recorder.translation_engine:
-                translation_tooltip = self.i18n.t(
-                    "realtime_record.translation_disabled_tooltip"
-                )
+                translation_tooltip = self.i18n.t("realtime_record.translation_disabled_tooltip")
             enable_translation_checkbox.setToolTip(translation_tooltip)
 
-        if hasattr(self, 'target_lang_combo'):
+        if hasattr(self, "target_lang_combo"):
             translation_tooltip = ""
             if not self.recorder.translation_engine:
-                translation_tooltip = self.i18n.t(
-                    "realtime_record.translation_disabled_tooltip"
-                )
+                translation_tooltip = self.i18n.t("realtime_record.translation_disabled_tooltip")
             self.target_lang_combo.setToolTip(translation_tooltip)
 
         # 控制组
@@ -910,82 +845,54 @@ class RealtimeRecordWidget(QWidget):
         record_button = self.findChild(QPushButton, "record_button")
         if record_button:
             if self.recorder.is_recording:
-                record_button.setText(
-                    self.i18n.t("realtime_record.stop_recording")
-                )
+                record_button.setText(self.i18n.t("realtime_record.stop_recording"))
             else:
-                record_button.setText(
-                    self.i18n.t("realtime_record.start_recording")
-                )
+                record_button.setText(self.i18n.t("realtime_record.start_recording"))
 
         add_marker_button = self.findChild(QPushButton, "add_marker_button")
         if add_marker_button:
-            add_marker_button.setText(
-                self.i18n.t("realtime_record.add_marker")
-            )
+            add_marker_button.setText(self.i18n.t("realtime_record.add_marker"))
 
         duration_label = self.findChild(QLabel, "duration_label")
         if duration_label:
-            duration_label.setText(
-                self.i18n.t("realtime_record.recording_duration") + ":"
-            )
+            duration_label.setText(self.i18n.t("realtime_record.recording_duration") + ":")
 
         # 转录组
         transcription_group = self.findChild(QGroupBox, "transcription_group")
         if transcription_group:
-            transcription_group.setTitle(
-                self.i18n.t("realtime_record.transcription_text")
-            )
+            transcription_group.setTitle(self.i18n.t("realtime_record.transcription_text"))
 
         # 翻译组
         translation_group = self.findChild(QGroupBox, "translation_group")
         if translation_group:
-            translation_group.setTitle(
-                self.i18n.t("realtime_record.translation_text")
-            )
+            translation_group.setTitle(self.i18n.t("realtime_record.translation_text"))
 
         markers_group = self.findChild(QGroupBox, "markers_group")
         if markers_group:
-            markers_group.setTitle(
-                self.i18n.t("realtime_record.markers")
-            )
+            markers_group.setTitle(self.i18n.t("realtime_record.markers"))
 
-        if hasattr(self, 'markers_list') and hasattr(self.markers_list, 'setPlaceholderText'):
-            self.markers_list.setPlaceholderText(
-                self.i18n.t("realtime_record.markers_placeholder")
-            )
+        if hasattr(self, "markers_list") and hasattr(self.markers_list, "setPlaceholderText"):
+            self.markers_list.setPlaceholderText(self.i18n.t("realtime_record.markers_placeholder"))
             self._refresh_markers_list()
 
         # 如果翻译引擎不可用，显示提示信息
-        if not self.recorder.translation_engine and hasattr(self, 'translation_text'):
+        if not self.recorder.translation_engine and hasattr(self, "translation_text"):
             self.translation_text.setPlaceholderText(
                 self.i18n.t("realtime_record.translation_not_available")
             )
 
         # 导出按钮
-        export_transcription_button = self.findChild(
-            QPushButton, "export_transcription_button"
-        )
+        export_transcription_button = self.findChild(QPushButton, "export_transcription_button")
         if export_transcription_button:
-            export_transcription_button.setText(
-                self.i18n.t("realtime_record.export_transcription")
-            )
+            export_transcription_button.setText(self.i18n.t("realtime_record.export_transcription"))
 
-        export_translation_button = self.findChild(
-            QPushButton, "export_translation_button"
-        )
+        export_translation_button = self.findChild(QPushButton, "export_translation_button")
         if export_translation_button:
-            export_translation_button.setText(
-                self.i18n.t("realtime_record.export_translation")
-            )
+            export_translation_button.setText(self.i18n.t("realtime_record.export_translation"))
 
-        save_recording_button = self.findChild(
-            QPushButton, "save_recording_button"
-        )
+        save_recording_button = self.findChild(QPushButton, "save_recording_button")
         if save_recording_button:
-            save_recording_button.setText(
-                self.i18n.t("realtime_record.save_recording")
-            )
+            save_recording_button.setText(self.i18n.t("realtime_record.save_recording"))
 
         # 更新音频可用性提示
         self._update_audio_availability()
@@ -1018,21 +925,21 @@ class RealtimeRecordWidget(QWidget):
             # Add to buffer
             with self._buffer_lock:
                 self._transcription_buffer.append(text)
-            
+
             # Update display with all buffered text
             with self._buffer_lock:
                 all_text = "\n".join(self._transcription_buffer)
-            
+
             # Use blockSignals to prevent document signals during update
             self.transcription_text.blockSignals(True)
             self.transcription_text.setPlainText(all_text)
             self.transcription_text.blockSignals(False)
-            
+
             # Scroll to bottom
             scrollbar = self.transcription_text.verticalScrollBar()
             if scrollbar:
                 scrollbar.setValue(scrollbar.maximum())
-            
+
             logger.debug(f"Transcription updated: {text}")
         except Exception as e:
             logger.error(f"Error updating transcription display: {e}")
@@ -1043,28 +950,28 @@ class RealtimeRecordWidget(QWidget):
             # Add to buffer
             with self._buffer_lock:
                 self._translation_buffer.append(text)
-            
+
             # Update display with all buffered text
             with self._buffer_lock:
                 all_text = "\n".join(self._translation_buffer)
-            
+
             # Use blockSignals to prevent document signals during update
             self.translation_text.blockSignals(True)
             self.translation_text.setPlainText(all_text)
             self.translation_text.blockSignals(False)
-            
+
             # Scroll to bottom
             scrollbar = self.translation_text.verticalScrollBar()
             if scrollbar:
                 scrollbar.setValue(scrollbar.maximum())
-            
+
             logger.debug(f"Translation updated: {text}")
         except Exception as e:
             logger.error(f"Error updating translation display: {e}")
 
     def _append_marker_item(self, marker):
         """在 UI 中追加标记条目。"""
-        if not marker or not hasattr(self, 'markers_list'):
+        if not marker or not hasattr(self, "markers_list"):
             return
 
         self._markers.append(marker)
@@ -1074,7 +981,7 @@ class RealtimeRecordWidget(QWidget):
 
     def _refresh_markers_list(self):
         """根据当前语言刷新标记显示。"""
-        if not hasattr(self, 'markers_list'):
+        if not hasattr(self, "markers_list"):
             return
 
         self.markers_list.blockSignals(True)
@@ -1086,23 +993,19 @@ class RealtimeRecordWidget(QWidget):
             self.markers_list.scrollToBottom()
 
     def _format_marker_entry(self, marker) -> str:
-        index = marker.get('index', len(self._markers))
-        timestamp = self._format_marker_timestamp(marker.get('offset', 0.0))
-        label = marker.get('label') or ""
+        index = marker.get("index", len(self._markers))
+        timestamp = self._format_marker_timestamp(marker.get("offset", 0.0))
+        label = marker.get("label") or ""
 
         if label:
             return self.i18n.t(
                 "realtime_record.marker_item_with_label",
                 number=index,
                 timestamp=timestamp,
-                label=label
+                label=label,
             )
 
-        return self.i18n.t(
-            "realtime_record.marker_item",
-            number=index,
-            timestamp=timestamp
-        )
+        return self.i18n.t("realtime_record.marker_item", number=index, timestamp=timestamp)
 
     @staticmethod
     def _format_marker_timestamp(seconds: float) -> str:
@@ -1125,7 +1028,7 @@ class RealtimeRecordWidget(QWidget):
 
     def _update_status_message(self, message: str, level: str) -> None:
         """在状态标签上更新反馈信息。"""
-        if not hasattr(self, 'feedback_label') or self.feedback_label is None:
+        if not hasattr(self, "feedback_label") or self.feedback_label is None:
             return
 
         if not message:
@@ -1133,15 +1036,9 @@ class RealtimeRecordWidget(QWidget):
             self.feedback_label.setVisible(False)
             return
 
-        palette = {
-            'error': '#B3261E',
-            'success': '#1B5E20',
-            'info': '#1E88E5'
-        }
-        color = palette.get(level, '#1E88E5')
-        self.feedback_label.setStyleSheet(
-            f"color: {color}; font-weight: 600;"
-        )
+        palette = {"error": "#B3261E", "success": "#1B5E20", "info": "#1E88E5"}
+        color = palette.get(level, "#1E88E5")
+        self.feedback_label.setStyleSheet(f"color: {color}; font-weight: 600;")
         self.feedback_label.setText(message)
         self.feedback_label.setVisible(True)
 
@@ -1152,54 +1049,46 @@ class RealtimeRecordWidget(QWidget):
             self.signals.error_occurred.emit(error)
             return
 
-        error_detail = error or self.i18n.t('errors.unknown_error')
+        error_detail = error or self.i18n.t("errors.unknown_error")
         logger.error("Recording error: %s", error_detail)
 
-        prefix = self.i18n.t('realtime_record.feedback.error_prefix')
+        prefix = self.i18n.t("realtime_record.feedback.error_prefix")
         label_message = f"{prefix}: {error_detail}"
-        self._update_status_message(label_message, 'error')
+        self._update_status_message(label_message, "error")
 
         if self._notification_manager is not None:
             try:
-                title = self.i18n.t('notifications.recording_failed')
+                title = self.i18n.t("notifications.recording_failed")
                 self._notification_manager.send_error(title, error_detail)
             except Exception as exc:  # noqa: BLE001
-                logger.warning(
-                    "Failed to send error notification: %s", exc, exc_info=True
-                )
+                logger.warning("Failed to send error notification: %s", exc, exc_info=True)
 
     def _update_status_display(self, is_recording: bool, duration: float):
         """更新状态显示（UI 线程）"""
         # 更新录制时长
-        self.duration_value_label.setText(
-            self._format_duration_hhmmss(duration)
-        )
-    
+        self.duration_value_label.setText(self._format_duration_hhmmss(duration))
+
     def _on_recording_started(self):
         """录制开始时的 UI 更新（主线程）"""
         logger.info("Updating UI for recording started")
-        self.record_button.setText(
-            self.i18n.t("realtime_record.stop_recording")
-        )
+        self.record_button.setText(self.i18n.t("realtime_record.stop_recording"))
         self.record_button.setProperty("recording", True)
         self.record_button.style().unpolish(self.record_button)
         self.record_button.style().polish(self.record_button)
         self.status_timer.start(100)
-        if hasattr(self, 'add_marker_button'):
+        if hasattr(self, "add_marker_button"):
             self.add_marker_button.setEnabled(True)
             self.add_marker_button.setToolTip("")
 
     def _on_recording_stopped(self):
         """录制停止时的 UI 更新（主线程）"""
         logger.info("Updating UI for recording stopped")
-        self.record_button.setText(
-            self.i18n.t("realtime_record.start_recording")
-        )
+        self.record_button.setText(self.i18n.t("realtime_record.start_recording"))
         self.record_button.setProperty("recording", False)
         self.record_button.style().unpolish(self.record_button)
         self.record_button.style().polish(self.record_button)
         self.status_timer.stop()
-        if hasattr(self, 'add_marker_button'):
+        if hasattr(self, "add_marker_button"):
             self.add_marker_button.setEnabled(False)
 
     def _update_status(self):
@@ -1210,15 +1099,14 @@ class RealtimeRecordWidget(QWidget):
         status = self.recorder.get_recording_status()
         # 正确解包字典并发射信号
         self.signals.status_changed.emit(
-            status.get('is_recording', False),
-            status.get('duration', 0.0)
+            status.get("is_recording", False), status.get("duration", 0.0)
         )
 
     # Event handlers
     def _reset_markers_ui(self):
         """清空标记列表显示。"""
         self._markers.clear()
-        if hasattr(self, 'markers_list'):
+        if hasattr(self, "markers_list"):
             self.markers_list.clear()
 
     def _on_gain_changed(self, value: int):
@@ -1269,7 +1157,7 @@ class RealtimeRecordWidget(QWidget):
         else:
             # 停止录制
             self._run_async_task(self._stop_recording())
-    
+
     def _run_async_task(self, coro):
         """在专用事件循环中运行异步任务"""
         import asyncio
@@ -1317,6 +1205,7 @@ class RealtimeRecordWidget(QWidget):
 
         # 使用 QTimer 异步检查结果
         from PySide6.QtCore import QTimer
+
         QTimer.singleShot(100, check_result)
 
     async def _start_recording(self):
@@ -1325,14 +1214,14 @@ class RealtimeRecordWidget(QWidget):
             self._refresh_recording_preferences()
 
             # Check if model is selected (if model_manager is available)
-            if self.model_manager and hasattr(self, 'model_combo'):
+            if self.model_manager and hasattr(self, "model_combo"):
                 selected_model = self.model_combo.currentData()
                 if not selected_model:
                     error_msg = self.i18n.t("realtime_record.no_model_selected")
                     logger.error(error_msg)
                     self.signals.error_occurred.emit(error_msg)
                     return
-                
+
                 # Verify model is downloaded
                 model_info = self.model_manager.get_model(selected_model)
                 if not model_info or not model_info.is_downloaded:
@@ -1340,7 +1229,7 @@ class RealtimeRecordWidget(QWidget):
                     logger.error(error_msg)
                     self.signals.error_occurred.emit(error_msg)
                     return
-                
+
                 logger.info(f"Using model: {selected_model}")
 
             # 获取选项
@@ -1350,23 +1239,23 @@ class RealtimeRecordWidget(QWidget):
             target_lang = self.target_lang_combo.currentData()
 
             options = {
-                'language': source_lang,
-                'enable_translation': enable_translation,
-                'target_language': target_lang,
-                'recording_format': self._recording_format,
-                'save_recording': self._auto_save_enabled,
-                'save_transcript': True,
-                'create_calendar_event': True
+                "language": source_lang,
+                "enable_translation": enable_translation,
+                "target_language": target_lang,
+                "recording_format": self._recording_format,
+                "save_recording": self._auto_save_enabled,
+                "save_transcript": True,
+                "create_calendar_event": True,
             }
-            
+
             # Add model info if available
-            if self.model_manager and hasattr(self, 'model_combo'):
+            if self.model_manager and hasattr(self, "model_combo"):
                 selected_model = self.model_combo.currentData()
                 if selected_model:
                     model_info = self.model_manager.get_model(selected_model)
                     if model_info and model_info.is_downloaded:
-                        options['model_name'] = selected_model
-                        options['model_path'] = model_info.local_path
+                        options["model_name"] = selected_model
+                        options["model_path"] = model_info.local_path
 
             # 清空文本显示和缓冲区
             with self._buffer_lock:
@@ -1384,9 +1273,7 @@ class RealtimeRecordWidget(QWidget):
             # 开始录制（音频数据会通过 on_audio_data 回调自动发送）
             # 传递事件循环引用
             await self.recorder.start_recording(
-                input_source=device_index,
-                options=options,
-                event_loop=self._async_loop
+                input_source=device_index, options=options, event_loop=self._async_loop
             )
 
             # 发射信号通知主线程更新 UI
@@ -1395,9 +1282,7 @@ class RealtimeRecordWidget(QWidget):
             logger.info("Recording started")
 
         except Exception as e:
-            error_message = self.i18n.t(
-                "realtime_record.start_failed", error=str(e)
-            )
+            error_message = self.i18n.t("realtime_record.start_failed", error=str(e))
             logger.error(error_message, exc_info=True)
             self.signals.error_occurred.emit(error_message)
 
@@ -1415,9 +1300,7 @@ class RealtimeRecordWidget(QWidget):
             self.signals.recording_succeeded.emit(result or {})
 
         except Exception as e:
-            error_message = self.i18n.t(
-                "realtime_record.stop_failed", error=str(e)
-            )
+            error_message = self.i18n.t("realtime_record.stop_failed", error=str(e))
             logger.error(error_message, exc_info=True)
             self.signals.error_occurred.emit(error_message)
 
@@ -1426,40 +1309,35 @@ class RealtimeRecordWidget(QWidget):
         if not isinstance(result, dict):
             result = {}
 
-        duration_seconds = float(result.get('duration') or 0.0)
+        duration_seconds = float(result.get("duration") or 0.0)
         duration_text = self._format_duration_hhmmss(duration_seconds)
 
         save_path = (
-            result.get('recording_path')
-            or result.get('transcript_path')
-            or result.get('translation_path')
-            or ''
+            result.get("recording_path")
+            or result.get("transcript_path")
+            or result.get("translation_path")
+            or ""
         )
 
-        success_prefix = self.i18n.t('realtime_record.feedback.success_prefix')
+        success_prefix = self.i18n.t("realtime_record.feedback.success_prefix")
         if save_path:
             detail = self.i18n.t(
-                'realtime_record.feedback.success_detail_with_path',
+                "realtime_record.feedback.success_detail_with_path",
                 duration=duration_text,
-                path=save_path
+                path=save_path,
             )
         else:
-            detail = self.i18n.t(
-                'realtime_record.feedback.success_detail',
-                duration=duration_text
-            )
+            detail = self.i18n.t("realtime_record.feedback.success_detail", duration=duration_text)
 
         label_message = f"{success_prefix}: {detail}"
-        self._update_status_message(label_message, 'success')
+        self._update_status_message(label_message, "success")
 
         if self._notification_manager is not None:
             try:
-                title = self.i18n.t('notifications.recording_saved')
+                title = self.i18n.t("notifications.recording_saved")
                 self._notification_manager.send_success(title, detail)
             except Exception as exc:  # noqa: BLE001
-                logger.warning(
-                    "Failed to send success notification: %s", exc, exc_info=True
-                )
+                logger.warning("Failed to send success notification: %s", exc, exc_info=True)
 
     def _export_transcription(self):
         """导出转录文本"""
@@ -1477,19 +1355,17 @@ class RealtimeRecordWidget(QWidget):
             self,
             self.i18n.t("realtime_record.export_transcription_title"),
             "",
-            self.i18n.t("realtime_record.export_file_filter")
+            self.i18n.t("realtime_record.export_file_filter"),
         )
 
         if file_path:
             try:
-                with open(file_path, 'w', encoding='utf-8') as f:
+                with open(file_path, "w", encoding="utf-8") as f:
                     f.write(text)
                 logger.info(f"Transcription exported to {file_path}")
             except Exception as e:
                 logger.error(f"Failed to export transcription: {e}")
-                self._show_error(
-                    self.i18n.t("realtime_record.export_failed", error=str(e))
-                )
+                self._show_error(self.i18n.t("realtime_record.export_failed", error=str(e)))
 
     def _export_translation(self):
         """导出翻译文本"""
@@ -1507,19 +1383,17 @@ class RealtimeRecordWidget(QWidget):
             self,
             self.i18n.t("realtime_record.export_translation_title"),
             "",
-            self.i18n.t("realtime_record.export_file_filter")
+            self.i18n.t("realtime_record.export_file_filter"),
         )
 
         if file_path:
             try:
-                with open(file_path, 'w', encoding='utf-8') as f:
+                with open(file_path, "w", encoding="utf-8") as f:
                     f.write(text)
                 logger.info(f"Translation exported to {file_path}")
             except Exception as e:
                 logger.error(f"Failed to export translation: {e}")
-                self._show_error(
-                    self.i18n.t("realtime_record.export_failed", error=str(e))
-                )
+                self._show_error(self.i18n.t("realtime_record.export_failed", error=str(e)))
 
     def _save_recording(self):
         """保存录音"""
@@ -1540,17 +1414,15 @@ class RealtimeRecordWidget(QWidget):
             except (TypeError, RuntimeError):
                 pass
 
-        if self.settings_manager and hasattr(self.settings_manager, 'setting_changed'):
+        if self.settings_manager and hasattr(self.settings_manager, "setting_changed"):
             try:
-                self.settings_manager.setting_changed.disconnect(
-                    self._on_settings_changed
-                )
+                self.settings_manager.setting_changed.disconnect(self._on_settings_changed)
             except (TypeError, RuntimeError, AttributeError):
                 pass
 
     def _stop_recorder_if_needed(self):
         """确保录制停止并等待后台任务完成。"""
-        if not getattr(self, 'recorder', None):
+        if not getattr(self, "recorder", None):
             return
 
         if self.recorder.is_recording and self._async_loop is not None:
@@ -1558,26 +1430,17 @@ class RealtimeRecordWidget(QWidget):
 
             try:
                 future = asyncio.run_coroutine_threadsafe(
-                    self.recorder.stop_recording(),
-                    self._async_loop
+                    self.recorder.stop_recording(), self._async_loop
                 )
                 try:
                     future.result(timeout=10)
                 except Exception as exc:  # noqa: BLE001
-                    logger.error(
-                        "Failed to stop recorder during cleanup: %s",
-                        exc,
-                        exc_info=True
-                    )
+                    logger.error("Failed to stop recorder during cleanup: %s", exc, exc_info=True)
                     future.cancel()
                 finally:
                     self._pending_futures.discard(future)
             except Exception as exc:  # noqa: BLE001
-                logger.error(
-                    "Error scheduling recorder shutdown: %s",
-                    exc,
-                    exc_info=True
-                )
+                logger.error("Error scheduling recorder shutdown: %s", exc, exc_info=True)
 
         # 释放回调引用，避免循环引用
         self.recorder.set_callbacks()
@@ -1612,7 +1475,7 @@ class RealtimeRecordWidget(QWidget):
         self._cleanup_in_progress = True
 
         # 停止定时器并断开回调
-        if hasattr(self, 'status_timer') and self.status_timer is not None:
+        if hasattr(self, "status_timer") and self.status_timer is not None:
             self.status_timer.stop()
             try:
                 self.status_timer.timeout.disconnect(self._update_status)

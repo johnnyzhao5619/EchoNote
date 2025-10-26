@@ -35,7 +35,7 @@ class AudioBuffer:
     def __init__(self, max_duration_seconds: int = 60, sample_rate: int = 16000):
         """
         初始化音频缓冲区
-        
+
         Args:
             max_duration_seconds: 最大缓冲时长（秒）
             sample_rate: 采样率（Hz）
@@ -43,22 +43,24 @@ class AudioBuffer:
         self.max_duration_seconds = max_duration_seconds
         self.sample_rate = sample_rate
         self.max_samples = max_duration_seconds * sample_rate
-        
+
         # 使用 deque 实现固定大小的环形缓冲区
         self.buffer = deque(maxlen=self.max_samples)
-        
+
         # 线程锁，确保线程安全
         self.lock = threading.Lock()
-        
+
         # 统计信息
         self.total_samples_added = 0
-        
-        logger.info(f"Audio buffer initialized: max_duration={max_duration_seconds}s, sample_rate={sample_rate}Hz")
+
+        logger.info(
+            f"Audio buffer initialized: max_duration={max_duration_seconds}s, sample_rate={sample_rate}Hz"
+        )
 
     def append(self, audio_chunk: np.ndarray):
         """
         添加音频数据块到缓冲区
-        
+
         Args:
             audio_chunk: 音频数据（numpy array）
         """
@@ -68,40 +70,40 @@ class AudioBuffer:
             self.buffer.extend(chunk_iter)
 
             self.total_samples_added += len(audio_chunk)
-            
+
             logger.debug(f"Added {len(audio_chunk)} samples to buffer (total: {len(self.buffer)})")
 
     def get_window(self, duration_seconds: float, offset_seconds: float = 0.0) -> np.ndarray:
         """
         获取指定时长的音频窗口
-        
+
         Args:
             duration_seconds: 窗口时长（秒）
             offset_seconds: 偏移量（秒），0 表示最新数据，正值表示向过去偏移
-            
+
         Returns:
             np.ndarray: 音频数据窗口
         """
         with self.lock:
             buffer_size = len(self.buffer)
-            
+
             if buffer_size == 0:
                 return np.array([], dtype=np.float32)
-            
+
             # 计算样本数
             window_samples = int(duration_seconds * self.sample_rate)
             offset_samples = int(offset_seconds * self.sample_rate)
-            
+
             # 计算窗口的起始和结束位置
             end_pos = buffer_size - offset_samples
             start_pos = max(0, end_pos - window_samples)
-            
+
             # 确保位置有效
             if start_pos >= buffer_size or end_pos <= 0:
                 return np.array([], dtype=np.float32)
-            
+
             end_pos = min(end_pos, buffer_size)
-            
+
             # 仅在需要的片段上迭代，避免完整拷贝
             window_length = end_pos - start_pos
             window_iter = islice(self.buffer, start_pos, end_pos)
@@ -117,10 +119,10 @@ class AudioBuffer:
     def get_latest(self, duration_seconds: float) -> np.ndarray:
         """
         获取最新的指定时长的音频数据
-        
+
         Args:
             duration_seconds: 时长（秒）
-            
+
         Returns:
             np.ndarray: 最新的音频数据
         """
@@ -129,7 +131,7 @@ class AudioBuffer:
     def get_all(self) -> np.ndarray:
         """
         获取缓冲区中的所有音频数据
-        
+
         Returns:
             np.ndarray: 所有音频数据
         """
@@ -141,24 +143,25 @@ class AudioBuffer:
 
             return np.fromiter(self.buffer, dtype=np.float32, count=buffer_size)
 
-    def get_sliding_windows(self, window_duration_seconds: float, 
-                           overlap_seconds: float = 0.0) -> list:
+    def get_sliding_windows(
+        self, window_duration_seconds: float, overlap_seconds: float = 0.0
+    ) -> list:
         """
         获取滑动窗口列表
-        
+
         Args:
             window_duration_seconds: 窗口时长（秒）
             overlap_seconds: 重叠时长（秒）
-            
+
         Returns:
             list: 窗口列表，每个窗口是一个 numpy array
         """
         with self.lock:
             buffer_size = len(self.buffer)
-            
+
             if buffer_size == 0:
                 return []
-            
+
             window_samples = int(window_duration_seconds * self.sample_rate)
             if window_samples <= 0:
                 logger.warning("Invalid window duration: duration must be positive")
@@ -169,14 +172,14 @@ class AudioBuffer:
             if step_samples <= 0:
                 logger.warning("Invalid overlap: overlap must be less than window duration")
                 return []
-            
+
             windows = []
             buffer_array = np.fromiter(self.buffer, dtype=np.float32, count=buffer_size)
 
             for start_pos in range(0, buffer_size - window_samples + 1, step_samples):
                 end_pos = start_pos + window_samples
                 windows.append(buffer_array[start_pos:end_pos].copy())
-            
+
             logger.debug(f"Generated {len(windows)} sliding windows")
             return windows
 
@@ -190,7 +193,7 @@ class AudioBuffer:
     def get_duration(self) -> float:
         """
         获取缓冲区中音频的总时长
-        
+
         Returns:
             float: 时长（秒）
         """
@@ -200,7 +203,7 @@ class AudioBuffer:
     def get_size(self) -> int:
         """
         获取缓冲区中的样本数
-        
+
         Returns:
             int: 样本数
         """
@@ -210,7 +213,7 @@ class AudioBuffer:
     def is_empty(self) -> bool:
         """
         检查缓冲区是否为空
-        
+
         Returns:
             bool: 是否为空
         """
@@ -220,7 +223,7 @@ class AudioBuffer:
     def is_full(self) -> bool:
         """
         检查缓冲区是否已满
-        
+
         Returns:
             bool: 是否已满
         """
@@ -230,7 +233,7 @@ class AudioBuffer:
     def get_memory_usage(self) -> int:
         """
         获取缓冲区的内存使用量
-        
+
         Returns:
             int: 内存使用量（字节）
         """
@@ -241,7 +244,7 @@ class AudioBuffer:
     def get_stats(self) -> dict:
         """
         获取缓冲区统计信息
-        
+
         Returns:
             dict: 统计信息
         """
@@ -254,5 +257,5 @@ class AudioBuffer:
                 "total_samples_added": self.total_samples_added,
                 "memory_usage_bytes": len(self.buffer) * 4,
                 "is_full": len(self.buffer) >= self.max_samples,
-                "fill_percentage": (len(self.buffer) / self.max_samples) * 100
+                "fill_percentage": (len(self.buffer) / self.max_samples) * 100,
             }

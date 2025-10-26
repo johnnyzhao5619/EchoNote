@@ -67,9 +67,7 @@ class ModelInfo:
             if has_content:
                 self.local_path = str(candidate)
                 try:
-                    self.download_date = datetime.fromtimestamp(
-                        candidate.stat().st_mtime
-                    )
+                    self.download_date = datetime.fromtimestamp(candidate.stat().st_mtime)
                 except OSError:
                     self.download_date = None
                 self.is_downloaded = True
@@ -86,17 +84,14 @@ class ModelRegistry:
 
     def __init__(self) -> None:
         self._models: Dict[str, ModelInfo] = {
-            info.name: info
-            for info in self._build_default_models()
+            info.name: info for info in self._build_default_models()
         }
         self._order: List[str] = list(self._models.keys())
 
     def _build_default_models(self) -> Iterable[ModelInfo]:
         """构建默认模型集合。"""
 
-        base_description = (
-            "Faster-Whisper 官方模型，提供本地离线语音识别能力。"
-        )
+        base_description = "Faster-Whisper 官方模型，提供本地离线语音识别能力。"
 
         return [
             ModelInfo(

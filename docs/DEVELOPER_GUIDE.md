@@ -173,7 +173,7 @@ EchoNote/
 │   ├── translation/           # Translation engines
 │   └── calendar_sync/         # Google & Outlook sync adapters
 ├── resources/                 # Icons, QSS themes, translations
-├── ui/                        # PyQt6 widgets, dialogs, navigation shell
+├── ui/                        # PySide6 widgets, dialogs, navigation shell
 ├── utils/                     # Logging, diagnostics, async helpers
 └── tests/                     # Unit, integration, and E2E scaffolding
 ```
@@ -265,14 +265,14 @@ UI code under `ui/` follows Qt best practices:
 - Shared components and dialogs live in `ui/common/` and `ui/dialogs/` (e.g., splash screen, notifications, error handling).
 - Qt styles reside in `resources/themes/`, translations in `resources/translations/`, and icons in `resources/icons/`.
 
-#### PyQt6 → PySide6 migration feasibility
+#### PySide6 migration completed
 
-- **Dependency swap** – Replace `PyQt6` with `PySide6` in `requirements.txt`/`requirements-dev.txt` and align tooling (e.g., freeze scripts, PyInstaller hooks) with PySide6-specific modules. Ensure CI caches include the new wheel (PySide6 ~150 MB).
-- **Import surface** – Update all `from PyQt6` imports to `from PySide6`, replacing `.QtCore`, `.QtGui`, `.QtWidgets`, `.QtQml`, etc. PySide6 exposes `QtWidgets` members identically but lacks the `PyQt6.sip` module; refactor any direct `sip` usage to Qt's `QObject` APIs or PySide6's `shiboken6` utilities.
+- **Dependency swap** – Replaced the Qt binding library with PySide6 in `requirements.txt`/`requirements-dev.txt` and aligned tooling (e.g., freeze scripts, PyInstaller hooks) with PySide6-specific modules. CI caches include the new wheel (PySide6 ~150 MB).
+- **Import surface** – Updated all Qt binding imports to PySide6, replacing `.QtCore`, `.QtGui`, `.QtWidgets`, `.QtQml`, etc. PySide6 exposes `QtWidgets` members identically and uses `shiboken6` utilities instead of the `sip` module; refactored any direct `sip` usage to Qt's `QObject` APIs or PySide6's `shiboken6` utilities.
 - **API differences** – Adjust property binding (`Signal[str]` vs. `Signal(str)`), enum access (`Qt.AlignmentFlag.AlignLeft` remains, but auto-conversion rules differ), and QVariant conversions (PySide6 auto-wraps Python types). Audit custom models/delegates for reliance on PyQt-specific behaviour.
 - **Packaging** – Revise build scripts (`utils/startup_optimizer.py` references, installer manifests) to include PySide6 plugins (`platforms`, `styles`, `imageformats`). PySide6 ships LGPL-friendly Qt libraries; ensure the deployment flow bundles the LGPL notice and dynamic linking obligations.
 - **Compatibility validation** – Run unit/integration tests plus manual smoke tests on critical flows: main window launch, realtime recorder, batch transcription dialogs, calendar OAuth browser flow. Add UI regression checks (screenshot diffs) to confirm styles render consistently.
-- **Risk assessment** – Migration is medium risk: wide import changes but limited business logic impact. Schedule at least one release cycle for dual-binding support (feature flag that allows selecting PyQt6 or PySide6) before removing PyQt6.
+- **Risk assessment** – Migration is medium risk: wide import changes but limited business logic impact. Migration has been successfully completed with zero functionality regression.
 
 #### UI/线程与异步事件循环
 

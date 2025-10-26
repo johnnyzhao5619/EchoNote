@@ -176,7 +176,7 @@ This will launch a standalone window with the settings UI for testing.
 
 ## Dependencies
 
-- PyQt6: UI framework
+- PySide6: UI framework
 - SettingsManager: Settings business logic
 - ConfigManager: Configuration persistence
 - I18nQtManager: Internationalization

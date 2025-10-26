@@ -77,7 +77,7 @@ class AudioVisualizer(QWidget):
             return
 
         # 计算 RMS（均方根）音量
-        rms = np.sqrt(np.mean(audio_chunk ** 2))
+        rms = np.sqrt(np.mean(audio_chunk**2))
         self.volume_level = float(rms)
 
         # 下采样音频数据用于波形显示
@@ -87,7 +87,7 @@ class AudioVisualizer(QWidget):
             chunk_size = len(audio_chunk) // 100
             downsampled = []
             for i in range(0, len(audio_chunk), chunk_size):
-                segment = audio_chunk[i:i + chunk_size]
+                segment = audio_chunk[i : i + chunk_size]
                 if len(segment) > 0:
                     downsampled.append(np.mean(segment))
             audio_chunk = np.array(downsampled)
@@ -113,16 +113,10 @@ class AudioVisualizer(QWidget):
         volume_bar_width = width - waveform_width - 10
 
         # 绘制波形
-        self._draw_waveform(
-            painter,
-            QRect(0, 0, waveform_width, height)
-        )
+        self._draw_waveform(painter, QRect(0, 0, waveform_width, height))
 
         # 绘制音量表
-        self._draw_volume_bar(
-            painter,
-            QRect(waveform_width + 10, 0, volume_bar_width, height)
-        )
+        self._draw_volume_bar(painter, QRect(waveform_width + 10, 0, volume_bar_width, height))
 
     def _draw_waveform(self, painter: QPainter, rect: QRect):
         """
@@ -197,24 +191,14 @@ class AudioVisualizer(QWidget):
             color = self.volume_bar_color
 
         # 绘制音量条（从底部向上）
-        bar_rect = QRect(
-            rect.left() + 1,
-            rect.bottom() - bar_height,
-            rect.width() - 2,
-            bar_height
-        )
+        bar_rect = QRect(rect.left() + 1, rect.bottom() - bar_height, rect.width() - 2, bar_height)
         painter.fillRect(bar_rect, color)
 
         # 绘制刻度线
         painter.setPen(QPen(self.grid_color, 1))
         for i in range(1, 10):
             y = rect.bottom() - int(rect.height() * i / 10)
-            painter.drawLine(
-                rect.left(),
-                y,
-                rect.left() + 5,
-                y
-            )
+            painter.drawLine(rect.left(), y, rect.left() + 5, y)
 
     def clear(self):
         """清空波形数据"""
@@ -222,8 +206,7 @@ class AudioVisualizer(QWidget):
         self.volume_level = 0.0
         self.update()
 
-    def set_colors(self, waveform_color=None, volume_bar_color=None,
-                   background_color=None):
+    def set_colors(self, waveform_color=None, volume_bar_color=None, background_color=None):
         """
         设置颜色
 

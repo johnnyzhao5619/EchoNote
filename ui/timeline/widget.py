@@ -26,8 +26,17 @@ from typing import Optional, Dict, Any, List, TYPE_CHECKING, cast
 from datetime import datetime
 
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QScrollArea,
-    QLineEdit, QComboBox, QLabel, QFrame, QPushButton, QMessageBox, QDateEdit
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QScrollArea,
+    QLineEdit,
+    QComboBox,
+    QLabel,
+    QFrame,
+    QPushButton,
+    QMessageBox,
+    QDateEdit,
 )
 from PySide6.QtCore import Qt, Signal, QTimer, QDateTime, QTime, QDate
 from PySide6.QtGui import QPalette
@@ -39,41 +48,41 @@ if TYPE_CHECKING:  # pragma: no cover - imported for type checking only
     from ui.timeline.event_card import EventCard
 
 
-logger = logging.getLogger('echonote.ui.timeline.widget')
+logger = logging.getLogger("echonote.ui.timeline.widget")
 
 
 class TimelineWidget(QWidget):
     """
     Timeline view widget showing past and future events.
-    
+
     Features:
     - Vertical scrolling timeline with current time indicator
     - Search and filter functionality
     - Lazy loading with pagination
     - Event cards for past and future events
     """
-    
+
     # Signals
     event_selected = Signal(str)  # event_id
     auto_task_changed = Signal(str, dict)  # event_id, config
-    
+
     def __init__(
         self,
         timeline_manager,
         i18n: I18nQtManager,
         parent: Optional[QWidget] = None,
-        settings_manager: Optional[object] = None
+        settings_manager: Optional[object] = None,
     ):
         """
         Initialize timeline widget.
-        
+
         Args:
             timeline_manager: TimelineManager instance
             i18n: Internationalization manager
             parent: Parent widget
         """
         super().__init__(parent)
-        
+
         self.timeline_manager = timeline_manager
         self.i18n = i18n
         self.settings_manager = settings_manager
@@ -81,133 +90,115 @@ class TimelineWidget(QWidget):
 
         # State
         self.current_page = 0
-        self.past_days = self._get_timeline_setting(
-            "timeline.past_days", default=30
-        )
-        self.future_days = self._get_timeline_setting(
-            "timeline.future_days", default=30
-        )
-        self.page_size = self._get_timeline_setting(
-            "timeline.page_size", default=50, minimum=1
-        )
+        self.past_days = self._get_timeline_setting("timeline.past_days", default=30)
+        self.future_days = self._get_timeline_setting("timeline.future_days", default=30)
+        self.page_size = self._get_timeline_setting("timeline.page_size", default=50, minimum=1)
         self.is_loading = False
         self._pending_refresh: Optional[bool] = None
         self.has_more = True
         self.event_cards: List[QWidget] = []
-        self._audio_player_dialogs: Dict[str, 'AudioPlayerDialog'] = {}
-        self._text_viewer_dialogs: Dict[str, 'TranscriptViewerDialog'] = {}
+        self._audio_player_dialogs: Dict[str, "AudioPlayerDialog"] = {}
+        self._text_viewer_dialogs: Dict[str, "TranscriptViewerDialog"] = {}
         self._auto_task_state_cache: Dict[str, Dict[str, Any]] = {}
-        
+
         # Current filters
         self.current_query = ""
         self.current_filters = {}
-        
+
         # Setup UI
         self.setup_ui()
-        
+
         # Connect language change
         self.i18n.language_changed.connect(self.update_translations)
-        
+
         # Connect settings change notifications when available
         self._connect_settings_manager()
 
         # Load initial data
         QTimer.singleShot(100, self.load_timeline_events)
-        
+
         logger.info("Timeline widget initialized")
-    
+
     def setup_ui(self):
         """Set up the timeline UI."""
         # Main layout
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(10)
-        
+
         # Title
-        self.title_label = QLabel(self.i18n.t('timeline.title'))
+        self.title_label = QLabel(self.i18n.t("timeline.title"))
         self.title_label.setObjectName("page_title")
         layout.addWidget(self.title_label)
-        
+
         # Header with search and filters
         header_layout = self.create_header()
         layout.addLayout(header_layout)
-        
+
         # Timeline scroll area
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
-        self.scroll_area.setHorizontalScrollBarPolicy(
-            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
-        )
-        self.scroll_area.setVerticalScrollBarPolicy(
-            Qt.ScrollBarPolicy.ScrollBarAsNeeded
-        )
-        
+        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+
         # Timeline container
         self.timeline_container = QWidget()
         self.timeline_layout = QVBoxLayout(self.timeline_container)
         self.timeline_layout.setContentsMargins(0, 0, 0, 0)
         self.timeline_layout.setSpacing(15)
-        
+
         # Add stretch at the end
         self.timeline_layout.addStretch()
-        
+
         self.scroll_area.setWidget(self.timeline_container)
         layout.addWidget(self.scroll_area)
-        
+
         # Connect scroll event for pagination
-        self.scroll_area.verticalScrollBar().valueChanged.connect(
-            self._on_scroll
-        )
-        
+        self.scroll_area.verticalScrollBar().valueChanged.connect(self._on_scroll)
+
         logger.debug("Timeline UI setup complete")
-    
+
     def create_header(self) -> QVBoxLayout:
         """
         Create header with search and filter controls.
-        
+
         Returns:
             Header layout (VBoxLayout with search and filter rows)
         """
         header_layout = QVBoxLayout()
         header_layout.setSpacing(10)
-        
+
         # First row: Search
         search_row = QHBoxLayout()
         search_row.setSpacing(10)
-        
+
         # Search box
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText(
-            self.i18n.t('timeline.search_placeholder')
-        )
+        self.search_input.setPlaceholderText(self.i18n.t("timeline.search_placeholder"))
         self.search_input.setClearButtonEnabled(True)
         self.search_input.returnPressed.connect(self._on_search)
         search_row.addWidget(self.search_input, stretch=2)
-        
+
         # Search button
-        self.search_button = QPushButton(self.i18n.t('timeline.search'))
+        self.search_button = QPushButton(self.i18n.t("timeline.search"))
         self.search_button.clicked.connect(self._on_search)
         search_row.addWidget(self.search_button)
-        
+
         header_layout.addLayout(search_row)
-        
+
         # Second row: Filters
         filter_row = QHBoxLayout()
         filter_row.setSpacing(10)
-        
+
         # Date range filter
-        self.date_range_label = QLabel(
-            self.i18n.t('timeline.filter_date_range_label')
-        )
+        self.date_range_label = QLabel(self.i18n.t("timeline.filter_date_range_label"))
         filter_row.addWidget(self.date_range_label)
-        
+
         self.start_date_edit = QDateEdit()
         self.start_date_edit.setCalendarPopup(True)
         filter_row.addWidget(self.start_date_edit)
 
-        self.date_range_separator = QLabel(
-            self.i18n.t('timeline.filter_date_range_separator')
-        )
+        self.date_range_separator = QLabel(self.i18n.t("timeline.filter_date_range_separator"))
         filter_row.addWidget(self.date_range_separator)
 
         self.end_date_edit = QDateEdit()
@@ -217,37 +208,25 @@ class TimelineWidget(QWidget):
         self.start_date_edit.dateChanged.connect(self._on_filter_changed)
         self.end_date_edit.dateChanged.connect(self._on_filter_changed)
         filter_row.addWidget(self.end_date_edit)
-        
+
         # Filter by event type
         self.type_filter = QComboBox()
-        self.type_filter.addItem(self.i18n.t('timeline.filter_all'), None)
-        self.type_filter.addItem(
-            self.i18n.t('timeline.filter_event'), 'Event'
-        )
-        self.type_filter.addItem(
-            self.i18n.t('timeline.filter_task'), 'Task'
-        )
-        self.type_filter.addItem(
-            self.i18n.t('timeline.filter_appointment'), 'Appointment'
-        )
+        self.type_filter.addItem(self.i18n.t("timeline.filter_all"), None)
+        self.type_filter.addItem(self.i18n.t("timeline.filter_event"), "Event")
+        self.type_filter.addItem(self.i18n.t("timeline.filter_task"), "Task")
+        self.type_filter.addItem(self.i18n.t("timeline.filter_appointment"), "Appointment")
         self.type_filter.currentIndexChanged.connect(self._on_filter_changed)
         filter_row.addWidget(self.type_filter, stretch=1)
-        
+
         # Filter by source
         self.source_filter = QComboBox()
-        self.source_filter.addItem(self.i18n.t('timeline.source_all'), None)
-        self.source_filter.addItem(
-            self.i18n.t('timeline.source_local'), 'local'
-        )
-        self.source_filter.addItem(
-            self.i18n.t('timeline.source_google'), 'google'
-        )
-        self.source_filter.addItem(
-            self.i18n.t('timeline.source_outlook'), 'outlook'
-        )
+        self.source_filter.addItem(self.i18n.t("timeline.source_all"), None)
+        self.source_filter.addItem(self.i18n.t("timeline.source_local"), "local")
+        self.source_filter.addItem(self.i18n.t("timeline.source_google"), "google")
+        self.source_filter.addItem(self.i18n.t("timeline.source_outlook"), "outlook")
         self.source_filter.currentIndexChanged.connect(self._on_filter_changed)
         filter_row.addWidget(self.source_filter, stretch=1)
-        
+
         header_layout.addLayout(filter_row)
 
         return header_layout
@@ -274,7 +253,7 @@ class TimelineWidget(QWidget):
 
     def sync_date_filters_with_preferences(self) -> None:
         """Update date range widgets so they match the configured preferences."""
-        if not hasattr(self, 'start_date_edit') or not hasattr(self, 'end_date_edit'):
+        if not hasattr(self, "start_date_edit") or not hasattr(self, "end_date_edit"):
             return
 
         start_date, end_date = self._calculate_date_range_defaults()
@@ -287,7 +266,7 @@ class TimelineWidget(QWidget):
         finally:
             self.start_date_edit.blockSignals(previous_start_block)
             self.end_date_edit.blockSignals(previous_end_block)
-    
+
     def load_timeline_events(self, reset: bool = True) -> bool:
         """
         Load timeline events from the manager.
@@ -308,9 +287,7 @@ class TimelineWidget(QWidget):
             return False
 
         previous_has_more = self.has_more
-        previous_page = (
-            self.current_page if reset else max(self.current_page - 1, 0)
-        )
+        previous_page = self.current_page if reset else max(self.current_page - 1, 0)
         page_to_load = 0 if reset else self.current_page
         success = False
 
@@ -334,26 +311,21 @@ class TimelineWidget(QWidget):
                 future_events: List[Dict[str, Any]] = []
 
                 for result in results:
-                    event = result['event']
+                    event = result["event"]
                     event_start = to_local_naive(event.start_time)
 
                     if event_start < center_time_local:
                         past_events.append(result)
                     else:
-                        future_events.append({
-                            'event': event,
-                            'auto_tasks': result['auto_tasks']
-                        })
+                        future_events.append({"event": event, "auto_tasks": result["auto_tasks"]})
 
-                future_events.sort(
-                    key=lambda item: to_local_naive(item['event'].start_time)
-                )
+                future_events.sort(key=lambda item: to_local_naive(item["event"].start_time))
 
                 data = {
-                    'current_time': center_time_local.isoformat(),
-                    'past_events': past_events,
-                    'future_events': future_events,
-                    'has_more': False
+                    "current_time": center_time_local.isoformat(),
+                    "past_events": past_events,
+                    "future_events": future_events,
+                    "has_more": False,
                 }
             else:
                 # Normal timeline mode
@@ -362,35 +334,23 @@ class TimelineWidget(QWidget):
                 seconds_per_day = 24 * 60 * 60
 
                 if self.current_filters:
-                    start_filter = self.current_filters.get('start_date')
+                    start_filter = self.current_filters.get("start_date")
                     if start_filter:
                         start_dt = to_local_naive(start_filter)
                         if start_dt < center_time_local:
-                            delta_seconds = (
-                                center_time_local - start_dt
-                            ).total_seconds()
+                            delta_seconds = (center_time_local - start_dt).total_seconds()
                             if delta_seconds > 0:
-                                required_days = math.ceil(
-                                    delta_seconds / seconds_per_day
-                                )
-                                effective_past_days = max(
-                                    effective_past_days, required_days
-                                )
+                                required_days = math.ceil(delta_seconds / seconds_per_day)
+                                effective_past_days = max(effective_past_days, required_days)
 
-                    end_filter = self.current_filters.get('end_date')
+                    end_filter = self.current_filters.get("end_date")
                     if end_filter:
                         end_dt = to_local_naive(end_filter)
                         if end_dt > center_time_local:
-                            delta_seconds = (
-                                end_dt - center_time_local
-                            ).total_seconds()
+                            delta_seconds = (end_dt - center_time_local).total_seconds()
                             if delta_seconds > 0:
-                                required_days = math.ceil(
-                                    delta_seconds / seconds_per_day
-                                )
-                                effective_future_days = max(
-                                    effective_future_days, required_days
-                                )
+                                required_days = math.ceil(delta_seconds / seconds_per_day)
+                                effective_future_days = max(effective_future_days, required_days)
 
                 data = self.timeline_manager.get_timeline_events(
                     center_time=center_time_local,
@@ -398,36 +358,35 @@ class TimelineWidget(QWidget):
                     future_days=effective_future_days,
                     page=page_to_load,
                     page_size=self.page_size,
-                    filters=self.current_filters or None
+                    filters=self.current_filters or None,
                 )
 
             # Update state
-            self.has_more = data.get('has_more', False)
+            self.has_more = data.get("has_more", False)
 
             # Clear and rebuild timeline only after data retrieval succeeded
             if reset and page_to_load == 0:
                 self.clear_timeline()
 
                 # Add future events first
-                for event_data in data['future_events']:
+                for event_data in data["future_events"]:
                     self._add_event_card(event_data, is_future=True)
 
                 # Add current time indicator
                 self._add_current_time_indicator()
 
                 # Add past events
-                for event_data in data['past_events']:
+                for event_data in data["past_events"]:
                     self._add_event_card(event_data, is_future=False)
             else:
                 # Append more events (pagination)
-                for event_data in data['past_events']:
+                for event_data in data["past_events"]:
                     self._add_event_card(event_data, is_future=False)
 
             self.current_page = page_to_load
 
             logger.debug(
-                f"Loaded timeline events: page {self.current_page}, "
-                f"has_more={self.has_more}"
+                f"Loaded timeline events: page {self.current_page}, " f"has_more={self.has_more}"
             )
 
             success = True
@@ -443,20 +402,12 @@ class TimelineWidget(QWidget):
                 self._pending_refresh = None
                 QTimer.singleShot(
                     0,
-                    lambda pending=pending_reset: self.load_timeline_events(
-                        reset=pending
-                    ),
+                    lambda pending=pending_reset: self.load_timeline_events(reset=pending),
                 )
 
         return success
 
-    def _get_timeline_setting(
-        self,
-        key: str,
-        default: int,
-        *,
-        minimum: int = 0
-    ) -> int:
+    def _get_timeline_setting(self, key: str, default: int, *, minimum: int = 0) -> int:
         """Return a timeline preference from settings with fallbacks."""
         manager = self.settings_manager
         if manager is None:
@@ -476,10 +427,7 @@ class TimelineWidget(QWidget):
             else:
                 return default
         except Exception as exc:  # pragma: no cover - defensive logging
-            logger.warning(
-                "Failed to read %s from settings manager: %s", key, exc,
-                exc_info=True
-            )
+            logger.warning("Failed to read %s from settings manager: %s", key, exc, exc_info=True)
             return default
 
         if isinstance(value, bool):
@@ -492,9 +440,7 @@ class TimelineWidget(QWidget):
             coerced = int(value)
             return coerced if coerced >= minimum else default
 
-        logger.debug(
-            "Using default for %s due to invalid value: %r", key, value
-        )
+        logger.debug("Using default for %s due to invalid value: %r", key, value)
         return default
 
     def _connect_settings_manager(self) -> None:
@@ -538,10 +484,10 @@ class TimelineWidget(QWidget):
 
     def _update_current_filter_dates(self) -> None:
         """Ensure ``current_filters`` stores the date range from the widgets."""
-        if not hasattr(self, 'start_date_edit') or not hasattr(self, 'end_date_edit'):
+        if not hasattr(self, "start_date_edit") or not hasattr(self, "end_date_edit"):
             return
 
-        if not isinstance(getattr(self, 'current_filters', None), dict):
+        if not isinstance(getattr(self, "current_filters", None), dict):
             self.current_filters = {}
 
         start_qdate = self.start_date_edit.date()
@@ -550,32 +496,32 @@ class TimelineWidget(QWidget):
         start_dt = QDateTime(start_qdate, QTime(0, 0, 0))
         end_dt = QDateTime(end_qdate, QTime(23, 59, 59))
 
-        self.current_filters['start_date'] = start_dt.toString(Qt.DateFormat.ISODate)
-        self.current_filters['end_date'] = end_dt.toString(Qt.DateFormat.ISODate)
+        self.current_filters["start_date"] = start_dt.toString(Qt.DateFormat.ISODate)
+        self.current_filters["end_date"] = end_dt.toString(Qt.DateFormat.ISODate)
 
     def _on_settings_changed(self, key: str, _value: Any) -> None:
         """React to preference changes that impact the timeline view."""
         preference_map = {
-            'timeline.past_days': (
-                'past_days',
+            "timeline.past_days": (
+                "past_days",
                 lambda: self._get_timeline_setting(
-                    'timeline.past_days',
+                    "timeline.past_days",
                     default=self.past_days,
                 ),
                 True,
             ),
-            'timeline.future_days': (
-                'future_days',
+            "timeline.future_days": (
+                "future_days",
                 lambda: self._get_timeline_setting(
-                    'timeline.future_days',
+                    "timeline.future_days",
                     default=self.future_days,
                 ),
                 True,
             ),
-            'timeline.page_size': (
-                'page_size',
+            "timeline.page_size": (
+                "page_size",
                 lambda: self._get_timeline_setting(
-                    'timeline.page_size',
+                    "timeline.page_size",
                     default=self.page_size,
                     minimum=1,
                 ),
@@ -583,7 +529,7 @@ class TimelineWidget(QWidget):
             ),
         }
 
-        if not isinstance(getattr(self, 'current_filters', None), dict):
+        if not isinstance(getattr(self, "current_filters", None), dict):
             self.current_filters = {}
 
         entry = preference_map.get(key)
@@ -597,61 +543,54 @@ class TimelineWidget(QWidget):
 
         setattr(self, attr_name, new_value)
 
-        if attr_name == 'page_size':
+        if attr_name == "page_size":
             self.current_page = 0
 
         if should_sync_dates:
-            preserved_event_type = self.current_filters.get('event_type')
-            preserved_source = self.current_filters.get('source')
+            preserved_event_type = self.current_filters.get("event_type")
+            preserved_source = self.current_filters.get("source")
 
             self.sync_date_filters_with_preferences()
 
             self.current_filters = {}
             if preserved_event_type:
-                self.current_filters['event_type'] = preserved_event_type
+                self.current_filters["event_type"] = preserved_event_type
             if preserved_source:
-                self.current_filters['source'] = preserved_source
+                self.current_filters["source"] = preserved_source
 
             self._update_current_filter_dates()
 
         logger.info("Timeline preference %s updated to %s", key, new_value)
         self.load_timeline_events(reset=True)
-    
+
     def _add_current_time_indicator(self):
         """Add current time indicator line to timeline."""
         # Import here to avoid circular imports
         from ui.timeline.event_card import CurrentTimeIndicator
-        
+
         indicator = CurrentTimeIndicator(self.i18n)
-        self.timeline_layout.insertWidget(
-            len(self.event_cards), indicator
-        )
+        self.timeline_layout.insertWidget(len(self.event_cards), indicator)
         self.event_cards.append(indicator)
-    
+
     def _add_event_card(self, event_data: Dict[str, Any], is_future: bool):
         """
         Add an event card to the timeline.
-        
+
         Args:
             event_data: Event data dictionary
             is_future: True if this is a future event
         """
         # Import here to avoid circular imports
         from ui.timeline.event_card import EventCard, CurrentTimeIndicator
-        
-        card = EventCard(
-            event_data=event_data,
-            is_future=is_future,
-            i18n=self.i18n,
-            parent=self
-        )
-        
+
+        card = EventCard(event_data=event_data, is_future=is_future, i18n=self.i18n, parent=self)
+
         # Connect signals
         card.auto_task_changed.connect(self._on_auto_task_changed)
         card.view_recording.connect(self._on_view_recording)
         card.view_transcript.connect(self._on_view_transcript)
         card.view_translation.connect(self._on_view_translation)
-        
+
         # Insert card at appropriate position
         if is_future:
             # Future events stay grouped above the current time indicator.
@@ -667,11 +606,7 @@ class TimelineWidget(QWidget):
             )
 
             # Search within the future event group for the correct position.
-            search_limit = (
-                indicator_index
-                if indicator_index is not None
-                else len(self.event_cards)
-            )
+            search_limit = indicator_index if indicator_index is not None else len(self.event_cards)
             insert_pos = search_limit
             for i in range(search_limit):
                 existing_card = self.event_cards[i]
@@ -704,8 +639,9 @@ class TimelineWidget(QWidget):
                         )
 
                     future_count = sum(
-                        1 for card_item in self.event_cards
-                        if getattr(card_item, 'is_future', False)
+                        1
+                        for card_item in self.event_cards
+                        if getattr(card_item, "is_future", False)
                     )
                     if list_index != future_count:
                         logger.debug(
@@ -720,42 +656,42 @@ class TimelineWidget(QWidget):
             self.event_cards.append(card)
 
         if is_future:
-            auto_tasks = event_data.get('auto_tasks') or {}
+            auto_tasks = event_data.get("auto_tasks") or {}
             self._auto_task_state_cache[card.event.id] = dict(auto_tasks)
 
-    def get_event_card_by_id(self, event_id: str) -> Optional['EventCard']:
+    def get_event_card_by_id(self, event_id: str) -> Optional["EventCard"]:
         """Return the event card associated with the given event id."""
         for card in self.event_cards:
-            if not hasattr(card, 'event'):
+            if not hasattr(card, "event"):
                 continue
-            if getattr(card.event, 'id', None) == event_id:
-                return cast('EventCard', card)
+            if getattr(card.event, "id", None) == event_id:
+                return cast("EventCard", card)
         return None
-    
+
     def clear_timeline(self):
         """Clear all event cards from timeline."""
         for card in self.event_cards:
             self.timeline_layout.removeWidget(card)
             card.deleteLater()
-        
+
         self.event_cards.clear()
         logger.debug("Timeline cleared")
-    
+
     def _on_scroll(self, value: int):
         """
         Handle scroll event for pagination.
-        
+
         Args:
             value: Scroll bar value
         """
         # Check if scrolled near bottom
         scrollbar = self.scroll_area.verticalScrollBar()
         max_value = scrollbar.maximum()
-        
+
         if max_value > 0:
             # Load more when 80% scrolled
             threshold = max_value * 0.8
-            
+
             if value >= threshold and self.has_more and not self.is_loading:
                 logger.debug("Loading more events (pagination)")
                 previous_page = self.current_page
@@ -763,11 +699,11 @@ class TimelineWidget(QWidget):
                 self.current_page = target_page
                 if not self.load_timeline_events(reset=False):
                     self.current_page = previous_page
-    
+
     def _on_search(self):
         """Handle search button click."""
         query = self.search_input.text().strip()
-        
+
         self.current_query = query
 
         if query:
@@ -776,7 +712,7 @@ class TimelineWidget(QWidget):
             logger.info("Refreshing timeline without query filter")
 
         self._refresh_timeline(reset=True)
-    
+
     def _on_filter_changed(self):
         """Handle filter change."""
         # Get current filter values
@@ -812,9 +748,9 @@ class TimelineWidget(QWidget):
         # Update filters
         self.current_filters = {}
         if event_type:
-            self.current_filters['event_type'] = event_type
+            self.current_filters["event_type"] = event_type
         if source:
-            self.current_filters['source'] = source
+            self.current_filters["source"] = source
 
         self._update_current_filter_dates()
 
@@ -827,8 +763,8 @@ class TimelineWidget(QWidget):
 
     def _show_audio_unavailable_message(self):
         """Inform the user that audio playback components are unavailable."""
-        title = self.i18n.t('timeline.audio_player_unavailable_title')
-        message = self.i18n.t('timeline.audio_player_unavailable_message')
+        title = self.i18n.t("timeline.audio_player_unavailable_title")
+        message = self.i18n.t("timeline.audio_player_unavailable_message")
         QMessageBox.warning(self, title, message)
 
     def _on_auto_task_changed(self, event_id: str, config: Dict[str, Any]):
@@ -847,12 +783,10 @@ class TimelineWidget(QWidget):
             self.timeline_manager.set_auto_task(event_id, config)
             logger.info(f"Auto-task config updated for event: {event_id}")
             if card:
-                card.event_data['auto_tasks'] = dict(config)
+                card.event_data["auto_tasks"] = dict(config)
             self.auto_task_changed.emit(event_id, config)
         except Exception as exc:
-            logger.exception(
-                "Failed to update auto-task config for %s", event_id
-            )
+            logger.exception("Failed to update auto-task config for %s", event_id)
 
             persisted_config: Optional[Dict[str, Any]] = None
             try:
@@ -866,9 +800,7 @@ class TimelineWidget(QWidget):
 
             if persisted_config is None:
                 try:
-                    persisted_config = (
-                        self.timeline_manager._default_auto_task_config()
-                    )
+                    persisted_config = self.timeline_manager._default_auto_task_config()
                 except Exception as default_error:  # pragma: no cover
                     logger.error(
                         "Failed to obtain default auto-task config: %s",
@@ -881,12 +813,10 @@ class TimelineWidget(QWidget):
 
             self._auto_task_state_cache[event_id] = dict(persisted_config)
 
-            title = self.i18n.t('timeline.auto_task_save_failed_title')
-            message = self.i18n.t('timeline.auto_task_save_failed_message').format(
-                error=str(exc)
-            )
+            title = self.i18n.t("timeline.auto_task_save_failed_title")
+            message = self.i18n.t("timeline.auto_task_save_failed_message").format(error=str(exc))
             QMessageBox.warning(self, title, message)
-    
+
     def _on_view_recording(self, file_path: str):
         """
         Handle view recording request.
@@ -895,15 +825,13 @@ class TimelineWidget(QWidget):
             file_path: Path to recording file
         """
         try:
-            audio_module = importlib.import_module('ui.timeline.audio_player')
+            audio_module = importlib.import_module("ui.timeline.audio_player")
         except ImportError as exc:
-            logger.warning(
-                "Failed to import audio playback components: %s", exc
-            )
+            logger.warning("Failed to import audio playback components: %s", exc)
             self._show_audio_unavailable_message()
             return
 
-        AudioPlayerDialog = getattr(audio_module, 'AudioPlayerDialog', None)
+        AudioPlayerDialog = getattr(audio_module, "AudioPlayerDialog", None)
         if AudioPlayerDialog is None:
             logger.warning(
                 "Audio playback dialog is unavailable; skipping playback for %s",
@@ -924,19 +852,18 @@ class TimelineWidget(QWidget):
 
             dialog = AudioPlayerDialog(file_path, self.i18n, self)
         except Exception as exc:
-            logger.exception(
-                "Failed to create audio player dialog for %s", file_path
+            logger.exception("Failed to create audio player dialog for %s", file_path)
+            title = self.i18n.t("timeline.audio_player_open_failed_title")
+            message = self.i18n.t("timeline.audio_player_open_failed_message").format(
+                error=str(exc)
             )
-            title = self.i18n.t('timeline.audio_player_open_failed_title')
-            message = self.i18n.t(
-                'timeline.audio_player_open_failed_message'
-            ).format(error=str(exc))
             QMessageBox.critical(self, title, message)
             return
 
         self._audio_player_dialogs[file_path] = dialog
 
         try:
+
             def _cleanup_dialog(*_):
                 tracked_dialog = self._audio_player_dialogs.get(file_path)
                 if tracked_dialog is dialog:
@@ -952,15 +879,13 @@ class TimelineWidget(QWidget):
             logger.info(f"Opened audio player for {file_path}")
         except Exception as exc:
             self._audio_player_dialogs.pop(file_path, None)
-            logger.exception(
-                "Failed to display audio player dialog for %s", file_path
+            logger.exception("Failed to display audio player dialog for %s", file_path)
+            title = self.i18n.t("timeline.audio_player_open_failed_title")
+            message = self.i18n.t("timeline.audio_player_open_failed_message").format(
+                error=str(exc)
             )
-            title = self.i18n.t('timeline.audio_player_open_failed_title')
-            message = self.i18n.t(
-                'timeline.audio_player_open_failed_message'
-            ).format(error=str(exc))
             QMessageBox.critical(self, title, message)
-    
+
     def _open_text_viewer(self, file_path: str, title_key: str):
         """Open a text viewer dialog for timeline artifacts."""
         from ui.timeline.transcript_viewer import TranscriptViewerDialog
@@ -976,12 +901,7 @@ class TimelineWidget(QWidget):
                 logger.info(f"Activated text viewer for {cache_key}")
                 return
 
-            dialog = TranscriptViewerDialog(
-                cache_key,
-                self.i18n,
-                self,
-                title_key=title_key
-            )
+            dialog = TranscriptViewerDialog(cache_key, self.i18n, self, title_key=title_key)
             self._text_viewer_dialogs[cache_key] = dialog
 
             def _cleanup_dialog(*_):
@@ -1002,62 +922,40 @@ class TimelineWidget(QWidget):
 
     def _on_view_transcript(self, file_path: str):
         """Handle view transcript request."""
-        self._open_text_viewer(file_path, 'transcript.viewer_title')
+        self._open_text_viewer(file_path, "transcript.viewer_title")
 
     def _on_view_translation(self, file_path: str):
         """Handle view translation request."""
-        self._open_text_viewer(file_path, 'timeline.translation_viewer_title')
-    
+        self._open_text_viewer(file_path, "timeline.translation_viewer_title")
+
     def update_translations(self):
         """Update UI text when language changes."""
         # Update title
-        self.title_label.setText(self.i18n.t('timeline.title'))
-        
-        self.search_input.setPlaceholderText(
-            self.i18n.t('timeline.search_placeholder')
-        )
-        self.search_button.setText(self.i18n.t('timeline.search'))
+        self.title_label.setText(self.i18n.t("timeline.title"))
 
-        if hasattr(self, 'date_range_label'):
-            self.date_range_label.setText(
-                self.i18n.t('timeline.filter_date_range_label')
-            )
+        self.search_input.setPlaceholderText(self.i18n.t("timeline.search_placeholder"))
+        self.search_button.setText(self.i18n.t("timeline.search"))
 
-        if hasattr(self, 'date_range_separator'):
-            self.date_range_separator.setText(
-                self.i18n.t('timeline.filter_date_range_separator')
-            )
+        if hasattr(self, "date_range_label"):
+            self.date_range_label.setText(self.i18n.t("timeline.filter_date_range_label"))
+
+        if hasattr(self, "date_range_separator"):
+            self.date_range_separator.setText(self.i18n.t("timeline.filter_date_range_separator"))
 
         # Update filter combo boxes
-        self.type_filter.setItemText(
-            0, self.i18n.t('timeline.filter_all')
-        )
-        self.type_filter.setItemText(
-            1, self.i18n.t('timeline.filter_event')
-        )
-        self.type_filter.setItemText(
-            2, self.i18n.t('timeline.filter_task')
-        )
-        self.type_filter.setItemText(
-            3, self.i18n.t('timeline.filter_appointment')
-        )
-        
-        self.source_filter.setItemText(
-            0, self.i18n.t('timeline.source_all')
-        )
-        self.source_filter.setItemText(
-            1, self.i18n.t('timeline.source_local')
-        )
-        self.source_filter.setItemText(
-            2, self.i18n.t('timeline.source_google')
-        )
-        self.source_filter.setItemText(
-            3, self.i18n.t('timeline.source_outlook')
-        )
-        
+        self.type_filter.setItemText(0, self.i18n.t("timeline.filter_all"))
+        self.type_filter.setItemText(1, self.i18n.t("timeline.filter_event"))
+        self.type_filter.setItemText(2, self.i18n.t("timeline.filter_task"))
+        self.type_filter.setItemText(3, self.i18n.t("timeline.filter_appointment"))
+
+        self.source_filter.setItemText(0, self.i18n.t("timeline.source_all"))
+        self.source_filter.setItemText(1, self.i18n.t("timeline.source_local"))
+        self.source_filter.setItemText(2, self.i18n.t("timeline.source_google"))
+        self.source_filter.setItemText(3, self.i18n.t("timeline.source_outlook"))
+
         # Update event cards
         for card in self.event_cards:
-            if hasattr(card, 'update_translations'):
+            if hasattr(card, "update_translations"):
                 card.update_translations()
 
         logger.debug("Timeline translations updated")

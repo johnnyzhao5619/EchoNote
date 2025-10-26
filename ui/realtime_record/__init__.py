@@ -18,4 +18,4 @@
 from ui.realtime_record.widget import RealtimeRecordWidget
 from ui.realtime_record.audio_visualizer import AudioVisualizer
 
-__all__ = ['RealtimeRecordWidget', 'AudioVisualizer']
+__all__ = ["RealtimeRecordWidget", "AudioVisualizer"]

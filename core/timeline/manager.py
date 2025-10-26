@@ -19,17 +19,13 @@ import logging
 from typing import Optional, List, Dict, Any, Union, Callable, TYPE_CHECKING, Iterable
 from datetime import datetime, timedelta
 
-from data.database.models import (
-    CalendarEvent,
-    EventAttachment,
-    AutoTaskConfig
-)
+from data.database.models import CalendarEvent, EventAttachment, AutoTaskConfig
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from utils.i18n import I18nManager
 
 
-logger = logging.getLogger('echonote.timeline.manager')
+logger = logging.getLogger("echonote.timeline.manager")
 
 
 _DEFAULT_TRANSCRIPT_CANDIDATE_WINDOW_DAYS = 30
@@ -40,15 +36,13 @@ def to_local_naive(value: Union[datetime, str]) -> datetime:
     """Convert datetime/ISO string to local-time naive datetime."""
     if isinstance(value, str):
         text = value.strip()
-        if text.endswith('Z'):
-            text = text[:-1] + '+00:00'
+        if text.endswith("Z"):
+            text = text[:-1] + "+00:00"
         dt = datetime.fromisoformat(text)
     elif isinstance(value, datetime):
         dt = value
     else:
-        raise TypeError(
-            f"Unsupported value type for to_local_naive: {type(value)!r}"
-        )
+        raise TypeError(f"Unsupported value type for to_local_naive: {type(value)!r}")
 
     if dt.tzinfo is not None:
         return dt.astimezone().replace(tzinfo=None)
@@ -70,7 +64,7 @@ class TimelineManager:
         self,
         calendar_manager,
         db_connection,
-        i18n: Optional['I18nManager'] = None,
+        i18n: Optional["I18nManager"] = None,
         translate: Optional[Callable[[str], str]] = None,
     ):
         """
@@ -85,9 +79,7 @@ class TimelineManager:
         self.calendar_manager = calendar_manager
         self.db = db_connection
         if i18n is not None and translate is not None:
-            raise ValueError(
-                "Provide either an i18n manager or a translation callback, not both"
-            )
+            raise ValueError("Provide either an i18n manager or a translation callback, not both")
         self._translate_callback = translate or (i18n.t if i18n else None)
         logger.info("TimelineManager initialized")
 
@@ -130,10 +122,7 @@ class TimelineManager:
 
         return value
 
-    def _prepare_filter_context(
-        self,
-        filters: Optional[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+    def _prepare_filter_context(self, filters: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         """Normalize and pre-compute reusable filter parameters."""
         resolved_filters: Dict[str, Any] = dict(filters or {})
 
@@ -142,37 +131,37 @@ class TimelineManager:
                 text = value.strip()
                 if text:
                     try:
-                        datetime.strptime(text, '%Y-%m-%d')
+                        datetime.strptime(text, "%Y-%m-%d")
                     except ValueError:
                         pass
                     else:
-                        suffix = 'T00:00:00' if is_start else 'T23:59:59'
+                        suffix = "T00:00:00" if is_start else "T23:59:59"
                         return f"{text}{suffix}"
             return value
 
-        if 'start_date' in resolved_filters:
-            resolved_filters['start_date'] = _normalize_date(
-                resolved_filters['start_date'],
+        if "start_date" in resolved_filters:
+            resolved_filters["start_date"] = _normalize_date(
+                resolved_filters["start_date"],
                 is_start=True,
             )
-        if 'end_date' in resolved_filters:
-            resolved_filters['end_date'] = _normalize_date(
-                resolved_filters['end_date'],
+        if "end_date" in resolved_filters:
+            resolved_filters["end_date"] = _normalize_date(
+                resolved_filters["end_date"],
                 is_start=False,
             )
 
         start_dt = (
-            to_local_naive(resolved_filters['start_date'])
-            if resolved_filters.get('start_date')
+            to_local_naive(resolved_filters["start_date"])
+            if resolved_filters.get("start_date")
             else datetime(1970, 1, 1)
         )
         end_dt = (
-            to_local_naive(resolved_filters['end_date'])
-            if resolved_filters.get('end_date')
+            to_local_naive(resolved_filters["end_date"])
+            if resolved_filters.get("end_date")
             else datetime(2099, 12, 31, 23, 59, 59)
         )
 
-        attendees_filter = resolved_filters.get('attendees')
+        attendees_filter = resolved_filters.get("attendees")
         if attendees_filter:
             if isinstance(attendees_filter, (list, tuple, set)):
                 attendees_filter = set(attendees_filter)
@@ -182,41 +171,36 @@ class TimelineManager:
             attendees_filter = None
 
         return {
-            'filters': resolved_filters,
-            'start_dt': start_dt,
-            'end_dt': end_dt,
-            'has_date_filter': bool(
-                resolved_filters.get('start_date') or
-                resolved_filters.get('end_date')
+            "filters": resolved_filters,
+            "start_dt": start_dt,
+            "end_dt": end_dt,
+            "has_date_filter": bool(
+                resolved_filters.get("start_date") or resolved_filters.get("end_date")
             ),
-            'attendees_filter': attendees_filter,
+            "attendees_filter": attendees_filter,
         }
 
-    def _event_matches_filters(
-        self,
-        event: CalendarEvent,
-        context: Dict[str, Any]
-    ) -> bool:
+    def _event_matches_filters(self, event: CalendarEvent, context: Dict[str, Any]) -> bool:
         """Return ``True`` when ``event`` satisfies ``context`` filters."""
-        filters = context['filters']
+        filters = context["filters"]
 
-        if context['has_date_filter']:
+        if context["has_date_filter"]:
             event_start = to_local_naive(event.start_time)
-            if not (context['start_dt'] <= event_start <= context['end_dt']):
+            if not (context["start_dt"] <= event_start <= context["end_dt"]):
                 return False
 
-        attendees_filter = context['attendees_filter']
+        attendees_filter = context["attendees_filter"]
         if attendees_filter:
-            attendees = getattr(event, 'attendees', []) or []
+            attendees = getattr(event, "attendees", []) or []
             if not any(attendee in attendees_filter for attendee in attendees):
                 return False
 
-        event_type = filters.get('event_type')
-        if event_type and getattr(event, 'event_type', None) != event_type:
+        event_type = filters.get("event_type")
+        if event_type and getattr(event, "event_type", None) != event_type:
             return False
 
-        source = filters.get('source')
-        if source and getattr(event, 'source', None) != source:
+        source = filters.get("source")
+        if source and getattr(event, "source", None) != source:
             return False
 
         return True
@@ -228,7 +212,7 @@ class TimelineManager:
         future_days: float,
         page: int = 0,
         page_size: int = 50,
-        filters: Optional[Dict[str, Any]] = None
+        filters: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         Get timeline events around a center time.
@@ -260,21 +244,20 @@ class TimelineManager:
             filter_context = self._prepare_filter_context(filters)
 
             calendar_filters = {
-                key: filter_context['filters'][key]
-                for key in ('event_type', 'source')
-                if filter_context['filters'].get(key)
+                key: filter_context["filters"][key]
+                for key in ("event_type", "source")
+                if filter_context["filters"].get(key)
             }
 
             # Get all events in range
             all_events = self.calendar_manager.get_events(
                 start_date=start_time.isoformat(),
                 end_date=end_time.isoformat(),
-                filters=calendar_filters or None
+                filters=calendar_filters or None,
             )
 
             filtered_events = [
-                event for event in all_events
-                if self._event_matches_filters(event, filter_context)
+                event for event in all_events if self._event_matches_filters(event, filter_context)
             ]
 
             # Separate past and future events
@@ -293,10 +276,7 @@ class TimelineManager:
                     future_event_ids.append(event.id)
                     future_event_items.append(event)
 
-            past_event_items.sort(
-                key=lambda evt: to_local_naive(evt.start_time),
-                reverse=True
-            )
+            past_event_items.sort(key=lambda evt: to_local_naive(evt.start_time), reverse=True)
 
             total_past_count = len(past_event_items)
             start_idx = max(page, 0) * page_size
@@ -310,10 +290,7 @@ class TimelineManager:
             for event in current_page_items:
                 attachments = attachments_map.get(event.id, [])
                 artifacts = self._build_artifacts_from_attachments(attachments)
-                past_events.append({
-                    'event': event,
-                    'artifacts': artifacts
-                })
+                past_events.append({"event": event, "artifacts": artifacts})
 
             auto_task_map = self._get_auto_task_map(future_event_ids)
 
@@ -322,15 +299,10 @@ class TimelineManager:
                 auto_tasks = auto_task_map.get(event.id)
                 if auto_tasks is None:
                     auto_tasks = self._default_auto_task_config()
-                future_events.append({
-                    'event': event,
-                    'auto_tasks': auto_tasks
-                })
+                future_events.append({"event": event, "auto_tasks": auto_tasks})
 
             # Sort events
-            future_events.sort(
-                key=lambda x: to_local_naive(x['event'].start_time)
-            )
+            future_events.sort(key=lambda x: to_local_naive(x["event"].start_time))
 
             total_future = len(future_events)
 
@@ -342,14 +314,14 @@ class TimelineManager:
                 future_page = []
 
             result = {
-                'current_time': center_time_local.isoformat(),
-                'past_events': past_events,
-                'future_events': future_page,
-                'total_count': total_past_count,
-                'future_total_count': total_future,
-                'page': page,
-                'page_size': page_size,
-                'has_more': end_idx < total_past_count
+                "current_time": center_time_local.isoformat(),
+                "past_events": past_events,
+                "future_events": future_page,
+                "total_count": total_past_count,
+                "future_total_count": total_future,
+                "page": page,
+                "page_size": page_size,
+                "has_more": end_idx < total_past_count,
             }
 
             logger.debug(
@@ -361,14 +333,14 @@ class TimelineManager:
         except Exception as e:
             logger.error(f"Failed to get timeline events: {e}")
             return {
-                'current_time': center_time_local.isoformat(),
-                'past_events': [],
-                'future_events': [],
-                'total_count': 0,
-                'future_total_count': 0,
-                'page': page,
-                'page_size': page_size,
-                'has_more': False
+                "current_time": center_time_local.isoformat(),
+                "past_events": [],
+                "future_events": [],
+                "total_count": 0,
+                "future_total_count": 0,
+                "page": page,
+                "page_size": page_size,
+                "has_more": False,
             }
 
     def set_auto_task(self, event_id: str, task_config: dict):
@@ -391,92 +363,63 @@ class TimelineManager:
                 raise ValueError(f"Event not found: {event_id}")
 
             # Check if config already exists
-            existing_config = AutoTaskConfig.get_by_event_id(
-                self.db, event_id
-            )
+            existing_config = AutoTaskConfig.get_by_event_id(self.db, event_id)
 
             if existing_config:
                 # Update existing config
                 existing_config.enable_transcription = task_config.get(
-                    'enable_transcription', False
+                    "enable_transcription", False
                 )
-                existing_config.enable_recording = task_config.get(
-                    'enable_recording', False
-                )
-                existing_config.transcription_language = task_config.get(
-                    'transcription_language'
-                )
-                existing_config.enable_translation = task_config.get(
-                    'enable_translation', False
-                )
-                existing_config.translation_target_language = (
-                    task_config.get('translation_target_language')
+                existing_config.enable_recording = task_config.get("enable_recording", False)
+                existing_config.transcription_language = task_config.get("transcription_language")
+                existing_config.enable_translation = task_config.get("enable_translation", False)
+                existing_config.translation_target_language = task_config.get(
+                    "translation_target_language"
                 )
                 existing_config.save(self.db)
-                logger.info(
-                    f"Updated auto-task config for event: {event_id}"
-                )
+                logger.info(f"Updated auto-task config for event: {event_id}")
             else:
                 # Create new config
                 config = AutoTaskConfig(
                     event_id=event_id,
-                    enable_transcription=task_config.get(
-                        'enable_transcription', False
-                    ),
-                    enable_recording=task_config.get(
-                        'enable_recording', False
-                    ),
-                    transcription_language=task_config.get(
-                        'transcription_language'
-                    ),
-                    enable_translation=task_config.get(
-                        'enable_translation', False
-                    ),
-                    translation_target_language=task_config.get(
-                        'translation_target_language'
-                    )
+                    enable_transcription=task_config.get("enable_transcription", False),
+                    enable_recording=task_config.get("enable_recording", False),
+                    transcription_language=task_config.get("transcription_language"),
+                    enable_translation=task_config.get("enable_translation", False),
+                    translation_target_language=task_config.get("translation_target_language"),
                 )
                 config.save(self.db)
                 logger.info(f"Created auto-task config for event: {event_id}")
 
         except Exception as e:
-            logger.error(
-                f"Failed to set auto-task config for event {event_id}: {e}"
-            )
+            logger.error(f"Failed to set auto-task config for event {event_id}: {e}")
             raise
 
-    def _serialize_auto_task_config(
-        self,
-        config: AutoTaskConfig
-    ) -> Dict[str, Any]:
+    def _serialize_auto_task_config(self, config: AutoTaskConfig) -> Dict[str, Any]:
         """Convert an ``AutoTaskConfig`` instance to a serializable dict."""
         return {
-            'enable_transcription': config.enable_transcription,
-            'enable_recording': config.enable_recording,
-            'transcription_language': config.transcription_language,
-            'enable_translation': config.enable_translation,
-            'translation_target_language': config.translation_target_language,
+            "enable_transcription": config.enable_transcription,
+            "enable_recording": config.enable_recording,
+            "transcription_language": config.transcription_language,
+            "enable_translation": config.enable_translation,
+            "translation_target_language": config.translation_target_language,
         }
 
     def _default_auto_task_config(self) -> Dict[str, Any]:
         """Return the default auto-task configuration for events."""
         return {
-            'enable_transcription': False,
-            'enable_recording': False,
-            'transcription_language': None,
-            'enable_translation': False,
-            'translation_target_language': None,
+            "enable_transcription": False,
+            "enable_recording": False,
+            "transcription_language": None,
+            "enable_translation": False,
+            "translation_target_language": None,
         }
 
     def _get_attachments_map(
-        self,
-        event_ids: Iterable[str],
-        base_map: Optional[Dict[str, List[EventAttachment]]] = None
+        self, event_ids: Iterable[str], base_map: Optional[Dict[str, List[EventAttachment]]] = None
     ) -> Dict[str, List[EventAttachment]]:
         """Fetch attachments for multiple events in a single query."""
-        attachments_map: Dict[str, List[EventAttachment]] = (
-            base_map if base_map is not None else {}
-        )
+        attachments_map: Dict[str, List[EventAttachment]] = base_map if base_map is not None else {}
 
         try:
             event_ids_list = list(event_ids)
@@ -505,20 +448,14 @@ class TimelineManager:
             )
             return attachments_map
 
-    def _get_auto_task_map(
-        self,
-        event_ids: List[str]
-    ) -> Dict[str, Dict[str, Any]]:
+    def _get_auto_task_map(self, event_ids: List[str]) -> Dict[str, Dict[str, Any]]:
         """Fetch auto-task configurations for multiple events at once."""
         try:
             if not event_ids:
                 return {}
 
             configs = AutoTaskConfig.get_by_event_ids(self.db, event_ids)
-            return {
-                config.event_id: self._serialize_auto_task_config(config)
-                for config in configs
-            }
+            return {config.event_id: self._serialize_auto_task_config(config) for config in configs}
         except Exception as exc:  # pragma: no cover - defensive logging
             logger.error(
                 "Failed to get auto-task configs for events %s: %s",
@@ -546,9 +483,7 @@ class TimelineManager:
             return None
 
         except Exception as e:
-            logger.error(
-                f"Failed to get auto-task config for event {event_id}: {e}"
-            )
+            logger.error(f"Failed to get auto-task config for event {event_id}: {e}")
             return None
 
     def search_events(
@@ -578,23 +513,22 @@ class TimelineManager:
         """
         try:
             filter_context = self._prepare_filter_context(filters)
-            filters = filter_context['filters']
+            filters = filter_context["filters"]
 
-            query_lower = query.lower() if query else ''
-            start_dt = filter_context['start_dt']
-            end_dt = filter_context['end_dt']
+            query_lower = query.lower() if query else ""
+            start_dt = filter_context["start_dt"]
+            end_dt = filter_context["end_dt"]
 
             # Get events by keyword
             events = CalendarEvent.search(
                 self.db,
                 keyword=query,
-                event_type=filters.get('event_type'),
-                source=filters.get('source')
+                event_type=filters.get("event_type"),
+                source=filters.get("source"),
             )
 
             events = [
-                event for event in events
-                if self._event_matches_filters(event, filter_context)
+                event for event in events if self._event_matches_filters(event, filter_context)
             ]
 
             event_ids = {event.id for event in events}
@@ -609,12 +543,12 @@ class TimelineManager:
                 event_id: str,
             ) -> bool:
                 for attachment in attachments:
-                    if attachment.attachment_type not in {'transcript', 'translation'}:
+                    if attachment.attachment_type not in {"transcript", "translation"}:
                         continue
 
                     content, _ = self._read_attachment_text(
                         attachment,
-                        getattr(attachment, 'event_id', event_id),
+                        getattr(attachment, "event_id", event_id),
                         collect_fallback=False,
                     )
 
@@ -625,9 +559,7 @@ class TimelineManager:
 
             if query:
                 candidate_filters = {
-                    key: filters[key]
-                    for key in ('event_type', 'source')
-                    if filters.get(key)
+                    key: filters[key] for key in ("event_type", "source") if filters.get(key)
                 }
 
                 candidate_start_dt, candidate_end_dt = self._resolve_transcript_candidate_range(
@@ -636,11 +568,14 @@ class TimelineManager:
                     filters,
                 )
 
-                candidate_events = self.calendar_manager.get_events(
-                    candidate_start_dt.isoformat(),
-                    candidate_end_dt.isoformat(),
-                    filters=candidate_filters or None
-                ) or []
+                candidate_events = (
+                    self.calendar_manager.get_events(
+                        candidate_start_dt.isoformat(),
+                        candidate_end_dt.isoformat(),
+                        filters=candidate_filters or None,
+                    )
+                    or []
+                )
 
                 additional_events: List[CalendarEvent] = []
                 for candidate in candidate_events:
@@ -671,9 +606,7 @@ class TimelineManager:
 
             # Build result with artifacts
             future_reference_time = (
-                to_local_naive(datetime.now().astimezone())
-                if include_future_auto_tasks
-                else None
+                to_local_naive(datetime.now().astimezone()) if include_future_auto_tasks else None
             )
             future_event_items: Dict[str, Dict[str, Any]] = {}
             future_event_ids: List[str] = []
@@ -683,19 +616,12 @@ class TimelineManager:
                 attachments = attachments_map.get(event.id, [])
                 artifacts = self._build_artifacts_from_attachments(attachments)
                 result_item = {
-                    'event': event,
-                    'artifacts': artifacts,
-                    'match_snippet': self.get_search_snippet(
-                        event,
-                        query,
-                        attachments
-                    )
+                    "event": event,
+                    "artifacts": artifacts,
+                    "match_snippet": self.get_search_snippet(event, query, attachments),
                 }
 
-                if (
-                    include_future_auto_tasks
-                    and future_reference_time is not None
-                ):
+                if include_future_auto_tasks and future_reference_time is not None:
                     event_start = to_local_naive(event.start_time)
                     if event_start >= future_reference_time:
                         future_event_items[event.id] = result_item
@@ -711,11 +637,9 @@ class TimelineManager:
                         config = self._default_auto_task_config()
                     else:
                         config = dict(config)
-                    future_event_items[event_id]['auto_tasks'] = config
+                    future_event_items[event_id]["auto_tasks"] = config
 
-            logger.debug(
-                f"Search found {len(results)} events for query: {query}"
-            )
+            logger.debug(f"Search found {len(results)} events for query: {query}")
             return results
 
         except Exception as e:
@@ -741,46 +665,38 @@ class TimelineManager:
             return self._build_artifacts_from_attachments(attachments)
 
         except Exception as e:
-            logger.error(
-                f"Failed to get artifacts for event {event_id}: {e}"
-            )
-            return {
-                'recording': None,
-                'transcript': None,
-                'attachments': []
-            }
+            logger.error(f"Failed to get artifacts for event {event_id}: {e}")
+            return {"recording": None, "transcript": None, "attachments": []}
 
     @staticmethod
-    def _build_artifacts_from_attachments(
-        attachments: List[EventAttachment]
-    ) -> Dict[str, Any]:
+    def _build_artifacts_from_attachments(attachments: List[EventAttachment]) -> Dict[str, Any]:
         """Convert attachment objects to artifact dictionary."""
         recording = None
         transcript = None
         translation = None
 
         for attachment in attachments:
-            if attachment.attachment_type == 'recording':
+            if attachment.attachment_type == "recording":
                 recording = attachment.file_path
-            elif attachment.attachment_type == 'transcript':
+            elif attachment.attachment_type == "transcript":
                 transcript = attachment.file_path
-            elif attachment.attachment_type == 'translation':
+            elif attachment.attachment_type == "translation":
                 translation = attachment.file_path
 
         return {
-            'recording': recording,
-            'transcript': transcript,
-            'translation': translation,
-            'attachments': [
+            "recording": recording,
+            "transcript": transcript,
+            "translation": translation,
+            "attachments": [
                 {
-                    'id': a.id,
-                    'type': a.attachment_type,
-                    'path': a.file_path,
-                    'size': a.file_size,
-                    'created_at': a.created_at
+                    "id": a.id,
+                    "type": a.attachment_type,
+                    "path": a.file_path,
+                    "size": a.file_size,
+                    "created_at": a.created_at,
                 }
                 for a in attachments
-            ]
+            ],
         }
 
     def _read_attachment_text(
@@ -791,15 +707,15 @@ class TimelineManager:
     ) -> tuple[Optional[str], Optional[str]]:
         """Read textual content from transcript/translation attachments."""
 
-        if attachment.attachment_type not in {'transcript', 'translation'}:
+        if attachment.attachment_type not in {"transcript", "translation"}:
             return None, None
 
         fallback_message: Optional[str] = None
         try:
-            with open(attachment.file_path, 'r', encoding='utf-8') as file_obj:
+            with open(attachment.file_path, "r", encoding="utf-8") as file_obj:
                 return file_obj.read(), None
         except FileNotFoundError:
-            if attachment.attachment_type == 'translation':
+            if attachment.attachment_type == "translation":
                 logger.warning(
                     "Translation file not found for event %s: %s",
                     event_id,
@@ -813,13 +729,13 @@ class TimelineManager:
                 )
             if collect_fallback:
                 fallback_message = self._translate(
-                    'timeline.snippet.missing_transcript',
-                    'Transcript unavailable (file missing)',
+                    "timeline.snippet.missing_transcript",
+                    "Transcript unavailable (file missing)",
                 )
         except UnicodeDecodeError:
             log_message = (
                 "Failed to decode translation for event %s: %s"
-                if attachment.attachment_type == 'translation'
+                if attachment.attachment_type == "translation"
                 else "Failed to decode transcript for event %s: %s"
             )
             logger.error(
@@ -830,13 +746,13 @@ class TimelineManager:
             )
             if collect_fallback:
                 fallback_message = self._translate(
-                    'timeline.snippet.unreadable_transcript',
-                    'Transcript unavailable (cannot read transcript)',
+                    "timeline.snippet.unreadable_transcript",
+                    "Transcript unavailable (cannot read transcript)",
                 )
         except Exception as exc:  # pragma: no cover - defensive logging
             log_message = (
                 "Failed to read translation %s for event %s: %s"
-                if attachment.attachment_type == 'translation'
+                if attachment.attachment_type == "translation"
                 else "Failed to read transcript %s for event %s: %s"
             )
             logger.warning(
@@ -847,17 +763,14 @@ class TimelineManager:
             )
             if collect_fallback:
                 fallback_message = self._translate(
-                    'timeline.snippet.generic_transcript',
-                    'Transcript unavailable',
+                    "timeline.snippet.generic_transcript",
+                    "Transcript unavailable",
                 )
 
         return None, fallback_message
 
     def get_search_snippet(
-        self,
-        event: CalendarEvent,
-        query: str,
-        attachments: Optional[List[EventAttachment]] = None
+        self, event: CalendarEvent, query: str, attachments: Optional[List[EventAttachment]] = None
     ) -> Optional[str]:
         """
         Get a snippet showing where the query matched.
@@ -877,10 +790,7 @@ class TimelineManager:
 
         # Check title
         if query_lower in event.title.lower():
-            title_prefix = self._translate(
-                'timeline.snippet.title_prefix',
-                'Title'
-            )
+            title_prefix = self._translate("timeline.snippet.title_prefix", "Title")
             return f"{title_prefix}: ...{event.title}..."
 
         # Check description
@@ -891,21 +801,17 @@ class TimelineManager:
             end = min(len(event.description), pos + len(query) + 30)
             snippet = event.description[start:end]
             description_prefix = self._translate(
-                'timeline.snippet.description_prefix',
-                'Description'
+                "timeline.snippet.description_prefix", "Description"
             )
             return f"{description_prefix}: ...{snippet}..."
 
         # Check transcripts
         attachments_to_check = attachments
         if attachments_to_check is None:
-            attachments_to_check = EventAttachment.get_by_event_id(
-                self.db,
-                event.id
-            )
+            attachments_to_check = EventAttachment.get_by_event_id(self.db, event.id)
         fallback_message: Optional[str] = None
         for attachment in attachments_to_check:
-            if attachment.attachment_type not in {'transcript', 'translation'}:
+            if attachment.attachment_type not in {"transcript", "translation"}:
                 continue
 
             content, attachment_fallback = self._read_attachment_text(
@@ -926,11 +832,11 @@ class TimelineManager:
                 end = min(len(content), pos + len(query) + 30)
                 snippet = content[start:end]
 
-                prefix_key = 'timeline.snippet.transcript_prefix'
-                default_prefix = 'Transcript'
-                if attachment.attachment_type == 'translation':
-                    prefix_key = 'timeline.snippet.translation_prefix'
-                    default_prefix = 'Translation'
+                prefix_key = "timeline.snippet.transcript_prefix"
+                default_prefix = "Transcript"
+                if attachment.attachment_type == "translation":
+                    prefix_key = "timeline.snippet.translation_prefix"
+                    default_prefix = "Translation"
 
                 transcript_prefix = self._translate(
                     prefix_key,
@@ -940,24 +846,17 @@ class TimelineManager:
 
         return fallback_message
 
-    def _get_match_snippet(
-        self,
-        event: CalendarEvent,
-        query: str
-    ) -> Optional[str]:
+    def _get_match_snippet(self, event: CalendarEvent, query: str) -> Optional[str]:
         """Compatibility wrapper for older callers."""
         return self.get_search_snippet(event, query)
 
     def _resolve_transcript_candidate_range(
-        self,
-        start_dt: datetime,
-        end_dt: datetime,
-        filters: Dict[str, Any]
+        self, start_dt: datetime, end_dt: datetime, filters: Dict[str, Any]
     ) -> tuple[datetime, datetime]:
         """Determine a bounded range for transcript candidate expansion."""
         window = timedelta(days=_DEFAULT_TRANSCRIPT_CANDIDATE_WINDOW_DAYS)
-        has_start = bool(filters.get('start_date'))
-        has_end = bool(filters.get('end_date'))
+        has_start = bool(filters.get("start_date"))
+        has_end = bool(filters.get("end_date"))
 
         if has_start and has_end:
             candidate_start = start_dt
@@ -969,8 +868,8 @@ class TimelineManager:
             candidate_end = end_dt
             candidate_start = end_dt - window
         else:
-            event_type = filters.get('event_type')
-            source = filters.get('source')
+            event_type = filters.get("event_type")
+            source = filters.get("source")
 
             bounds = CalendarEvent.get_time_bounds(
                 self.db,

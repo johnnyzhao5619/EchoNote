@@ -53,8 +53,7 @@ class GoogleTranslateEngine(TranslationEngine):
 
         # Create the underlying HTTP client.
         self.client: Optional[httpx.AsyncClient] = httpx.AsyncClient(
-            timeout=30.0,
-            headers={'Content-Type': 'application/json'}
+            timeout=30.0, headers={"Content-Type": "application/json"}
         )
 
         logger.info("Google Translate engine initialized")
@@ -67,10 +66,7 @@ class GoogleTranslateEngine(TranslationEngine):
         """Return the supported language codes."""
         return self.SUPPORTED_LANGUAGES.copy()
 
-    async def translate(
-        self, text: str, source_lang: str = 'auto',
-        target_lang: str = 'en'
-    ) -> str:
+    async def translate(self, text: str, source_lang: str = "auto", target_lang: str = "en") -> str:
         """Translate text using the Google Cloud Translation API.
 
         Args:
@@ -91,44 +87,34 @@ class GoogleTranslateEngine(TranslationEngine):
             raise ValueError(msg)
 
         # Prepare request parameters.
-        params = {
-            'key': self.api_key,
-            'q': text,
-            'target': target_lang
-        }
+        params = {"key": self.api_key, "q": text, "target": target_lang}
 
         # Include the explicit source language when provided.
-        if source_lang != 'auto':
+        if source_lang != "auto":
             if not self.validate_language(source_lang):
                 msg = f"Unsupported source language: {source_lang}"
                 logger.error(msg)
                 raise ValueError(msg)
-            params['source'] = source_lang
+            params["source"] = source_lang
 
         # Retry loop.
         last_error = None
         for attempt in range(self.max_retries):
             try:
-                logger.debug(
-                    f"Translation attempt {attempt + 1}/"
-                    f"{self.max_retries}"
-                )
+                logger.debug(f"Translation attempt {attempt + 1}/" f"{self.max_retries}")
 
                 # Send the HTTP request.
-                response = await self.client.post(
-                    self.base_url,
-                    params=params
-                )
+                response = await self.client.post(self.base_url, params=params)
 
                 # Inspect the response status code.
                 if response.status_code == 200:
                     data = response.json()
 
                     # Extract translation payload.
-                    if 'data' in data and 'translations' in data['data']:
-                        translations = data['data']['translations']
+                    if "data" in data and "translations" in data["data"]:
+                        translations = data["data"]["translations"]
                         if translations:
-                            translated = translations[0]['translatedText']
+                            translated = translations[0]["translatedText"]
                             logger.debug(
                                 f"Translation successful: "
                                 f"{text[:50]}... -> {translated[:50]}..."
@@ -142,48 +128,36 @@ class GoogleTranslateEngine(TranslationEngine):
                 elif response.status_code == 400:
                     # Client error: do not retry.
                     error_data = response.json()
-                    error_msg = error_data.get(
-                        'error', {}
-                    ).get('message', 'Unknown error')
-                    logger.error(
-                        f"Google Translate API error (400): {error_msg}"
-                    )
+                    error_msg = error_data.get("error", {}).get("message", "Unknown error")
+                    logger.error(f"Google Translate API error (400): {error_msg}")
                     raise ValueError(f"Translation failed: {error_msg}")
 
                 elif response.status_code == 403:
                     # Authentication error: do not retry.
-                    logger.error(
-                        "Google Translate API authentication failed (403)"
-                    )
+                    logger.error("Google Translate API authentication failed (403)")
                     msg = "Invalid API key or insufficient permissions"
                     raise ValueError(msg)
 
                 elif response.status_code == 429:
                     # Rate limit exceeded: apply exponential backoff.
-                    logger.warning(
-                        "Google Translate API rate limit exceeded (429)"
-                    )
+                    logger.warning("Google Translate API rate limit exceeded (429)")
                     if attempt < self.max_retries - 1:
                         import asyncio
-                        await asyncio.sleep(2 ** attempt)  # Exponential backoff.
+
+                        await asyncio.sleep(2**attempt)  # Exponential backoff.
                         continue
                     msg = "Translation failed: Rate limit exceeded"
                     raise ValueError(msg)
 
                 else:
                     # Other error: retry when attempts remain.
-                    logger.warning(
-                        f"Google Translate API error "
-                        f"({response.status_code})"
-                    )
+                    logger.warning(f"Google Translate API error " f"({response.status_code})")
                     if attempt < self.max_retries - 1:
                         import asyncio
+
                         await asyncio.sleep(1)
                         continue
-                    msg = (
-                        f"Translation failed with status code: "
-                        f"{response.status_code}"
-                    )
+                    msg = f"Translation failed with status code: " f"{response.status_code}"
                     raise ValueError(msg)
 
             except httpx.RequestError as e:
@@ -192,6 +166,7 @@ class GoogleTranslateEngine(TranslationEngine):
                 last_error = e
                 if attempt < self.max_retries - 1:
                     import asyncio
+
                     await asyncio.sleep(1)
                     continue
 
@@ -202,10 +177,7 @@ class GoogleTranslateEngine(TranslationEngine):
 
         # All retries exhausted.
         if last_error:
-            msg = (
-                f"Translation failed after {self.max_retries} "
-                f"attempts: {last_error}"
-            )
+            msg = f"Translation failed after {self.max_retries} " f"attempts: {last_error}"
             raise ValueError(msg)
 
         msg = f"Translation failed after {self.max_retries} attempts"
@@ -246,26 +218,19 @@ class GoogleTranslateEngine(TranslationEngine):
 
         try:
             # Use the Google Translate API detection endpoint.
-            params = {
-                'key': self.api_key,
-                'q': text
-            }
+            params = {"key": self.api_key, "q": text}
 
-            response = await self.client.post(
-                f"{self.base_url}/detect",
-                params=params
-            )
+            response = await self.client.post(f"{self.base_url}/detect", params=params)
 
             if response.status_code == 200:
                 data = response.json()
-                if 'data' in data and 'detections' in data['data']:
-                    detections = data['data']['detections']
+                if "data" in data and "detections" in data["data"]:
+                    detections = data["data"]["detections"]
                     if detections and detections[0]:
-                        language = detections[0][0]['language']
-                        confidence = detections[0][0].get('confidence', 0)
+                        language = detections[0][0]["language"]
+                        confidence = detections[0][0].get("confidence", 0)
                         logger.debug(
-                            f"Detected language: {language} "
-                            f"(confidence: {confidence})"
+                            f"Detected language: {language} " f"(confidence: {confidence})"
                         )
                         return language
 
@@ -279,21 +244,18 @@ class GoogleTranslateEngine(TranslationEngine):
     def get_config_schema(self) -> dict:
         """Return the JSON schema describing configuration options."""
         return {
-            'type': 'object',
-            'properties': {
-                'api_key': {
-                    'type': 'string',
-                    'description': 'Google Cloud API Key'
+            "type": "object",
+            "properties": {
+                "api_key": {"type": "string", "description": "Google Cloud API Key"},
+                "max_retries": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10,
+                    "default": 3,
+                    "description": "Maximum number of retry attempts",
                 },
-                'max_retries': {
-                    'type': 'integer',
-                    'minimum': 1,
-                    'maximum': 10,
-                    'default': 3,
-                    'description': 'Maximum number of retry attempts'
-                }
             },
-            'required': ['api_key']
+            "required": ["api_key"],
         }
 
     async def __aenter__(self):
