@@ -1,3 +1,18 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (c) 2024-2025 EchoNote Contributors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """模型下载器实现。"""
 
 from __future__ import annotations
@@ -11,7 +26,7 @@ from threading import Event, Lock
 from typing import Dict, Optional, Tuple
 
 import requests
-from PyQt6.QtCore import QObject, pyqtSignal
+from PySide6.QtCore import QObject, Signal
 
 from .registry import ModelInfo
 
@@ -32,9 +47,9 @@ class _RemoteFile:
 class ModelDownloader(QObject):
     """负责从 Hugging Face 下载模型文件。"""
 
-    download_progress = pyqtSignal(str, int, float)
-    download_completed = pyqtSignal(str)
-    download_failed = pyqtSignal(str, str)
+    download_progress = Signal(str, int, float)
+    download_completed = Signal(str)
+    download_failed = Signal(str, str)
 
     def __init__(self, models_dir: Path, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)

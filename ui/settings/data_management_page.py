@@ -1,3 +1,18 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (c) 2024-2025 EchoNote Contributors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """
 Data Management settings page for EchoNote application.
 
@@ -5,11 +20,11 @@ Provides UI for managing user data, including cleanup functionality.
 """
 
 import logging
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QVBoxLayout, QLabel, QPushButton,
     QGroupBox, QMessageBox, QProgressDialog
 )
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PySide6.QtCore import Qt, QThread, Signal
 
 from ui.settings.base_page import BasePage
 from utils.data_cleanup import DataCleanup
@@ -21,8 +36,8 @@ logger = logging.getLogger(__name__)
 class CleanupWorker(QThread):
     """Worker thread for data cleanup operations."""
     
-    finished = pyqtSignal(dict)  # Emits cleanup results
-    error = pyqtSignal(str)  # Emits error message
+    finished = Signal(dict)  # Emits cleanup results
+    error = Signal(str)  # Emits error message
     
     def __init__(self, cleanup_manager: DataCleanup):
         super().__init__()

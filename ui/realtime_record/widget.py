@@ -1,3 +1,18 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (c) 2024-2025 EchoNote Contributors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """
 实时录制主界面
 
@@ -9,11 +24,11 @@ import logging
 from concurrent.futures import Future
 from typing import Dict, Optional, Set
 
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
     QSlider, QCheckBox, QPushButton, QPlainTextEdit, QGroupBox, QListWidget
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QObject, QThread
+from PySide6.QtCore import Qt, QTimer, Signal, QObject, QThread
 import threading
 
 from ui.common.notification import get_notification_manager
@@ -26,31 +41,31 @@ class RealtimeRecorderSignals(QObject):
     """Qt Signal wrapper for RealtimeRecorder callbacks"""
 
     # Signal emitted when new transcription text is available
-    transcription_updated = pyqtSignal(str)
+    transcription_updated = Signal(str)
 
     # Signal emitted when new translation text is available
-    translation_updated = pyqtSignal(str)
+    translation_updated = Signal(str)
 
     # Signal emitted when an error occurs
-    error_occurred = pyqtSignal(str)
+    error_occurred = Signal(str)
 
     # Signal emitted when recording status changes
-    status_changed = pyqtSignal(bool, float)
+    status_changed = Signal(bool, float)
 
     # Signal emitted when audio data is available (for visualization)
-    audio_data_available = pyqtSignal(object)  # np.ndarray
+    audio_data_available = Signal(object)  # np.ndarray
     
     # Signal emitted when recording starts (for UI update)
-    recording_started = pyqtSignal()
+    recording_started = Signal()
     
     # Signal emitted when recording stops (for UI update)
-    recording_stopped = pyqtSignal()
+    recording_stopped = Signal()
 
     # Signal emitted when recording stops successfully with metadata
-    recording_succeeded = pyqtSignal(dict)
+    recording_succeeded = Signal(dict)
 
     # Signal emitted when a marker is added
-    marker_added = pyqtSignal(object)
+    marker_added = Signal(object)
 
     def __init__(self):
         super().__init__()
@@ -755,7 +770,7 @@ class RealtimeRecordWidget(QWidget):
             return
         
         # Create download guide widget
-        from PyQt6.QtWidgets import QFrame, QLabel, QPushButton
+        from PySide6.QtWidgets import QFrame, QLabel, QPushButton
         
         guide_widget = QFrame()
         guide_widget.setObjectName("download_guide")
@@ -1301,7 +1316,7 @@ class RealtimeRecordWidget(QWidget):
                     self._pending_futures.discard(future)
 
         # 使用 QTimer 异步检查结果
-        from PyQt6.QtCore import QTimer
+        from PySide6.QtCore import QTimer
         QTimer.singleShot(100, check_result)
 
     async def _start_recording(self):
@@ -1448,7 +1463,7 @@ class RealtimeRecordWidget(QWidget):
 
     def _export_transcription(self):
         """导出转录文本"""
-        from PyQt6.QtWidgets import QFileDialog
+        from PySide6.QtWidgets import QFileDialog
 
         # 获取累积的转录文本
         text = self.recorder.get_accumulated_transcription()
@@ -1478,7 +1493,7 @@ class RealtimeRecordWidget(QWidget):
 
     def _export_translation(self):
         """导出翻译文本"""
-        from PyQt6.QtWidgets import QFileDialog
+        from PySide6.QtWidgets import QFileDialog
 
         # 获取累积的翻译文本
         text = self.recorder.get_accumulated_translation()

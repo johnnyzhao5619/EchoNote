@@ -35,4 +35,4 @@ py2app>=0.28.0  # macOS only
 
 # Type Stubs
 types-requests>=2.31.0
-PyQt6-stubs>=6.5.0
+PySide6-stubs>=6.5.0

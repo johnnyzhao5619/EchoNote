@@ -1,3 +1,18 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (c) 2024-2025 EchoNote Contributors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """
 模型管理设置页面
 
@@ -8,13 +23,13 @@ import logging
 from datetime import datetime
 from typing import Dict
 
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QMessageBox,
     QPushButton, QProgressBar, QFrame, QComboBox, QCheckBox,
     QSpinBox, QDialog, QFormLayout, QDialogButtonBox
 )
-from PyQt6.QtCore import pyqtSlot
-from PyQt6.QtGui import QFont
+from PySide6.QtCore import Slot
+from PySide6.QtGui import QFont
 
 from ui.settings.base_page import BaseSettingsPage
 from ui.common.error_dialog import show_error_dialog
@@ -166,7 +181,7 @@ class ModelManagementPage(BaseSettingsPage):
         
         logger.debug("Translations updated for model management page")
 
-    @pyqtSlot()
+    @Slot()
     def _refresh_model_list(self):
         """刷新模型列表"""
         logger.debug("Refreshing model list")
@@ -693,7 +708,7 @@ class ModelManagementPage(BaseSettingsPage):
         # 通用建议
         return self.i18n.t('settings.model_management.delete_suggestion_general')
     
-    @pyqtSlot(str, str)
+    @Slot(str, str)
     def _on_validation_failed(self, model_name: str, error_message: str):
         """
         处理模型验证失败事件
@@ -799,7 +814,7 @@ class ModelManagementPage(BaseSettingsPage):
             )
         
         # 在线程池中执行下载
-        from PyQt6.QtCore import QThreadPool, QRunnable
+        from PySide6.QtCore import QThreadPool, QRunnable
         
         class DownloadRunnable(QRunnable):
             def run(self):
@@ -1032,7 +1047,7 @@ class ModelManagementPage(BaseSettingsPage):
         logger.info(f"Downloading recommended model: {model_name}")
         self._on_download_clicked(model_name)
 
-    @pyqtSlot(str, int, float)
+    @Slot(str, int, float)
     def _update_download_progress(
         self,
         model_name: str,
@@ -1071,7 +1086,7 @@ class ModelManagementPage(BaseSettingsPage):
             else:
                 progress_bar.setFormat(f"{progress}%")
 
-    @pyqtSlot(str)
+    @Slot(str)
     def _on_download_completed(self, model_name: str):
         """
         处理下载完成事件
@@ -1094,7 +1109,7 @@ class ModelManagementPage(BaseSettingsPage):
         # 刷新模型列表（会自动将模型移到已下载区域）
         self._refresh_model_list()
 
-    @pyqtSlot(str, str)
+    @Slot(str, str)
     def _on_download_failed(self, model_name: str, error: str):
         """
         处理下载失败事件
@@ -1221,7 +1236,7 @@ class ModelDetailsDialog(QDialog):
         """
         super().__init__(parent)
         
-        from PyQt6.QtWidgets import QGridLayout
+        from PySide6.QtWidgets import QGridLayout
         from pathlib import Path
         import subprocess
         import platform

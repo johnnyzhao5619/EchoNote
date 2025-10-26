@@ -1,4 +1,19 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (c) 2024-2025 EchoNote Contributors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """
 EchoNote - Intelligent Voice Transcription and Calendar Management Application
 
@@ -121,7 +136,7 @@ def exception_hook(exctype, value, tb):
     
     # Try to show error dialog if PyQt is available
     try:
-        from PyQt6.QtWidgets import QApplication
+        from PySide6.QtWidgets import QApplication
         from ui.common.error_dialog import show_error_dialog
         
         # Check if QApplication exists
@@ -174,8 +189,8 @@ def main():
 
         # Initialize PyQt application FIRST (needed for splash screen)
         logger.info("Initializing PyQt application...")
-        from PyQt6.QtWidgets import QApplication
-        from PyQt6.QtCore import Qt
+        from PySide6.QtWidgets import QApplication
+        from PySide6.QtCore import Qt
         
         # Enable high DPI scaling
         QApplication.setHighDpiScaleFactorRoundingPolicy(
@@ -779,7 +794,7 @@ def main():
             # If user chose to download later, show a reminder in the main window
             if not user_downloaded:
                 logger.info("User chose to download later, showing reminder...")
-                from PyQt6.QtWidgets import QMessageBox
+                from PySide6.QtWidgets import QMessageBox
                 
                 QMessageBox.warning(
                     main_window,

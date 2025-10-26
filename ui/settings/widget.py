@@ -1,3 +1,18 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (c) 2024-2025 EchoNote Contributors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """
 Settings widget for EchoNote application.
 
@@ -8,12 +23,12 @@ for configuring all application features.
 import logging
 from typing import Dict, Any, Optional
 
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QListWidget, QListWidgetItem,
     QStackedWidget, QPushButton, QLabel, QMessageBox, QFrame
 )
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QFont
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QFont
 
 from utils.i18n import I18nQtManager
 
@@ -30,7 +45,7 @@ class SettingsWidget(QWidget):
     """
     
     # Signal emitted when settings are saved
-    settings_saved = pyqtSignal()
+    settings_saved = Signal()
     
     def __init__(
         self,
@@ -229,7 +244,7 @@ class SettingsWidget(QWidget):
         except Exception as e:
             logger.error(f"Error creating settings pages: {e}", exc_info=True)
             # Create placeholder pages if real ones fail
-            from PyQt6.QtWidgets import QLabel, QVBoxLayout
+            from PySide6.QtWidgets import QLabel, QVBoxLayout
             
             categories = ['transcription', 'realtime', 'model_management',
                          'calendar', 'timeline', 'appearance', 'language']

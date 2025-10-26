@@ -1,3 +1,18 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (c) 2024-2025 EchoNote Contributors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """
 音频波形可视化组件
 
@@ -7,9 +22,9 @@
 import logging
 import numpy as np
 from collections import deque
-from PyQt6.QtWidgets import QWidget
-from PyQt6.QtCore import QTimer, QRect
-from PyQt6.QtGui import QPainter, QColor, QPen
+from PySide6.QtWidgets import QWidget
+from PySide6.QtCore import QTimer, QRect
+from PySide6.QtGui import QPainter, QColor, QPen
 
 logger = logging.getLogger(__name__)
 

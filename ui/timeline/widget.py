@@ -1,3 +1,18 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (c) 2024-2025 EchoNote Contributors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """
 Timeline widget for EchoNote.
 
@@ -10,12 +25,12 @@ import math
 from typing import Optional, Dict, Any, List, TYPE_CHECKING, cast
 from datetime import datetime
 
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QScrollArea,
     QLineEdit, QComboBox, QLabel, QFrame, QPushButton, QMessageBox, QDateEdit
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QDateTime, QTime, QDate
-from PyQt6.QtGui import QPalette
+from PySide6.QtCore import Qt, Signal, QTimer, QDateTime, QTime, QDate
+from PySide6.QtGui import QPalette
 
 from utils.i18n import I18nQtManager
 from core.timeline.manager import to_local_naive
@@ -39,8 +54,8 @@ class TimelineWidget(QWidget):
     """
     
     # Signals
-    event_selected = pyqtSignal(str)  # event_id
-    auto_task_changed = pyqtSignal(str, dict)  # event_id, config
+    event_selected = Signal(str)  # event_id
+    auto_task_changed = Signal(str, dict)  # event_id, config
     
     def __init__(
         self,

@@ -1,3 +1,18 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (c) 2024-2025 EchoNote Contributors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """
 Settings management for EchoNote application.
 
@@ -9,7 +24,7 @@ import copy
 import logging
 from collections.abc import Mapping
 from typing import Any, Dict, Optional
-from PyQt6.QtCore import QObject, pyqtSignal
+from PySide6.QtCore import QObject, Signal
 
 
 logger = logging.getLogger(__name__)
@@ -27,10 +42,10 @@ class SettingsManager(QObject):
     """
 
     # Signal emitted when any setting changes
-    setting_changed = pyqtSignal(str, object)  # (key, new_value)
+    setting_changed = Signal(str, object)  # (key, new_value)
     
     # Signal emitted when API keys are updated (for engine reloading)
-    api_keys_updated = pyqtSignal()
+    api_keys_updated = Signal()
 
     def __init__(self, config_manager):
         """

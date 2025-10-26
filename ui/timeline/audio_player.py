@@ -1,3 +1,18 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (c) 2024-2025 EchoNote Contributors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """
 Audio player widget for timeline recordings.
 
@@ -8,12 +23,12 @@ import logging
 from typing import Optional
 from pathlib import Path
 
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QSlider, QDialog, QMessageBox
 )
-from PyQt6.QtCore import Qt, QUrl, pyqtSignal
-from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
+from PySide6.QtCore import Qt, QUrl, Signal
+from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 
 from utils.i18n import I18nQtManager
 
@@ -33,7 +48,7 @@ class AudioPlayer(QWidget):
     """
 
     # Signals
-    playback_error = pyqtSignal(str)  # error_message
+    playback_error = Signal(str)  # error_message
 
     _ERROR_TRANSLATIONS = {
         QMediaPlayer.Error.ServiceMissingError:

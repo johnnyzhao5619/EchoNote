@@ -1,3 +1,18 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (c) 2024-2025 EchoNote Contributors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """
 Event card components for timeline view.
 
@@ -7,12 +22,12 @@ Displays event information with different layouts for past and future events.
 import logging
 from typing import Optional, Dict, Any
 
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QFrame, QPushButton, QCheckBox, QComboBox
 )
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QFont, QPalette, QColor
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QFont, QPalette, QColor
 
 from utils.i18n import I18nQtManager, LANGUAGE_OPTION_KEYS
 from core.timeline.manager import to_local_naive
@@ -86,10 +101,10 @@ class EventCard(QFrame):
     """
     
     # Signals
-    auto_task_changed = pyqtSignal(str, dict)  # event_id, config
-    view_recording = pyqtSignal(str)  # file_path
-    view_transcript = pyqtSignal(str)  # file_path
-    view_translation = pyqtSignal(str)  # file_path
+    auto_task_changed = Signal(str, dict)  # event_id, config
+    view_recording = Signal(str)  # file_path
+    view_transcript = Signal(str)  # file_path
+    view_translation = Signal(str)  # file_path
     
     EVENT_TYPE_TRANSLATION_MAP = {
         'event': 'timeline.filter_event',

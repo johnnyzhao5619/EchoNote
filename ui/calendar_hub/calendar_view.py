@@ -1,3 +1,18 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (c) 2024-2025 EchoNote Contributors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """
 Calendar View Components for EchoNote.
 
@@ -8,12 +23,12 @@ import logging
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QLabel, QScrollArea, QFrame, QPushButton
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QDate
-from PyQt6.QtGui import QColor, QPalette
+from PySide6.QtCore import Qt, Signal, QDate
+from PySide6.QtGui import QColor, QPalette
 
 from utils.i18n import I18nQtManager
 
@@ -26,7 +41,7 @@ class EventCard(QFrame):
     Visual representation of a calendar event.
     """
     
-    clicked = pyqtSignal(str)  # event_id
+    clicked = Signal(str)  # event_id
     
     def __init__(
         self,
@@ -103,8 +118,8 @@ class MonthView(QWidget):
     Month calendar view.
     """
     
-    date_changed = pyqtSignal(datetime)
-    event_clicked = pyqtSignal(str)  # event_id
+    date_changed = Signal(datetime)
+    event_clicked = Signal(str)  # event_id
     
     def __init__(
         self,
@@ -348,8 +363,8 @@ class WeekView(QWidget):
     Week calendar view.
     """
     
-    date_changed = pyqtSignal(datetime)
-    event_clicked = pyqtSignal(str)  # event_id
+    date_changed = Signal(datetime)
+    event_clicked = Signal(str)  # event_id
     
     def __init__(
         self,
@@ -554,8 +569,8 @@ class DayView(QWidget):
     Day calendar view.
     """
     
-    date_changed = pyqtSignal(datetime)
-    event_clicked = pyqtSignal(str)  # event_id
+    date_changed = Signal(datetime)
+    event_clicked = Signal(str)  # event_id
     
     def __init__(
         self,

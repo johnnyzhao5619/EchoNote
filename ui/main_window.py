@@ -1,3 +1,18 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (c) 2024-2025 EchoNote Contributors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """
 Main window for EchoNote application.
 
@@ -8,12 +23,12 @@ content area for different features.
 import logging
 from typing import Dict, Any, Optional
 
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QStackedWidget,
     QApplication
 )
-from PyQt6.QtCore import Qt, QSettings, QSize, QPoint
-from PyQt6.QtGui import QCloseEvent
+from PySide6.QtCore import Qt, QSettings, QSize, QPoint
+from PySide6.QtGui import QCloseEvent
 
 from utils.i18n import I18nQtManager
 
@@ -268,7 +283,7 @@ class MainWindow(QMainWindow):
             page_name: Name of the page
             error_msg: Error message to display
         """
-        from PyQt6.QtWidgets import QLabel, QVBoxLayout
+        from PySide6.QtWidgets import QLabel, QVBoxLayout
         
         placeholder = QWidget()
         layout = QVBoxLayout(placeholder)
@@ -469,7 +484,7 @@ class MainWindow(QMainWindow):
                 task_count = self._get_running_task_count()
                 
                 # Show confirmation dialog
-                from PyQt6.QtWidgets import QMessageBox
+                from PySide6.QtWidgets import QMessageBox
                 
                 # Build message with task count
                 if task_count > 0:
@@ -755,7 +770,7 @@ class MainWindow(QMainWindow):
     
     def _setup_keyboard_shortcuts(self):
         """Setup global keyboard shortcuts for accessibility."""
-        from PyQt6.QtGui import QShortcut, QKeySequence
+        from PySide6.QtGui import QShortcut, QKeySequence
         
         # Navigation shortcuts (Ctrl+1-5)
         pages = ['batch_transcribe', 'realtime_record', 'calendar_hub', 'timeline', 'settings']

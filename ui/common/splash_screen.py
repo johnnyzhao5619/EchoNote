@@ -1,3 +1,18 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (c) 2024-2025 EchoNote Contributors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """
 Splash screen for application startup.
 
@@ -5,9 +20,9 @@ Displays a splash screen with progress updates during initialization.
 """
 
 import logging
-from PyQt6.QtWidgets import QSplashScreen
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QPixmap, QPainter, QColor, QFont
+from PySide6.QtWidgets import QSplashScreen
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QPixmap, QPainter, QColor, QFont
 
 
 logger = logging.getLogger(__name__)
@@ -136,7 +151,7 @@ class SplashScreen(QSplashScreen):
         painter.setFont(percent_font)
         
         # Calculate text width for right alignment
-        from PyQt6.QtGui import QFontMetrics
+        from PySide6.QtGui import QFontMetrics
         metrics = QFontMetrics(percent_font)
         text_width = metrics.horizontalAdvance(percent_text)
         
@@ -162,7 +177,7 @@ class SplashScreen(QSplashScreen):
         self.repaint()
         
         # Process events to keep UI responsive
-        from PyQt6.QtWidgets import QApplication
+        from PySide6.QtWidgets import QApplication
         QApplication.processEvents()
         
         logger.debug(f"Splash progress: {message} ({self._progress_percent}%)")

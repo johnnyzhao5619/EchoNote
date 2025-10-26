@@ -1,3 +1,18 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (c) 2024-2025 EchoNote Contributors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """
 Calendar Hub Widget for EchoNote.
 
@@ -10,11 +25,11 @@ from urllib.parse import urlparse
 from datetime import datetime
 from typing import Optional, Dict, Any, Tuple
 
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QLabel, QStackedWidget, QButtonGroup, QFrame, QDialog
 )
-from PyQt6.QtCore import pyqtSignal
+from PySide6.QtCore import Signal
 
 from utils.i18n import I18nQtManager
 
@@ -34,10 +49,10 @@ class CalendarHubWidget(QWidget):
     """
     
     # Signals
-    view_changed = pyqtSignal(str)  # month/week/day
-    date_changed = pyqtSignal(object)  # datetime
-    create_event_requested = pyqtSignal()
-    add_account_requested = pyqtSignal()
+    view_changed = Signal(str)  # month/week/day
+    date_changed = Signal(object)  # datetime
+    create_event_requested = Signal()
+    add_account_requested = Signal()
     
     def __init__(
         self,
@@ -392,7 +407,7 @@ class CalendarHubWidget(QWidget):
                     
                 except Exception as e:
                     logger.error(f"Error saving event: {e}")
-                    from PyQt6.QtWidgets import QMessageBox
+                    from PySide6.QtWidgets import QMessageBox
                     QMessageBox.critical(
                         self,
                         "Error",
@@ -422,7 +437,7 @@ class CalendarHubWidget(QWidget):
             self._refresh_current_view()
             
             # Show success message
-            from PyQt6.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.information(
                 self,
                 "Success",
@@ -456,7 +471,7 @@ class CalendarHubWidget(QWidget):
             self._refresh_current_view()
             
             # Show success message
-            from PyQt6.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.information(
                 self,
                 "Success",
@@ -478,7 +493,7 @@ class CalendarHubWidget(QWidget):
     
     def show_add_account_dialog(self):
         """Show dialog to add external calendar account."""
-        from PyQt6.QtWidgets import QDialog, QVBoxLayout, QPushButton
+        from PySide6.QtWidgets import QDialog, QVBoxLayout, QPushButton
         
         # Create simple provider selection dialog
         dialog = QDialog(self)
@@ -519,7 +534,7 @@ class CalendarHubWidget(QWidget):
         try:
             # Get sync adapter
             if provider not in self.calendar_manager.sync_adapters:
-                from PyQt6.QtWidgets import QMessageBox
+                from PySide6.QtWidgets import QMessageBox
                 provider_name = self._get_provider_display_name(provider)
                 QMessageBox.warning(
                     self,
@@ -577,7 +592,7 @@ class CalendarHubWidget(QWidget):
             
         except Exception as e:
             logger.error(f"Error starting OAuth flow: {e}")
-            from PyQt6.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(
                 self,
                 "Error",
@@ -735,7 +750,7 @@ class CalendarHubWidget(QWidget):
             self._refresh_current_view()
             
             # Show success message
-            from PyQt6.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             provider_name = self._get_provider_display_name(provider)
             QMessageBox.information(
                 self,
@@ -853,7 +868,7 @@ class CalendarHubWidget(QWidget):
             provider: Provider name
             error: Error message
         """
-        from PyQt6.QtWidgets import QMessageBox
+        from PySide6.QtWidgets import QMessageBox
 
         provider_name = self._get_provider_display_name(provider)
 
@@ -1031,7 +1046,7 @@ class CalendarHubWidget(QWidget):
             provider: Provider name (google/outlook)
         """
         try:
-            from PyQt6.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             from data.database.models import CalendarSyncStatus
 
             provider_name = self._get_provider_display_name(provider)
@@ -1092,7 +1107,7 @@ class CalendarHubWidget(QWidget):
             
         except Exception as e:
             logger.error(f"Error disconnecting account: {e}")
-            from PyQt6.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(
                 self,
                 "Error",
@@ -1103,7 +1118,7 @@ class CalendarHubWidget(QWidget):
         """Handle sync now button click."""
         try:
             if not self.connected_accounts:
-                from PyQt6.QtWidgets import QMessageBox
+                from PySide6.QtWidgets import QMessageBox
                 QMessageBox.information(
                     self,
                     "No Accounts",
@@ -1137,7 +1152,7 @@ class CalendarHubWidget(QWidget):
             self._update_sync_status()
             
             # Show result
-            from PyQt6.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             if error_count == 0:
                 QMessageBox.information(
                     self,
@@ -1154,7 +1169,7 @@ class CalendarHubWidget(QWidget):
             
         except Exception as e:
             logger.error(f"Error during manual sync: {e}")
-            from PyQt6.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(
                 self,
                 "Sync Error",

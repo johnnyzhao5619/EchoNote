@@ -1,3 +1,18 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (c) 2024-2025 EchoNote Contributors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """
 OAuth Authorization Dialog for EchoNote Calendar.
 
@@ -14,11 +29,11 @@ import errno
 import threading
 from html import escape
 
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QProgressBar, QTextEdit, QMessageBox
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QThread
+from PySide6.QtCore import Qt, Signal, QTimer, QThread
 
 from utils.i18n import I18nQtManager
 
@@ -93,8 +108,8 @@ class OAuthDialog(QDialog):
     """
     
     # Signals
-    authorization_complete = pyqtSignal(str, str)  # authorization_code, code_verifier
-    authorization_failed = pyqtSignal(str)    # error_message
+    authorization_complete = Signal(str, str)  # authorization_code, code_verifier
+    authorization_failed = Signal(str)    # error_message
 
     def __init__(
         self,

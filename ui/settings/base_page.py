@@ -1,3 +1,18 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (c) 2024-2025 EchoNote Contributors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """
 Base class for settings pages.
 
@@ -7,9 +22,9 @@ Provides common functionality for all settings pages.
 import logging
 from typing import Tuple
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QScrollArea
-from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtGui import QFont
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QScrollArea
+from PySide6.QtCore import Signal
+from PySide6.QtGui import QFont
 
 from utils.i18n import I18nQtManager
 
@@ -25,7 +40,7 @@ class BaseSettingsPage(QWidget):
     """
     
     # Signal emitted when settings change
-    settings_changed = pyqtSignal()
+    settings_changed = Signal()
     
     def __init__(self, settings_manager, i18n: I18nQtManager):
         """

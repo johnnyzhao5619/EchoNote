@@ -1,3 +1,18 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (c) 2024-2025 EchoNote Contributors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """
 Transcript viewer dialog for viewing and editing transcription results.
 
@@ -9,13 +24,13 @@ import logging
 import os
 from typing import Optional
 
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTextEdit,
     QLabel, QPushButton, QMessageBox, QFrame, QMenu, QFileDialog,
     QApplication, QProgressDialog
 )
-from PyQt6.QtCore import QSize, QTimer, QSettings, QThread, pyqtSignal, Qt
-from PyQt6.QtGui import QFont, QKeySequence, QShortcut, QAction
+from PySide6.QtCore import QSize, QTimer, QSettings, QThread, Signal, Qt
+from PySide6.QtGui import QFont, QKeySequence, QShortcut, QAction
 
 from utils.i18n import I18nQtManager
 from data.database.models import TranscriptionTask
@@ -34,9 +49,9 @@ class FileLoadWorker(QThread):
     """
     
     # Signals
-    finished = pyqtSignal(str)  # Emits loaded content
-    error = pyqtSignal(str)  # Emits error message
-    progress = pyqtSignal(int)  # Emits progress percentage
+    finished = Signal(str)  # Emits loaded content
+    error = Signal(str)  # Emits error message
+    progress = Signal(int)  # Emits progress percentage
     
     def __init__(self, file_path: str):
         """

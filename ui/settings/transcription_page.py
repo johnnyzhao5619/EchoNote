@@ -1,3 +1,18 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (c) 2024-2025 EchoNote Contributors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """
 Transcription settings page.
 
@@ -8,11 +23,11 @@ import logging
 from pathlib import Path
 from typing import Dict, Any, Tuple
 
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QLabel, QComboBox, QSpinBox, QLineEdit, QPushButton,
     QHBoxLayout, QFileDialog, QGroupBox, QVBoxLayout, QFormLayout
 )
-from PyQt6.QtCore import Qt
+from PySide6.QtCore import Qt
 
 from core.models.registry import get_default_model_names
 from ui.settings.base_page import BaseSettingsPage
@@ -60,7 +75,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         """Set up the transcription settings UI."""
         # General settings section
         self.general_title = QLabel(self.i18n.t('settings.transcription.general'))
-        from PyQt6.QtGui import QFont
+        from PySide6.QtGui import QFont
         font = QFont()
         font.setPointSize(12)
         font.setBold(True)
@@ -340,7 +355,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         Args:
             parent_layout: Parent layout to add widgets to
         """
-        from PyQt6.QtWidgets import QGroupBox, QFormLayout, QPushButton
+        from PySide6.QtWidgets import QGroupBox, QFormLayout, QPushButton
         
         # OpenAI API Key
         self.openai_group = QGroupBox(
@@ -531,8 +546,8 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         Args:
             provider: Provider name (openai/google/azure)
         """
-        from PyQt6.QtWidgets import QMessageBox, QApplication
-        from PyQt6.QtCore import QThread
+        from PySide6.QtWidgets import QMessageBox, QApplication
+        from PySide6.QtCore import QThread
         import asyncio
         
         # Get API key

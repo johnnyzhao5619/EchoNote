@@ -1,3 +1,18 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (c) 2024-2025 EchoNote Contributors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """
 Batch transcription widget.
 
@@ -7,12 +22,12 @@ Provides UI for importing audio files and managing transcription tasks.
 import logging
 from typing import Optional, Dict, TYPE_CHECKING
 
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QLabel, QComboBox, QListWidget, QFileDialog,
     QMessageBox, QListWidgetItem
 )
-from PyQt6.QtCore import pyqtSignal, QTimer
+from PySide6.QtCore import Signal, QTimer
 
 from utils.i18n import I18nQtManager
 from core.transcription.manager import TranscriptionManager
@@ -32,7 +47,7 @@ class BatchTranscribeWidget(QWidget):
     """
 
     # Signal emitted when a task is added
-    task_added = pyqtSignal(str)  # task_id
+    task_added = Signal(str)  # task_id
 
     def __init__(
         self,
@@ -278,8 +293,8 @@ class BatchTranscribeWidget(QWidget):
         
         try:
             # Create download guide widget
-            from PyQt6.QtWidgets import QFrame
-            from PyQt6.QtCore import Qt
+            from PySide6.QtWidgets import QFrame
+            from PySide6.QtCore import Qt
             
             guide_frame = QFrame()
             guide_frame.setObjectName("download_guide_frame")
@@ -329,7 +344,7 @@ class BatchTranscribeWidget(QWidget):
                 settings_widget = main_window.pages.get('settings')
                 if settings_widget and hasattr(settings_widget, 'switch_to_page'):
                     # Give it a moment to switch pages
-                    from PyQt6.QtCore import QTimer
+                    from PySide6.QtCore import QTimer
                     QTimer.singleShot(
                         100,
                         lambda: settings_widget.switch_to_page('model_management')
@@ -611,7 +626,7 @@ class BatchTranscribeWidget(QWidget):
             # Add to list widget
             list_item = QListWidgetItem(self.task_list)
             # Set a fixed size hint to prevent overlapping
-            from PyQt6.QtCore import QSize
+            from PySide6.QtCore import QSize
             list_item.setSizeHint(QSize(800, 160))
             self.task_list.addItem(list_item)
             self.task_list.setItemWidget(list_item, task_item)

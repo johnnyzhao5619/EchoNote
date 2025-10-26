@@ -1,3 +1,18 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (c) 2024-2025 EchoNote Contributors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """
 Task item widget for batch transcription.
 
@@ -7,12 +22,12 @@ Displays individual transcription task information and controls.
 import logging
 from typing import Optional, Dict, Any
 
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QLabel, QProgressBar, QMenu
 )
-from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtGui import QAction
+from PySide6.QtCore import Signal
+from PySide6.QtGui import QAction
 
 from utils.i18n import I18nQtManager
 
@@ -28,13 +43,13 @@ class TaskItem(QWidget):
     """
 
     # Signals
-    start_clicked = pyqtSignal(str)  # task_id
-    pause_clicked = pyqtSignal(str)  # task_id
-    cancel_clicked = pyqtSignal(str)  # task_id
-    delete_clicked = pyqtSignal(str)  # task_id
-    view_clicked = pyqtSignal(str)  # task_id
-    export_clicked = pyqtSignal(str)  # task_id
-    retry_clicked = pyqtSignal(str)  # task_id
+    start_clicked = Signal(str)  # task_id
+    pause_clicked = Signal(str)  # task_id
+    cancel_clicked = Signal(str)  # task_id
+    delete_clicked = Signal(str)  # task_id
+    view_clicked = Signal(str)  # task_id
+    export_clicked = Signal(str)  # task_id
+    retry_clicked = Signal(str)  # task_id
 
     def __init__(
         self,
@@ -262,7 +277,7 @@ class TaskItem(QWidget):
 
     def sizeHint(self):
         """Return the recommended size for this widget."""
-        from PyQt6.QtCore import QSize
+        from PySide6.QtCore import QSize
         # Return a fixed size to ensure consistent layout
         return QSize(800, 150)
 

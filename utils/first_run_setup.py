@@ -1,3 +1,18 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (c) 2024-2025 EchoNote Contributors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """
 First run setup for EchoNote application.
 
@@ -116,11 +131,11 @@ class FirstRunSetup:
                 return False
 
             # Import here to avoid circular dependencies
-            from PyQt6.QtWidgets import (
+            from PySide6.QtWidgets import (
                 QDialog, QVBoxLayout, QHBoxLayout, QLabel,
                 QPushButton, QWidget
             )
-            from PyQt6.QtCore import Qt
+            from PySide6.QtCore import Qt
 
             # Create dialog
             dialog = QDialog(parent)
@@ -273,7 +288,7 @@ class FirstRunSetup:
                     f"{recommended_model_name}"
                 )
                 # Start download in a separate thread with its own event loop
-                from PyQt6.QtCore import QThreadPool, QRunnable
+                from PySide6.QtCore import QThreadPool, QRunnable
                 
                 def run_download():
                     """在新线程中运行下载"""
@@ -409,13 +424,13 @@ class FirstRunWizard:
             True if wizard was completed, False if cancelled
         """
         try:
-            from PyQt6.QtWidgets import (
+            from PySide6.QtWidgets import (
                 QWizard, QWizardPage, QVBoxLayout, QHBoxLayout,
                 QLabel, QComboBox, QRadioButton, QButtonGroup,
                 QPushButton, QProgressBar, QWidget, QFileDialog
             )
-            from PyQt6.QtCore import Qt, QThread, pyqtSignal
-            from PyQt6.QtGui import QFont
+            from PySide6.QtCore import Qt, QThread, Signal
+            from PySide6.QtGui import QFont
             
             class WelcomePage(QWizardPage):
                 """Welcome page with introduction."""
@@ -666,7 +681,7 @@ class FirstRunWizard:
                     )
                     
                     # Start download in thread
-                    from PyQt6.QtCore import QThreadPool, QRunnable
+                    from PySide6.QtCore import QThreadPool, QRunnable
                     
                     def run_download():
                         """Run download in thread."""
@@ -674,7 +689,7 @@ class FirstRunWizard:
                         def _on_success():
                             self.download_completed = True
                             # Update UI in main thread
-                            from PyQt6.QtCore import QMetaObject, Qt
+                            from PySide6.QtCore import QMetaObject, Qt
 
                             QMetaObject.invokeMethod(
                                 self,
@@ -684,7 +699,7 @@ class FirstRunWizard:
 
                         def _on_error(exc: Exception):
                             # Update UI in main thread
-                            from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
+                            from PySide6.QtCore import QMetaObject, Qt, Q_ARG
 
                             QMetaObject.invokeMethod(
                                 self,

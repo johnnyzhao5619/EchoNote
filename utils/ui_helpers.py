@@ -1,3 +1,18 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (c) 2024-2025 EchoNote Contributors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """
 UI helper utilities for EchoNote application.
 
@@ -6,9 +21,9 @@ Provides functions for consistent styling, animations, and responsive layouts.
 
 import logging
 from typing import Optional
-from PyQt6.QtWidgets import QWidget, QLabel, QFrame, QGraphicsOpacityEffect
-from PyQt6.QtCore import QPropertyAnimation, QEasingCurve, QSize, Qt, QTimer
-from PyQt6.QtGui import QFont
+from PySide6.QtWidgets import QWidget, QLabel, QFrame, QGraphicsOpacityEffect
+from PySide6.QtCore import QPropertyAnimation, QEasingCurve, QSize, Qt, QTimer
+from PySide6.QtGui import QFont
 
 
 logger = logging.getLogger('echonote.utils.ui_helpers')
@@ -157,7 +172,7 @@ class UIHelper:
         Returns:
             Empty state widget
         """
-        from PyQt6.QtWidgets import QVBoxLayout
+        from PySide6.QtWidgets import QVBoxLayout
         
         widget = QWidget()
         layout = QVBoxLayout(widget)
@@ -200,7 +215,7 @@ class UIHelper:
             base_width: Base width
             base_height: Base height
         """
-        from PyQt6.QtWidgets import QApplication
+        from PySide6.QtWidgets import QApplication
         
         screen = QApplication.primaryScreen()
         if screen:
@@ -332,7 +347,7 @@ def create_icon_button(icon_text: str, tooltip: str = "") -> 'QPushButton':
     Returns:
         Icon button
     """
-    from PyQt6.QtWidgets import QPushButton
+    from PySide6.QtWidgets import QPushButton
     
     button = QPushButton(icon_text)
     button.setFixedSize(QSize(40, 40))
@@ -383,7 +398,7 @@ def show_success_message(parent: QWidget, message: str):
         parent: Parent widget
         message: Success message
     """
-    from PyQt6.QtWidgets import QMessageBox
+    from PySide6.QtWidgets import QMessageBox
     
     msg_box = QMessageBox(parent)
     msg_box.setIcon(QMessageBox.Icon.Information)
@@ -419,7 +434,7 @@ def confirm_action(parent: QWidget, title: str, message: str) -> bool:
     Returns:
         True if user confirmed
     """
-    from PyQt6.QtWidgets import QMessageBox
+    from PySide6.QtWidgets import QMessageBox
     
     reply = QMessageBox.question(
         parent,
