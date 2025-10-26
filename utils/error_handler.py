@@ -20,11 +20,10 @@
 """
 
 import logging
-from typing import Dict, Any, Optional
 from enum import Enum
+from typing import Any, Dict, Optional
 
 from engines.speech.base import AUDIO_VIDEO_FORMATS
-
 
 logger = logging.getLogger(__name__)
 

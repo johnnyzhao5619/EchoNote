@@ -21,27 +21,26 @@ Provides dialog for creating and editing calendar events.
 
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any, List
+from typing import Any, Dict, List, Optional
 
+from PySide6.QtCore import QDateTime, Qt
 from PySide6.QtWidgets import (
-    QDialog,
-    QVBoxLayout,
-    QHBoxLayout,
-    QFormLayout,
-    QLineEdit,
-    QTextEdit,
+    QCheckBox,
     QComboBox,
     QDateTimeEdit,
-    QPushButton,
-    QCheckBox,
-    QLabel,
-    QMessageBox,
+    QDialog,
+    QFormLayout,
     QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QTextEdit,
+    QVBoxLayout,
 )
-from PySide6.QtCore import Qt, QDateTime
 
 from utils.i18n import I18nQtManager
-
 
 logger = logging.getLogger("echonote.ui.event_dialog")
 

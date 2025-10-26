@@ -20,9 +20,9 @@ API 密钥验证工具
 """
 
 import logging
-import httpx
-from typing import Tuple, Optional
+from typing import Optional, Tuple
 
+import httpx
 
 logger = logging.getLogger(__name__)
 

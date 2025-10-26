@@ -6,9 +6,9 @@ Unit tests for PySide6 migration verification.
 
 def test_pyside6_imports():
     """Test that UI modules use PySide6 imports correctly."""
+    import ui.common.error_dialog
     import ui.main_window
     import ui.sidebar
-    import ui.common.error_dialog
 
     # Verify PySide6 imports are used
     modules_to_check = [ui.main_window, ui.sidebar, ui.common.error_dialog]

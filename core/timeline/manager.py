@@ -16,10 +16,10 @@
 """Timeline Manager for EchoNote."""
 
 import logging
-from typing import Optional, List, Dict, Any, Union, Callable, TYPE_CHECKING, Iterable
 from datetime import datetime, timedelta
+from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional, Union
 
-from data.database.models import CalendarEvent, EventAttachment, AutoTaskConfig
+from data.database.models import AutoTaskConfig, CalendarEvent, EventAttachment
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from utils.i18n import I18nManager

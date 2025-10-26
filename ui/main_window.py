@@ -21,14 +21,13 @@ content area for different features.
 """
 
 import logging
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
-from PySide6.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QStackedWidget, QApplication
-from PySide6.QtCore import Qt, QSettings, QSize, QPoint
+from PySide6.QtCore import QPoint, QSettings, QSize, Qt
 from PySide6.QtGui import QCloseEvent
+from PySide6.QtWidgets import QApplication, QHBoxLayout, QMainWindow, QStackedWidget, QWidget
 
 from utils.i18n import I18nQtManager
-
 
 logger = logging.getLogger("echonote.ui.main_window")
 
@@ -165,10 +164,10 @@ class MainWindow(QMainWindow):
         """
         # Import actual widget classes
         from ui.batch_transcribe.widget import BatchTranscribeWidget
-        from ui.realtime_record.widget import RealtimeRecordWidget
         from ui.calendar_hub.widget import CalendarHubWidget
-        from ui.timeline.widget import TimelineWidget
+        from ui.realtime_record.widget import RealtimeRecordWidget
         from ui.settings.widget import SettingsWidget
+        from ui.timeline.widget import TimelineWidget
 
         # Create batch transcribe widget
         if self.managers.get("transcription_manager") is not None:
@@ -752,7 +751,7 @@ class MainWindow(QMainWindow):
 
     def _setup_keyboard_shortcuts(self):
         """Setup global keyboard shortcuts for accessibility."""
-        from PySide6.QtGui import QShortcut, QKeySequence
+        from PySide6.QtGui import QKeySequence, QShortcut
 
         # Navigation shortcuts (Ctrl+1-5)
         pages = ["batch_transcribe", "realtime_record", "calendar_hub", "timeline", "settings"]

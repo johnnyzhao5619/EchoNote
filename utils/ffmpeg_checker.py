@@ -20,10 +20,9 @@ Checks if ffmpeg/ffprobe is installed and provides installation guidance.
 """
 
 import logging
-import subprocess
 import platform
+import subprocess
 from typing import Optional, Tuple
-
 
 logger = logging.getLogger("echonote.utils.ffmpeg_checker")
 

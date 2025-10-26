@@ -23,7 +23,6 @@ import logging
 import platform
 from typing import Dict, List, Tuple
 
-
 logger = logging.getLogger(__name__)
 
 

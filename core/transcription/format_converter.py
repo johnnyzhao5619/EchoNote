@@ -22,7 +22,6 @@ Converts internal transcription format to various output formats (TXT, SRT, MD).
 import logging
 from typing import Dict, List
 
-
 logger = logging.getLogger("echonote.transcription.format_converter")
 
 

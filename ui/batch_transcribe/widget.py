@@ -20,25 +20,25 @@ Provides UI for importing audio files and managing transcription tasks.
 """
 
 import logging
-from typing import Optional, Dict, TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, Optional
 
+from PySide6.QtCore import QTimer, Signal
 from PySide6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QPushButton,
-    QLabel,
     QComboBox,
-    QListWidget,
     QFileDialog,
-    QMessageBox,
+    QHBoxLayout,
+    QLabel,
+    QListWidget,
     QListWidgetItem,
+    QMessageBox,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
 )
-from PySide6.QtCore import Signal, QTimer
 
-from utils.i18n import I18nQtManager
 from core.transcription.manager import TranscriptionManager
 from ui.batch_transcribe.task_item import TaskItem
+from utils.i18n import I18nQtManager
 
 if TYPE_CHECKING:
     from ui.batch_transcribe.transcript_viewer import TranscriptViewerDialog
@@ -296,8 +296,8 @@ class BatchTranscribeWidget(QWidget):
 
         try:
             # Create download guide widget
-            from PySide6.QtWidgets import QFrame
             from PySide6.QtCore import Qt
+            from PySide6.QtWidgets import QFrame
 
             guide_frame = QFrame()
             guide_frame.setObjectName("download_guide_frame")

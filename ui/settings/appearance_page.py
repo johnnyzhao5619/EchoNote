@@ -20,14 +20,13 @@ Provides UI for configuring theme settings.
 """
 
 import logging
-from typing import Dict, Any, Tuple
+from typing import Any, Dict, Tuple
 
-from PySide6.QtWidgets import QLabel, QComboBox, QHBoxLayout, QFrame, QVBoxLayout
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QComboBox, QFrame, QHBoxLayout, QLabel, QVBoxLayout
 
 from ui.settings.base_page import BaseSettingsPage
 from utils.i18n import I18nQtManager
-
 
 logger = logging.getLogger("echonote.ui.settings.appearance")
 

@@ -21,8 +21,9 @@ Azure Speech API 语音识别引擎
 
 import logging
 from typing import Dict, List, Optional
-import numpy as np
+
 import httpx
+import numpy as np
 
 from engines.speech.base import (
     BASE_LANGUAGE_CODES,
@@ -226,6 +227,7 @@ class AzureEngine(SpeechEngine):
             sample_rate: 输入音频的采样率
         """
         import tempfile
+
         import soundfile as sf
 
         logger.debug("Transcribing audio stream with Azure")

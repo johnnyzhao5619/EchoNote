@@ -16,16 +16,13 @@
 """Google Calendar synchronization adapter."""
 
 import logging
-from datetime import timezone
-from typing import Dict, Any, Optional, List
-
-from datetime import datetime
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
 
 import httpx
 
-from engines.calendar_sync.base import OAuthCalendarAdapter, OAuthEndpoints
 from data.database.models import CalendarEvent
-
+from engines.calendar_sync.base import OAuthCalendarAdapter, OAuthEndpoints
 
 logger = logging.getLogger("echonote.calendar_sync.google")
 

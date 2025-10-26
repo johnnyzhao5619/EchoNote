@@ -9,7 +9,6 @@ import argparse
 import json
 import logging
 import os
-import psutil
 import statistics
 import subprocess
 import sys
@@ -18,6 +17,8 @@ import time
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
+
+import psutil
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -149,18 +150,18 @@ except Exception as e:
         self.logger.info("Measuring UI response times...")
 
         try:
+            from PySide6.QtCore import Qt
             from PySide6.QtWidgets import (
                 QApplication,
-                QMainWindow,
-                QPushButton,
-                QMenuBar,
                 QDialog,
                 QLabel,
-                QVBoxLayout,
                 QListWidget,
                 QListWidgetItem,
+                QMainWindow,
+                QMenuBar,
+                QPushButton,
+                QVBoxLayout,
             )
-            from PySide6.QtCore import Qt
 
             app = QApplication.instance()
             if not app:
@@ -382,8 +383,8 @@ except Exception as e:
 
     def _test_calendar_performance(self) -> Dict:
         """Test calendar performance."""
-        from data.database.connection import DatabaseConnection
         from core.calendar.manager import CalendarManager
+        from data.database.connection import DatabaseConnection
 
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as temp_file:
             temp_db_path = temp_file.name

@@ -23,30 +23,30 @@ import logging
 from datetime import datetime
 from typing import Dict
 
+from PySide6.QtCore import Slot
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QMessageBox,
-    QPushButton,
     QProgressBar,
-    QFrame,
-    QComboBox,
-    QCheckBox,
+    QPushButton,
     QSpinBox,
-    QDialog,
-    QFormLayout,
-    QDialogButtonBox,
+    QVBoxLayout,
+    QWidget,
 )
-from PySide6.QtCore import Slot
-from PySide6.QtGui import QFont
 
-from ui.settings.base_page import BaseSettingsPage
+from core.models.registry import ModelInfo
 from ui.common.error_dialog import show_error_dialog
+from ui.settings.base_page import BaseSettingsPage
 from utils.i18n import I18nQtManager
 from utils.model_download import run_model_download
-from core.models.registry import ModelInfo
 
 logger = logging.getLogger("echonote.ui.settings.model_management")
 
@@ -732,7 +732,7 @@ class ModelManagementPage(BaseSettingsPage):
             )
 
         # 在线程池中执行下载
-        from PySide6.QtCore import QThreadPool, QRunnable
+        from PySide6.QtCore import QRunnable, QThreadPool
 
         class DownloadRunnable(QRunnable):
             def run(self):
@@ -1094,10 +1094,11 @@ class ModelDetailsDialog(QDialog):
         """
         super().__init__(parent)
 
-        from PySide6.QtWidgets import QGridLayout
-        from pathlib import Path
-        import subprocess
         import platform
+        import subprocess
+        from pathlib import Path
+
+        from PySide6.QtWidgets import QGridLayout
 
         self.model = model
         self.i18n = i18n
@@ -1251,8 +1252,8 @@ class ModelDetailsDialog(QDialog):
         Args:
             path: 模型文件路径
         """
-        import subprocess
         import platform
+        import subprocess
         from pathlib import Path
 
         try:

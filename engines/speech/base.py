@@ -15,13 +15,13 @@
 # limitations under the License.
 """Unified interface that all speech recognition engines must implement."""
 
+import io
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Tuple, FrozenSet
-import io
+from typing import Dict, FrozenSet, Iterable, List, Optional, Tuple
+
 import numpy as np
 import soundfile as sf
-
 
 # Base language set shared by speech and translation engines.
 BASE_LANGUAGE_CODES: Tuple[str, ...] = (

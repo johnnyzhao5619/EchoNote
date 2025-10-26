@@ -24,8 +24,8 @@ import copy
 import logging
 from collections.abc import Mapping
 from typing import Any, Dict, Optional
-from PySide6.QtCore import QObject, Signal
 
+from PySide6.QtCore import QObject, Signal
 
 logger = logging.getLogger(__name__)
 

@@ -20,19 +20,19 @@ Monitors upcoming events and automatically starts configured tasks
 (recording, transcription) when events begin.
 """
 
-import logging
 import asyncio
+import logging
 import queue
 import threading
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
+
 from apscheduler.schedulers.background import BackgroundScheduler
 
-from ui.common.notification import get_notification_manager
-from data.database.models import EventAttachment
 from core.timeline.manager import to_local_naive
+from data.database.models import EventAttachment
+from ui.common.notification import get_notification_manager
 from utils.i18n import I18nQtManager
-
 
 logger = logging.getLogger("echonote.timeline.auto_task_scheduler")
 

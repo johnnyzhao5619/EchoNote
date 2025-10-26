@@ -20,24 +20,23 @@ Displays event information with different layouts for past and future events.
 """
 
 import logging
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QColor, QFont, QPalette
 from PySide6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QLabel,
-    QFrame,
-    QPushButton,
     QCheckBox,
     QComboBox,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
 )
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFont, QPalette, QColor
 
-from utils.i18n import I18nQtManager, LANGUAGE_OPTION_KEYS
 from core.timeline.manager import to_local_naive
-
+from utils.i18n import LANGUAGE_OPTION_KEYS, I18nQtManager
 
 logger = logging.getLogger("echonote.ui.timeline.event_card")
 

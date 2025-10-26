@@ -21,25 +21,24 @@ for configuring all application features.
 """
 
 import logging
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
-from PySide6.QtWidgets import (
-    QWidget,
-    QHBoxLayout,
-    QVBoxLayout,
-    QListWidget,
-    QListWidgetItem,
-    QStackedWidget,
-    QPushButton,
-    QLabel,
-    QMessageBox,
-    QFrame,
-)
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont
+from PySide6.QtWidgets import (
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QListWidget,
+    QListWidgetItem,
+    QMessageBox,
+    QPushButton,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
 from utils.i18n import I18nQtManager
-
 
 logger = logging.getLogger("echonote.ui.settings")
 
@@ -191,13 +190,13 @@ class SettingsWidget(QWidget):
         """Create all settings pages and add to container."""
         try:
             # Import page classes
-            from ui.settings.transcription_page import TranscriptionSettingsPage
-            from ui.settings.realtime_page import RealtimeSettingsPage
-            from ui.settings.model_management_page import ModelManagementPage
-            from ui.settings.calendar_page import CalendarSettingsPage
-            from ui.settings.timeline_page import TimelineSettingsPage
             from ui.settings.appearance_page import AppearanceSettingsPage
+            from ui.settings.calendar_page import CalendarSettingsPage
             from ui.settings.language_page import LanguageSettingsPage
+            from ui.settings.model_management_page import ModelManagementPage
+            from ui.settings.realtime_page import RealtimeSettingsPage
+            from ui.settings.timeline_page import TimelineSettingsPage
+            from ui.settings.transcription_page import TranscriptionSettingsPage
 
             # Create pages
             pages = [

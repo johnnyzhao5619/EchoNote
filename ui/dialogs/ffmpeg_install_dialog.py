@@ -23,19 +23,18 @@ import logging
 import platform
 from typing import Optional
 
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
+    QCheckBox,
     QDialog,
-    QVBoxLayout,
     QHBoxLayout,
     QLabel,
     QPushButton,
     QTextEdit,
-    QCheckBox,
+    QVBoxLayout,
 )
-from PySide6.QtGui import QFont
 
 from utils.i18n import I18nQtManager
-
 
 logger = logging.getLogger("echonote.ui.dialogs.ffmpeg_install")
 

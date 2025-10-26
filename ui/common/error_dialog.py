@@ -22,18 +22,18 @@ Provides a dialog for displaying error messages with details and copy functional
 import logging
 from typing import Optional
 
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QClipboard, QIcon
 from PySide6.QtWidgets import (
+    QApplication,
     QDialog,
-    QVBoxLayout,
     QHBoxLayout,
     QLabel,
     QPushButton,
     QTextEdit,
+    QVBoxLayout,
     QWidget,
 )
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QIcon, QClipboard
-from PySide6.QtWidgets import QApplication
 
 from utils.i18n import I18nQtManager
 

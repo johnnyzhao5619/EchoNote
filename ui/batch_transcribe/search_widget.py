@@ -24,20 +24,19 @@ import logging
 import re
 from typing import List, Optional
 
+from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtGui import QColor, QTextCursor, QTextDocument
 from PySide6.QtWidgets import (
-    QWidget,
+    QCheckBox,
     QHBoxLayout,
+    QLabel,
     QLineEdit,
     QPushButton,
-    QCheckBox,
-    QLabel,
     QTextEdit,
+    QWidget,
 )
-from PySide6.QtCore import Qt, Signal, QTimer
-from PySide6.QtGui import QTextCursor, QTextDocument, QColor
 
 from utils.i18n import I18nQtManager
-
 
 logger = logging.getLogger("echonote.ui.search_widget")
 

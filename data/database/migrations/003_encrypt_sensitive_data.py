@@ -22,9 +22,8 @@ This migration encrypts the sync_token field in calendar_sync_status table.
 import logging
 from typing import Optional
 
-from data.security.encryption import SecurityManager
 from data.database.encryption_helper import DatabaseEncryptionHelper
-
+from data.security.encryption import SecurityManager
 
 logger = logging.getLogger("echonote.migrations")
 

@@ -21,8 +21,8 @@ synchronization.
 """
 
 import logging
-from datetime import datetime, timezone, timedelta
-from typing import Optional, List, Dict, Any, TYPE_CHECKING, Tuple, Union
+from datetime import datetime, timedelta, timezone
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
 from data.database.models import (
     CalendarEvent,

@@ -20,10 +20,10 @@ Displays a splash screen with progress updates during initialization.
 """
 
 import logging
-from PySide6.QtWidgets import QSplashScreen
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QPixmap, QPainter, QColor, QFont
 
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QColor, QFont, QPainter, QPixmap
+from PySide6.QtWidgets import QSplashScreen
 
 logger = logging.getLogger(__name__)
 

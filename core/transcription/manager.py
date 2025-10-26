@@ -25,18 +25,17 @@ import json
 import logging
 import os
 import threading
-from pathlib import Path
-from typing import Callable, Dict, List, Optional, Any, Tuple
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from config.app_config import get_app_dir
+from core.transcription.format_converter import FormatConverter
+from core.transcription.task_queue import TaskQueue
 from data.database.connection import DatabaseConnection
 from data.database.models import TranscriptionTask
-from engines.speech.base import SpeechEngine, AUDIO_VIDEO_SUFFIXES
-from core.transcription.task_queue import TaskQueue
-from core.transcription.format_converter import FormatConverter
-from config.app_config import get_app_dir
+from engines.speech.base import AUDIO_VIDEO_SUFFIXES, SpeechEngine
 from ui.common.notification import get_notification_manager
-
 
 logger = logging.getLogger("echonote.transcription.manager")
 

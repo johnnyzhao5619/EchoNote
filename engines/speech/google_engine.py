@@ -19,12 +19,13 @@ Google Speech-to-Text API 语音识别引擎
 使用 Google Cloud Speech-to-Text API 进行云端语音识别
 """
 
-import logging
-from typing import Dict, List, Optional
-import numpy as np
-import httpx
-from pathlib import Path
 import base64
+import logging
+from pathlib import Path
+from typing import Dict, List, Optional
+
+import httpx
+import numpy as np
 
 from engines.speech.base import (
     BASE_LANGUAGE_CODES,
@@ -232,6 +233,7 @@ class GoogleEngine(SpeechEngine):
             sample_rate: 输入音频的采样率
         """
         import tempfile
+
         import soundfile as sf
 
         logger.debug("Transcribing audio stream with Google")

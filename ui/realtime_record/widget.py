@@ -21,24 +21,24 @@
 """
 
 import logging
+import threading
 from concurrent.futures import Future
 from typing import Dict, Optional, Set
 
+from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal
 from PySide6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
+    QCheckBox,
+    QComboBox,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
-    QComboBox,
-    QSlider,
-    QCheckBox,
-    QPushButton,
-    QPlainTextEdit,
-    QGroupBox,
     QListWidget,
+    QPlainTextEdit,
+    QPushButton,
+    QSlider,
+    QVBoxLayout,
+    QWidget,
 )
-from PySide6.QtCore import Qt, QTimer, Signal, QObject, QThread
-import threading
 
 from ui.common.notification import get_notification_manager
 from utils.i18n import LANGUAGE_OPTION_KEYS

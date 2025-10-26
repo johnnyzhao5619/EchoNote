@@ -20,29 +20,28 @@ Provides user interface for OAuth authorization flow with external
 calendar services.
 """
 
-import logging
-import webbrowser
-from typing import Dict, Optional, Tuple
-from http.server import HTTPServer, BaseHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs
 import errno
+import logging
 import threading
+import webbrowser
 from html import escape
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from typing import Dict, Optional, Tuple
+from urllib.parse import parse_qs, urlparse
 
+from PySide6.QtCore import Qt, QThread, QTimer, Signal
 from PySide6.QtWidgets import (
     QDialog,
-    QVBoxLayout,
     QHBoxLayout,
     QLabel,
-    QPushButton,
-    QProgressBar,
-    QTextEdit,
     QMessageBox,
+    QProgressBar,
+    QPushButton,
+    QTextEdit,
+    QVBoxLayout,
 )
-from PySide6.QtCore import Qt, Signal, QTimer, QThread
 
 from utils.i18n import I18nQtManager
-
 
 logger = logging.getLogger("echonote.ui.oauth_dialog")
 

@@ -4,19 +4,19 @@
 
 """Windows build script for EchoNote using PyInstaller with PySide6."""
 
-import sys
-import subprocess
 import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from build_config import (
-    PROJECT_ROOT,
-    DIST_DIR,
     APP_NAME,
     APP_VERSION,
-    get_pyinstaller_args,
+    DIST_DIR,
+    PROJECT_ROOT,
     clean_build_dirs,
+    get_pyinstaller_args,
 )
 
 

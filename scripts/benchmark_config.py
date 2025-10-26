@@ -5,8 +5,9 @@ Centralized benchmark configuration and baselines.
 """
 
 import platform
-import psutil
 from typing import Dict
+
+import psutil
 
 
 class BenchmarkConfig:

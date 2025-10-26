@@ -22,12 +22,11 @@ Provides ORM-like classes for database operations.
 import json
 import logging
 import uuid
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, time, timedelta, timezone
-from typing import List, Optional, Dict, Any, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
-from data.database.encryption_helper import encrypt_sensitive_field, decrypt_sensitive_field
-
+from data.database.encryption_helper import decrypt_sensitive_field, encrypt_sensitive_field
 
 logger = logging.getLogger("echonote.database.models")
 

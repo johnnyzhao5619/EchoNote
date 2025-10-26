@@ -20,22 +20,21 @@ Displays individual transcription task information and controls.
 """
 
 import logging
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
-from PySide6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QPushButton,
-    QLabel,
-    QProgressBar,
-    QMenu,
-)
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QAction
+from PySide6.QtWidgets import (
+    QHBoxLayout,
+    QLabel,
+    QMenu,
+    QProgressBar,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from utils.i18n import I18nQtManager
-
 
 logger = logging.getLogger("echonote.ui.batch_transcribe.task_item")
 

@@ -22,9 +22,9 @@ lazy loading and background initialization.
 
 import logging
 import time
-from typing import Callable, Any, Optional
-from PySide6.QtCore import QThread, Signal
+from typing import Any, Callable, Optional
 
+from PySide6.QtCore import QThread, Signal
 
 logger = logging.getLogger(__name__)
 

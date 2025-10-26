@@ -20,23 +20,22 @@ Provides UI for managing external calendar account connections.
 """
 
 import logging
-from typing import Dict, Any, Tuple
+from typing import Any, Dict, Tuple
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QHBoxLayout,
     QLabel,
-    QPushButton,
     QListWidget,
     QListWidgetItem,
-    QHBoxLayout,
-    QVBoxLayout,
     QMessageBox,
+    QPushButton,
+    QVBoxLayout,
     QWidget,
 )
-from PySide6.QtCore import Qt
 
 from ui.settings.base_page import BaseSettingsPage
 from utils.i18n import I18nQtManager
-
 
 logger = logging.getLogger("echonote.ui.settings.calendar")
 

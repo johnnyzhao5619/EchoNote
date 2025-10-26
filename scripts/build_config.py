@@ -5,10 +5,10 @@
 """Common build configuration for PyInstaller packaging with PySide6."""
 
 import os
-import sys
 import platform
+import sys
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
 # Project paths
 PROJECT_ROOT = Path(__file__).parent.parent

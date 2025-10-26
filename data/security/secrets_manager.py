@@ -22,11 +22,10 @@ Provides encrypted storage for API keys and other sensitive data.
 import json
 import logging
 from pathlib import Path
-from typing import Dict, Optional, Any
+from typing import Any, Dict, Optional
 
-from data.security.encryption import SecurityManager
 from config.app_config import get_app_dir
-
+from data.security.encryption import SecurityManager
 
 logger = logging.getLogger("echonote.security.secrets")
 

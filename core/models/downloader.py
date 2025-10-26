@@ -30,7 +30,6 @@ from PySide6.QtCore import QObject, Signal
 
 from .registry import ModelInfo
 
-
 logger = logging.getLogger(__name__)
 
 

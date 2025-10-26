@@ -17,10 +17,11 @@
 
 import importlib
 import logging
-from typing import List, Dict, Optional, Callable
-import numpy as np
-import threading
 import queue
+import threading
+from typing import Callable, Dict, List, Optional
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 

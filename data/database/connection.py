@@ -21,11 +21,10 @@ Provides SQLite connection with optional SQLCipher encryption support.
 
 import logging
 import sqlite3
+import threading
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Optional
-from contextlib import contextmanager
-import threading
-
 
 logger = logging.getLogger("echonote.database")
 

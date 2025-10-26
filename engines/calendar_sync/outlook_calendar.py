@@ -17,15 +17,14 @@
 
 import logging
 import re
+from datetime import datetime, timedelta, timezone, tzinfo
 from html import unescape
-from datetime import datetime, timezone, timedelta, tzinfo
-from typing import Dict, Any, Optional, List
+from typing import Any, Dict, List, Optional
 
 import httpx
 
-from engines.calendar_sync.base import OAuthCalendarAdapter, OAuthEndpoints
 from data.database.models import CalendarEvent
-
+from engines.calendar_sync.base import OAuthCalendarAdapter, OAuthEndpoints
 
 logger = logging.getLogger("echonote.calendar_sync.outlook")
 

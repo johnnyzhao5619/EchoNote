@@ -28,7 +28,6 @@ from typing import Optional
 from config.app_config import get_app_dir
 from utils.model_download import run_model_download
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -121,15 +120,15 @@ class FirstRunSetup:
                 return False
 
             # Import here to avoid circular dependencies
+            from PySide6.QtCore import Qt
             from PySide6.QtWidgets import (
                 QDialog,
-                QVBoxLayout,
                 QHBoxLayout,
                 QLabel,
                 QPushButton,
+                QVBoxLayout,
                 QWidget,
             )
-            from PySide6.QtCore import Qt
 
             # Create dialog
             dialog = QDialog(parent)
@@ -261,7 +260,7 @@ class FirstRunSetup:
                     f"User chose to download recommended model: " f"{recommended_model_name}"
                 )
                 # Start download in a separate thread with its own event loop
-                from PySide6.QtCore import QThreadPool, QRunnable
+                from PySide6.QtCore import QRunnable, QThreadPool
 
                 def run_download():
                     """在新线程中运行下载"""
@@ -393,22 +392,22 @@ class FirstRunWizard:
             True if wizard was completed, False if cancelled
         """
         try:
-            from PySide6.QtWidgets import (
-                QWizard,
-                QWizardPage,
-                QVBoxLayout,
-                QHBoxLayout,
-                QLabel,
-                QComboBox,
-                QRadioButton,
-                QButtonGroup,
-                QPushButton,
-                QProgressBar,
-                QWidget,
-                QFileDialog,
-            )
             from PySide6.QtCore import Qt, QThread, Signal
             from PySide6.QtGui import QFont
+            from PySide6.QtWidgets import (
+                QButtonGroup,
+                QComboBox,
+                QFileDialog,
+                QHBoxLayout,
+                QLabel,
+                QProgressBar,
+                QPushButton,
+                QRadioButton,
+                QVBoxLayout,
+                QWidget,
+                QWizard,
+                QWizardPage,
+            )
 
             class WelcomePage(QWizardPage):
                 """Welcome page with introduction."""
@@ -643,7 +642,7 @@ class FirstRunWizard:
                     self.status_label.setText(self.i18n.t("wizard.model.downloading"))
 
                     # Start download in thread
-                    from PySide6.QtCore import QThreadPool, QRunnable
+                    from PySide6.QtCore import QRunnable, QThreadPool
 
                     def run_download():
                         """Run download in thread."""
@@ -659,7 +658,7 @@ class FirstRunWizard:
 
                         def _on_error(exc: Exception):
                             # Update UI in main thread
-                            from PySide6.QtCore import QMetaObject, Qt, Q_ARG
+                            from PySide6.QtCore import Q_ARG, QMetaObject, Qt
 
                             QMetaObject.invokeMethod(
                                 self,

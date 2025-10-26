@@ -21,26 +21,25 @@ and account management.
 """
 
 import logging
-from urllib.parse import urlparse
 from datetime import datetime
-from typing import Optional, Dict, Any, Tuple
+from typing import Any, Dict, Optional, Tuple
+from urllib.parse import urlparse
 
-from PySide6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QPushButton,
-    QLabel,
-    QStackedWidget,
-    QButtonGroup,
-    QFrame,
-    QDialog,
-    QMessageBox,
-)
 from PySide6.QtCore import Signal
+from PySide6.QtWidgets import (
+    QButtonGroup,
+    QDialog,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
 from utils.i18n import I18nQtManager
-
 
 logger = logging.getLogger("echonote.ui.calendar_hub")
 
@@ -249,7 +248,7 @@ class CalendarHubWidget(QWidget):
         container = QStackedWidget()
 
         # Import calendar views
-        from ui.calendar_hub.calendar_view import MonthView, WeekView, DayView
+        from ui.calendar_hub.calendar_view import DayView, MonthView, WeekView
 
         # Create actual calendar views
         self.month_view = MonthView(self.calendar_manager, self.i18n)
@@ -482,7 +481,7 @@ class CalendarHubWidget(QWidget):
 
     def show_add_account_dialog(self):
         """Show dialog to add external calendar account."""
-        from PySide6.QtWidgets import QDialog, QVBoxLayout, QPushButton
+        from PySide6.QtWidgets import QDialog, QPushButton, QVBoxLayout
 
         # Create simple provider selection dialog
         dialog = QDialog(self)
@@ -1117,8 +1116,9 @@ class CalendarHubWidget(QWidget):
     def _update_sync_status(self):
         """Update sync status label with last sync time."""
         try:
-            from data.database.models import CalendarSyncStatus
             from datetime import datetime
+
+            from data.database.models import CalendarSyncStatus
 
             # Get most recent sync time from all accounts
             sync_statuses = CalendarSyncStatus.get_all_active(self.calendar_manager.db)

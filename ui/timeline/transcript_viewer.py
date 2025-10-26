@@ -20,26 +20,25 @@ Displays transcript text with search and export functionality.
 """
 
 import logging
-from typing import Optional
 from pathlib import Path
+from typing import Optional
 
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QColor, QTextCharFormat, QTextCursor
 from PySide6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QTextEdit,
-    QPushButton,
-    QLineEdit,
-    QLabel,
     QDialog,
     QFileDialog,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
     QMessageBox,
+    QPushButton,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
 )
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QTextCursor, QTextCharFormat, QColor
 
 from utils.i18n import I18nQtManager
-
 
 logger = logging.getLogger("echonote.ui.timeline.transcript_viewer")
 

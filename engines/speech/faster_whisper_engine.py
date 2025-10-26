@@ -20,21 +20,21 @@ Faster-Whisper 语音识别引擎实现
 参考: https://github.com/SYSTRAN/faster-whisper
 """
 
-import os
 import logging
-from typing import Dict, List, Optional
-import numpy as np
+import os
 from pathlib import Path
+from typing import Dict, List, Optional
 
+import numpy as np
+
+from config.app_config import get_app_dir
 from core.models.registry import get_model_size_metadata
-
 from engines.speech.base import (
     BASE_LANGUAGE_CODES,
     SpeechEngine,
-    ensure_audio_sample_rate,
     combine_languages,
+    ensure_audio_sample_rate,
 )
-from config.app_config import get_app_dir
 
 logger = logging.getLogger(__name__)
 
@@ -317,8 +317,8 @@ class FasterWhisperEngine(SpeechEngine):
                 logger.warning(f"Could not get audio duration via soundfile: {e}")
                 # 尝试使用 ffprobe 获取时长
                 try:
-                    import subprocess
                     import json
+                    import subprocess
 
                     result = subprocess.run(
                         [
@@ -510,6 +510,7 @@ class FasterWhisperEngine(SpeechEngine):
             # 转录音频块
             # 注意：faster-whisper 需要音频文件路径，所以需要临时保存
             import tempfile
+
             import soundfile as sf
 
             with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_file:

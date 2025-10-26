@@ -21,9 +21,8 @@ Manages concurrent task execution with configurable limits.
 
 import asyncio
 import logging
-from typing import Dict, Callable, Any, Optional
 from enum import Enum
-
+from typing import Any, Callable, Dict, Optional
 
 logger = logging.getLogger("echonote.transcription.task_queue")
 

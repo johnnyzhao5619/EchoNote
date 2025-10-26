@@ -3,8 +3,8 @@
 Integration tests for PySide6 migration verification.
 """
 
-from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QTimer
+from PySide6.QtWidgets import QApplication
 
 
 def test_pyside6_qt_integration(qapp):

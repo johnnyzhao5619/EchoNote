@@ -17,8 +17,8 @@
 
 import logging
 
+from ui.timeline.event_card import CurrentTimeIndicator, EventCard
 from ui.timeline.widget import TimelineWidget
-from ui.timeline.event_card import EventCard, CurrentTimeIndicator
 
 logger = logging.getLogger("echonote.ui.timeline")
 

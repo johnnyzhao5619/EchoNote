@@ -21,10 +21,10 @@ Provides utilities for running async code in Qt applications.
 
 import asyncio
 import logging
-from typing import Coroutine, Any, Callable, Optional
 from concurrent.futures import ThreadPoolExecutor
-from PySide6.QtCore import QObject, Signal
+from typing import Any, Callable, Coroutine, Optional
 
+from PySide6.QtCore import QObject, Signal
 
 logger = logging.getLogger("echonote.utils.qt_async")
 

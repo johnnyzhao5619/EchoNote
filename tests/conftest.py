@@ -4,6 +4,7 @@ Pytest configuration for EchoNote PySide6 migration tests.
 """
 
 import sys
+
 import pytest
 from PySide6.QtWidgets import QApplication
 

@@ -20,13 +20,13 @@
 """
 
 import logging
-import time
 import socket
+import time
 from contextlib import closing
 from functools import wraps
-from typing import Callable, Optional, Any
-import httpx
+from typing import Any, Callable, Optional
 
+import httpx
 
 logger = logging.getLogger(__name__)
 

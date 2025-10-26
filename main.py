@@ -25,12 +25,11 @@ import inspect
 import sys
 import traceback
 
-from utils.logger import setup_logging
-from utils.first_run_setup import FirstRunSetup
 from config.app_config import ConfigManager
 from utils.error_handler import ErrorHandler
+from utils.first_run_setup import FirstRunSetup
+from utils.logger import setup_logging
 from utils.resource_cleanup import close_lazy_loaded_engine
-
 
 # Global logger for exception hook
 _logger = None
@@ -135,6 +134,7 @@ def exception_hook(exctype, value, tb):
     # Try to show error dialog if PySide6 is available
     try:
         from PySide6.QtWidgets import QApplication
+
         from ui.common.error_dialog import show_error_dialog
 
         # Check if QApplication exists
@@ -185,8 +185,8 @@ def main():
 
         # Initialize PySide6 application FIRST (needed for splash screen)
         logger.info("Initializing PySide6 application...")
-        from PySide6.QtWidgets import QApplication
         from PySide6.QtCore import Qt
+        from PySide6.QtWidgets import QApplication
 
         # Enable high DPI scaling
         QApplication.setHighDpiScaleFactorRoundingPolicy(

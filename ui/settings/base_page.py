@@ -22,12 +22,11 @@ Provides common functionality for all settings pages.
 import logging
 from typing import Tuple
 
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QScrollArea
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QFont
+from PySide6.QtWidgets import QLabel, QScrollArea, QVBoxLayout, QWidget
 
 from utils.i18n import I18nQtManager
-
 
 logger = logging.getLogger("echonote.ui.settings.base")
 

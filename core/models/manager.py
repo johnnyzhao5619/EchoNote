@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 import psutil
-from PySide6.QtCore import QObject, QCoreApplication, QTimer, Signal
+from PySide6.QtCore import QCoreApplication, QObject, QTimer, Signal
 
 from config.app_config import ConfigManager, get_app_dir
 from core.models.downloader import DownloadCancelled, ModelDownloader
@@ -33,7 +33,6 @@ from core.models.registry import ModelInfo, ModelRegistry
 from data.database.connection import DatabaseConnection
 from data.database.models import ModelUsageStats
 from utils.gpu_detector import GPUDetector
-
 
 logger = logging.getLogger(__name__)
 

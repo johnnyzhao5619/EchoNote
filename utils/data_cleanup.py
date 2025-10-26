@@ -26,7 +26,6 @@ from typing import List, Optional
 
 from config.app_config import get_app_dir
 
-
 logger = logging.getLogger("echonote.cleanup")
 
 

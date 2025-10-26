@@ -23,11 +23,10 @@ import json
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
-from data.security.encryption import SecurityManager
 from config.app_config import get_app_dir
-
+from data.security.encryption import SecurityManager
 
 logger = logging.getLogger("echonote.security.oauth")
 

@@ -22,12 +22,11 @@ Provides navigation buttons for switching between different features.
 import logging
 from typing import Dict, Optional
 
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QPushButton, QSizePolicy
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QIcon
+from PySide6.QtWidgets import QPushButton, QSizePolicy, QVBoxLayout, QWidget
 
 from utils.i18n import I18nQtManager
-
 
 logger = logging.getLogger("echonote.ui.sidebar")
 

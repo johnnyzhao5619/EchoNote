@@ -20,11 +20,12 @@
 """
 
 import logging
-import numpy as np
 from collections import deque
+
+import numpy as np
+from PySide6.QtCore import QRect, QTimer
+from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import QWidget
-from PySide6.QtCore import QTimer, QRect
-from PySide6.QtGui import QPainter, QColor, QPen
 
 logger = logging.getLogger(__name__)
 

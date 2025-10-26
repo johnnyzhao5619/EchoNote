@@ -22,8 +22,8 @@
 import logging
 import time
 from typing import Iterable, Optional, Set
-import httpx
 
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -144,8 +144,8 @@ class RetryableHttpClient:
         Returns:
             重试等待时间（秒），如果没有则返回 None
         """
-        from email.utils import parsedate_to_datetime
         from datetime import datetime, timezone
+        from email.utils import parsedate_to_datetime
 
         retry_after = response.headers.get("Retry-After")
 
@@ -366,8 +366,8 @@ class AsyncRetryableHttpClient:
 
     def _get_retry_after(self, response: httpx.Response) -> Optional[float]:
         """从响应头获取 Retry-After 时间"""
-        from email.utils import parsedate_to_datetime
         from datetime import datetime, timezone
+        from email.utils import parsedate_to_datetime
 
         retry_after = response.headers.get("Retry-After")
 

@@ -21,12 +21,11 @@
 
 import logging
 import os
+import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-import sys
 
 from config.app_config import get_app_dir
-
 
 # 日志级别映射
 LOG_LEVELS = {

@@ -21,10 +21,10 @@ Manages automatic periodic synchronization of external calendars.
 
 import logging
 import time
-from typing import Optional, Dict
+from typing import Dict, Optional
+
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
-
 
 logger = logging.getLogger("echonote.calendar.sync_scheduler")
 

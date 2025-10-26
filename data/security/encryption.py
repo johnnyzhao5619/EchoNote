@@ -29,11 +29,11 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from config.app_config import get_app_dir
 
+from config.app_config import get_app_dir
 
 logger = logging.getLogger("echonote.security")
 

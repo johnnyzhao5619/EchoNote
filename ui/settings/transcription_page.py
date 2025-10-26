@@ -21,26 +21,25 @@ Provides UI for configuring batch transcription settings.
 
 import logging
 from pathlib import Path
-from typing import Dict, Any, Tuple
+from typing import Any, Dict, Tuple
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QLabel,
     QComboBox,
-    QSpinBox,
+    QFileDialog,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
     QLineEdit,
     QPushButton,
-    QHBoxLayout,
-    QFileDialog,
-    QGroupBox,
+    QSpinBox,
     QVBoxLayout,
-    QFormLayout,
 )
-from PySide6.QtCore import Qt
 
 from core.models.registry import get_default_model_names
 from ui.settings.base_page import BaseSettingsPage
 from utils.i18n import I18nQtManager
-
 
 logger = logging.getLogger("echonote.ui.settings.transcription")
 
@@ -327,7 +326,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         Args:
             parent_layout: Parent layout to add widgets to
         """
-        from PySide6.QtWidgets import QGroupBox, QFormLayout, QPushButton
+        from PySide6.QtWidgets import QFormLayout, QGroupBox, QPushButton
 
         # OpenAI API Key
         self.openai_group = QGroupBox(self.i18n.t("settings.transcription.cloud_api_openai"))
@@ -468,9 +467,10 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         Args:
             provider: Provider name (openai/google/azure)
         """
-        from PySide6.QtWidgets import QMessageBox, QApplication
-        from PySide6.QtCore import QThread
         import asyncio
+
+        from PySide6.QtCore import QThread
+        from PySide6.QtWidgets import QApplication, QMessageBox
 
         # Get API key
         if provider == "openai":
@@ -665,8 +665,8 @@ class TranscriptionSettingsPage(BaseSettingsPage):
 
     def _on_show_ffmpeg_guide(self):
         """Show FFmpeg installation guide dialog."""
-        from utils.ffmpeg_checker import get_ffmpeg_checker
         from ui.dialogs.ffmpeg_install_dialog import FFmpegInstallDialog
+        from utils.ffmpeg_checker import get_ffmpeg_checker
 
         ffmpeg_checker = get_ffmpeg_checker()
         title, instructions = ffmpeg_checker.get_installation_instructions(self.i18n)

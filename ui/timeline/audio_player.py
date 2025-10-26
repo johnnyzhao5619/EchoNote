@@ -20,24 +20,23 @@ Provides playback controls for audio recordings.
 """
 
 import logging
-from typing import Optional
 from pathlib import Path
+from typing import Optional
 
+from PySide6.QtCore import Qt, QUrl, Signal
+from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
 from PySide6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
+    QDialog,
     QHBoxLayout,
     QLabel,
+    QMessageBox,
     QPushButton,
     QSlider,
-    QDialog,
-    QMessageBox,
+    QVBoxLayout,
+    QWidget,
 )
-from PySide6.QtCore import Qt, QUrl, Signal
-from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 
 from utils.i18n import I18nQtManager
-
 
 logger = logging.getLogger("echonote.ui.timeline.audio_player")
 

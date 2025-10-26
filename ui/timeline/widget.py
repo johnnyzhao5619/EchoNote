@@ -22,27 +22,27 @@ Displays a vertical timeline of past and future events with search and filtering
 import importlib
 import logging
 import math
-from typing import Optional, Dict, Any, List, TYPE_CHECKING, cast
 from datetime import datetime
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, cast
 
-from PySide6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QScrollArea,
-    QLineEdit,
-    QComboBox,
-    QLabel,
-    QFrame,
-    QPushButton,
-    QMessageBox,
-    QDateEdit,
-)
-from PySide6.QtCore import Qt, Signal, QTimer, QDateTime, QTime, QDate
+from PySide6.QtCore import QDate, QDateTime, Qt, QTime, QTimer, Signal
 from PySide6.QtGui import QPalette
+from PySide6.QtWidgets import (
+    QComboBox,
+    QDateEdit,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
 
-from utils.i18n import I18nQtManager
 from core.timeline.manager import to_local_naive
+from utils.i18n import I18nQtManager
 
 if TYPE_CHECKING:  # pragma: no cover - imported for type checking only
     from ui.timeline.event_card import EventCard
@@ -581,7 +581,7 @@ class TimelineWidget(QWidget):
             is_future: True if this is a future event
         """
         # Import here to avoid circular imports
-        from ui.timeline.event_card import EventCard, CurrentTimeIndicator
+        from ui.timeline.event_card import CurrentTimeIndicator, EventCard
 
         card = EventCard(event_data=event_data, is_future=is_future, i18n=self.i18n, parent=self)
 

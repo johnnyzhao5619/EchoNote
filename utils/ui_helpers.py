@@ -21,10 +21,10 @@ Provides functions for consistent styling, animations, and responsive layouts.
 
 import logging
 from typing import Optional
-from PySide6.QtWidgets import QWidget, QLabel, QFrame, QGraphicsOpacityEffect
-from PySide6.QtCore import QPropertyAnimation, QEasingCurve, QSize, Qt, QTimer
-from PySide6.QtGui import QFont
 
+from PySide6.QtCore import QEasingCurve, QPropertyAnimation, QSize, Qt, QTimer
+from PySide6.QtGui import QFont
+from PySide6.QtWidgets import QFrame, QGraphicsOpacityEffect, QLabel, QWidget
 
 logger = logging.getLogger("echonote.utils.ui_helpers")
 

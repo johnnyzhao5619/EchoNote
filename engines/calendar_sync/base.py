@@ -22,7 +22,7 @@ import os
 import secrets
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import datetime, timezone, tzinfo, timedelta
+from datetime import datetime, timedelta, timezone, tzinfo
 from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urlencode
 
@@ -34,7 +34,6 @@ except ImportError:  # pragma: no cover - fallback for older Python
 
 from data.database.models import CalendarEvent
 from utils.http_client import RetryableHttpClient
-
 
 logger = logging.getLogger("echonote.calendar_sync.base")
 

@@ -21,8 +21,8 @@ Provides utilities for encrypting/decrypting sensitive database fields.
 
 import logging
 from typing import Optional
-from data.security.encryption import SecurityManager
 
+from data.security.encryption import SecurityManager
 
 logger = logging.getLogger("echonote.database.encryption")
 

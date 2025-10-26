@@ -24,28 +24,27 @@ import logging
 import os
 from typing import Optional
 
+from PySide6.QtCore import QSettings, QSize, Qt, QThread, QTimer, Signal
+from PySide6.QtGui import QAction, QFont, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
-    QDialog,
-    QVBoxLayout,
-    QHBoxLayout,
-    QTextEdit,
-    QLabel,
-    QPushButton,
-    QMessageBox,
-    QFrame,
-    QMenu,
-    QFileDialog,
     QApplication,
+    QDialog,
+    QFileDialog,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QMenu,
+    QMessageBox,
     QProgressDialog,
+    QPushButton,
+    QTextEdit,
+    QVBoxLayout,
 )
-from PySide6.QtCore import QSize, QTimer, QSettings, QThread, Signal, Qt
-from PySide6.QtGui import QFont, QKeySequence, QShortcut, QAction
 
-from utils.i18n import I18nQtManager
-from data.database.models import TranscriptionTask
 from core.transcription.format_converter import FormatConverter
+from data.database.models import TranscriptionTask
 from ui.batch_transcribe.search_widget import SearchWidget
-
+from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.transcript_viewer")
 

@@ -20,19 +20,19 @@ Provides UI for managing user data, including cleanup functionality.
 """
 
 import logging
+
+from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtWidgets import (
-    QVBoxLayout,
-    QLabel,
-    QPushButton,
     QGroupBox,
+    QLabel,
     QMessageBox,
     QProgressDialog,
+    QPushButton,
+    QVBoxLayout,
 )
-from PySide6.QtCore import Qt, QThread, Signal
 
 from ui.settings.base_page import BasePage
 from utils.data_cleanup import DataCleanup
-
 
 logger = logging.getLogger(__name__)
 

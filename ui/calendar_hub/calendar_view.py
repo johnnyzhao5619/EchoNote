@@ -21,23 +21,22 @@ Provides month, week, and day views for displaying calendar events.
 
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional
 
-from PySide6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QGridLayout,
-    QLabel,
-    QScrollArea,
-    QFrame,
-    QPushButton,
-)
-from PySide6.QtCore import Qt, Signal, QDate
+from PySide6.QtCore import QDate, Qt, Signal
 from PySide6.QtGui import QColor, QPalette
+from PySide6.QtWidgets import (
+    QFrame,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
 
 from utils.i18n import I18nQtManager
-
 
 logger = logging.getLogger("echonote.ui.calendar_view")
 

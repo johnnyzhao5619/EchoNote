@@ -20,21 +20,22 @@ OpenAI Whisper API 语音识别引擎
 """
 
 import logging
-from typing import Dict, List, Optional
-import numpy as np
 import os
 from pathlib import Path
+from typing import Dict, List, Optional
 
+import numpy as np
+
+from data.database.models import APIUsage
 from engines.speech.base import (
-    AUDIO_VIDEO_FORMATS,
     AUDIO_VIDEO_FORMAT_SET,
+    AUDIO_VIDEO_FORMATS,
     BASE_LANGUAGE_CODES,
     CLOUD_SPEECH_ADDITIONAL_LANGUAGES,
     SpeechEngine,
     combine_languages,
 )
 from utils.http_client import AsyncRetryableHttpClient
-from data.database.models import APIUsage
 
 logger = logging.getLogger(__name__)
 
@@ -309,6 +310,7 @@ class OpenAIEngine(SpeechEngine):
             str: 转录文本片段
         """
         import tempfile
+
         import soundfile as sf
 
         # 检查音频长度（至少需要 1 秒的音频）

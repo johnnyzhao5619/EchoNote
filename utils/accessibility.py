@@ -21,11 +21,11 @@ keyboard navigation, screen reader support, and focus management.
 """
 
 import logging
-from typing import Optional, List
-from PySide6.QtWidgets import QWidget, QPushButton, QLineEdit, QTextEdit, QComboBox
-from PySide6.QtCore import Qt, QEvent
-from PySide6.QtGui import QKeyEvent, QFocusEvent
+from typing import List, Optional
 
+from PySide6.QtCore import QEvent, Qt
+from PySide6.QtGui import QFocusEvent, QKeyEvent
+from PySide6.QtWidgets import QComboBox, QLineEdit, QPushButton, QTextEdit, QWidget
 
 logger = logging.getLogger("echonote.utils.accessibility")
 

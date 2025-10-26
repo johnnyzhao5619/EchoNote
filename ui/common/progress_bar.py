@@ -22,8 +22,8 @@ Provides a customizable progress bar with percentage display.
 import logging
 from typing import Optional
 
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QProgressBar, QVBoxLayout, QWidget
 
 logger = logging.getLogger("echonote.ui.progress_bar")
 

@@ -21,7 +21,6 @@ from typing import Any, Dict, Optional
 import psutil
 from PySide6.QtCore import QObject, QTimer, Signal
 
-
 logger = logging.getLogger(__name__)
 
 

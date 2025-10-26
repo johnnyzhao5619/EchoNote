@@ -22,12 +22,11 @@ Provides UI for configuring timeline view and auto-task settings.
 import logging
 from typing import Tuple
 
-from PySide6.QtWidgets import QLabel, QComboBox, QSpinBox, QCheckBox, QHBoxLayout
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QCheckBox, QComboBox, QHBoxLayout, QLabel, QSpinBox
 
 from ui.settings.base_page import BaseSettingsPage
 from utils.i18n import I18nQtManager
-
 
 logger = logging.getLogger("echonote.ui.settings.timeline")
 
