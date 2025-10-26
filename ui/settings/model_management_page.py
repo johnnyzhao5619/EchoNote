@@ -1325,7 +1325,7 @@ class ModelConfigDialog(QDialog):
             import torch
 
             cuda_available = torch.cuda.is_available()
-        except:
+        except Exception:
             pass
 
         if not cuda_available:

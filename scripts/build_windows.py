@@ -48,7 +48,7 @@ def build_executable():
     args = ["pyinstaller"] + get_pyinstaller_args()
     args.extend(["--version-file", str(PROJECT_ROOT / "scripts" / "version_info.txt")])
 
-    result = subprocess.run(args, cwd=PROJECT_ROOT, shell=True)
+    result = subprocess.run(args, cwd=PROJECT_ROOT)
     if result.returncode != 0:
         sys.exit(1)
 
