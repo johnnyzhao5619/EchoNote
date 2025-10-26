@@ -20,8 +20,7 @@ EchoNote - Intelligent Voice Transcription and Calendar Management Application
 Main entry point for the application.
 """
 
-import asyncio
-import inspect
+
 import sys
 import traceback
 
@@ -462,7 +461,8 @@ def main():
             )
         except Exception as exc:  # noqa: BLE001
             logger.warning(
-                "Audio capture unavailable due to runtime error. Real-time recording will be disabled."
+                "Audio capture unavailable due to runtime error. "
+                "Real-time recording will be disabled."
             )
             logger.warning("Audio capture initialization error: %s", exc, exc_info=True)
 
@@ -497,7 +497,7 @@ def main():
             def __getattr__(self, name):
                 engine = translation_engine_loader.get()
                 if engine is None:
-                    raise AttributeError(f"Translation engine not available")
+                    raise AttributeError("Translation engine not available")
                 return getattr(engine, name)
 
             def __bool__(self):
