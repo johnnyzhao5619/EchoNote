@@ -23,7 +23,7 @@ import logging
 from typing import Any, Dict, Tuple
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QComboBox, QFrame, QHBoxLayout, QLabel, QVBoxLayout
+from PySide6.QtWidgets import QComboBox, QFrame, QLabel, QVBoxLayout
 
 from ui.settings.base_page import BaseSettingsPage
 from utils.i18n import I18nQtManager
@@ -65,10 +65,7 @@ class AppearanceSettingsPage(BaseSettingsPage):
         self.theme_title.setFont(font)
         self.content_layout.addWidget(self.theme_title)
 
-        # Theme selection
-        theme_layout = QHBoxLayout()
-        self.theme_label = QLabel(self.i18n.t("settings.appearance.theme_select"))
-        self.theme_label.setMinimumWidth(200)
+        # Theme selection using mixin helper
         self.theme_combo = QComboBox()
         self.theme_combo.addItems(
             [
@@ -79,9 +76,12 @@ class AppearanceSettingsPage(BaseSettingsPage):
             ]
         )
         self.theme_combo.currentIndexChanged.connect(self._on_theme_changed)
-        theme_layout.addWidget(self.theme_label)
-        theme_layout.addWidget(self.theme_combo)
-        theme_layout.addStretch()
+
+        from ui.layout_utils import create_label_control_row
+
+        theme_layout = create_label_control_row(
+            self.i18n.t("settings.appearance.theme_select"), self.theme_combo
+        )
         self.content_layout.addLayout(theme_layout)
 
         self.add_spacing(10)
@@ -106,7 +106,7 @@ class AppearanceSettingsPage(BaseSettingsPage):
         # Theme info
         self.info_label = QLabel(self.i18n.t("settings.appearance.theme_info"))
         self.info_label.setWordWrap(True)
-        self.info_label.setStyleSheet("color: #666; font-style: italic;")
+        self.info_label.setProperty("role", "auto-start-desc")
         self.content_layout.addWidget(self.info_label)
 
         # Add stretch at the end

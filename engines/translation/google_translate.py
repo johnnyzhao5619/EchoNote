@@ -20,6 +20,7 @@ from typing import List, Optional
 
 import httpx
 
+from config.api_constants import GOOGLE_TRANSLATE_BASE_URL
 from engines.speech.base import (
     BASE_LANGUAGE_CODES,
     CHINESE_LANGUAGE_VARIANTS,
@@ -49,8 +50,7 @@ class GoogleTranslateEngine(TranslationEngine):
         """
         self.api_key = api_key
         self.max_retries = max_retries
-        base = "https://translation.googleapis.com"
-        self.base_url = f"{base}/language/translate/v2"
+        self.base_url = f"{GOOGLE_TRANSLATE_BASE_URL}/language/translate/v2"
 
         # Create the underlying HTTP client.
         self.client: Optional[httpx.AsyncClient] = httpx.AsyncClient(
@@ -263,6 +263,6 @@ class GoogleTranslateEngine(TranslationEngine):
         """Async context manager entry."""
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, _exc_type, _exc_val, _exc_tb):
         """Async context manager exit."""
         await self.aclose()

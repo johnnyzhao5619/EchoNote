@@ -69,7 +69,9 @@ class Sidebar(QWidget):
     def setup_ui(self):
         """Set up the sidebar UI."""
         # Set fixed width for sidebar
-        self.setFixedWidth(200)
+        from ui.constants import SIDEBAR_WIDTH
+
+        self.setFixedWidth(SIDEBAR_WIDTH)
 
         # Set object name for styling
         self.setObjectName("sidebar")
@@ -79,8 +81,10 @@ class Sidebar(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
+        from ui.constants import DEFAULT_LAYOUT_SPACING
+
         # Add spacing at top
-        layout.addSpacing(20)
+        layout.addSpacing(DEFAULT_LAYOUT_SPACING * 2)
 
         # Create navigation buttons
         self._create_nav_buttons(layout)
@@ -147,7 +151,9 @@ class Sidebar(QWidget):
         button.setObjectName(f"nav_button_{name}")
         button.setCheckable(True)
         button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        button.setMinimumHeight(50)
+        from ui.constants import SIDEBAR_BUTTON_MIN_HEIGHT
+
+        button.setMinimumHeight(SIDEBAR_BUTTON_MIN_HEIGHT)
 
         # Set text from translation
         button.setText(self.i18n.t(text_key))

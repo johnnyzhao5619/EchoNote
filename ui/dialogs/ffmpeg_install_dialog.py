@@ -128,7 +128,7 @@ class FFmpegInstallDialog(QDialog):
 
         # Instructions text area
         instructions_label = QLabel(self.i18n.t("ffmpeg.installation_instructions"))
-        instructions_label.setStyleSheet("font-weight: bold;")
+        instructions_label.setProperty("role", "audio-file")
         layout.addWidget(instructions_label)
 
         instructions_text = QTextEdit()

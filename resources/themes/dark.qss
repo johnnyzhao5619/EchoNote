@@ -1409,3 +1409,619 @@ QWidget#search_widget QCheckBox {
 /* Search Highlight Colors - Dark Theme */
 /* Applied via QTextEdit::ExtraSelection in code */
 /* Highlight color: #FF9800 (orange) with better contrast */
+
+/* ===== ADDITIONAL SEMANTIC STYLES FOR HARDCODED COLOR ELIMINATION ===== */
+
+/* FFmpeg Status Styles */
+QLabel[role="ffmpeg-status"][state="available"] {
+    color: #4caf50;
+    font-weight: bold;
+}
+
+QLabel[role="ffmpeg-status"][state="missing"] {
+    color: #ff9800;
+    font-weight: bold;
+}
+
+/* Device and API Info Styles */
+QLabel[role="device-info"],
+QLabel[role="api-info"],
+QLabel[role="ffmpeg-info"] {
+    color: #b0b0b0;
+    font-size: 11px;
+}
+
+QLabel[role="api-note"] {
+    color: #b0b0b0;
+    font-style: italic;
+}
+
+/* Usage Statistics Styles */
+QLabel[role="usage-stats"] {
+    color: #e0e0e0;
+}
+
+QLabel[role="usage-stats"][state="no-data"] {
+    color: #b0b0b0;
+}
+
+/* Model Management Styles */
+QLabel[role="model-name-downloaded"] {
+    color: #66bb6a;
+    font-weight: bold;
+}
+
+QPushButton[role="model-delete"] {
+    color: #f48fb1;
+    background-color: transparent;
+    border: 1px solid #f48fb1;
+}
+
+QPushButton[role="model-delete"]:hover {
+    background-color: #f48fb1;
+    color: #1e1e1e;
+}
+
+QLabel[role="model-usage"],
+QLabel[role="model-last-used"],
+QLabel[role="model-lang"] {
+    color: #b0b0b0;
+}
+
+QLabel[role="model-title-recommendation"] {
+    color: #42a5f5;
+    font-weight: bold;
+}
+
+QLabel[role="model-reason"] {
+    color: #e0e0e0;
+    margin-bottom: 8px;
+}
+
+QLabel[role="model-feature"] {
+    font-weight: bold;
+}
+
+QLabel[role="model-path"] {
+    color: #b0b0b0;
+}
+
+QLabel[role="cuda-note"] {
+    color: #ff9800;
+    font-style: italic;
+}
+
+/* Data Management Styles */
+QLabel[role="data-title"] {
+    font-size: 18px;
+    font-weight: bold;
+}
+
+QLabel[role="data-total"] {
+    font-weight: bold;
+}
+
+QLabel[role="data-warning"] {
+    color: #f48fb1;
+    padding: 10px;
+}
+
+QPushButton[role="data-delete-all"] {
+    background-color: #f48fb1;
+    color: #1e1e1e;
+    padding: 10px;
+    font-weight: bold;
+}
+
+QPushButton[role="data-delete-all"]:hover {
+    background-color: #f06292;
+}
+
+QLabel[role="data-description"] {
+    color: #b0b0b0;
+    padding: 10px;
+}
+
+/* Timeline Auto Start Description */
+QLabel[role="auto-start-desc"] {
+    color: #b0b0b0;
+    font-style: italic;
+}
+
+/* Appearance and Language Info */
+QLabel[role="appearance-info"],
+QLabel[role="language-info"] {
+    color: #b0b0b0;
+    font-style: italic;
+}
+
+/* Realtime Record Styles */
+QLabel[role="duration-display"] {
+    font-size: 16px;
+    font-weight: bold;
+}
+
+QLabel[role="warning-large"] {
+    font-size: 20px;
+}
+
+QLabel[role="feedback"][state="error"] {
+    color: #f48fb1;
+    font-weight: 600;
+}
+
+QLabel[role="feedback"][state="success"] {
+    color: #66bb6a;
+    font-weight: 600;
+}
+
+QLabel[role="feedback"][state="info"] {
+    color: #42a5f5;
+    font-weight: 600;
+}
+
+/* Task Item Styles */
+QWidget[role="task-item"] {
+    background-color: #3a3a3a;
+    border: 1px solid #4a4a4a;
+    border-radius: 8px;
+}
+
+QWidget[role="task-item"]:hover {
+    background-color: #404040;
+}
+
+QLabel[role="task-filename"] {
+    font-weight: bold;
+    font-size: 14px;
+}
+
+QLabel[role="task-info"] {
+    color: #b0b0b0;
+    font-size: 12px;
+}
+
+QLabel[role="task-error"] {
+    color: #f48fb1;
+    font-size: 12px;
+}
+
+QLabel[role="task-status"][state="pending"] {
+    color: #b0b0b0;
+    font-weight: bold;
+}
+
+QLabel[role="task-status"][state="processing"] {
+    color: #42a5f5;
+    font-weight: bold;
+}
+
+QLabel[role="task-status"][state="completed"] {
+    color: #66bb6a;
+    font-weight: bold;
+}
+
+QLabel[role="task-status"][state="failed"] {
+    color: #f48fb1;
+    font-weight: bold;
+}
+
+QLabel[role="task-status"][state="cancelled"] {
+    color: #b0b0b0;
+    font-weight: bold;
+}
+
+/* Search Widget Highlight Colors */
+QTextEdit[role="search-highlight"] {
+    selection-background-color: #FF9800;
+}
+
+/* FFmpeg Installation Dialog */
+QLabel[role="ffmpeg-instructions"] {
+    font-weight: bold;
+}
+
+/* Calendar Widget Styles */
+QFrame[role="account-badge"] {
+    background-color: #3a3a3a;
+    border: 1px solid #4a4a4a;
+    border-radius: 4px;
+    padding: 8px;
+}
+
+QLabel[role="calendar-indicator"][provider="google"] {
+    color: #EA4335;
+    font-size: 12px;
+}
+
+QLabel[role="calendar-indicator"][provider="outlook"] {
+    color: #FF6F00;
+    font-size: 12px;
+}
+
+QPushButton[role="account-disconnect"] {
+    color: #b0b0b0;
+    background-color: transparent;
+    border: none;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+QPushButton[role="account-disconnect"]:hover {
+    color: #f48fb1;
+}
+
+/* OAuth Dialog Styles */
+QLabel[role="oauth-status"][state="error"] {
+    color: #f48fb1;
+    font-weight: bold;
+}
+
+QLabel[role="oauth-status"][state="success"] {
+    color: #66bb6a;
+    font-weight: bold;
+}
+
+/* Calendar View Styles */
+QWidget[role="event-card"] {
+    border: 2px solid #4a4a4a;
+    border-radius: 8px;
+}
+
+QLabel[role="event-title"] {
+    font-weight: bold;
+    color: white;
+}
+
+QLabel[role="event-time"] {
+    font-size: 10px;
+    color: white;
+}
+
+QLabel[role="calendar-header"] {
+    font-size: 18px;
+    font-weight: bold;
+}
+
+QLabel[role="calendar-day-header"] {
+    font-weight: bold;
+    padding: 5px;
+}
+
+QLabel[role="calendar-week-header"] {
+    font-weight: bold;
+    padding: 10px;
+}
+
+QLabel[role="event-indicator"][source="local"] {
+    color: #2196F3;
+}
+
+QLabel[role="event-indicator"][source="google"] {
+    color: #EA4335;
+}
+
+QLabel[role="event-indicator"][source="outlook"] {
+    color: #FF6F00;
+}
+
+QLabel[role="event-indicator"][source="unknown"] {
+    color: #888888;
+}
+
+QLabel[role="more-events"] {
+    font-size: 10px;
+    color: #b0b0b0;
+}
+
+QLabel[role="no-events"] {
+    color: #888888;
+    font-style: italic;
+}
+
+/* Timeline Styles */
+QLabel[role="transcript-file"] {
+    font-weight: bold;
+    font-size: 12px;
+}
+
+QLabel[role="audio-file"] {
+    font-weight: bold;
+}
+
+QLabel[role="time-display"] {
+    color: #b0b0b0;
+}
+
+QPushButton[role="audio-play"] {
+    background-color: #2196F3;
+    color: white;
+    border: none;
+    border-radius: 20px;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+QPushButton[role="audio-play"]:hover {
+    background-color: #1976D2;
+}
+
+QLabel[role="event-description"] {
+    font-size: 11px;
+}
+
+QLabel[role="no-artifacts"] {
+    font-style: italic;
+}
+
+/* First Run Setup Styles */
+QWidget[role="info-card"] {
+    background-color: #2a4a5a;
+    border: 1px solid #3a5a7a;
+    border-radius: 8px;
+    padding: 12px;
+}
+
+QLabel[role="model-name-setup"] {
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+QLabel[role="model-details-setup"] {
+    color: #e0e0e0;
+    font-size: 12px;
+}
+
+QLabel[role="model-reason-setup"] {
+    color: #b0b0b0;
+    font-size: 12px;
+}
+
+QPushButton[role="download-setup"] {
+    background-color: #0078d4;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 4px;
+    border: none;
+}
+
+QPushButton[role="download-setup"]:hover {
+    background-color: #106ebe;
+}
+
+QWidget[role="setup-info"] {
+    background-color: #3a3a3a;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+QLabel[role="wizard-info"] {
+    color: #b0b0b0;
+}
+
+QLabel[role="wizard-skip"] {
+    color: #b0b0b0;
+    font-size: 10pt;
+}
+
+QLabel[role="setup-status"][state="success"] {
+    color: #66bb6a;
+}
+
+QLabel[role="setup-status"][state="error"] {
+    color: #f48fb1;
+}
+
+/* UI Helper Styles */
+QLabel[role="description"] {
+    color: #b0b0b0;
+}
+
+QWidget[role="card"] {
+    border: 1px solid #4a4a4a;
+    border-radius: 8px;
+    padding: 12px;
+}
+
+QLabel[role="badge"] {
+    background-color: #0078d4;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+/* ===== SEMANTIC STYLES FOR HARDCODED COLOR ELIMINATION ===== */
+
+/* User Feedback Styles */
+QLabel[role="user-feedback"][state="info"] {
+    color: #b0b0b0;
+}
+
+QLabel[role="user-feedback"][state="success"] {
+    color: #66bb6a;
+}
+
+QLabel[role="user-feedback"][state="warning"] {
+    color: #ffb74d;
+}
+
+QLabel[role="user-feedback"][state="error"] {
+    color: #f48fb1;
+}
+
+/* First Run Setup Styles */
+QWidget[role="info-card"] {
+    background-color: #1e3a4a;
+    border: 1px solid #3a5a7a;
+    border-radius: 8px;
+    padding: 15px;
+}
+
+QLabel[role="model-name-setup"] {
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+QLabel[role="model-details-setup"] {
+    color: #e0e0e0;
+    font-size: 12px;
+}
+
+QLabel[role="model-reason-setup"] {
+    color: #b0b0b0;
+    font-size: 12px;
+}
+
+QPushButton[role="download-setup"] {
+    background-color: #0078d4;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 4px;
+    border: none;
+    font-weight: bold;
+}
+
+QPushButton[role="download-setup"]:hover {
+    background-color: #106ebe;
+}
+
+QWidget[role="setup-info"] {
+    background-color: #2a2a2a;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+QLabel[role="wizard-skip"] {
+    color: #b0b0b0;
+    font-size: 10pt;
+}
+
+QLabel[role="setup-status"][state="success"] {
+    color: #66bb6a;
+    font-weight: bold;
+}
+
+QLabel[role="setup-status"][state="error"] {
+    color: #f48fb1;
+    font-weight: bold;
+}
+
+/* UI Helper Styles */
+QWidget[role="card"] {
+    background-color: #3a3a3a;
+    border: 1px solid #4a4a4a;
+    border-radius: 8px;
+    padding: 15px;
+}
+
+QLabel[role="badge"] {
+    background-color: #0078d4;
+    color: white;
+    border-radius: 10px;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: bold;
+}
+
+/* Calendar Event Indicator Colors */
+QLabel[role="event-indicator"][source="local"] {
+    color: #42a5f5;
+}
+
+QLabel[role="event-indicator"][source="google"] {
+    color: #ef5350;
+}
+
+QLabel[role="event-indicator"][source="outlook"] {
+    color: #ff9800;
+}
+
+QLabel[role="event-indicator"][source="unknown"] {
+    color: #b0b0b0;
+}
+
+/* Search Highlight Colors */
+QTextEdit[role="search-highlight"] {
+    selection-background-color: #FF9800;
+    selection-color: #000000;
+}
+
+/* Timeline Event Card Colors */
+QWidget[role="event-card"] {
+    background-color: #3a3a3a;
+    border: 1px solid #4a4a4a;
+    border-radius: 8px;
+}
+
+QWidget[role="event-card"]:hover {
+    border: 2px solid #2196F3;
+}
+
+/* Audio Player Button */
+QPushButton[role="audio-play"] {
+    background-color: #2196F3;
+    color: #ffffff;
+    border: none;
+    border-radius: 4px;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+QPushButton[role="audio-play"]:hover {
+    background-color: #1976D2;
+}
+
+/* Calendar Widget Styles */
+QFrame[role="account-badge"] {
+    background-color: #2a2a2a;
+    border: 1px solid #4a4a4a;
+    border-radius: 4px;
+    padding: 8px;
+}
+
+QLabel[role="calendar-indicator"][provider="google"] {
+    color: #ef5350;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+QLabel[role="calendar-indicator"][provider="outlook"] {
+    color: #ff9800;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+QPushButton[role="account-disconnect"] {
+    color: #b0b0b0;
+    background-color: transparent;
+    border: 1px solid #4a4a4a;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+QPushButton[role="account-disconnect"]:hover {
+    color: #ffffff;
+    background-color: #f48fb1;
+}/* Event
+ Type Badge */
+QLabel[role="event-type-badge"] {
+    background-color: rgba(33, 150, 243, 0.2);
+    color: #42a5f5;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+}/
+* OAuth Dialog Styles */
+QLabel[role="oauth-status"][state="error"] {
+    color: #f48fb1;
+    font-weight: bold;
+}
+
+QLabel[role="oauth-status"][state="success"] {
+    color: #66bb6a;
+    font-weight: bold;
+}

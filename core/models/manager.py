@@ -78,27 +78,73 @@ class ModelManager(QObject):
     # ------------------------------------------------------------------
 
     def get_all_models(self) -> List[ModelInfo]:
+        """获取所有可用模型的列表。
+
+        Returns:
+            所有模型信息的列表副本。
+        """
         with self._lock:
             self._ensure_cache()
             return [replace(self._model_cache[name]) for name in self._model_order]
 
     def get_downloaded_models(self) -> List[ModelInfo]:
+        """获取所有已下载模型的列表。
+
+        Returns:
+            已下载模型信息的列表。
+        """
         return [m for m in self.get_all_models() if m.is_downloaded]
 
     def get_model(self, name: str) -> Optional[ModelInfo]:
+        """根据名称获取模型信息。
+
+        Args:
+            name: 模型名称。
+
+        Returns:
+            模型信息副本，如果不存在则返回 None。
+        """
         with self._lock:
             self._ensure_cache()
             model = self._model_cache.get(name)
             return replace(model) if model else None
 
     def is_model_downloaded(self, name: str) -> bool:
+        """检查模型是否已下载。
+
+        Args:
+            name: 模型名称。
+
+        Returns:
+            如果模型已下载则返回 True，否则返回 False。
+        """
         model = self.get_model(name)
         return bool(model and model.is_downloaded)
 
     def is_model_in_use(self, name: str) -> bool:
+        """检查模型是否正在使用中（下载中）。
+
+        Args:
+            name: 模型名称。
+
+        Returns:
+            如果模型正在下载则返回 True，否则返回 False。
+        """
         return self.downloader.is_downloading(name)
 
     async def download_model(self, name: str) -> Path:
+        """下载指定的模型。
+
+        Args:
+            name: 模型名称。
+
+        Returns:
+            下载后的模型路径。
+
+        Raises:
+            ValueError: 如果模型名称未知。
+            DownloadCancelled: 如果下载被取消。
+        """
         model = self.get_model(name)
         if not model:
             raise ValueError(f"Unknown model: {name}")
@@ -118,10 +164,26 @@ class ModelManager(QObject):
             raise
 
     def cancel_download(self, name: str) -> None:
+        """取消正在进行的模型下载。
+
+        Args:
+            name: 模型名称。
+        """
         logger.info(f"Cancelling download for model: {name}")
         self.downloader.cancel(name)
 
     def delete_model(self, name: str) -> bool:
+        """删除已下载的模型。
+
+        Args:
+            name: 模型名称。
+
+        Returns:
+            如果成功删除则返回 True，否则返回 False。
+
+        Raises:
+            RuntimeError: 如果模型正在下载中。
+        """
         model = self.get_model(name)
         if not model or not model.is_downloaded:
             return False
@@ -150,6 +212,12 @@ class ModelManager(QObject):
         name: str,
         transcription_duration: float = 0.0,
     ) -> None:
+        """标记模型已使用并更新使用统计。
+
+        Args:
+            name: 模型名称。
+            transcription_duration: 转录持续时间（秒）。
+        """
         try:
             ModelUsageStats.increment_usage(
                 self._database,
@@ -164,6 +232,7 @@ class ModelManager(QObject):
             self.models_updated.emit()
 
     def start_validation(self) -> None:
+        """启动模型验证过程，检查已下载模型的完整性。"""
         logger.info("Starting model validation")
         self._refresh_cache()
         app = QCoreApplication.instance()
@@ -173,6 +242,11 @@ class ModelManager(QObject):
             QTimer.singleShot(0, self._validate_models)
 
     def recommend_model(self) -> str:
+        """根据系统资源和使用历史推荐最佳模型。
+
+        Returns:
+            推荐的模型名称。
+        """
         models = self.get_all_models()
         downloaded = [m for m in models if m.is_downloaded]
         if downloaded:
@@ -217,6 +291,11 @@ class ModelManager(QObject):
         return self._registry.default_model()
 
     def get_recommendation_context(self) -> Dict[str, float]:
+        """获取用于模型推荐的系统上下文信息。
+
+        Returns:
+            包含系统资源信息的字典。
+        """
         memory_gb = round(psutil.virtual_memory().total / (1024**3), 1)
         cpu_count = psutil.cpu_count(logical=False) or psutil.cpu_count()
         disk_usage = psutil.disk_usage(str(self._models_dir))

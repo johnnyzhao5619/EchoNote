@@ -150,7 +150,7 @@ class RealtimeSettingsPage(BaseSettingsPage):
 
         self.format_hint_label = QLabel()
         self.format_hint_label.setWordWrap(True)
-        self.format_hint_label.setStyleSheet("color: #666; font-size: 11px;")
+        self.format_hint_label.setProperty("role", "device-info")
         self._update_format_hint_text()
         self.content_layout.addWidget(self.format_hint_label)
 
@@ -390,27 +390,3 @@ class RealtimeSettingsPage(BaseSettingsPage):
         if current == "mp3" and not self._mp3_supported:
             return "wav"
         return current
-
-        # Update combo box items
-        if hasattr(self, "source_combo"):
-            current_index = self.source_combo.currentIndex()
-            self.source_combo.blockSignals(True)
-            self.source_combo.clear()
-            self.source_combo.addItems(
-                [
-                    self.i18n.t("settings.realtime.default_device"),
-                    self.i18n.t("settings.realtime.system_audio"),
-                ]
-            )
-            self.source_combo.setCurrentIndex(current_index)
-            self.source_combo.blockSignals(False)
-
-        if hasattr(self, "translation_combo"):
-            current_index = self.translation_combo.currentIndex()
-            self.translation_combo.blockSignals(True)
-            self.translation_combo.clear()
-            self.translation_combo.addItems(
-                [self.i18n.t("settings.realtime.no_translation"), "Google Translate"]
-            )
-            self.translation_combo.setCurrentIndex(current_index)
-            self.translation_combo.blockSignals(False)

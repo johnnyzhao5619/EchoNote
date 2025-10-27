@@ -23,7 +23,6 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, Tuple
 
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
@@ -131,12 +130,14 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         self.ffmpeg_status_text = QLabel()
         if ffmpeg_checker.is_ffmpeg_available() and ffmpeg_checker.is_ffprobe_available():
             self.ffmpeg_status_text.setText(self.i18n.t("settings.transcription.ffmpeg_installed"))
-            self.ffmpeg_status_text.setStyleSheet("color: green; font-weight: bold;")
+            self.ffmpeg_status_text.setProperty("role", "ffmpeg-status")
+            self.ffmpeg_status_text.setProperty("state", "success")
         else:
             self.ffmpeg_status_text.setText(
                 self.i18n.t("settings.transcription.ffmpeg_not_installed")
             )
-            self.ffmpeg_status_text.setStyleSheet("color: orange; font-weight: bold;")
+            self.ffmpeg_status_text.setProperty("role", "ffmpeg-status")
+        {}.setProperty("state", "missing")
 
         ffmpeg_status_layout.addWidget(self.ffmpeg_status_label)
         ffmpeg_status_layout.addWidget(self.ffmpeg_status_text)
@@ -154,7 +155,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         # FFmpeg info
         self.ffmpeg_info = QLabel(self.i18n.t("settings.transcription.ffmpeg_info"))
         self.ffmpeg_info.setWordWrap(True)
-        self.ffmpeg_info.setStyleSheet("color: #666; font-size: 11px;")
+        self.ffmpeg_info.setProperty("role", "device-info")
         self.content_layout.addWidget(self.ffmpeg_info)
 
         self.add_spacing(20)
@@ -220,7 +221,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         device_layout = QVBoxLayout()
         device_layout.addWidget(self.device_combo)
         self.device_info_label = QLabel()
-        self.device_info_label.setStyleSheet("color: #666; font-size: 11px;")
+        self.device_info_label.setProperty("role", "device-info")
         self.device_info_label.setWordWrap(True)
         device_layout.addWidget(self.device_info_label)
 
@@ -246,7 +247,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         # Note about API keys
         self.note_label = QLabel(self.i18n.t("settings.transcription.api_key_note"))
         self.note_label.setWordWrap(True)
-        self.note_label.setStyleSheet("color: #666; font-style: italic;")
+        self.note_label.setProperty("role", "auto-start-desc")
         cloud_layout.addWidget(self.note_label)
 
         # API Key configuration section
@@ -359,7 +360,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
 
         # Usage statistics
         self.openai_usage_label = QLabel(self.i18n.t("settings.transcription.no_usage_data"))
-        self.openai_usage_label.setStyleSheet("color: #666;")
+        self.openai_usage_label.setProperty("role", "time-display")
         self.openai_monthly_usage_label = QLabel(
             self.i18n.t("settings.transcription.monthly_usage")
         )
@@ -395,7 +396,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         google_layout.addRow(self.google_api_key_label, google_key_layout)
 
         self.google_usage_label = QLabel(self.i18n.t("settings.transcription.no_usage_data"))
-        self.google_usage_label.setStyleSheet("color: #666;")
+        self.google_usage_label.setProperty("role", "time-display")
         self.google_monthly_usage_label = QLabel(
             self.i18n.t("settings.transcription.monthly_usage")
         )
@@ -440,7 +441,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         azure_layout.addRow(self.azure_region_label, self.azure_region_edit)
 
         self.azure_usage_label = QLabel(self.i18n.t("settings.transcription.no_usage_data"))
-        self.azure_usage_label.setStyleSheet("color: #666;")
+        self.azure_usage_label.setProperty("role", "time-display")
         self.azure_monthly_usage_label = QLabel(self.i18n.t("settings.transcription.monthly_usage"))
         azure_layout.addRow(self.azure_monthly_usage_label, self.azure_usage_label)
 
@@ -469,7 +470,6 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         """
         import asyncio
 
-        from PySide6.QtCore import QThread
         from PySide6.QtWidgets import QApplication, QMessageBox
 
         # Get API key
@@ -594,10 +594,10 @@ class TranscriptionSettingsPage(BaseSettingsPage):
                     # Format usage text
                     usage_text = f"{count} calls, {duration_minutes:.1f} min, " f"${cost:.2f}"
                     label.setText(usage_text)
-                    label.setStyleSheet("color: #333;")
+                    label.setProperty("role", "usage-stats")
                 else:
                     label.setText(self.i18n.t("settings.transcription.no_usage_data"))
-                    label.setStyleSheet("color: #666;")
+                    label.setProperty("role", "time-display")
 
             logger.debug("Usage statistics loaded successfully")
 
@@ -650,16 +650,16 @@ class TranscriptionSettingsPage(BaseSettingsPage):
             info_text = f"Will automatically use: {device_name} ({recommended_compute})"
             self.device_info_label.setText(info_text)
         elif device_id == "cuda":
-            self.device_info_label.setText("NVIDIA GPU acceleration. Requires CUDA-compatible GPU.")
+            self.device_info_label.setText(self.i18n.t("settings.transcription.gpu_acceleration"))
         elif device_id == "cpu":
             # Check if CoreML is available
             devices = GPUDetector.detect_available_devices()
             if devices["coreml"]:
                 self.device_info_label.setText(
-                    "CPU mode. CoreML optimization will be used automatically on Apple Silicon."
+                    self.i18n.t("settings.transcription.device_info_cpu")
                 )
             else:
-                self.device_info_label.setText("CPU mode. No GPU acceleration.")
+                self.device_info_label.setText(self.i18n.t("settings.transcription.cpu_mode"))
         else:
             self.device_info_label.setText("")
 
@@ -677,12 +677,14 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         # Refresh status after dialog closes
         if ffmpeg_checker.is_ffmpeg_available() and ffmpeg_checker.is_ffprobe_available():
             self.ffmpeg_status_text.setText(self.i18n.t("settings.transcription.ffmpeg_installed"))
-            self.ffmpeg_status_text.setStyleSheet("color: green; font-weight: bold;")
+            self.ffmpeg_status_text.setProperty("role", "ffmpeg-status")
+            self.ffmpeg_status_text.setProperty("state", "success")
         else:
             self.ffmpeg_status_text.setText(
                 self.i18n.t("settings.transcription.ffmpeg_not_installed")
             )
-            self.ffmpeg_status_text.setStyleSheet("color: orange; font-weight: bold;")
+            self.ffmpeg_status_text.setProperty("role", "ffmpeg-status")
+            self.ffmpeg_status_text.setProperty("state", "missing")
 
         logger.info("Showed FFmpeg installation guide")
 

@@ -24,20 +24,22 @@ from data.database.models import AutoTaskConfig, CalendarEvent, EventAttachment
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from utils.i18n import I18nManager
 
+from config.constants import DEFAULT_TRANSCRIPT_CANDIDATE_WINDOW_DAYS, MAX_TRANSCRIPT_CANDIDATES
 
 logger = logging.getLogger("echonote.timeline.manager")
 
-
-_DEFAULT_TRANSCRIPT_CANDIDATE_WINDOW_DAYS = 30
-_MAX_TRANSCRIPT_CANDIDATES = 200
+_DEFAULT_TRANSCRIPT_CANDIDATE_WINDOW_DAYS = DEFAULT_TRANSCRIPT_CANDIDATE_WINDOW_DAYS
+_MAX_TRANSCRIPT_CANDIDATES = MAX_TRANSCRIPT_CANDIDATES
 
 
 def to_local_naive(value: Union[datetime, str]) -> datetime:
     """Convert datetime/ISO string to local-time naive datetime."""
     if isinstance(value, str):
         text = value.strip()
-        if text.endswith("Z"):
-            text = text[:-1] + "+00:00"
+        from config.constants import UTC_TIMEZONE_SUFFIX, UTC_TIMEZONE_OFFSET
+
+        if text.endswith(UTC_TIMEZONE_SUFFIX):
+            text = text[:-1] + UTC_TIMEZONE_OFFSET
         dt = datetime.fromisoformat(text)
     elif isinstance(value, datetime):
         dt = value
@@ -135,7 +137,9 @@ class TimelineManager:
                     except ValueError:
                         pass
                     else:
-                        suffix = "T00:00:00" if is_start else "T23:59:59"
+                        from config.constants import TIMEZONE_SUFFIX_START, TIMEZONE_SUFFIX_END
+
+                        suffix = TIMEZONE_SUFFIX_START if is_start else TIMEZONE_SUFFIX_END
                         return f"{text}{suffix}"
             return value
 
@@ -150,15 +154,34 @@ class TimelineManager:
                 is_start=False,
             )
 
+        from config.constants import (
+            TIMELINE_MIN_YEAR,
+            TIMELINE_MIN_MONTH,
+            TIMELINE_MIN_DAY,
+            TIMELINE_MAX_YEAR,
+            TIMELINE_MAX_MONTH,
+            TIMELINE_MAX_DAY,
+            TIMELINE_MAX_HOUR,
+            TIMELINE_MAX_MINUTE,
+            TIMELINE_MAX_SECOND,
+        )
+
         start_dt = (
             to_local_naive(resolved_filters["start_date"])
             if resolved_filters.get("start_date")
-            else datetime(1970, 1, 1)
+            else datetime(TIMELINE_MIN_YEAR, TIMELINE_MIN_MONTH, TIMELINE_MIN_DAY)
         )
         end_dt = (
             to_local_naive(resolved_filters["end_date"])
             if resolved_filters.get("end_date")
-            else datetime(2099, 12, 31, 23, 59, 59)
+            else datetime(
+                TIMELINE_MAX_YEAR,
+                TIMELINE_MAX_MONTH,
+                TIMELINE_MAX_DAY,
+                TIMELINE_MAX_HOUR,
+                TIMELINE_MAX_MINUTE,
+                TIMELINE_MAX_SECOND,
+            )
         )
 
         attendees_filter = resolved_filters.get("attendees")
@@ -796,9 +819,11 @@ class TimelineManager:
         # Check description
         if event.description and query_lower in event.description.lower():
             # Find the position and extract context
+            from config.constants import SEARCH_CONTEXT_CHARS_BEFORE, SEARCH_CONTEXT_CHARS_AFTER
+
             pos = event.description.lower().find(query_lower)
-            start = max(0, pos - 30)
-            end = min(len(event.description), pos + len(query) + 30)
+            start = max(0, pos - SEARCH_CONTEXT_CHARS_BEFORE)
+            end = min(len(event.description), pos + len(query) + SEARCH_CONTEXT_CHARS_AFTER)
             snippet = event.description[start:end]
             description_prefix = self._translate(
                 "timeline.snippet.description_prefix", "Description"
@@ -828,8 +853,8 @@ class TimelineManager:
             content_lower = content.lower()
             if query_lower in content_lower:
                 pos = content_lower.find(query_lower)
-                start = max(0, pos - 30)
-                end = min(len(content), pos + len(query) + 30)
+                start = max(0, pos - SEARCH_CONTEXT_CHARS_BEFORE)
+                end = min(len(content), pos + len(query) + SEARCH_CONTEXT_CHARS_AFTER)
                 snippet = content[start:end]
 
                 prefix_key = "timeline.snippet.transcript_prefix"

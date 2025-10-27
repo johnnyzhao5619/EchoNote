@@ -88,9 +88,14 @@ class OutlookCalendarAdapter(OAuthCalendarAdapter):
         self,
         client_id: str,
         client_secret: str,
-        redirect_uri: str = "http://localhost:8080/callback",
+        redirect_uri: str = None,
         http_client_config: Optional[Dict[str, Any]] = None,
     ):
+        from config.constants import DEFAULT_OAUTH_REDIRECT_PORT
+
+        if redirect_uri is None:
+            redirect_uri = f"http://localhost:{DEFAULT_OAUTH_REDIRECT_PORT}/callback"
+
         super().__init__(
             client_id=client_id,
             client_secret=client_secret,
@@ -155,11 +160,16 @@ class OutlookCalendarAdapter(OAuthCalendarAdapter):
                     current_url = base_url
 
             while True:
+                from config.constants import (
+                    CALENDAR_API_TIMEOUT_SECONDS,
+                    OUTLOOK_CALENDAR_MAX_PAGE_SIZE,
+                )
+
                 response = self.api_request(
                     "GET",
                     current_url,
-                    headers={"Prefer": "odata.maxpagesize=250"},
-                    timeout=30.0,
+                    headers={"Prefer": f"odata.maxpagesize={OUTLOOK_CALENDAR_MAX_PAGE_SIZE}"},
+                    timeout=CALENDAR_API_TIMEOUT_SECONDS,
                 )
                 data = response.json()
 

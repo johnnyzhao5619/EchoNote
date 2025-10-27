@@ -24,7 +24,7 @@ import logging
 import os
 from typing import Optional
 
-from PySide6.QtCore import QSettings, QSize, Qt, QThread, QTimer, Signal
+from PySide6.QtCore import QSize, Qt, QTimer
 from PySide6.QtGui import QAction, QFont, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
@@ -43,90 +43,13 @@ from PySide6.QtWidgets import (
 
 from core.transcription.format_converter import FormatConverter
 from data.database.models import TranscriptionTask
+from ui.batch_transcribe.file_operations import FileExporter, FileLoadWorker
 from ui.batch_transcribe.search_widget import SearchWidget
+from ui.batch_transcribe.theme_manager import TranscriptViewerThemeManager
+from ui.batch_transcribe.window_state_manager import WindowStateManager
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.transcript_viewer")
-
-
-class FileLoadWorker(QThread):
-    """
-    Worker thread for loading transcript files asynchronously.
-
-    Prevents UI blocking when loading large transcript files.
-    """
-
-    # Signals
-    finished = Signal(str)  # Emits loaded content
-    error = Signal(str)  # Emits error message
-    progress = Signal(int)  # Emits progress percentage
-
-    def __init__(self, file_path: str):
-        """
-        Initialize file load worker.
-
-        Args:
-            file_path: Path to transcript file
-        """
-        super().__init__()
-        self.file_path = file_path
-        self._is_cancelled = False
-
-    def run(self):
-        """Load file in background thread."""
-        try:
-            if not os.path.exists(self.file_path):
-                self.error.emit(f"File not found: {self.file_path}")
-                return
-
-            # Get file size for progress tracking
-            file_size = os.path.getsize(self.file_path)
-
-            # For small files (< 1MB), load directly
-            if file_size < 1024 * 1024:
-                with open(self.file_path, "r", encoding="utf-8") as f:
-                    content = f.read()
-                self.progress.emit(100)
-                self.finished.emit(content)
-                return
-
-            # For large files, load in chunks with progress
-            content_parts = []
-            bytes_read = 0
-            chunk_size = 64 * 1024  # 64KB chunks
-
-            with open(self.file_path, "r", encoding="utf-8") as f:
-                while not self._is_cancelled:
-                    chunk = f.read(chunk_size)
-                    if not chunk:
-                        break
-
-                    content_parts.append(chunk)
-                    bytes_read += len(chunk.encode("utf-8"))
-
-                    # Update progress
-                    progress = int((bytes_read / file_size) * 100)
-                    self.progress.emit(min(progress, 99))
-
-            if self._is_cancelled:
-                self.error.emit("Loading cancelled")
-                return
-
-            # Combine all parts
-            content = "".join(content_parts)
-            self.progress.emit(100)
-            self.finished.emit(content)
-
-        except PermissionError as e:
-            self.error.emit(f"Permission denied: {e}")
-        except UnicodeDecodeError as e:
-            self.error.emit(f"Invalid file encoding: {e}")
-        except Exception as e:
-            self.error.emit(f"Error loading file: {e}")
-
-    def cancel(self):
-        """Cancel the loading operation."""
-        self._is_cancelled = True
 
 
 class TranscriptViewerDialog(QDialog):
@@ -171,8 +94,10 @@ class TranscriptViewerDialog(QDialog):
         self.is_modified = False
         self.is_edit_mode = False
 
-        # QSettings for window state persistence
-        self.settings = QSettings("EchoNote", "TranscriptViewer")
+        # Initialize managers
+        self.window_state_manager = WindowStateManager(self)
+        self.theme_manager = TranscriptViewerThemeManager(self, settings_manager)
+        self.file_exporter = FileExporter(i18n)
 
         # File loading state
         self.load_worker = None

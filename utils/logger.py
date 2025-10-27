@@ -153,9 +153,11 @@ def setup_logging(
     sensitive_filter = SensitiveDataFilter()
 
     # 文件处理器 - 详细日志，带轮转
+    from config.constants import LOG_FILE_BACKUP_COUNT, LOG_FILE_MAX_BYTES
+
     log_file = log_dir / "echonote.log"
     file_handler = RotatingFileHandler(
-        log_file, maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"  # 10 MB
+        log_file, maxBytes=LOG_FILE_MAX_BYTES, backupCount=LOG_FILE_BACKUP_COUNT, encoding="utf-8"
     )
     file_handler.setLevel(log_level)
     file_formatter = logging.Formatter(
@@ -242,16 +244,20 @@ def get_log_file_path() -> Path:
     return get_app_dir() / "logs" / "echonote.log"
 
 
-def get_recent_logs(lines: int = 100) -> list:
+def get_recent_logs(lines: int = None) -> list:
     """
     获取最近的日志行
 
     Args:
-        lines: 要读取的行数，默认 100
+        lines: 要读取的行数，默认使用 DEFAULT_LOG_LINES_TO_READ
 
     Returns:
         日志行列表
     """
+    if lines is None:
+        from config.constants import DEFAULT_LOG_LINES_TO_READ
+
+        lines = DEFAULT_LOG_LINES_TO_READ
     log_file = get_log_file_path()
 
     if not log_file.exists():

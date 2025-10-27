@@ -20,7 +20,7 @@ API 密钥验证工具
 """
 
 import logging
-from typing import Optional, Tuple
+from typing import Tuple
 
 import httpx
 

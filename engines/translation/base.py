@@ -30,12 +30,10 @@ class TranslationEngine(ABC):
     @abstractmethod
     def get_name(self) -> str:
         """Return the engine identifier (e.g., ``"google-translate"``)."""
-        pass
 
     @abstractmethod
     def get_supported_languages(self) -> List[str]:
         """Return language codes supported by the engine."""
-        pass
 
     @abstractmethod
     async def translate(self, text: str, source_lang: str, target_lang: str) -> str:
@@ -49,7 +47,6 @@ class TranslationEngine(ABC):
         Returns:
             str: Translated text.
         """
-        pass
 
     def validate_language(self, lang_code: str) -> bool:
         """Return ``True`` when the language code is supported."""

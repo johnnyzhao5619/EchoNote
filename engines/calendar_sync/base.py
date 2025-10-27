@@ -37,6 +37,10 @@ from utils.http_client import RetryableHttpClient
 
 logger = logging.getLogger("echonote.calendar_sync.base")
 
+# Constants
+SECONDS_PER_MINUTE = 60
+CALENDAR_API_TIMEOUT_SECONDS = 30
+
 
 class CalendarSyncAdapter(ABC):
     """
@@ -66,7 +70,6 @@ class CalendarSyncAdapter(ABC):
         Raises:
             Exception: If authentication fails
         """
-        pass
 
     @abstractmethod
     def fetch_events(
@@ -110,7 +113,6 @@ class CalendarSyncAdapter(ABC):
         Raises:
             Exception: If fetching events fails
         """
-        pass
 
     @abstractmethod
     def push_event(self, event: CalendarEvent) -> str:
@@ -126,7 +128,6 @@ class CalendarSyncAdapter(ABC):
         Raises:
             Exception: If pushing event fails
         """
-        pass
 
     @abstractmethod
     def update_event(self, event: CalendarEvent, external_id: str) -> None:
@@ -140,7 +141,6 @@ class CalendarSyncAdapter(ABC):
         Raises:
             Exception: If updating the external event fails
         """
-        pass
 
     @abstractmethod
     def delete_event(self, event: CalendarEvent, external_id: str) -> None:
@@ -154,7 +154,6 @@ class CalendarSyncAdapter(ABC):
         Raises:
             Exception: If deleting the external event fails
         """
-        pass
 
     @abstractmethod
     def revoke_access(self):
@@ -167,7 +166,6 @@ class CalendarSyncAdapter(ABC):
         Raises:
             Exception: If revoking access fails
         """
-        pass
 
     def get_name(self) -> str:
         """
@@ -202,13 +200,21 @@ class CalendarSyncAdapter(ABC):
     def _generate_state_and_pkce() -> Dict[str, str]:
         """Generate OAuth state and PKCE parameters."""
 
-        state = secrets.token_urlsafe(16)
-        code_verifier = secrets.token_urlsafe(64)
+        from config.constants import OAUTH_CODE_VERIFIER_LENGTH, OAUTH_STATE_TOKEN_LENGTH
 
-        while len(code_verifier) < 43:
-            code_verifier += secrets.token_urlsafe(32)
+        state = secrets.token_urlsafe(OAUTH_STATE_TOKEN_LENGTH)
+        code_verifier = secrets.token_urlsafe(OAUTH_CODE_VERIFIER_LENGTH)
 
-        code_verifier = code_verifier[:128]
+        from config.constants import (
+            OAUTH_CODE_VERIFIER_MAX_LENGTH,
+            OAUTH_CODE_VERIFIER_MIN_LENGTH,
+            OAUTH_CODE_VERIFIER_PADDING_LENGTH,
+        )
+
+        while len(code_verifier) < OAUTH_CODE_VERIFIER_MIN_LENGTH:
+            code_verifier += secrets.token_urlsafe(OAUTH_CODE_VERIFIER_PADDING_LENGTH)
+
+        code_verifier = code_verifier[:OAUTH_CODE_VERIFIER_MAX_LENGTH]
 
         code_challenge_bytes = hashlib.sha256(code_verifier.encode("ascii")).digest()
         code_challenge = base64.urlsafe_b64encode(code_challenge_bytes).decode("ascii").rstrip("=")
@@ -261,7 +267,9 @@ class CalendarSyncAdapter(ABC):
         elif isinstance(value, str):
             text = value.strip()
             if text.endswith("Z"):
-                text = f"{text[:-1]}+00:00"
+                from config.constants import UTC_TIMEZONE_OFFSET
+
+                text = f"{text[:-1]}{UTC_TIMEZONE_OFFSET}"
             try:
                 dt_value = datetime.fromisoformat(text)
             except ValueError as exc:
@@ -302,13 +310,15 @@ class CalendarSyncAdapter(ABC):
         if offset is None:
             return None
 
-        total_minutes = int(offset.total_seconds() // 60)
+        from config.constants import UTC_OFFSET_MINUTES_PER_HOUR
+
+        total_minutes = int(offset.total_seconds() // SECONDS_PER_MINUTE)
         if total_minutes == 0:
             return "UTC"
 
         sign = "+" if total_minutes > 0 else "-"
         total_minutes = abs(total_minutes)
-        hours, minutes = divmod(total_minutes, 60)
+        hours, minutes = divmod(total_minutes, UTC_OFFSET_MINUTES_PER_HOUR)
         return f"UTC{sign}{hours:02d}:{minutes:02d}"
 
     @staticmethod
@@ -389,11 +399,23 @@ class OAuthHttpClient:
         return self._http_client
 
     def close(self) -> None:
+        """Close the HTTP client if owned by this instance."""
         if self._owns_http_client:
             self._http_client.close()
 
     # Token lifecycle -------------------------------------------------
     def exchange_authorization_code(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Exchange authorization code for access token.
+
+        Args:
+            data: Token request data including authorization code.
+
+        Returns:
+            Dictionary containing token information.
+
+        Raises:
+            Exception: If token exchange fails.
+        """
         try:
             token_data = self._token_request(data)
             self.logger.info("Successfully exchanged authorization code")
@@ -403,6 +425,17 @@ class OAuthHttpClient:
             raise
 
     def refresh_access_token(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Refresh the access token using refresh token.
+
+        Args:
+            data: Token refresh request data.
+
+        Returns:
+            Dictionary containing new token information.
+
+        Raises:
+            Exception: If token refresh fails.
+        """
         try:
             token_data = self._token_request(data)
             self.logger.info("Successfully refreshed access token")
@@ -420,6 +453,20 @@ class OAuthHttpClient:
         headers: Optional[Dict[str, str]] = None,
         **kwargs: Any,
     ):
+        """Make an authenticated API request.
+
+        Args:
+            method: HTTP method (GET, POST, etc.).
+            url: Request URL.
+            headers: Optional additional headers.
+            **kwargs: Additional request parameters.
+
+        Returns:
+            HTTP response object.
+
+        Raises:
+            ValueError: If not authenticated.
+        """
         if not self.state.access_token:
             raise ValueError("Not authenticated")
 
@@ -435,6 +482,15 @@ class OAuthHttpClient:
         revoke_url: Optional[str],
         request_kwargs: Optional[Dict[str, Any]],
     ) -> None:
+        """Revoke OAuth access token.
+
+        Args:
+            revoke_url: Optional revocation endpoint URL.
+            request_kwargs: Optional request parameters.
+
+        Raises:
+            Exception: If revocation fails.
+        """
         if not self.state.access_token:
             self.logger.warning("No access token to revoke")
             return
@@ -455,18 +511,39 @@ class OAuthHttpClient:
 
     # State helpers ---------------------------------------------------
     def clear_tokens(self) -> None:
+        """Clear all stored OAuth tokens."""
         self.state = OAuthTokenState()
 
     def set_access_token(self, access_token: Optional[str]) -> None:
+        """Set the access token.
+
+        Args:
+            access_token: OAuth access token.
+        """
         self.state.access_token = access_token
 
     def set_refresh_token(self, refresh_token: Optional[str]) -> None:
+        """Set the refresh token.
+
+        Args:
+            refresh_token: OAuth refresh token.
+        """
         self.state.refresh_token = refresh_token
 
     def set_expires_at(self, expires_at: Optional[str]) -> None:
+        """Set the token expiration timestamp.
+
+        Args:
+            expires_at: ISO format timestamp.
+        """
         self.state.expires_at = expires_at
 
     def set_token_type(self, token_type: Optional[str]) -> None:
+        """Set the token type (e.g., 'Bearer').
+
+        Args:
+            token_type: OAuth token type.
+        """
         if token_type is None:
             self.state.token_type = None
         else:
@@ -510,7 +587,9 @@ class OAuthHttpClient:
         return normalized
 
     def _normalize_expires_in(self, expires_in: Any) -> int:
-        default = 3600
+        from config.constants import DEFAULT_TOKEN_EXPIRES_IN_SECONDS
+
+        default = DEFAULT_TOKEN_EXPIRES_IN_SECONDS
         if expires_in is None:
             return default
         try:
@@ -567,7 +646,15 @@ class OAuthCalendarAdapter(CalendarSyncAdapter):
         self._oauth_client.close()
 
     def build_authorization_params(self, state: str, code_challenge: str) -> Dict[str, Any]:
-        """Base authorization parameters; subclasses may extend."""
+        """Build OAuth authorization parameters.
+
+        Args:
+            state: OAuth state parameter.
+            code_challenge: PKCE code challenge.
+
+        Returns:
+            Dictionary of authorization parameters.
+        """
 
         return {
             "client_id": self.client_id,
@@ -580,6 +667,11 @@ class OAuthCalendarAdapter(CalendarSyncAdapter):
         }
 
     def get_authorization_url(self) -> Dict[str, str]:
+        """Generate OAuth authorization URL with PKCE parameters.
+
+        Returns:
+            Dictionary containing authorization_url, state, and code_verifier.
+        """
         oauth_params = self._generate_state_and_pkce()
         params = self.build_authorization_params(
             oauth_params["state"], oauth_params["code_challenge"]
@@ -597,6 +689,17 @@ class OAuthCalendarAdapter(CalendarSyncAdapter):
         }
 
     def authenticate(self, credentials: dict) -> dict:
+        """Authenticate with the calendar provider.
+
+        Args:
+            credentials: Dictionary containing either authorization_code or empty for URL generation.
+
+        Returns:
+            Token dictionary or authorization URL dictionary.
+
+        Raises:
+            Exception: If authentication fails.
+        """
         try:
             if "authorization_code" in credentials:
                 return self.exchange_code_for_token(
@@ -609,6 +712,15 @@ class OAuthCalendarAdapter(CalendarSyncAdapter):
             raise
 
     def exchange_code_for_token(self, code: str, code_verifier: Optional[str] = None) -> dict:
+        """Exchange authorization code for access token.
+
+        Args:
+            code: Authorization code from OAuth callback.
+            code_verifier: Optional PKCE code verifier.
+
+        Returns:
+            Dictionary containing access token and related information.
+        """
         data = {
             "code": code,
             "client_id": self.client_id,
@@ -622,6 +734,17 @@ class OAuthCalendarAdapter(CalendarSyncAdapter):
         return self._oauth_client.exchange_authorization_code(data)
 
     def refresh_access_token(self, code_verifier: Optional[str] = None) -> dict:
+        """Refresh the access token using refresh token.
+
+        Args:
+            code_verifier: Optional PKCE code verifier.
+
+        Returns:
+            Dictionary containing new access token.
+
+        Raises:
+            ValueError: If no refresh token is available.
+        """
         if not self.refresh_token:
             raise ValueError("No refresh token available")
 
@@ -639,6 +762,17 @@ class OAuthCalendarAdapter(CalendarSyncAdapter):
     def api_request(
         self, method: str, url: str, *, headers: Optional[Dict[str, str]] = None, **kwargs
     ):
+        """Make an authenticated API request to the calendar provider.
+
+        Args:
+            method: HTTP method.
+            url: Request URL.
+            headers: Optional additional headers.
+            **kwargs: Additional request parameters.
+
+        Returns:
+            HTTP response object.
+        """
         return self._oauth_client.api_request(
             method,
             url,
@@ -647,10 +781,16 @@ class OAuthCalendarAdapter(CalendarSyncAdapter):
         )
 
     def revoke_access(self):
+        """Revoke OAuth access to the calendar provider."""
         request_kwargs = self.build_revoke_request()
         self._oauth_client.revoke(self.endpoints.revoke_url, request_kwargs)
 
     def build_revoke_request(self) -> Dict[str, Any]:
+        """Build the revocation request parameters.
+
+        Returns:
+            Dictionary of revocation request parameters.
+        """
         return {"params": {"token": self.access_token}}
 
     # Token state passthroughs ---------------------------------------

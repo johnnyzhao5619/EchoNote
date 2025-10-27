@@ -452,7 +452,9 @@ class FileManager:
         if not temp_dir.exists():
             return
 
-        cutoff_time = datetime.now().timestamp() - (older_than_days * 86400)
+        from config.constants import SECONDS_PER_DAY
+
+        cutoff_time = datetime.now().timestamp() - (older_than_days * SECONDS_PER_DAY)
         deleted_count = 0
 
         for file_path in temp_dir.glob("*"):
@@ -478,17 +480,20 @@ class FileManager:
         os.chmod(path, 0o700)
         logger.debug(f"Ensured directory exists: {path}")
 
-    def set_file_permissions(self, file_path: str, mode: int = 0o600):
+    def set_file_permissions(self, file_path: str, mode: int = None):
         """
         Set file permissions.
 
         Args:
             file_path: Path to file (absolute or relative to base_dir)
-            mode: Permission mode (default: 0o600 - owner read/write only)
+            mode: Permission mode (default: FILE_PERMISSION_OWNER_RW - owner read/write only)
 
         Raises:
             FileNotFoundError: If file does not exist
         """
+        if mode is None:
+            mode = 0o600  # Owner read/write only
+
         path = self._resolve_path(file_path)
 
         if not path.exists():

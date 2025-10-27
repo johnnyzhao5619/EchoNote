@@ -24,7 +24,7 @@ import logging
 from typing import List, Optional
 
 from PySide6.QtCore import QEvent, Qt
-from PySide6.QtGui import QFocusEvent, QKeyEvent
+from PySide6.QtGui import QKeyEvent
 from PySide6.QtWidgets import QComboBox, QLineEdit, QPushButton, QTextEdit, QWidget
 
 logger = logging.getLogger("echonote.utils.accessibility")
@@ -146,7 +146,12 @@ class AccessibilityHelper:
         # Reset after a short delay
         from PySide6.QtCore import QTimer
 
-        QTimer.singleShot(100, lambda: widget.setAccessibleDescription(original_desc))
+        from config.constants import ACCESSIBILITY_ANNOUNCEMENT_DELAY_MS
+
+        QTimer.singleShot(
+            ACCESSIBILITY_ANNOUNCEMENT_DELAY_MS,
+            lambda: widget.setAccessibleDescription(original_desc),
+        )
 
         logger.debug(f"Announced to screen reader: {message}")
 
@@ -164,12 +169,12 @@ class KeyboardShortcutFilter(QEvent):
         super().__init__(QEvent.Type.KeyPress)
         self.parent = parent
 
-    def eventFilter(self, obj: QWidget, event: QEvent) -> bool:
+    def eventFilter(self, _obj: QWidget, event: QEvent) -> bool:
         """
         Filter keyboard events for shortcuts.
 
         Args:
-            obj: Object receiving event
+            _obj: Object receiving event (unused but required by Qt protocol)
             event: Event to filter
 
         Returns:

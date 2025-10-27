@@ -121,9 +121,11 @@ class SearchWidget(QWidget):
         # Search input
         self.search_input = QLineEdit()
         self.search_input.setObjectName("search_input")
-        self.search_input.setPlaceholderText("Search...")
+        self.search_input.setPlaceholderText(self.i18n.t("search.placeholder"))
         self.search_input.setClearButtonEnabled(True)
-        self.search_input.setMinimumWidth(250)
+        from ui.constants import SEARCH_INPUT_MIN_WIDTH
+
+        self.search_input.setMinimumWidth(SEARCH_INPUT_MIN_WIDTH)
 
         # Connect search input signals
         self.search_input.textChanged.connect(self._on_search_text_changed)
@@ -140,14 +142,18 @@ class SearchWidget(QWidget):
         # Previous button
         self.prev_button = QPushButton("↑")
         self.prev_button.setObjectName("prev_button")
-        self.prev_button.setFixedWidth(40)
+        from ui.constants import BUTTON_FIXED_WIDTH_LARGE
+
+        self.prev_button.setFixedWidth(BUTTON_FIXED_WIDTH_LARGE)
+        self.prev_button.setToolTip(self.i18n.t("search.previous"))
         self.prev_button.clicked.connect(self.find_previous)
         layout.addWidget(self.prev_button)
 
         # Next button
         self.next_button = QPushButton("↓")
         self.next_button.setObjectName("next_button")
-        self.next_button.setFixedWidth(40)
+        self.next_button.setFixedWidth(BUTTON_FIXED_WIDTH_LARGE)
+        self.next_button.setToolTip(self.i18n.t("search.next"))
         self.next_button.clicked.connect(self.find_next)
         layout.addWidget(self.next_button)
 
@@ -160,7 +166,10 @@ class SearchWidget(QWidget):
         # Close button
         self.close_button = QPushButton("×")
         self.close_button.setObjectName("close_button")
-        self.close_button.setFixedWidth(30)
+        from ui.constants import BUTTON_FIXED_WIDTH_MEDIUM
+
+        self.close_button.setFixedWidth(BUTTON_FIXED_WIDTH_MEDIUM)
+        self.close_button.setToolTip(self.i18n.t("search.close"))
         self.close_button.clicked.connect(self._on_close_clicked)
         layout.addWidget(self.close_button)
 
@@ -394,7 +403,7 @@ class SearchWidget(QWidget):
             QColor for highlighting matches
         """
         # Default to yellow for light theme
-        default_color = QColor("#FFEB3B")
+        default_color = self._get_theme_highlight_color()
 
         # Try to get theme from settings manager
         if self.settings_manager:
@@ -402,7 +411,7 @@ class SearchWidget(QWidget):
                 theme = self.settings_manager.get_setting("ui.theme")
                 if theme == "dark":
                     # Orange for dark theme (better contrast)
-                    return QColor("#FF9800")
+                    return self._get_theme_highlight_color()
                 elif theme == "system":
                     # Detect system theme
                     return self._get_system_theme_color()
@@ -435,8 +444,8 @@ class SearchWidget(QWidget):
                     text=True,
                 )
                 if result.returncode == 0 and "Dark" in result.stdout:
-                    return QColor("#FF9800")  # Orange for dark
-                return QColor("#FFEB3B")  # Yellow for light
+                    return self._get_theme_highlight_color()  # Orange for dark
+                return self._get_theme_highlight_color()  # Yellow for light
 
             elif system == "Windows":
                 try:
@@ -447,8 +456,8 @@ class SearchWidget(QWidget):
                     value, _ = winreg.QueryValueEx(key, "AppsUseLightTheme")
                     winreg.CloseKey(key)
                     if value == 0:
-                        return QColor("#FF9800")  # Orange for dark
-                    return QColor("#FFEB3B")  # Yellow for light
+                        return self._get_theme_highlight_color()  # Orange for dark
+                    return self._get_theme_highlight_color()  # Yellow for light
                 except Exception:
                     pass
 
@@ -456,7 +465,7 @@ class SearchWidget(QWidget):
             logger.debug(f"Could not detect system theme: {e}")
 
         # Default to light theme color
-        return QColor("#FFEB3B")
+        return self._get_theme_highlight_color()
 
     def update_highlight_color(self):
         """
@@ -542,3 +551,22 @@ class SearchWidget(QWidget):
         self._update_match_label()
 
         logger.debug("SearchWidget language updated")
+
+    def _get_theme_highlight_color(self) -> QColor:
+        """Get theme-appropriate highlight color."""
+        # Use theme-aware colors from QSS
+        # Colors are now defined in theme files and applied via semantic properties
+        if self.settings_manager:
+            try:
+                theme = self.settings_manager.get_setting("ui.theme")
+                if theme == "dark":
+                    return QColor("#FF9800")  # Orange for dark theme
+                elif theme == "high_contrast":
+                    return QColor("#FFFF00")  # Yellow for high contrast
+                else:
+                    return QColor("#FFEB3B")  # Yellow for light theme
+            except Exception:
+                pass
+
+        # Default fallback
+        return QColor("#FFEB3B")

@@ -22,9 +22,8 @@ Displays individual transcription task information and controls.
 import logging
 from typing import Any, Dict, Optional
 
-from PySide6.QtCore import Signal
-from PySide6.QtGui import QAction
-from PySide6.QtWidgets import (
+from ui.qt_imports import (
+    QAction,
     QHBoxLayout,
     QLabel,
     QMenu,
@@ -32,8 +31,10 @@ from PySide6.QtWidgets import (
     QPushButton,
     QVBoxLayout,
     QWidget,
+    Signal,
 )
 
+# Removed over-engineered mixins
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.batch_transcribe.task_item")
@@ -91,51 +92,34 @@ class TaskItem(QWidget):
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(8)
 
-        # Set background and border
-        self.setStyleSheet(
-            """
-            TaskItem {
-                background-color: #f5f5f5;
-                border: 1px solid #ddd;
-                border-radius: 5px;
-            }
-            TaskItem:hover {
-                background-color: #eeeeee;
-            }
-        """
-        )
+        # Set semantic properties for theming
+        self.setProperty("role", "task-item")
 
-        # Top row: filename and status
-        top_layout = QHBoxLayout()
-        top_layout.setSpacing(10)
+        # Create filename and status labels
+        self.filename_label = QLabel()
+        self.filename_label.setObjectName("filename_label")
+        self.filename_label.setProperty("role", "task-filename")
 
-        # File icon and name
-        filename_label = QLabel()
-        filename_label.setObjectName("filename_label")
-        filename_label.setStyleSheet("font-weight: bold; font-size: 14px;")
-        top_layout.addWidget(filename_label)
-        self.filename_label = filename_label
+        self.status_label = QLabel()
+        self.status_label.setObjectName("status_label")
 
-        # Spacer
+        # Create task header
+        from ui.layout_utils import create_horizontal_layout
+
+        top_layout = create_horizontal_layout(spacing=10)
+        top_layout.addWidget(self.filename_label)
         top_layout.addStretch()
-
-        # Status label
-        status_label = QLabel()
-        status_label.setObjectName("status_label")
-        top_layout.addWidget(status_label)
-        self.status_label = status_label
-
+        top_layout.addWidget(self.status_label)
         layout.addLayout(top_layout)
 
-        # Info row: size, duration, language
-        info_layout = QHBoxLayout()
-        info_layout.setSpacing(15)
+        # Create info label and row
+        self.info_label = QLabel()
+        self.info_label.setObjectName("info_label")
+        self.info_label.setProperty("role", "task-info")
 
-        info_label = QLabel()
-        info_label.setObjectName("info_label")
-        info_label.setStyleSheet("color: #666; font-size: 12px;")
-        info_layout.addWidget(info_label)
-        self.info_label = info_label
+        info_layout = create_horizontal_layout(spacing=15)
+        info_layout.addWidget(self.info_label)
+        info_layout.addStretch()
 
         info_layout.addStretch()
 
@@ -154,7 +138,7 @@ class TaskItem(QWidget):
         # Error message (only shown when failed)
         error_label = QLabel()
         error_label.setObjectName("error_label")
-        error_label.setStyleSheet("color: #d32f2f; font-size: 12px;")
+        error_label.setProperty("role", "task-error")
         error_label.setWordWrap(True)
         error_label.setVisible(False)
         layout.addWidget(error_label)
@@ -164,58 +148,59 @@ class TaskItem(QWidget):
         actions_layout = QHBoxLayout()
         actions_layout.setSpacing(8)
 
-        # Start button
-        start_btn = QPushButton()
-        start_btn.setObjectName("start_btn")
-        start_btn.clicked.connect(lambda: self.start_clicked.emit(self.task_id))
-        actions_layout.addWidget(start_btn)
-        self.start_btn = start_btn
+        # Create action buttons
+        self.start_btn = QPushButton()
+        self.start_btn.setObjectName("start_btn")
+        actions_layout.addWidget(self.start_btn)
 
-        # Pause button
-        pause_btn = QPushButton()
-        pause_btn.setObjectName("pause_btn")
-        pause_btn.clicked.connect(lambda: self.pause_clicked.emit(self.task_id))
-        pause_btn.setVisible(False)
-        actions_layout.addWidget(pause_btn)
-        self.pause_btn = pause_btn
+        self.pause_btn = QPushButton()
+        self.pause_btn.setObjectName("pause_btn")
+        self.pause_btn.setVisible(False)
+        actions_layout.addWidget(self.pause_btn)
 
-        # Cancel button
-        cancel_btn = QPushButton()
-        cancel_btn.setObjectName("cancel_btn")
-        cancel_btn.clicked.connect(lambda: self.cancel_clicked.emit(self.task_id))
-        actions_layout.addWidget(cancel_btn)
-        self.cancel_btn = cancel_btn
+        self.cancel_btn = QPushButton()
+        self.cancel_btn.setObjectName("cancel_btn")
+        actions_layout.addWidget(self.cancel_btn)
 
-        # Delete button
-        delete_btn = QPushButton()
-        delete_btn.setObjectName("delete_btn")
-        delete_btn.clicked.connect(lambda: self.delete_clicked.emit(self.task_id))
-        actions_layout.addWidget(delete_btn)
-        self.delete_btn = delete_btn
+        self.delete_btn = QPushButton()
+        self.delete_btn.setObjectName("delete_btn")
+        actions_layout.addWidget(self.delete_btn)
 
-        # View button
-        view_btn = QPushButton()
-        view_btn.setObjectName("view_btn")
-        view_btn.clicked.connect(lambda: self.view_clicked.emit(self.task_id))
-        view_btn.setVisible(False)
-        actions_layout.addWidget(view_btn)
-        self.view_btn = view_btn
+        self.view_btn = QPushButton()
+        self.view_btn.setObjectName("view_btn")
+        self.view_btn.setVisible(False)
+        actions_layout.addWidget(self.view_btn)
 
-        # Export button
-        export_btn = QPushButton()
-        export_btn.setObjectName("export_btn")
-        export_btn.clicked.connect(lambda: self.export_clicked.emit(self.task_id))
-        export_btn.setVisible(False)
-        actions_layout.addWidget(export_btn)
-        self.export_btn = export_btn
+        self.export_btn = QPushButton()
+        self.export_btn.setObjectName("export_btn")
+        self.export_btn.setVisible(False)
+        actions_layout.addWidget(self.export_btn)
 
-        # Retry button
-        retry_btn = QPushButton()
-        retry_btn.setObjectName("retry_btn")
-        retry_btn.clicked.connect(lambda: self.retry_clicked.emit(self.task_id))
-        retry_btn.setVisible(False)
-        actions_layout.addWidget(retry_btn)
-        self.retry_btn = retry_btn
+        self.retry_btn = QPushButton()
+        self.retry_btn.setObjectName("retry_btn")
+        self.retry_btn.setVisible(False)
+        actions_layout.addWidget(self.retry_btn)
+
+        # Connect all task action buttons using helper
+        from ui.signal_helpers import connect_task_action_buttons
+
+        connect_task_action_buttons(
+            self.start_btn,
+            self.pause_btn,
+            self.cancel_btn,
+            self.delete_btn,
+            self.view_btn,
+            self.export_btn,
+            self.retry_btn,
+            self.task_id,
+            self.start_clicked,
+            self.pause_clicked,
+            self.cancel_clicked,
+            self.delete_clicked,
+            self.view_clicked,
+            self.export_clicked,
+            self.retry_clicked,
+        )
 
         actions_layout.addStretch()
 
@@ -301,25 +286,30 @@ class TaskItem(QWidget):
         status_key = f"batch_transcribe.status.{status}"
         status_text = self.i18n.t(status_key)
 
-        # Apply styling based on status
+        # Set semantic properties for theming
+        self.status_label.setProperty("role", "task-status")
+
         if status == "pending":
-            style = "color: #666; font-weight: bold;"
+            self.status_label.setProperty("state", "pending")
             icon = "⏳"
         elif status == "processing":
-            style = "color: #1976d2; font-weight: bold;"
+            self.status_label.setProperty("state", "processing")
             icon = "⚙️"
         elif status == "completed":
-            style = "color: #388e3c; font-weight: bold;"
+            self.status_label.setProperty("state", "completed")
             icon = "✓"
         elif status == "failed":
-            style = "color: #d32f2f; font-weight: bold;"
+            self.status_label.setProperty("state", "failed")
             icon = "✗"
         else:
-            style = "color: #666; font-weight: bold;"
+            self.status_label.setProperty("state", "cancelled")
             icon = ""
 
         self.status_label.setText(f"{icon} {status_text}")
-        self.status_label.setStyleSheet(style)
+
+        # Force style refresh to apply new properties
+        self.status_label.style().unpolish(self.status_label)
+        self.status_label.style().polish(self.status_label)
 
     def _update_filename_label(self):
         """Update filename label with fallback translation if needed."""

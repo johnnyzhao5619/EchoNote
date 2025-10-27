@@ -158,10 +158,10 @@ class CalendarHubWidget(QWidget):
         self.day_btn.setObjectName("view_button")
         view_group.addButton(self.day_btn)
 
-        # Connect view buttons
-        self.month_btn.clicked.connect(lambda: self._on_view_changed("month"))
-        self.week_btn.clicked.connect(lambda: self._on_view_changed("week"))
-        self.day_btn.clicked.connect(lambda: self._on_view_changed("day"))
+        # Connect view buttons using helper
+        from ui.signal_helpers import connect_view_buttons
+
+        connect_view_buttons(self.month_btn, self.week_btn, self.day_btn, self._on_view_changed)
 
         toolbar_layout.addWidget(self.month_btn)
         toolbar_layout.addWidget(self.week_btn)
@@ -171,15 +171,27 @@ class CalendarHubWidget(QWidget):
 
         # Date navigation
         self.prev_btn = QPushButton("<")
-        self.prev_btn.setFixedWidth(40)
-        self.prev_btn.clicked.connect(self._on_prev_clicked)
+        from ui.constants import BUTTON_FIXED_WIDTH_LARGE
 
+        self.prev_btn.setFixedWidth(BUTTON_FIXED_WIDTH_LARGE)
+        self.prev_btn.setToolTip(self.i18n.t("calendar_hub.widget.previous"))
         self.today_btn = QPushButton(self.i18n.t("calendar_hub.today"))
-        self.today_btn.clicked.connect(self._on_today_clicked)
 
         self.next_btn = QPushButton(">")
-        self.next_btn.setFixedWidth(40)
-        self.next_btn.clicked.connect(self._on_next_clicked)
+        self.next_btn.setFixedWidth(BUTTON_FIXED_WIDTH_LARGE)
+        self.next_btn.setToolTip(self.i18n.t("calendar_hub.widget.next"))
+
+        # Connect navigation buttons using helper
+        from ui.signal_helpers import connect_navigation_buttons
+
+        connect_navigation_buttons(
+            self.prev_btn,
+            self.next_btn,
+            self.today_btn,
+            self._on_prev_clicked,
+            self._on_next_clicked,
+            self._on_today_clicked,
+        )
 
         toolbar_layout.addWidget(self.prev_btn)
         toolbar_layout.addWidget(self.today_btn)
@@ -222,7 +234,7 @@ class CalendarHubWidget(QWidget):
 
         # Sync status label
         self.sync_status_label = QLabel("")
-        self.sync_status_label.setStyleSheet("color: #666; font-size: 11px;")
+        self.sync_status_label.setProperty("role", "sync-status")
         accounts_layout.addWidget(self.sync_status_label)
 
         # Sync now button
@@ -485,18 +497,18 @@ class CalendarHubWidget(QWidget):
 
         # Create simple provider selection dialog
         dialog = QDialog(self)
-        dialog.setWindowTitle("Add Calendar Account")
+        dialog.setWindowTitle(self.i18n.t("calendar_hub.widget.add_calendar_account"))
         dialog.setMinimumWidth(300)
 
         layout = QVBoxLayout(dialog)
 
         # Google Calendar button
-        google_btn = QPushButton("Connect Google Calendar")
+        google_btn = QPushButton(self.i18n.t("calendar_hub.widget.connect_google"))
         google_btn.clicked.connect(lambda: self._start_oauth_flow("google", dialog))
         layout.addWidget(google_btn)
 
         # Outlook Calendar button
-        outlook_btn = QPushButton("Connect Outlook Calendar")
+        outlook_btn = QPushButton(self.i18n.t("calendar_hub.widget.connect_outlook"))
         outlook_btn.clicked.connect(lambda: self._start_oauth_flow("outlook", dialog))
         layout.addWidget(outlook_btn)
 
@@ -907,15 +919,7 @@ class CalendarHubWidget(QWidget):
         # Create account badge
         badge = QFrame()
         badge.setObjectName(f"account_badge_{provider}")
-        badge.setStyleSheet(
-            """
-            QFrame {
-                background-color: #f0f0f0;
-                border: 1px solid #ccc;
-                border-radius: 4px;
-            }
-        """
-        )
+        badge.setProperty("role", "account-badge")
         badge_layout = QHBoxLayout(badge)
         badge_layout.setContentsMargins(8, 4, 8, 4)
         badge_layout.setSpacing(5)
@@ -923,8 +927,8 @@ class CalendarHubWidget(QWidget):
         # Status indicator
         indicator = QLabel("●")
         indicator.setObjectName(f"indicator_{provider}")
-        color = "#EA4335" if provider == "google" else "#FF6F00"
-        indicator.setStyleSheet(f"color: {color}; font-size: 12px;")
+        indicator.setProperty("role", "calendar-indicator")
+        indicator.setProperty("provider", provider)
         badge_layout.addWidget(indicator)
 
         # Account info
@@ -935,20 +939,7 @@ class CalendarHubWidget(QWidget):
         # Disconnect button
         disconnect_btn = QPushButton("×")
         disconnect_btn.setFixedSize(20, 20)
-        disconnect_btn.setStyleSheet(
-            """
-            QPushButton {
-                background-color: transparent;
-                border: none;
-                color: #666;
-                font-size: 16px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                color: #f00;
-            }
-        """
-        )
+        disconnect_btn.setProperty("role", "account-disconnect")
         disconnect_btn.clicked.connect(lambda: self.disconnect_account(provider))
         badge_layout.addWidget(disconnect_btn)
 
@@ -1067,8 +1058,8 @@ class CalendarHubWidget(QWidget):
 
             # Update UI to show syncing
             self.sync_now_btn.setEnabled(False)
-            self.sync_status_label.setText("Syncing...")
-            self.sync_status_label.setStyleSheet("color: #2196F3; font-size: 11px;")
+            self.sync_status_label.setText(self.i18n.t("calendar_hub.widget.syncing"))
+            self.sync_status_label.setProperty("state", "syncing")
 
             # Sync all connected accounts
             success_count = 0
@@ -1108,7 +1099,11 @@ class CalendarHubWidget(QWidget):
         except Exception as e:
             logger.error(f"Error during manual sync: {e}")
 
-            QMessageBox.critical(self, "Sync Error", f"Failed to sync calendars: {str(e)}")
+            QMessageBox.critical(
+                self,
+                self.i18n.t("calendar_hub.widget.sync_error"),
+                f"Failed to sync calendars: {str(e)}",
+            )
         finally:
             # Re-enable sync button
             self.sync_now_btn.setEnabled(True)
@@ -1153,10 +1148,10 @@ class CalendarHubWidget(QWidget):
                     time_ago = f"{days}d ago"
 
                 self.sync_status_label.setText(f"Last sync: {time_ago}")
-                self.sync_status_label.setStyleSheet("color: #666; font-size: 11px;")
+                self.sync_status_label.setProperty("state", None)  # Reset to default
             else:
-                self.sync_status_label.setText("Never synced")
-                self.sync_status_label.setStyleSheet("color: #999; font-size: 11px;")
+                self.sync_status_label.setText(self.i18n.t("calendar_hub.widget.never_synced"))
+                self.sync_status_label.setProperty("state", "never")
 
         except Exception as e:
             logger.error(f"Error updating sync status: {e}")

@@ -24,7 +24,42 @@
     "copy": "Copy",
     "copied": "Copied!",
     "show_details": "Show Details",
-    "hide_details": "Hide Details"
+    "hide_details": "Hide Details",
+    "refresh": "Refresh"
+  },
+  "search": {
+    "placeholder": "Search...",
+    "previous": "Previous",
+    "next": "Next",
+    "close": "Close"
+  },
+  "data_management": {
+    "title": "Data Management",
+    "clear_all": "Clear All Data",
+    "confirm_cleanup": "Confirm Data Cleanup",
+    "confirm_delete": "Are you sure you want to delete ALL user data?",
+    "final_confirmation": "Final Confirmation",
+    "last_chance": "This is your last chance to cancel!",
+    "cleanup_progress": "Cleanup in Progress",
+    "cleanup_complete": "Cleanup Complete",
+    "cleanup_success": "All user data has been deleted successfully.",
+    "cleanup_errors": "Cleanup Completed with Errors",
+    "cleanup_partial": "Data cleanup completed, but some items could not be deleted.",
+    "storage_labels": {
+      "database": "Database: Calculating...",
+      "configuration": "Configuration: Calculating...",
+      "recordings": "Recordings: Calculating...",
+      "transcripts": "Transcripts: Calculating...",
+      "logs": "Logs: Calculating...",
+      "total": "Total: Calculating..."
+    },
+    "clear_all_description": "This will delete:\n• Database (all tasks, events, and settings)\n• Configuration files\n• All recordings\n• All transcripts\n• Log files",
+    "confirm_delete_details": "This will permanently delete approximately {size} of data.\n\nThis operation cannot be undone!\n\nThe application will need to be restarted after cleanup.",
+    "final_confirmation_details": "Type 'DELETE' in the confirmation dialog to proceed.\n\nAre you absolutely sure you want to delete all data?",
+    "cleanup_progress_message": "Deleting all user data...",
+    "cleanup_success_details": "Deleted {count} items.\n\nPlease restart the application.",
+    "more_errors": "... and {count} more errors",
+    "cleanup_partial_details": "Deleted: {deleted} items\nFailed: {failed} items"
   },
   "sidebar": {
     "batch_transcribe": "Batch Transcribe",
@@ -96,6 +131,7 @@
     "source_language": "Source Language",
     "target_language": "Target Language",
     "enable_translation": "Enable Translation",
+    "default_duration": "00:00:00",
     "available_languages": {
       "zh": "Chinese (Simplified)",
       "en": "English",
@@ -170,6 +206,37 @@
       "event": "Event",
       "task": "Task",
       "appointment": "Appointment"
+    },
+    "event_dialog": {
+      "title_placeholder": "Enter event title",
+      "location_placeholder": "Enter location",
+      "attendees_placeholder": "Enter emails separated by commas",
+      "description_placeholder": "Enter description",
+      "validation_error": "Validation Error",
+      "title_required": "Title is required.",
+      "end_after_start": "End time must be after start time.",
+      "invalid_email": "Invalid email format: {email}"
+    },
+    "oauth_dialog": {
+      "ready_to_authorize": "Ready to authorize",
+      "start_authorization": "Start Authorization",
+      "waiting_authorization": "Waiting for authorization...",
+      "authorization_failed": "Authorization failed: state mismatch",
+      "authorization_successful": "Authorization successful!",
+      "authorization_error": "Authorization Error"
+    },
+    "widget": {
+      "add_calendar_account": "Add Calendar Account",
+      "connect_google": "Connect Google Calendar",
+      "connect_outlook": "Connect Outlook Calendar",
+      "syncing": "Syncing...",
+      "sync_error": "Sync Error",
+      "never_synced": "Never synced",
+      "previous": "Previous",
+      "next": "Next"
+    },
+    "calendar_view": {
+      "no_events": "No events for this day"
     }
   },
   "timeline": {
@@ -369,6 +436,7 @@
       "model_size": "Model Size",
       "device": "Device",
       "compute_type": "Compute Type",
+      "device_info_cpu": "CPU mode. CoreML optimization will be used automatically on Apple Silicon.",
       "cloud_config": "Cloud Service Configuration",
       "api_key_note": "Note: API keys will be encrypted and stored securely. Please keep your keys safe.",
       "test_connection": "Test Connection",
@@ -398,6 +466,9 @@
       "api_key_placeholder": "sk-...",
       "azure_region_label": "Region:",
       "azure_region_placeholder": "e.g., eastus",
+      "gpu_acceleration": "NVIDIA GPU acceleration. Requires CUDA-compatible GPU.",
+      "cpu_mode": "CPU mode. No GPU acceleration.",
+      "show_password": "Show/Hide Password",
       "error": {
         "empty_path": "Save path cannot be empty",
         "invalid_path": "Invalid path: {error}"

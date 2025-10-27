@@ -89,7 +89,7 @@ class MainWindow(QMainWindow):
     def setup_ui(self):
         """Set up the main window UI layout."""
         # Set window properties
-        self.setWindowTitle("EchoNote")
+        self.setWindowTitle(self.i18n.t("app.title"))
         self.setMinimumSize(1024, 768)
 
         # Create central widget

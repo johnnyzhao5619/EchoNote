@@ -86,8 +86,8 @@ class DataManagementPage(BasePage):
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         # Page title
-        title = QLabel("Data Management")
-        title.setStyleSheet("font-size: 18px; font-weight: bold;")
+        title = QLabel(self.i18n.t("data_management.title"))
+        title.setProperty("role", "calendar-header")
         layout.addWidget(title)
 
         # Storage summary group
@@ -109,13 +109,13 @@ class DataManagementPage(BasePage):
         layout = QVBoxLayout()
 
         # Summary labels
-        self.database_label = QLabel("Database: Calculating...")
-        self.config_label = QLabel("Configuration: Calculating...")
-        self.recordings_label = QLabel("Recordings: Calculating...")
-        self.transcripts_label = QLabel("Transcripts: Calculating...")
-        self.logs_label = QLabel("Logs: Calculating...")
-        self.total_label = QLabel("Total: Calculating...")
-        self.total_label.setStyleSheet("font-weight: bold;")
+        self.database_label = QLabel(self.i18n.t("data_management.storage_labels.database"))
+        self.config_label = QLabel(self.i18n.t("data_management.storage_labels.configuration"))
+        self.recordings_label = QLabel(self.i18n.t("data_management.storage_labels.recordings"))
+        self.transcripts_label = QLabel(self.i18n.t("data_management.storage_labels.transcripts"))
+        self.logs_label = QLabel(self.i18n.t("data_management.storage_labels.logs"))
+        self.total_label = QLabel(self.i18n.t("data_management.storage_labels.total"))
+        self.total_label.setProperty("role", "audio-file")
 
         layout.addWidget(self.database_label)
         layout.addWidget(self.config_label)
@@ -147,30 +147,19 @@ class DataManagementPage(BasePage):
             "⚠️ Warning: Data cleanup operations cannot be undone!\n"
             "Please make sure you have backed up any important data."
         )
-        warning.setStyleSheet("color: #ff6b6b; padding: 10px;")
+        warning.setProperty("role", "data-warning")
         warning.setWordWrap(True)
         layout.addWidget(warning)
 
         # Clear all data button
-        clear_all_btn = QPushButton("Clear All Data")
-        clear_all_btn.setStyleSheet(
-            "QPushButton { background-color: #ff6b6b; color: white; "
-            "padding: 10px; font-weight: bold; }"
-            "QPushButton:hover { background-color: #ff5252; }"
-        )
+        clear_all_btn = QPushButton(self.i18n.t("data_management.clear_all"))
+        clear_all_btn.setProperty("role", "data-delete-all")
         clear_all_btn.clicked.connect(self._confirm_clear_all_data)
         layout.addWidget(clear_all_btn)
 
         # Description
-        description = QLabel(
-            "This will delete:\n"
-            "• Database (all tasks, events, and settings)\n"
-            "• Configuration files\n"
-            "• All recordings\n"
-            "• All transcripts\n"
-            "• Log files"
-        )
-        description.setStyleSheet("color: #666; padding: 10px;")
+        description = QLabel(self.i18n.t("data_management.clear_all_description"))
+        description.setProperty("role", "data-description")
         layout.addWidget(description)
 
         group.setLayout(layout)
@@ -210,7 +199,9 @@ class DataManagementPage(BasePage):
 
         except Exception as e:
             logger.error(f"Failed to refresh storage summary: {e}")
-            QMessageBox.critical(self, "Error", f"Failed to calculate storage summary:\n{str(e)}")
+            QMessageBox.critical(
+                self, self.i18n.t("common.error"), f"Failed to calculate storage summary:\n{str(e)}"
+            )
 
     def _confirm_clear_all_data(self):
         """Show confirmation dialog before clearing all data."""
@@ -221,12 +212,10 @@ class DataManagementPage(BasePage):
         # Create confirmation dialog
         msg_box = QMessageBox(self)
         msg_box.setIcon(QMessageBox.Icon.Warning)
-        msg_box.setWindowTitle("Confirm Data Cleanup")
-        msg_box.setText("Are you sure you want to delete ALL user data?")
+        msg_box.setWindowTitle(self.i18n.t("data_management.confirm_cleanup"))
+        msg_box.setText(self.i18n.t("data_management.confirm_delete"))
         msg_box.setInformativeText(
-            f"This will permanently delete approximately {total_size} of data.\n\n"
-            "This operation cannot be undone!\n\n"
-            "The application will need to be restarted after cleanup."
+            self.i18n.t("data_management.confirm_delete_details", size=total_size)
         )
         msg_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         msg_box.setDefaultButton(QMessageBox.StandardButton.No)
@@ -238,11 +227,10 @@ class DataManagementPage(BasePage):
             # Double confirmation
             confirm_box = QMessageBox(self)
             confirm_box.setIcon(QMessageBox.Icon.Warning)
-            confirm_box.setWindowTitle("Final Confirmation")
-            confirm_box.setText("This is your last chance to cancel!")
+            confirm_box.setWindowTitle(self.i18n.t("data_management.final_confirmation"))
+            confirm_box.setText(self.i18n.t("data_management.last_chance"))
             confirm_box.setInformativeText(
-                "Type 'DELETE' in the confirmation dialog to proceed.\n\n"
-                "Are you absolutely sure you want to delete all data?"
+                self.i18n.t("data_management.final_confirmation_details")
             )
             confirm_box.setStandardButtons(
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
@@ -258,13 +246,13 @@ class DataManagementPage(BasePage):
         """Execute data cleanup operation."""
         # Show progress dialog
         progress = QProgressDialog(
-            "Deleting all user data...",
+            self.i18n.t("data_management.cleanup_progress_message"),
             None,  # No cancel button
             0,
             0,  # Indeterminate progress
             self,
         )
-        progress.setWindowTitle("Cleanup in Progress")
+        progress.setWindowTitle(self.i18n.t("data_management.cleanup_progress"))
         progress.setWindowModality(Qt.WindowModality.WindowModal)
         progress.show()
 
@@ -284,11 +272,12 @@ class DataManagementPage(BasePage):
             # Show success message
             msg_box = QMessageBox(self)
             msg_box.setIcon(QMessageBox.Icon.Information)
-            msg_box.setWindowTitle("Cleanup Complete")
-            msg_box.setText("All user data has been deleted successfully.")
+            msg_box.setWindowTitle(self.i18n.t("data_management.cleanup_complete"))
+            msg_box.setText(self.i18n.t("data_management.cleanup_success"))
             msg_box.setInformativeText(
-                f"Deleted {len(results['deleted_items'])} items.\n\n"
-                "Please restart the application."
+                self.i18n.t(
+                    "data_management.cleanup_success_details", count=len(results["deleted_items"])
+                )
             )
             msg_box.exec()
 
@@ -300,16 +289,22 @@ class DataManagementPage(BasePage):
             # Show error message
             error_details = "\n".join(results["errors"][:5])  # Show first 5 errors
             if len(results["errors"]) > 5:
-                error_details += f"\n... and {len(results['errors']) - 5} more errors"
+                more_errors_count = len(results["errors"]) - 5
+                error_details += (
+                    f"\n{self.i18n.t('data_management.more_errors', count=more_errors_count)}"
+                )
 
             msg_box = QMessageBox(self)
             msg_box.setIcon(QMessageBox.Icon.Warning)
-            msg_box.setWindowTitle("Cleanup Completed with Errors")
-            msg_box.setText("Data cleanup completed, but some items could not be deleted.")
+            msg_box.setWindowTitle(self.i18n.t("data_management.cleanup_errors"))
+            msg_box.setText(self.i18n.t("data_management.cleanup_partial"))
             msg_box.setDetailedText(error_details)
             msg_box.setInformativeText(
-                f"Deleted: {len(results['deleted_items'])} items\n"
-                f"Failed: {len(results['failed_items'])} items"
+                self.i18n.t(
+                    "data_management.cleanup_partial_details",
+                    deleted=len(results["deleted_items"]),
+                    failed=len(results["failed_items"]),
+                )
             )
             msg_box.exec()
 
@@ -330,8 +325,6 @@ class DataManagementPage(BasePage):
 
     def load_settings(self):
         """Load settings (not applicable for this page)."""
-        pass
 
     def save_settings(self):
         """Save settings (not applicable for this page)."""
-        pass

@@ -320,9 +320,11 @@ class DataCleanup:
             Formatted size string (e.g., "1.5 MB")
         """
         for unit in ["B", "KB", "MB", "GB"]:
-            if size_bytes < 1024.0:
+            from config.constants import FILE_SIZE_THRESHOLD
+
+            if size_bytes < FILE_SIZE_THRESHOLD:
                 return f"{size_bytes:.1f} {unit}"
-            size_bytes /= 1024.0
+            size_bytes /= FILE_SIZE_THRESHOLD
         return f"{size_bytes:.1f} TB"
 
 

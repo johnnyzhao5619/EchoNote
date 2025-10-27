@@ -26,6 +26,7 @@ from typing import Dict, List, Optional
 
 import numpy as np
 
+from config.api_constants import OPENAI_TRANSCRIPTION_ENDPOINT
 from data.database.models import APIUsage
 from engines.speech.base import (
     AUDIO_VIDEO_FORMAT_SET,
@@ -191,7 +192,9 @@ class OpenAIEngine(SpeechEngine):
                     except Exception as e:
                         logger.error(f"Error in progress callback: {e}")
 
-                response = await self.client.post("/audio/transcriptions", files=files, data=data)
+                response = await self.client.post(
+                    OPENAI_TRANSCRIPTION_ENDPOINT, files=files, data=data
+                )
 
             # 调用进度回调（处理中）
             if progress_callback:

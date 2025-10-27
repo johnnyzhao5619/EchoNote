@@ -30,7 +30,11 @@ class AudioCapture:
     """High-level wrapper for microphone capture using PyAudio."""
 
     def __init__(
-        self, sample_rate: int = 16000, channels: int = 1, chunk_size: int = 512, gain: float = 1.0
+        self,
+        sample_rate: int = None,
+        channels: int = None,
+        chunk_size: int = None,
+        gain: float = None,
     ):
         """Initialize the capture interface.
 
@@ -38,17 +42,22 @@ class AudioCapture:
         is only required when microphone capture is enabled.
 
         Args:
-            sample_rate: Sampling rate in Hz. Defaults to 16 kHz (Whisper
-                baseline).
+            sample_rate: Sampling rate in Hz. Defaults to 16 kHz (Whisper baseline).
             channels: Number of input channels. Defaults to mono.
-            chunk_size: Number of samples per read. Defaults to 512 samples
-                (~32 ms at 16 kHz).
+            chunk_size: Number of samples per read. Defaults to 512 samples (~32 ms at 16 kHz).
             gain: Linear gain factor applied to captured audio. Defaults to 1.0.
         """
-        self.sample_rate = sample_rate
-        self.channels = channels
-        self.chunk_size = chunk_size
-        self.gain = gain
+        from config.constants import (
+            DEFAULT_AUDIO_CHANNELS,
+            DEFAULT_AUDIO_GAIN,
+            DEFAULT_CHUNK_SIZE_SAMPLES,
+            DEFAULT_SAMPLE_RATE_HZ,
+        )
+
+        self.sample_rate = sample_rate if sample_rate is not None else DEFAULT_SAMPLE_RATE_HZ
+        self.channels = channels if channels is not None else DEFAULT_AUDIO_CHANNELS
+        self.chunk_size = chunk_size if chunk_size is not None else DEFAULT_CHUNK_SIZE_SAMPLES
+        self.gain = gain if gain is not None else DEFAULT_AUDIO_GAIN
 
         self.pyaudio = None
         self.stream = None
@@ -222,8 +231,10 @@ class AudioCapture:
                 # Convert to a numpy array.
                 audio_array = np.frombuffer(audio_data, dtype=np.int16)
 
+                from config.constants import AUDIO_NORMALIZATION_DIVISOR
+
                 # Normalize to float32 samples in the [-1, 1] range.
-                audio_float = audio_array.astype(np.float32) / 32768.0
+                audio_float = audio_array.astype(np.float32) / AUDIO_NORMALIZATION_DIVISOR
 
                 # Apply gain adjustment.
                 audio_float = audio_float * self.gain
@@ -281,9 +292,13 @@ class AudioCapture:
 
     def set_gain(self, gain: float):
         """Update the gain factor applied to captured audio samples."""
-        if gain < 0.0 or gain > 10.0:
-            logger.warning(f"Gain value {gain} is out of range [0.0, 10.0]")
-            gain = np.clip(gain, 0.0, 10.0)
+        from config.constants import MAX_AUDIO_GAIN, MIN_AUDIO_GAIN
+
+        if gain < MIN_AUDIO_GAIN or gain > MAX_AUDIO_GAIN:
+            logger.warning(
+                f"Gain value {gain} is out of range [{MIN_AUDIO_GAIN}, {MAX_AUDIO_GAIN}]"
+            )
+            gain = np.clip(gain, MIN_AUDIO_GAIN, MAX_AUDIO_GAIN)
 
         self.gain = gain
         logger.info(f"Gain set to {gain}")
@@ -327,6 +342,6 @@ class AudioCapture:
         """Context manager entry hook."""
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, _exc_type, _exc_val, _exc_tb):
         """Context manager exit hook."""
         self.close()

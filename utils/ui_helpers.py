@@ -196,7 +196,7 @@ class UIHelper:
         desc_label = QLabel(description)
         desc_label.setWordWrap(True)
         desc_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        desc_label.setStyleSheet("color: #666;")
+        desc_label.setProperty("role", "time-display")
         layout.addWidget(desc_label)
 
         return widget
@@ -310,16 +310,7 @@ class UIHelper:
         Args:
             widget: Widget to style
         """
-        widget.setStyleSheet(
-            """
-            QWidget {
-                background-color: white;
-                border: 1px solid #e0e0e0;
-                border-radius: 8px;
-                padding: 15px;
-            }
-        """
-        )
+        widget.setProperty("role", "card")
 
     @staticmethod
     def apply_hover_effect(widget: QWidget):
@@ -360,7 +351,7 @@ def create_icon_button(icon_text: str, tooltip: str = ""):
     return button
 
 
-def create_badge(text: str, color: str = "#0078d4") -> QLabel:
+def create_badge(text: str, color: str = None) -> QLabel:
     """
     Create a badge label.
 
@@ -373,36 +364,26 @@ def create_badge(text: str, color: str = "#0078d4") -> QLabel:
     """
     badge = QLabel(text)
     badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    badge.setStyleSheet(
-        f"""
-        QLabel {{
-            background-color: {color};
-            color: white;
-            border-radius: 10px;
-            padding: 2px 8px;
-            font-size: 11px;
-            font-weight: bold;
-        }}
-    """
-    )
+    badge.setProperty("role", "badge")
     badge.setFixedHeight(20)
 
     return badge
 
 
-def show_success_message(parent: QWidget, message: str):
+def show_success_message(parent: QWidget, message: str, i18n=None):
     """
     Show a success message to the user.
 
     Args:
         parent: Parent widget
         message: Success message
+        i18n: Optional i18n manager for translations
     """
     from PySide6.QtWidgets import QMessageBox
 
     msg_box = QMessageBox(parent)
     msg_box.setIcon(QMessageBox.Icon.Information)
-    msg_box.setWindowTitle("Success")
+    msg_box.setWindowTitle(i18n.t("common.success") if i18n else "Success")
     msg_box.setText(message)
     msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
     msg_box.exec()

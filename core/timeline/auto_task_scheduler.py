@@ -191,8 +191,16 @@ class AutoTaskScheduler:
     def _apply_reminder_minutes(self, minutes: int) -> None:
         """Persist reminder minutes and refresh dependent time windows."""
         self.reminder_minutes = minutes
-        self._past_window_minutes = max(minutes, 5)
-        self._future_window_minutes = max(minutes + 10, 15)
+        from config.constants import (
+            MIN_REMINDER_WINDOW_MINUTES,
+            REMINDER_FUTURE_WINDOW_OFFSET_MINUTES,
+            MIN_FUTURE_WINDOW_MINUTES,
+        )
+
+        self._past_window_minutes = max(minutes, MIN_REMINDER_WINDOW_MINUTES)
+        self._future_window_minutes = max(
+            minutes + REMINDER_FUTURE_WINDOW_OFFSET_MINUTES, MIN_FUTURE_WINDOW_MINUTES
+        )
 
     def _subscribe_to_setting_changes(self) -> None:
         """Listen for reminder preference updates from the settings manager."""

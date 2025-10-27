@@ -235,12 +235,10 @@ class SpeechEngine(ABC):
     @abstractmethod
     def get_name(self) -> str:
         """Return the engine identifier (e.g., ``"faster-whisper"``)."""
-        pass
 
     @abstractmethod
     def get_supported_languages(self) -> List[str]:
         """Return the list of language codes supported by the engine."""
-        pass
 
     @abstractmethod
     async def transcribe_file(
@@ -257,7 +255,6 @@ class SpeechEngine(ABC):
             Dict: Structured transcription result including segments, detected
             language, and total duration.
         """
-        pass
 
     @abstractmethod
     async def transcribe_stream(
@@ -273,12 +270,10 @@ class SpeechEngine(ABC):
         Returns:
             str: Transcribed text fragment.
         """
-        pass
 
     @abstractmethod
     def get_config_schema(self) -> Dict:
         """Return the JSON schema that describes engine configuration."""
-        pass
 
     def validate_config(self, config: Dict) -> bool:
         """Validate the provided configuration payload."""

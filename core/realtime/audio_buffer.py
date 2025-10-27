@@ -32,14 +32,23 @@ logger = logging.getLogger(__name__)
 class AudioBuffer:
     """音频缓冲区，支持滑动窗口访问"""
 
-    def __init__(self, max_duration_seconds: int = 60, sample_rate: int = 16000):
+    def __init__(self, max_duration_seconds: int = None, sample_rate: int = None):
         """
         初始化音频缓冲区
 
         Args:
-            max_duration_seconds: 最大缓冲时长（秒）
-            sample_rate: 采样率（Hz）
+            max_duration_seconds: 最大缓冲时长（秒），默认使用 DEFAULT_AUDIO_BUFFER_DURATION_SECONDS
+            sample_rate: 采样率（Hz），默认使用 DEFAULT_WHISPER_SAMPLE_RATE
         """
+        if max_duration_seconds is None:
+            from config.constants import DEFAULT_AUDIO_BUFFER_DURATION_SECONDS
+
+            max_duration_seconds = DEFAULT_AUDIO_BUFFER_DURATION_SECONDS
+
+        if sample_rate is None:
+            from config.constants import DEFAULT_WHISPER_SAMPLE_RATE
+
+            sample_rate = DEFAULT_WHISPER_SAMPLE_RATE
         self.max_duration_seconds = max_duration_seconds
         self.sample_rate = sample_rate
         self.max_samples = max_duration_seconds * sample_rate
@@ -54,7 +63,8 @@ class AudioBuffer:
         self.total_samples_added = 0
 
         logger.info(
-            f"Audio buffer initialized: max_duration={max_duration_seconds}s, sample_rate={sample_rate}Hz"
+            f"Audio buffer initialized: max_duration={max_duration_seconds}s, "
+            f"sample_rate={sample_rate}Hz"
         )
 
     def append(self, audio_chunk: np.ndarray):
@@ -111,7 +121,8 @@ class AudioBuffer:
             window_array = np.fromiter(window_iter, dtype=np.float32, count=window_length)
 
             logger.debug(
-                f"Retrieved window: duration={duration_seconds}s, offset={offset_seconds}s, samples={len(window_array)}"
+                f"Retrieved window: duration={duration_seconds}s, "
+                f"offset={offset_seconds}s, samples={len(window_array)}"
             )
 
             return window_array
@@ -239,7 +250,9 @@ class AudioBuffer:
         """
         with self.lock:
             # 每个 float32 样本占用 4 字节
-            return len(self.buffer) * 4
+            from config.constants import AUDIO_CHUNK_MEMORY_BYTES_PER_SAMPLE
+
+            return len(self.buffer) * AUDIO_CHUNK_MEMORY_BYTES_PER_SAMPLE
 
     def get_stats(self) -> dict:
         """
@@ -249,13 +262,15 @@ class AudioBuffer:
             dict: 统计信息
         """
         with self.lock:
+            from config.constants import AUDIO_CHUNK_MEMORY_BYTES_PER_SAMPLE, PERCENTAGE_MULTIPLIER
+
             return {
                 "current_samples": len(self.buffer),
                 "max_samples": self.max_samples,
                 "current_duration_seconds": len(self.buffer) / self.sample_rate,
                 "max_duration_seconds": self.max_duration_seconds,
                 "total_samples_added": self.total_samples_added,
-                "memory_usage_bytes": len(self.buffer) * 4,
+                "memory_usage_bytes": len(self.buffer) * AUDIO_CHUNK_MEMORY_BYTES_PER_SAMPLE,
                 "is_full": len(self.buffer) >= self.max_samples,
-                "fill_percentage": (len(self.buffer) / self.max_samples) * 100,
+                "fill_percentage": (len(self.buffer) / self.max_samples) * PERCENTAGE_MULTIPLIER,
             }

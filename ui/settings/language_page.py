@@ -22,9 +22,9 @@ Provides UI for configuring language preferences.
 import logging
 from typing import Tuple
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLabel
+from PySide6.QtWidgets import QComboBox, QLabel
 
+# Removed over-engineered mixins
 from ui.settings.base_page import BaseSettingsPage
 from utils.i18n import I18nQtManager
 
@@ -62,10 +62,7 @@ class LanguageSettingsPage(BaseSettingsPage):
         self.language_title.setFont(font)
         self.content_layout.addWidget(self.language_title)
 
-        # Language selection
-        language_layout = QHBoxLayout()
-        self.language_label = QLabel(self.i18n.t("settings.language.select"))
-        self.language_label.setMinimumWidth(200)
+        # Language selection using mixin helper
         self.language_combo = QComboBox()
 
         # Add language options
@@ -75,9 +72,11 @@ class LanguageSettingsPage(BaseSettingsPage):
 
         self.language_combo.currentIndexChanged.connect(self._on_language_changed)
 
-        language_layout.addWidget(self.language_label)
-        language_layout.addWidget(self.language_combo)
-        language_layout.addStretch()
+        from ui.layout_utils import create_label_control_row
+
+        language_layout = create_label_control_row(
+            self.i18n.t("settings.language.select"), self.language_combo
+        )
         self.content_layout.addLayout(language_layout)
 
         self.add_spacing(10)
@@ -85,7 +84,7 @@ class LanguageSettingsPage(BaseSettingsPage):
         # Language info
         self.info_label = QLabel(self.i18n.t("settings.language.change_info"))
         self.info_label.setWordWrap(True)
-        self.info_label.setStyleSheet("color: #666; font-style: italic;")
+        self.info_label.setProperty("role", "auto-start-desc")
         self.content_layout.addWidget(self.info_label)
 
         # Add stretch at the end

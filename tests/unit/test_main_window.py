@@ -10,13 +10,11 @@ def test_pyside6_imports():
     import ui.main_window
     import ui.sidebar
 
-    # Verify PySide6 imports are used
     modules_to_check = [ui.main_window, ui.sidebar, ui.common.error_dialog]
 
     for module in modules_to_check:
         module_dict = module.__dict__
 
-        # Check that no PyQt6 references exist
         for key, value in module_dict.items():
             if hasattr(value, "__module__") and value.__module__:
                 assert "PyQt6" not in str(
@@ -28,9 +26,6 @@ def test_pyside6_signal_imports():
     """Test that Signal imports are from PySide6."""
     from PySide6.QtCore import Signal
 
-    # Test that Signal class is available from PySide6
     assert Signal is not None
-
-    # Test that we can create a Signal instance
     test_signal = Signal()
     assert test_signal is not None

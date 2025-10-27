@@ -68,7 +68,13 @@ class DatabaseConnection:
             )
 
             # Create connection
-            conn = sqlite3.connect(str(self.db_path), check_same_thread=False, timeout=30.0)
+            from config.constants import DATABASE_CONNECTION_TIMEOUT_SECONDS
+
+            conn = sqlite3.connect(
+                str(self.db_path),
+                check_same_thread=False,
+                timeout=DATABASE_CONNECTION_TIMEOUT_SECONDS,
+            )
 
             # Enable foreign keys
             conn.execute("PRAGMA foreign_keys = ON")

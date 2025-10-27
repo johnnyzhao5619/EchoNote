@@ -24,7 +24,42 @@
     "copy": "复制",
     "copied": "已复制！",
     "show_details": "显示详情",
-    "hide_details": "隐藏详情"
+    "hide_details": "隐藏详情",
+    "refresh": "刷新"
+  },
+  "search": {
+    "placeholder": "搜索...",
+    "previous": "上一个",
+    "next": "下一个",
+    "close": "关闭"
+  },
+  "data_management": {
+    "title": "数据管理",
+    "clear_all": "清空所有数据",
+    "confirm_cleanup": "确认数据清理",
+    "confirm_delete": "确定要删除所有用户数据吗？",
+    "final_confirmation": "最终确认",
+    "last_chance": "这是您取消的最后机会！",
+    "cleanup_progress": "清理进行中",
+    "cleanup_complete": "清理完成",
+    "cleanup_success": "所有用户数据已成功删除。",
+    "cleanup_errors": "清理完成但有错误",
+    "cleanup_partial": "数据清理已完成，但某些项目无法删除。",
+    "storage_labels": {
+      "database": "数据库：计算中...",
+      "configuration": "配置：计算中...",
+      "recordings": "录音：计算中...",
+      "transcripts": "转录：计算中...",
+      "logs": "日志：计算中...",
+      "total": "总计：计算中..."
+    },
+    "clear_all_description": "这将删除：\n• 数据库（所有任务、事件和设置）\n• 配置文件\n• 所有录音\n• 所有转录\n• 日志文件",
+    "confirm_delete_details": "这将永久删除大约 {size} 的数据。\n\n此操作无法撤销！\n\n清理后需要重启应用程序。",
+    "final_confirmation_details": "在确认对话框中输入 'DELETE' 以继续。\n\n您确定要删除所有数据吗？",
+    "cleanup_progress_message": "正在删除所有用户数据...",
+    "cleanup_success_details": "已删除 {count} 个项目。\n\n请重启应用程序。",
+    "more_errors": "... 还有 {count} 个错误",
+    "cleanup_partial_details": "已删除：{deleted} 个项目\n失败：{failed} 个项目"
   },
   "sidebar": {
     "batch_transcribe": "批量转录",
@@ -96,6 +131,7 @@
     "source_language": "源语言",
     "target_language": "目标语言",
     "enable_translation": "启用翻译",
+    "default_duration": "00:00:00",
     "available_languages": {
       "zh": "中文",
       "en": "英语",
@@ -170,6 +206,37 @@
       "event": "事件",
       "task": "任务",
       "appointment": "约会"
+    },
+    "event_dialog": {
+      "title_placeholder": "输入事件标题",
+      "location_placeholder": "输入地点",
+      "attendees_placeholder": "输入邮箱，用逗号分隔",
+      "description_placeholder": "输入描述",
+      "validation_error": "验证错误",
+      "title_required": "标题为必填项。",
+      "end_after_start": "结束时间必须晚于开始时间。",
+      "invalid_email": "邮箱格式无效：{email}"
+    },
+    "oauth_dialog": {
+      "ready_to_authorize": "准备授权",
+      "start_authorization": "开始授权",
+      "waiting_authorization": "等待授权中...",
+      "authorization_failed": "授权失败：状态不匹配",
+      "authorization_successful": "授权成功！",
+      "authorization_error": "授权错误"
+    },
+    "widget": {
+      "add_calendar_account": "添加日历账户",
+      "connect_google": "连接 Google 日历",
+      "connect_outlook": "连接 Outlook 日历",
+      "syncing": "同步中...",
+      "sync_error": "同步错误",
+      "never_synced": "从未同步",
+      "previous": "上一个",
+      "next": "下一个"
+    },
+    "calendar_view": {
+      "no_events": "今天没有事件"
     }
   },
   "timeline": {
@@ -369,6 +436,7 @@
       "model_size": "模型大小",
       "device": "设备",
       "compute_type": "计算类型",
+      "device_info_cpu": "CPU 模式。在 Apple Silicon 上将自动使用 CoreML 优化。",
       "cloud_config": "云服务配置",
       "api_key_note": "注意：API 密钥将被加密存储。请妥善保管您的密钥。",
       "test_connection": "测试连接",

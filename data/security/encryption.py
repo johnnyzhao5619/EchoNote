@@ -100,7 +100,9 @@ class SecurityManager:
             try:
                 self.machine_uuid_file.write_text(value, encoding="utf-8")
                 try:
-                    os.chmod(self.machine_uuid_file, 0o600)
+                    from config.constants import FILE_PERMISSION_OWNER_RW
+
+                    os.chmod(self.machine_uuid_file, FILE_PERMISSION_OWNER_RW)
                 except Exception as chmod_error:
                     logger.warning(f"Could not set permissions on machine UUID file: {chmod_error}")
             except Exception as persist_error:
@@ -150,7 +152,9 @@ class SecurityManager:
                 logger.warning(f"Could not read salt file: {e}")
 
         # Create new salt
-        salt = os.urandom(32)
+        from config.constants import SALT_SIZE_BYTES
+
+        salt = os.urandom(SALT_SIZE_BYTES)
 
         try:
             # Save salt with restricted permissions
@@ -158,7 +162,9 @@ class SecurityManager:
                 f.write(salt)
 
             # Set file permissions (owner read/write only)
-            os.chmod(self.salt_file, 0o600)
+            from config.constants import FILE_PERMISSION_OWNER_RW
+
+            os.chmod(self.salt_file, FILE_PERMISSION_OWNER_RW)
 
             logger.info("Created new salt")
         except Exception as e:
@@ -172,14 +178,16 @@ class SecurityManager:
         Derive encryption key from machine UUID and salt.
 
         Returns:
-            32-byte encryption key for AES-256
+            ENCRYPTION_KEY_SIZE_BYTES-byte encryption key for AES-256
         """
+        from config.constants import ENCRYPTION_KEY_SIZE_BYTES
+
         machine_uuid = self._get_machine_uuid()
 
         # Use PBKDF2 to derive key
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
-            length=32,  # 256 bits for AES-256
+            length=ENCRYPTION_KEY_SIZE_BYTES,  # 256 bits for AES-256
             salt=self.salt,
             iterations=100000,  # OWASP recommended minimum
         )

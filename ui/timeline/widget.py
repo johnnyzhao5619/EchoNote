@@ -26,11 +26,15 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, cast
 
 from PySide6.QtCore import QDate, QDateTime, Qt, QTime, QTimer, Signal
-from PySide6.QtGui import QPalette
+
+if TYPE_CHECKING:
+    from ui.timeline.audio_player import AudioPlayerDialog
+    from ui.timeline.transcript_viewer import TranscriptViewerDialog
+
+# QPalette import removed - using semantic styling instead
 from PySide6.QtWidgets import (
     QComboBox,
     QDateEdit,
-    QFrame,
     QHBoxLayout,
     QLabel,
     QLineEdit,

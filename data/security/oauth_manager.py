@@ -101,7 +101,9 @@ class OAuthManager:
             # Set file permissions (owner read/write only)
             import os
 
-            os.chmod(self.tokens_file, 0o600)
+            from config.constants import FILE_PERMISSION_OWNER_RW
+
+            os.chmod(self.tokens_file, FILE_PERMISSION_OWNER_RW)
 
             logger.debug("OAuth tokens saved successfully")
 
@@ -220,18 +222,22 @@ class OAuthManager:
         token_data = self.get_token(provider)
         return token_data.get("refresh_token") if token_data else None
 
-    def is_token_expired(self, provider: str, buffer_seconds: int = 300) -> bool:
+    def is_token_expired(self, provider: str, buffer_seconds: int = None) -> bool:
         """
         Check if a token is expired or will expire soon.
 
         Args:
             provider: Provider name
             buffer_seconds: Consider token expired if it expires within
-                          this many seconds (default: 5 minutes)
+                          this many seconds (default: DEFAULT_TOKEN_BUFFER_SECONDS)
 
         Returns:
             True if token is expired or will expire soon
         """
+        if buffer_seconds is None:
+            from config.constants import DEFAULT_TOKEN_BUFFER_SECONDS
+
+            buffer_seconds = DEFAULT_TOKEN_BUFFER_SECONDS
         token_data = self.get_token(provider)
 
         if not token_data:
@@ -362,7 +368,7 @@ class OAuthManager:
         logger.info("All OAuth tokens cleared")
 
     def refresh_token_if_needed(
-        self, provider: str, refresh_callback, buffer_seconds: int = 300
+        self, provider: str, refresh_callback, buffer_seconds: int = None
     ) -> Dict[str, Any]:
         """
         Check if token is expired and refresh if needed.
@@ -374,7 +380,7 @@ class OAuthManager:
                             'access_token' and optionally 'expires_in',
                             'token_type', 'refresh_token', or 'expires_at'
             buffer_seconds: Consider token expired if it expires within
-                          this many seconds (default: 5 minutes)
+                          this many seconds (default: DEFAULT_TOKEN_BUFFER_SECONDS)
 
         Returns:
             Current (possibly refreshed) token data
@@ -397,6 +403,11 @@ class OAuthManager:
                 my_refresh_callback
             )
         """
+        if buffer_seconds is None:
+            from config.constants import DEFAULT_TOKEN_BUFFER_SECONDS
+
+            buffer_seconds = DEFAULT_TOKEN_BUFFER_SECONDS
+
         # Check if token exists
         if not self.has_token(provider):
             raise ValueError(f"No token found for provider: {provider}")

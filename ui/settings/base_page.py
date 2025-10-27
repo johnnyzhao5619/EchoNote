@@ -101,7 +101,6 @@ class BaseSettingsPage(QWidget):
 
         Should be overridden by subclasses.
         """
-        pass
 
     def save_settings(self):
         """
@@ -109,7 +108,6 @@ class BaseSettingsPage(QWidget):
 
         Should be overridden by subclasses.
         """
-        pass
 
     def validate_settings(self) -> Tuple[bool, str]:
         """
@@ -128,7 +126,6 @@ class BaseSettingsPage(QWidget):
 
         Should be overridden by subclasses.
         """
-        pass
 
     def _emit_changed(self):
         """Emit settings changed signal."""

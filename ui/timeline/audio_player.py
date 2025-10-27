@@ -125,7 +125,7 @@ class AudioPlayer(QWidget):
         # File name label
         file_name = Path(self.file_path).name
         self.file_label = QLabel(file_name)
-        self.file_label.setStyleSheet("font-weight: bold;")
+        self.file_label.setProperty("role", "audio-file")
         layout.addWidget(self.file_label)
 
         # Progress slider
@@ -140,13 +140,13 @@ class AudioPlayer(QWidget):
         # Time labels
         time_layout = QHBoxLayout()
         self.current_time_label = QLabel(self._initial_time_text)
-        self.current_time_label.setStyleSheet("color: #666;")
+        self.current_time_label.setProperty("role", "time-display")
         time_layout.addWidget(self.current_time_label)
 
         time_layout.addStretch()
 
         self.total_time_label = QLabel(self._initial_time_text)
-        self.total_time_label.setStyleSheet("color: #666;")
+        self.total_time_label.setProperty("role", "time-display")
         time_layout.addWidget(self.total_time_label)
 
         layout.addLayout(time_layout)
@@ -159,20 +159,7 @@ class AudioPlayer(QWidget):
         self.play_button = QPushButton(self.i18n.t("timeline.audio_player.play_button_label"))
         self.play_button.setFixedSize(40, 40)
         self.play_button.clicked.connect(self.toggle_playback)
-        self.play_button.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #2196F3;
-                color: white;
-                border: none;
-                border-radius: 20px;
-                font-size: 16px;
-            }
-            QPushButton:hover {
-                background-color: #1976D2;
-            }
-        """
-        )
+        self.play_button.setProperty("role", "audio-play")
         controls_layout.addWidget(self.play_button)
 
         # Volume label

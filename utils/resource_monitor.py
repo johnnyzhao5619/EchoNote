@@ -32,13 +32,15 @@ class ResourceMonitor(QObject):
     high_cpu_warning = Signal(float)  # CPU usage percentage
     resources_recovered = Signal()  # Resources back to normal
 
-    # Thresholds
-    LOW_MEMORY_THRESHOLD_MB = 500  # Warn if available memory < 500MB
-    HIGH_CPU_THRESHOLD_PERCENT = 90  # Warn if CPU usage > 90%
+    # Thresholds (imported from constants)
+    from config.constants import HIGH_CPU_THRESHOLD_PERCENT, LOW_MEMORY_THRESHOLD_MB
+
+    # Constants
+    BYTES_TO_MB = 1024 * 1024  # Conversion factor from bytes to megabytes
 
     def __init__(
         self,
-        check_interval_ms: int = 30000,  # Check every 30 seconds
+        check_interval_ms: int = None,  # Check every 30 seconds
         parent: Optional[QObject] = None,
         *,
         config_manager: Optional[Any] = None,
@@ -53,20 +55,29 @@ class ResourceMonitor(QObject):
             config_manager: Optional ConfigManager supplying thresholds
             settings_manager: Optional SettingsManager supplying thresholds
         """
+        from config.constants import RESOURCE_CHECK_INTERVAL_MS
+
+        if check_interval_ms is None:
+            check_interval_ms = RESOURCE_CHECK_INTERVAL_MS
+
         super().__init__(parent)
 
         self._threshold_source = settings_manager or config_manager
+        from config.constants import MAX_MEMORY_THRESHOLD_MB, MIN_MEMORY_THRESHOLD_MB
+
         self.low_memory_threshold_mb = self._resolve_threshold(
             key="resource_monitor.low_memory_mb",
             default=float(self.LOW_MEMORY_THRESHOLD_MB),
-            minimum=64.0,
-            maximum=1048576.0,
+            minimum=MIN_MEMORY_THRESHOLD_MB,
+            maximum=MAX_MEMORY_THRESHOLD_MB,
         )
+        from config.constants import MAX_CPU_THRESHOLD_PERCENT, MIN_CPU_THRESHOLD_PERCENT
+
         self.high_cpu_threshold_percent = self._resolve_threshold(
             key="resource_monitor.high_cpu_percent",
             default=float(self.HIGH_CPU_THRESHOLD_PERCENT),
-            minimum=1.0,
-            maximum=100.0,
+            minimum=MIN_CPU_THRESHOLD_PERCENT,
+            maximum=MAX_CPU_THRESHOLD_PERCENT,
         )
 
         self.check_interval_ms = check_interval_ms
@@ -120,7 +131,7 @@ class ResourceMonitor(QObject):
         try:
             # Get memory info
             memory = psutil.virtual_memory()
-            available_mb = memory.available / (1024 * 1024)
+            available_mb = memory.available / self.BYTES_TO_MB
             self._last_memory_mb = available_mb
 
             cpu_percent = self._get_cpu_percent()
@@ -186,9 +197,9 @@ class ResourceMonitor(QObject):
             cpu_percent = self._get_cpu_percent()
 
             return {
-                "memory_available_mb": memory.available / (1024 * 1024),
+                "memory_available_mb": memory.available / self.BYTES_TO_MB,
                 "memory_used_percent": memory.percent,
-                "memory_total_mb": memory.total / (1024 * 1024),
+                "memory_total_mb": memory.total / self.BYTES_TO_MB,
                 "cpu_percent": cpu_percent,
                 "cpu_count": psutil.cpu_count(),
             }
@@ -230,8 +241,10 @@ class ResourceMonitor(QObject):
         Returns:
             Formatted string (e.g., "1.5 GB", "512 MB")
         """
-        if size_mb >= 1024:
-            return f"{size_mb / 1024:.1f} GB"
+        from config.constants import MB_TO_GB_THRESHOLD
+
+        if size_mb >= MB_TO_GB_THRESHOLD:
+            return f"{size_mb / MB_TO_GB_THRESHOLD:.1f} GB"
         else:
             return f"{size_mb:.0f} MB"
 

@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Optional
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QColor, QTextCharFormat, QTextCursor
+from PySide6.QtGui import QTextCharFormat, QTextCursor
 from PySide6.QtWidgets import (
     QDialog,
     QFileDialog,
@@ -101,7 +101,7 @@ class TranscriptViewer(QWidget):
         # File name label
         file_name = Path(self.file_path).name
         self.file_label = QLabel(file_name)
-        self.file_label.setStyleSheet("font-weight: bold; font-size: 12px;")
+        self.file_label.setProperty("role", "transcript-file")
         layout.addWidget(self.file_label)
 
         # Search bar
@@ -209,7 +209,7 @@ class TranscriptViewer(QWidget):
 
         # Highlight format
         highlight_format = QTextCharFormat()
-        highlight_format.setBackground(QColor("#FFEB3B"))
+        highlight_format.setBackground(self._get_theme_highlight_color())
 
         # Find all occurrences and store positions
         while True:

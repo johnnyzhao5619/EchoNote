@@ -9,7 +9,6 @@ from PySide6.QtWidgets import QApplication
 
 def test_pyside6_qt_integration(qapp):
     """Test basic PySide6 Qt integration works."""
-    # Test QTimer creation and basic functionality
     timer = QTimer()
     assert timer is not None
     assert hasattr(timer, "timeout")

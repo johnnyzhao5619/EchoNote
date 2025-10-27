@@ -45,7 +45,7 @@ class NotificationManager:
         """Check if notifications are available on this platform."""
         if self.system == "Windows":
             try:
-                import win10toast
+                pass
 
                 self.windows_available = True
             except ImportError:

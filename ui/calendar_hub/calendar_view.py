@@ -23,14 +23,11 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-from PySide6.QtCore import QDate, Qt, Signal
-from PySide6.QtGui import QColor, QPalette
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
-    QHBoxLayout,
     QLabel,
-    QPushButton,
     QScrollArea,
     QVBoxLayout,
     QWidget,
@@ -48,19 +45,17 @@ class EventCard(QFrame):
 
     clicked = Signal(str)  # event_id
 
-    def __init__(self, event: Any, color: str, parent: Optional[QWidget] = None):
+    def __init__(self, event: Any, parent: Optional[QWidget] = None):
         """
         Initialize event card.
 
         Args:
             event: CalendarEvent instance
-            color: Color code for the event source
             parent: Parent widget
         """
         super().__init__(parent)
 
         self.event = event
-        self.color = color
 
         self.setup_ui()
 
@@ -70,19 +65,9 @@ class EventCard(QFrame):
         self.setFrameStyle(QFrame.Shape.StyledPanel)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
-        # Set background color based on source
-        self.setStyleSheet(
-            f"""
-            #event_card {{
-                background-color: {self.color};
-                border-radius: 4px;
-                padding: 4px;
-            }}
-            #event_card:hover {{
-                border: 2px solid #333;
-            }}
-        """
-        )
+        # Set semantic properties for theming
+        self.setProperty("role", "event-card")
+        self.setProperty("source", self.event.source)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
@@ -91,7 +76,7 @@ class EventCard(QFrame):
         # Event title
         title_label = QLabel(self.event.title)
         title_label.setWordWrap(True)
-        title_label.setStyleSheet("font-weight: bold; color: white;")
+        title_label.setProperty("role", "event-title")
         layout.addWidget(title_label)
 
         # Event time
@@ -106,7 +91,7 @@ class EventCard(QFrame):
         start_time = start_dt.strftime("%H:%M")
         end_time = end_dt.strftime("%H:%M")
         time_label = QLabel(f"{start_time} - {end_time}")
-        time_label.setStyleSheet("font-size: 10px; color: white;")
+        time_label.setProperty("role", "event-time")
         layout.addWidget(time_label)
 
     def mousePressEvent(self, event):
@@ -140,12 +125,8 @@ class MonthView(QWidget):
         # Current date
         self.current_date = datetime.now()
 
-        # Color mapping for event sources
-        self.source_colors = {
-            "local": "#2196F3",  # Blue
-            "google": "#EA4335",  # Red
-            "outlook": "#FF6F00",  # Orange
-        }
+        # Event source types (colors defined in QSS)
+        self.source_types = ["local", "google", "outlook"]
 
         self.setup_ui()
 
@@ -158,7 +139,7 @@ class MonthView(QWidget):
         # Month/year header
         self.header_label = QLabel()
         self.header_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.header_label.setStyleSheet("font-size: 18px; font-weight: bold;")
+        self.header_label.setProperty("role", "calendar-header")
         layout.addWidget(self.header_label)
 
         # Calendar grid
@@ -170,7 +151,7 @@ class MonthView(QWidget):
         for col, day_name in enumerate(day_names):
             header = QLabel(day_name)
             header.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            header.setStyleSheet("font-weight: bold; padding: 5px;")
+            header.setProperty("role", "calendar-day-header")
             self.calendar_grid.addWidget(header, 0, col)
 
         # Add calendar cells (will be populated by refresh_view)
@@ -265,15 +246,15 @@ class MonthView(QWidget):
 
         # Event indicators (show up to 3 events)
         for event in events[:3]:
-            color = self.source_colors.get(event.source, "#999999")
             indicator = QLabel("●")
-            indicator.setStyleSheet(f"color: {color};")
+            indicator.setProperty("role", "event-indicator")
+            indicator.setProperty("source", event.source)
             layout.addWidget(indicator)
 
         # Show "+N more" if there are more events
         if len(events) > 3:
             more_label = QLabel(f"+{len(events) - 3} more")
-            more_label.setStyleSheet("font-size: 10px; color: #666;")
+            more_label.setProperty("role", "more-events")
             layout.addWidget(more_label)
 
         layout.addStretch()
@@ -355,12 +336,8 @@ class WeekView(QWidget):
         # Current date
         self.current_date = datetime.now()
 
-        # Color mapping for event sources
-        self.source_colors = {
-            "local": "#2196F3",  # Blue
-            "google": "#EA4335",  # Red
-            "outlook": "#FF6F00",  # Orange
-        }
+        # Event source types (colors defined in QSS)
+        self.source_types = ["local", "google", "outlook"]
 
         self.setup_ui()
 
@@ -373,7 +350,7 @@ class WeekView(QWidget):
         # Week header
         self.header_label = QLabel()
         self.header_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.header_label.setStyleSheet("font-size: 18px; font-weight: bold;")
+        self.header_label.setProperty("role", "calendar-header")
         layout.addWidget(self.header_label)
 
         # Scroll area for week grid
@@ -415,7 +392,7 @@ class WeekView(QWidget):
             date = week_start + timedelta(days=col)
             header = QLabel(f"{day_name}\n{date.day}")
             header.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            header.setStyleSheet("font-weight: bold; padding: 10px;")
+            header.setProperty("role", "calendar-week-header")
             self.week_grid.addWidget(header, 0, col)
 
         # Load events for the week
@@ -466,8 +443,7 @@ class WeekView(QWidget):
 
         # Add event cards
         for event in sorted_events:
-            color = self.source_colors.get(event.source, "#999999")
-            card = EventCard(event, color)
+            card = EventCard(event)
             card.clicked.connect(self.event_clicked.emit)
             layout.addWidget(card)
 
@@ -544,12 +520,8 @@ class DayView(QWidget):
         # Current date
         self.current_date = datetime.now()
 
-        # Color mapping for event sources
-        self.source_colors = {
-            "local": "#2196F3",  # Blue
-            "google": "#EA4335",  # Red
-            "outlook": "#FF6F00",  # Orange
-        }
+        # Event source types (colors defined in QSS)
+        self.source_types = ["local", "google", "outlook"]
 
         self.setup_ui()
 
@@ -562,7 +534,7 @@ class DayView(QWidget):
         # Day header
         self.header_label = QLabel()
         self.header_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.header_label.setStyleSheet("font-size: 18px; font-weight: bold;")
+        self.header_label.setProperty("role", "calendar-header")
         layout.addWidget(self.header_label)
 
         # Scroll area for events
@@ -608,15 +580,14 @@ class DayView(QWidget):
         # Add event cards
         if sorted_events:
             for event in sorted_events:
-                color = self.source_colors.get(event.source, "#999999")
-                card = EventCard(event, color)
+                card = EventCard(event)
                 card.clicked.connect(self.event_clicked.emit)
                 self.events_layout.addWidget(card)
         else:
             # No events message
-            no_events_label = QLabel("No events for this day")
+            no_events_label = QLabel(self.i18n.t("calendar_hub.calendar_view.no_events"))
             no_events_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            no_events_label.setStyleSheet("color: #999; font-style: italic;")
+            no_events_label.setProperty("role", "no-events")
             self.events_layout.addWidget(no_events_label)
 
         self.events_layout.addStretch()

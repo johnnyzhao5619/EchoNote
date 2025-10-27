@@ -22,7 +22,6 @@ Provides UI for configuring timeline view and auto-task settings.
 import logging
 from typing import Tuple
 
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QCheckBox, QComboBox, QHBoxLayout, QLabel, QSpinBox
 
 from ui.settings.base_page import BaseSettingsPage
@@ -128,7 +127,7 @@ class TimelineSettingsPage(BaseSettingsPage):
         # Description
         self.auto_start_desc = QLabel(self.i18n.t("settings.timeline.auto_start_description"))
         self.auto_start_desc.setWordWrap(True)
-        self.auto_start_desc.setStyleSheet("color: #666; font-style: italic;")
+        self.auto_start_desc.setProperty("role", "auto-start-desc")
         self.content_layout.addWidget(self.auto_start_desc)
 
         # Add stretch at the end

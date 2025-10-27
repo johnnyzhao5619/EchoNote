@@ -12,8 +12,7 @@ from PySide6.QtWidgets import QApplication
 @pytest.fixture(scope="session")
 def qapp():
     """Create QApplication instance for PySide6 testing."""
-    if not QApplication.instance():
+    app = QApplication.instance()
+    if app is None:
         app = QApplication(sys.argv)
-    else:
-        app = QApplication.instance()
     yield app

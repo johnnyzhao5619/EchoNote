@@ -20,10 +20,10 @@ Provides dialog for creating and editing calendar events.
 """
 
 import logging
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from datetime import datetime
+from typing import Any, Dict, Optional
 
-from PySide6.QtCore import QDateTime, Qt
+from PySide6.QtCore import QDateTime
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -32,7 +32,6 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
-    QLabel,
     QLineEdit,
     QMessageBox,
     QPushButton,
@@ -125,7 +124,9 @@ class EventDialog(QDialog):
 
         # Title (required)
         self.title_input = QLineEdit()
-        self.title_input.setPlaceholderText("Enter event title")
+        self.title_input.setPlaceholderText(
+            self.i18n.t("calendar_hub.event_dialog.title_placeholder")
+        )
         form.addRow("Title *:", self.title_input)
 
         # Event type
@@ -157,17 +158,23 @@ class EventDialog(QDialog):
 
         # Location (optional)
         self.location_input = QLineEdit()
-        self.location_input.setPlaceholderText("Enter location")
+        self.location_input.setPlaceholderText(
+            self.i18n.t("calendar_hub.event_dialog.location_placeholder")
+        )
         form.addRow("Location:", self.location_input)
 
         # Attendees (optional)
         self.attendees_input = QLineEdit()
-        self.attendees_input.setPlaceholderText("Enter emails separated by commas")
+        self.attendees_input.setPlaceholderText(
+            self.i18n.t("calendar_hub.event_dialog.attendees_placeholder")
+        )
         form.addRow("Attendees:", self.attendees_input)
 
         # Description (optional)
         self.description_input = QTextEdit()
-        self.description_input.setPlaceholderText("Enter description")
+        self.description_input.setPlaceholderText(
+            self.i18n.t("calendar_hub.event_dialog.description_placeholder")
+        )
         self.description_input.setMaximumHeight(100)
         form.addRow("Description:", self.description_input)
 
@@ -311,7 +318,11 @@ class EventDialog(QDialog):
         """
         # Check required fields
         if not self.title_input.text().strip():
-            QMessageBox.warning(self, "Validation Error", "Title is required.")
+            QMessageBox.warning(
+                self,
+                self.i18n.t("calendar_hub.event_dialog.validation_error"),
+                self.i18n.t("calendar_hub.event_dialog.title_required"),
+            )
             self.title_input.setFocus()
             return False
 
@@ -320,7 +331,11 @@ class EventDialog(QDialog):
         end_time = self.end_time_input.dateTime().toPyDateTime()
 
         if start_time >= end_time:
-            QMessageBox.warning(self, "Validation Error", "End time must be after start time.")
+            QMessageBox.warning(
+                self,
+                self.i18n.t("calendar_hub.event_dialog.validation_error"),
+                self.i18n.t("calendar_hub.event_dialog.end_after_start"),
+            )
             self.end_time_input.setFocus()
             return False
 
@@ -330,7 +345,11 @@ class EventDialog(QDialog):
             emails = [e.strip() for e in attendees_text.split(",")]
             for email in emails:
                 if email and "@" not in email:
-                    QMessageBox.warning(self, "Validation Error", f"Invalid email format: {email}")
+                    QMessageBox.warning(
+                        self,
+                        self.i18n.t("calendar_hub.event_dialog.validation_error"),
+                        self.i18n.t("calendar_hub.event_dialog.invalid_email").format(email=email),
+                    )
                     self.attendees_input.setFocus()
                     return False
 

@@ -30,8 +30,6 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QMessageBox,
     QPushButton,
-    QVBoxLayout,
-    QWidget,
 )
 
 from ui.settings.base_page import BaseSettingsPage
@@ -77,7 +75,7 @@ class CalendarSettingsPage(BaseSettingsPage):
         # Description
         self.desc_label = QLabel(self.i18n.t("settings.calendar.accounts_description"))
         self.desc_label.setWordWrap(True)
-        self.desc_label.setStyleSheet("color: #666;")
+        self.desc_label.setProperty("role", "description")
         self.content_layout.addWidget(self.desc_label)
 
         self.add_spacing(10)
@@ -120,7 +118,7 @@ class CalendarSettingsPage(BaseSettingsPage):
         # Sync interval (this would be implemented if needed)
         self.sync_info = QLabel(self.i18n.t("settings.calendar.sync_info"))
         self.sync_info.setWordWrap(True)
-        self.sync_info.setStyleSheet("color: #666;")
+        self.sync_info.setProperty("role", "description")
         self.content_layout.addWidget(self.sync_info)
 
         # Add stretch at the end

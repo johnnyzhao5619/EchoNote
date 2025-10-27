@@ -184,12 +184,16 @@ class FormatConverter:
         Returns:
             Formatted timestamp string
         """
-        hours = int(seconds // 3600)
-        minutes = int((seconds % 3600) // 60)
-        secs = int(seconds % 60)
-        milliseconds = int((seconds % 1) * 1000)
+        from config.constants import SECONDS_PER_HOUR, SECONDS_PER_MINUTE, MILLISECONDS_PER_SECOND
 
-        return f"{hours:02d}:{minutes:02d}:{secs:02d},{milliseconds:03d}"
+        hours = int(seconds // SECONDS_PER_HOUR)
+        minutes = int((seconds % SECONDS_PER_HOUR) // SECONDS_PER_MINUTE)
+        secs = int(seconds % SECONDS_PER_MINUTE)
+        milliseconds = int((seconds % 1) * MILLISECONDS_PER_SECOND)
+
+        from config.constants import SRT_TIMESTAMP_FORMAT
+
+        return SRT_TIMESTAMP_FORMAT.format(hours, minutes, secs, milliseconds)
 
     def _format_timestamp_md(self, seconds: float) -> str:
         """
@@ -201,8 +205,10 @@ class FormatConverter:
         Returns:
             Formatted timestamp string
         """
-        hours = int(seconds // 3600)
-        minutes = int((seconds % 3600) // 60)
-        secs = int(seconds % 60)
+        hours = int(seconds // SECONDS_PER_HOUR)
+        minutes = int((seconds % SECONDS_PER_HOUR) // SECONDS_PER_MINUTE)
+        secs = int(seconds % SECONDS_PER_MINUTE)
 
-        return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+        from config.constants import MARKDOWN_TIMESTAMP_FORMAT
+
+        return MARKDOWN_TIMESTAMP_FORMAT.format(hours, minutes, secs)

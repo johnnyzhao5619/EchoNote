@@ -29,7 +29,6 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,
-    QDialogButtonBox,
     QFormLayout,
     QFrame,
     QHBoxLayout,
@@ -234,7 +233,7 @@ class ModelManagementPage(BaseSettingsPage):
         name_font.setPointSize(11)
         name_font.setBold(True)
         name_label.setFont(name_font)
-        name_label.setStyleSheet("color: #2e7d32;")
+        name_label.setProperty("role", "model-name-downloaded")
         header_layout.addWidget(name_label)
 
         header_layout.addStretch()
@@ -248,7 +247,7 @@ class ModelManagementPage(BaseSettingsPage):
         # 删除按钮
         delete_btn = QPushButton(self.i18n.t("settings.model_management.delete"))
         delete_btn.setMaximumWidth(80)
-        delete_btn.setStyleSheet("QPushButton { color: #d32f2f; }")
+        delete_btn.setProperty("role", "model-delete")
         delete_btn.clicked.connect(lambda: self._on_delete_clicked(model.name))
 
         # 检查模型是否正在使用（如果 ModelManager 支持此功能）
@@ -301,7 +300,7 @@ class ModelManagementPage(BaseSettingsPage):
         # 使用次数
         usage_text = self.i18n.t("settings.model_management.usage_count", count=model.usage_count)
         usage_label = QLabel(usage_text)
-        usage_label.setStyleSheet("color: #666;")
+        usage_label.setProperty("role", "time-display")
         stats_layout.addWidget(usage_label)
 
         # 最后使用时间
@@ -310,11 +309,11 @@ class ModelManagementPage(BaseSettingsPage):
             last_used_label = QLabel(
                 f"{self.i18n.t('settings.model_management.last_used')}: " f"{last_used_text}"
             )
-            last_used_label.setStyleSheet("color: #666;")
+            last_used_label.setProperty("role", "time-display")
             stats_layout.addWidget(last_used_label)
         else:
             never_used_label = QLabel(self.i18n.t("settings.model_management.never_used"))
-            never_used_label.setStyleSheet("color: #666;")
+            never_used_label.setProperty("role", "time-display")
             stats_layout.addWidget(never_used_label)
 
         stats_layout.addStretch()
@@ -399,7 +398,7 @@ class ModelManagementPage(BaseSettingsPage):
             lang_text = self.i18n.t("settings.model_management.english_only")
 
         lang_label = QLabel(lang_text)
-        lang_label.setStyleSheet("color: #666;")
+        lang_label.setProperty("role", "time-display")
         lang_layout.addWidget(lang_label)
 
         lang_layout.addStretch()
@@ -828,14 +827,14 @@ class ModelManagementPage(BaseSettingsPage):
         title_font.setPointSize(12)
         title_font.setBold(True)
         title_label.setFont(title_font)
-        title_label.setStyleSheet("color: #1976d2;")
+        title_label.setProperty("role", "model-title-recommendation")
         layout.addWidget(title_label)
 
         # 推荐理由
         reason_text = self._get_recommendation_reason(recommended_model_name)
         reason_label = QLabel(reason_text)
         reason_label.setWordWrap(True)
-        reason_label.setStyleSheet("color: #424242; margin-bottom: 8px;")
+        reason_label.setProperty("role", "model-reason")
         layout.addWidget(reason_label)
 
         # 模型特征
@@ -846,7 +845,7 @@ class ModelManagementPage(BaseSettingsPage):
             f"{self.i18n.t('settings.model_management.size')}: " f"{recommended_model.size_mb} MB"
         )
         size_label = QLabel(size_text)
-        size_label.setStyleSheet("font-weight: bold;")
+        size_label.setProperty("role", "audio-file")
         features_layout.addWidget(size_label)
 
         # 速度
@@ -855,7 +854,7 @@ class ModelManagementPage(BaseSettingsPage):
             f"{self._translate_speed(recommended_model.speed)}"
         )
         speed_label = QLabel(speed_text)
-        speed_label.setStyleSheet("font-weight: bold;")
+        speed_label.setProperty("role", "audio-file")
         features_layout.addWidget(speed_label)
 
         # 准确度
@@ -864,7 +863,7 @@ class ModelManagementPage(BaseSettingsPage):
             f"{self._translate_accuracy(recommended_model.accuracy)}"
         )
         accuracy_label = QLabel(accuracy_text)
-        accuracy_label.setStyleSheet("font-weight: bold;")
+        accuracy_label.setProperty("role", "audio-file")
         features_layout.addWidget(accuracy_label)
 
         features_layout.addStretch()
@@ -1073,11 +1072,9 @@ class ModelManagementPage(BaseSettingsPage):
 
     def load_settings(self):
         """加载设置（模型管理页面不需要加载设置）"""
-        pass
 
     def save_settings(self):
         """保存设置（模型管理页面不需要保存设置）"""
-        pass
 
 
 class ModelDetailsDialog(QDialog):
@@ -1094,8 +1091,6 @@ class ModelDetailsDialog(QDialog):
         """
         super().__init__(parent)
 
-        import platform
-        import subprocess
         from pathlib import Path
 
         from PySide6.QtWidgets import QGridLayout
@@ -1175,7 +1170,7 @@ class ModelDetailsDialog(QDialog):
             )
             path_label = QLabel(model.local_path)
             path_label.setWordWrap(True)
-            path_label.setStyleSheet("color: #666;")
+            path_label.setProperty("role", "time-display")
             info_layout.addWidget(path_label, row, 1)
             row += 1
 
@@ -1398,7 +1393,7 @@ class ModelConfigDialog(QDialog):
         if not cuda_available:
             cuda_note = QLabel(i18n.t("settings.model_management.cuda_not_available"))
             cuda_note.setWordWrap(True)
-            cuda_note.setStyleSheet("color: #ff9800; font-style: italic;")
+            cuda_note.setProperty("role", "cuda-note")
             layout.addWidget(cuda_note)
 
         # 添加弹性空间

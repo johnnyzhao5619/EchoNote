@@ -21,10 +21,9 @@ for configuring all application features.
 """
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,

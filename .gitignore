@@ -145,6 +145,10 @@ models/
 # Temporary files
 *.tmp
 *.temp
+*.swp
+*.swo
+*~
+\#*\#
 
 # Logs
 logs/
@@ -217,3 +221,4 @@ test_transcripts/
 *.bak
 *.backup
 *.old
+migration_backup_*/

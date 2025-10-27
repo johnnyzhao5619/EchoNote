@@ -131,26 +131,34 @@ def validate_api_key(key: str, provider: str) -> Tuple[bool, str]:
     # Provider-specific validation
     if provider == "openai":
         # OpenAI keys start with "sk-"
+        from config.constants import MIN_OPENAI_API_KEY_LENGTH
+
         if not key.startswith("sk-"):
             return False, "OpenAI API key must start with 'sk-'"
-        if len(key) < 20:
+        if len(key) < MIN_OPENAI_API_KEY_LENGTH:
             return False, "OpenAI API key is too short"
 
     elif provider == "google":
+        from config.constants import MIN_GOOGLE_API_KEY_LENGTH
+
         # Google API keys are typically 39 characters
-        if len(key) < 20:
+        if len(key) < MIN_GOOGLE_API_KEY_LENGTH:
             return False, "Google API key is too short"
 
     elif provider == "azure":
+        from config.constants import AZURE_API_KEY_LENGTH
+
         # Azure keys are typically 32 characters hex
-        if len(key) != 32:
-            return False, "Azure API key must be 32 characters"
-        if not re.match(r"^[a-fA-F0-9]{32}$", key):
+        if len(key) != AZURE_API_KEY_LENGTH:
+            return False, f"Azure API key must be {AZURE_API_KEY_LENGTH} characters"
+        if not re.match(rf"^[a-fA-F0-9]{{{AZURE_API_KEY_LENGTH}}}$", key):
             return False, "Azure API key must be hexadecimal"
 
     else:
+        from config.constants import MIN_GENERIC_API_KEY_LENGTH
+
         # Generic validation for unknown providers
-        if len(key) < 10:
+        if len(key) < MIN_GENERIC_API_KEY_LENGTH:
             return False, f"API key for {provider} is too short"
 
     return True, ""
@@ -197,11 +205,15 @@ def validate_url(url: str) -> Tuple[bool, str]:
     if not url.strip():
         return False, "URL cannot be empty"
 
+    # Import constants for URL validation
+    from config.constants import URL_DOMAIN_MAX_LABEL_LENGTH, URL_TLD_MAX_LENGTH, URL_TLD_MIN_LENGTH
+
     # URL regex pattern
     pattern = (
         r"^https?://"  # http:// or https://
-        r"(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+"
-        r"(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|"  # domain
+        rf"(?:(?:[A-Z0-9](?:[A-Z0-9-]{{0,{URL_DOMAIN_MAX_LABEL_LENGTH}}}[A-Z0-9])?\.)+"
+        rf"(?:[A-Z]{{{URL_TLD_MIN_LENGTH},{URL_TLD_MAX_LENGTH}}}\.?|"
+        rf"[A-Z0-9-]{{{URL_TLD_MIN_LENGTH},}}\.?)|"  # domain
         r"localhost|"  # localhost
         r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})"  # IP
         r"(?::\d+)?"  # optional port

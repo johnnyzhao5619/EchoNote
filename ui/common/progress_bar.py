@@ -22,8 +22,7 @@ Provides a customizable progress bar with percentage display.
 import logging
 from typing import Optional
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QProgressBar, QVBoxLayout, QWidget
+from ui.qt_imports import QHBoxLayout, QLabel, QProgressBar, Qt, QVBoxLayout, QWidget, Signal
 
 logger = logging.getLogger("echonote.ui.progress_bar")
 
@@ -44,6 +43,7 @@ class ProgressBar(QWidget):
         show_percentage: bool = True,
         show_estimated_time: bool = False,
         parent: Optional[QWidget] = None,
+        i18n=None,
     ):
         """
         Initialize progress bar.
@@ -53,11 +53,13 @@ class ProgressBar(QWidget):
             show_percentage: Whether to show percentage text
             show_estimated_time: Whether to show estimated time remaining
             parent: Parent widget
+            i18n: Internationalization manager for text translation
         """
         super().__init__(parent)
 
         self.show_percentage = show_percentage
         self.show_estimated_time = show_estimated_time
+        self.i18n = i18n
 
         # Time tracking for estimation
         self.start_time = None
@@ -170,7 +172,12 @@ class ProgressBar(QWidget):
         time_str = self._format_time(remaining)
 
         if hasattr(self, "time_label"):
-            self.time_label.setText(f"剩余时间: {time_str}")
+            if self.i18n:
+                self.time_label.setText(
+                    self.i18n.t("common.progress.remaining_time", time=time_str)
+                )
+            else:
+                self.time_label.setText(f"Remaining time: {time_str}")
 
     def _format_time(self, seconds: float) -> str:
         """
@@ -183,18 +190,30 @@ class ProgressBar(QWidget):
             Formatted time string
         """
         if seconds < 0:
-            return "计算中..."
+            if self.i18n:
+                return self.i18n.t("common.progress.calculating")
+            else:
+                return "Calculating..."
 
         if seconds < 60:
-            return f"{int(seconds)}秒"
+            if self.i18n:
+                return self.i18n.t("common.progress.seconds", count=int(seconds))
+            else:
+                return f"{int(seconds)}s"
         elif seconds < 3600:
             minutes = int(seconds / 60)
             secs = int(seconds % 60)
-            return f"{minutes}分{secs}秒"
+            if self.i18n:
+                return self.i18n.t("common.progress.minutes_seconds", minutes=minutes, seconds=secs)
+            else:
+                return f"{minutes}m {secs}s"
         else:
             hours = int(seconds / 3600)
             minutes = int((seconds % 3600) / 60)
-            return f"{hours}小时{minutes}分"
+            if self.i18n:
+                return self.i18n.t("common.progress.hours_minutes", hours=hours, minutes=minutes)
+            else:
+                return f"{hours}h {minutes}m"
 
     def get_progress(self) -> float:
         """

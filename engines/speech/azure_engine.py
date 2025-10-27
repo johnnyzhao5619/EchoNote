@@ -40,16 +40,23 @@ logger = logging.getLogger(__name__)
 class AzureEngine(SpeechEngine):
     """Azure Speech API 引擎"""
 
-    def __init__(self, subscription_key: str, region: str, timeout: int = 60, max_retries: int = 3):
+    def __init__(
+        self, subscription_key: str, region: str, timeout: int = None, max_retries: int = 3
+    ):
         """
         初始化 Azure 引擎
 
         Args:
             subscription_key: Azure 订阅密钥
             region: Azure 区域（如 'eastus', 'westeurope'）
-            timeout: 请求超时时间（秒）
+            timeout: 请求超时时间（秒），默认使用 DEFAULT_HTTP_TIMEOUT_SECONDS
             max_retries: 最大重试次数
         """
+        if timeout is None:
+            from config.constants import DEFAULT_HTTP_TIMEOUT_SECONDS
+
+            timeout = DEFAULT_HTTP_TIMEOUT_SECONDS
+
         self.subscription_key = subscription_key
         self.region = region
         self.timeout = timeout
@@ -114,7 +121,9 @@ class AzureEngine(SpeechEngine):
         # 准备 URL 参数
         params = {"language": language_code, "format": "detailed", "profanity": profanity}
 
-        target_rate = sample_rate or 16000
+        from config.constants import DEFAULT_WHISPER_SAMPLE_RATE
+
+        target_rate = sample_rate or DEFAULT_WHISPER_SAMPLE_RATE
         audio_data, effective_rate, original_rate, detected_format = convert_audio_to_wav_bytes(
             audio_path, target_rate
         )

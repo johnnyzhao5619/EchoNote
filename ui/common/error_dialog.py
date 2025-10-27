@@ -22,9 +22,9 @@ Provides a dialog for displaying error messages with details and copy functional
 import logging
 from typing import Optional
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QClipboard, QIcon
-from PySide6.QtWidgets import (
+from PySide6.QtCore import QTimer
+
+from ui.qt_imports import (
     QApplication,
     QDialog,
     QHBoxLayout,
@@ -34,7 +34,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.error_dialog")
@@ -66,18 +65,19 @@ class ErrorDialog(QDialog):
             parent: Parent widget
         """
         super().__init__(parent)
-
         self.i18n = i18n
+        self.setWindowTitle(title)
+        self.setModal(True)
+
+        if self.i18n:
+            self.i18n.language_changed.connect(self._on_language_changed)
+
         self.error_title = title
         self.error_message = message
         self.error_details = details
 
         # Setup UI
         self.setup_ui()
-
-        # Connect language change signal if i18n is provided
-        if self.i18n:
-            self.i18n.language_changed.connect(self._on_language_changed)
 
     def setup_ui(self):
         """Set up the error dialog UI."""
@@ -160,11 +160,9 @@ class ErrorDialog(QDialog):
         if self.i18n:
             self.copy_button.setText(self.i18n.t("common.copied"))
         else:
-            self.copy_button.setText("Copied!")
+            self.copy_button.setText(self.i18n.t("common.copied"))
 
         # Reset button text after 2 seconds
-        from PySide6.QtCore import QTimer
-
         QTimer.singleShot(2000, self._update_copy_button_text)
 
         logger.debug("Error details copied to clipboard")

@@ -23,10 +23,13 @@ including a welcome wizard for initial configuration.
 import logging
 import shutil
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from config.app_config import get_app_dir
 from utils.model_download import run_model_download
+
+if TYPE_CHECKING:
+    from data.security.encryption import SecurityManager
 
 logger = logging.getLogger(__name__)
 
@@ -120,7 +123,6 @@ class FirstRunSetup:
                 return False
 
             # Import here to avoid circular dependencies
-            from PySide6.QtCore import Qt
             from PySide6.QtWidgets import (
                 QDialog,
                 QHBoxLayout,
@@ -163,19 +165,12 @@ class FirstRunSetup:
 
             # Model info card
             info_card = QWidget()
-            info_card.setStyleSheet(
-                "QWidget { "
-                "background-color: #e8f4f8; "
-                "border: 1px solid #b3d9e6; "
-                "border-radius: 8px; "
-                "padding: 15px; "
-                "}"
-            )
+            info_card.setProperty("role", "info-card")
             info_layout = QVBoxLayout(info_card)
 
             # Model name
             model_name_label = QLabel(f"<b>{recommended_model.full_name}</b>")
-            model_name_label.setStyleSheet("color: #1a1a1a; font-size: 14px;")
+            model_name_label.setProperty("role", "model-name-setup")
             info_layout.addWidget(model_name_label)
 
             # Model details
@@ -189,7 +184,7 @@ class FirstRunSetup:
             )
             details_label = QLabel(details_text)
             details_label.setWordWrap(True)
-            details_label.setStyleSheet("color: #333333; font-size: 12px;")
+            details_label.setProperty("role", "model-details-setup")
             info_layout.addWidget(details_label)
 
             layout.addWidget(info_card)
@@ -218,7 +213,7 @@ class FirstRunSetup:
             reason_text = " ".join(reason_parts)
             reason_label = QLabel(reason_text)
             reason_label.setWordWrap(True)
-            reason_label.setStyleSheet("color: #b0b0b0; font-size: 12px;")
+            reason_label.setProperty("role", "model-reason-setup")
             layout.addWidget(reason_label)
 
             # Spacing
@@ -236,17 +231,7 @@ class FirstRunSetup:
             # Download button
             download_button = QPushButton(i18n.t("settings.model_management.download_now"))
             download_button.setDefault(True)
-            download_button.setStyleSheet(
-                "QPushButton { "
-                "background-color: #0078d4; "
-                "color: white; "
-                "padding: 8px 16px; "
-                "border-radius: 4px; "
-                "} "
-                "QPushButton:hover { "
-                "background-color: #106ebe; "
-                "}"
-            )
+            download_button.setProperty("role", "download-setup")
             download_button.clicked.connect(dialog.accept)
             button_layout.addWidget(download_button)
 
@@ -392,19 +377,14 @@ class FirstRunWizard:
             True if wizard was completed, False if cancelled
         """
         try:
-            from PySide6.QtCore import Qt, QThread, Signal
-            from PySide6.QtGui import QFont
             from PySide6.QtWidgets import (
                 QButtonGroup,
                 QComboBox,
-                QFileDialog,
-                QHBoxLayout,
                 QLabel,
                 QProgressBar,
                 QPushButton,
                 QRadioButton,
                 QVBoxLayout,
-                QWidget,
                 QWizard,
                 QWizardPage,
             )
@@ -472,7 +452,7 @@ class FirstRunWizard:
                     # Info message
                     info_label = QLabel(i18n.t("wizard.language.info"))
                     info_label.setWordWrap(True)
-                    info_label.setStyleSheet("color: #666;")
+                    info_label.setProperty("role", "time-display")
                     layout.addWidget(info_label)
 
                     layout.addStretch()
@@ -533,7 +513,7 @@ class FirstRunWizard:
                     # Info message
                     info_label = QLabel(i18n.t("wizard.theme.info"))
                     info_label.setWordWrap(True)
-                    info_label.setStyleSheet("color: #666;")
+                    info_label.setProperty("role", "time-display")
                     layout.addWidget(info_label)
 
                     layout.addStretch()
@@ -594,9 +574,7 @@ class FirstRunWizard:
                             f"{i18n.t(f'settings.model_management.accuracy_{recommended_info.accuracy}')}"
                         )
                         info_label = QLabel(info_text)
-                        info_label.setStyleSheet(
-                            "background-color: #f0f0f0; " "padding: 10px; " "border-radius: 5px;"
-                        )
+                        info_label.setProperty("role", "setup-info")
                         layout.addWidget(info_label)
 
                     layout.addSpacing(20)
@@ -621,7 +599,7 @@ class FirstRunWizard:
                     # Skip info
                     skip_label = QLabel(i18n.t("wizard.model.skip_info"))
                     skip_label.setWordWrap(True)
-                    skip_label.setStyleSheet("color: #666; font-size: 10pt;")
+                    skip_label.setProperty("role", "wizard-skip")
                     layout.addWidget(skip_label)
 
                     layout.addStretch()
@@ -693,7 +671,8 @@ class FirstRunWizard:
                     self.progress_bar.setRange(0, 100)
                     self.progress_bar.setValue(100)
                     self.status_label.setText(self.i18n.t("wizard.model.download_complete"))
-                    self.status_label.setStyleSheet("color: green;")
+                    self.status_label.setProperty("role", "setup-status")
+                    self.status_label.setProperty("state", "success")
 
                     # Enable next button
                     wizard = self.wizard()
@@ -706,7 +685,8 @@ class FirstRunWizard:
                     self.status_label.setText(
                         self.i18n.t("wizard.model.download_error", error=error_msg)
                     )
-                    self.status_label.setStyleSheet("color: red;")
+                    self.status_label.setProperty("role", "setup-status")
+                    self.status_label.setProperty("state", "error")
                     self.download_button.setEnabled(True)
                     self.download_started = False
 

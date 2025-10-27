@@ -26,6 +26,34 @@
     "show_details": "Afficher les Détails",
     "hide_details": "Masquer les Détails"
   },
+  "data_management": {
+    "title": "Gestion des Données",
+    "clear_all": "Effacer Toutes les Données",
+    "confirm_cleanup": "Confirmer le Nettoyage des Données",
+    "confirm_delete": "Êtes-vous sûr de vouloir supprimer TOUTES les données utilisateur ?",
+    "final_confirmation": "Confirmation Finale",
+    "last_chance": "C'est votre dernière chance d'annuler !",
+    "cleanup_progress": "Nettoyage en Cours",
+    "cleanup_complete": "Nettoyage Terminé",
+    "cleanup_success": "Toutes les données utilisateur ont été supprimées avec succès.",
+    "cleanup_errors": "Nettoyage Terminé avec des Erreurs",
+    "cleanup_partial": "Le nettoyage des données est terminé, mais certains éléments n'ont pas pu être supprimés.",
+    "storage_labels": {
+      "database": "Base de données : Calcul en cours...",
+      "configuration": "Configuration : Calcul en cours...",
+      "recordings": "Enregistrements : Calcul en cours...",
+      "transcripts": "Transcriptions : Calcul en cours...",
+      "logs": "Journaux : Calcul en cours...",
+      "total": "Total : Calcul en cours..."
+    },
+    "clear_all_description": "Ceci supprimera :\n• Base de données (toutes les tâches, événements et paramètres)\n• Fichiers de configuration\n• Tous les enregistrements\n• Toutes les transcriptions\n• Fichiers journaux",
+    "confirm_delete_details": "Ceci supprimera définitivement environ {size} de données.\n\nCette opération ne peut pas être annulée !\n\nL'application devra être redémarrée après le nettoyage.",
+    "final_confirmation_details": "Tapez 'DELETE' dans la boîte de confirmation pour continuer.\n\nÊtes-vous absolument sûr de vouloir supprimer toutes les données ?",
+    "cleanup_progress_message": "Suppression de toutes les données utilisateur...",
+    "cleanup_success_details": "Supprimé {count} éléments.\n\nVeuillez redémarrer l'application.",
+    "more_errors": "... et {count} erreurs de plus",
+    "cleanup_partial_details": "Supprimé : {deleted} éléments\nÉchoué : {failed} éléments"
+  },
   "sidebar": {
     "batch_transcribe": "Transcription par Lot",
     "realtime_record": "Enregistrement en Temps Réel",
@@ -96,6 +124,7 @@
     "source_language": "Langue Source",
     "target_language": "Langue Cible",
     "enable_translation": "Activer la Traduction",
+    "default_duration": "00:00:00",
     "available_languages": {
       "zh": "Chinois",
       "en": "Anglais",
@@ -168,6 +197,39 @@
       "event": "Événement",
       "task": "Tâche",
       "appointment": "Rendez-vous"
+    },
+    "event_dialog": {
+      "title_placeholder": "Saisir le titre de l'événement",
+      "location_placeholder": "Saisir le lieu",
+      "attendees_placeholder": "Saisir les emails séparés par des virgules",
+      "description_placeholder": "Saisir la description",
+      "validation_error": "Erreur de Validation",
+      "title_required": "Le titre est requis.",
+      "end_after_start": "L'heure de fin doit être après l'heure de début.",
+      "invalid_email": "Format d'email invalide : {email}"
+    },
+    "oauth_dialog": {
+      "ready_to_authorize": "Prêt à autoriser",
+      "start_authorization": "Commencer l'Autorisation",
+      "waiting_authorization": "En attente d'autorisation...",
+      "authorization_failed": "Échec de l'autorisation : état non concordant",
+      "authorization_successful": "Autorisation réussie !",
+      "authorization_error": "Erreur d'Autorisation"
+    },
+    "widget": {
+      "add_calendar_account": "Ajouter un Compte de Calendrier",
+      "connect_google": "Connecter Google Calendar",
+      "connect_outlook": "Connecter Outlook Calendar",
+      "syncing": "Synchronisation...",
+      "sync_error": "Erreur de Synchronisation",
+      "never_synced": "Jamais synchronisé",
+      "previous": "Précédent",
+      "next": "Suivant",
+      "sync_now": "Synchroniser Maintenant",
+      "sync_now_tooltip": "Synchroniser manuellement tous les calendriers connectés"
+    },
+    "calendar_view": {
+      "no_events": "Aucun événement pour ce jour"
     }
   },
   "timeline": {
@@ -367,6 +429,7 @@
       "model_size": "Taille du Modèle",
       "device": "Appareil",
       "compute_type": "Type de Calcul",
+      "device_info_cpu": "Mode CPU. L'optimisation CoreML sera utilisée automatiquement sur Apple Silicon.",
       "cloud_config": "Configuration du Service Cloud",
       "api_key_note": "Note : Les clés API seront chiffrées et stockées en toute sécurité. Veuillez garder vos clés en sécurité.",
       "test_connection": "Tester la Connexion",
@@ -396,6 +459,8 @@
       "api_key_placeholder": "sk-...",
       "azure_region_label": "Région :",
       "azure_region_placeholder": "par ex., eastus",
+      "gpu_acceleration": "Accélération GPU NVIDIA. Nécessite un GPU compatible CUDA.",
+      "cpu_mode": "Mode CPU. Pas d'accélération GPU.",
       "error": {
         "empty_path": "Le chemin de sauvegarde ne peut pas être vide",
         "invalid_path": "Chemin invalide : {error}"

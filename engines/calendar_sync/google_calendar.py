@@ -16,13 +16,17 @@
 """Google Calendar synchronization adapter."""
 
 import logging
-from datetime import datetime, timezone
+from datetime import timezone
 from typing import Any, Dict, List, Optional
 
 import httpx
 
 from data.database.models import CalendarEvent
-from engines.calendar_sync.base import OAuthCalendarAdapter, OAuthEndpoints
+from engines.calendar_sync.base import (
+    CALENDAR_API_TIMEOUT_SECONDS,
+    OAuthCalendarAdapter,
+    OAuthEndpoints,
+)
 
 logger = logging.getLogger("echonote.calendar_sync.google")
 
@@ -49,9 +53,14 @@ class GoogleCalendarAdapter(OAuthCalendarAdapter):
         self,
         client_id: str,
         client_secret: str,
-        redirect_uri: str = "http://localhost:8080/callback",
+        redirect_uri: str = None,
         http_client_config: Optional[Dict[str, Any]] = None,
     ):
+        from config.constants import DEFAULT_OAUTH_REDIRECT_PORT
+
+        if redirect_uri is None:
+            redirect_uri = f"http://localhost:{DEFAULT_OAUTH_REDIRECT_PORT}/callback"
+
         super().__init__(
             client_id=client_id,
             client_secret=client_secret,
@@ -101,9 +110,11 @@ class GoogleCalendarAdapter(OAuthCalendarAdapter):
             page_token = None
             new_sync_token = None
 
+            from config.constants import CALENDAR_API_TIMEOUT_SECONDS, GOOGLE_CALENDAR_MAX_RESULTS
+
             while True:
                 params = {
-                    "maxResults": 250,
+                    "maxResults": GOOGLE_CALENDAR_MAX_RESULTS,
                     "singleEvents": True,
                     "orderBy": "startTime",
                     "showDeleted": True,
@@ -125,7 +136,7 @@ class GoogleCalendarAdapter(OAuthCalendarAdapter):
                     "GET",
                     f"{self.api_base_url}/calendars/primary/events",
                     params=params,
-                    timeout=30.0,
+                    timeout=CALENDAR_API_TIMEOUT_SECONDS,
                 )
                 data = response.json()
 
@@ -182,7 +193,7 @@ class GoogleCalendarAdapter(OAuthCalendarAdapter):
                 f"{self.api_base_url}/calendars/primary/events",
                 json=google_event,
                 headers={"Content-Type": "application/json"},
-                timeout=30.0,
+                timeout=CALENDAR_API_TIMEOUT_SECONDS,
             )
             data = response.json()
             google_id = data["id"]
@@ -207,7 +218,7 @@ class GoogleCalendarAdapter(OAuthCalendarAdapter):
                 f"{self.api_base_url}/calendars/primary/events/{external_id}",
                 json=google_event,
                 headers={"Content-Type": "application/json"},
-                timeout=30.0,
+                timeout=CALENDAR_API_TIMEOUT_SECONDS,
             )
 
             self.logger.info("Updated Google event: %s", external_id)
@@ -225,7 +236,7 @@ class GoogleCalendarAdapter(OAuthCalendarAdapter):
             self.api_request(
                 "DELETE",
                 f"{self.api_base_url}/calendars/primary/events/{external_id}",
-                timeout=30.0,
+                timeout=CALENDAR_API_TIMEOUT_SECONDS,
             )
 
             self.logger.info("Deleted Google event: %s", external_id)
@@ -335,7 +346,13 @@ class GoogleCalendarAdapter(OAuthCalendarAdapter):
         local_tz = self._get_local_timezone()
 
         def _is_date_only(value: Any) -> bool:
-            return isinstance(value, str) and "T" not in value and len(value.strip()) == 10
+            from config.constants import ISO_DATE_ONLY_LENGTH
+
+            return (
+                isinstance(value, str)
+                and "T" not in value
+                and len(value.strip()) == ISO_DATE_ONLY_LENGTH
+            )
 
         is_all_day = False
         if hasattr(event, "is_all_day_event"):

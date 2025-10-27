@@ -30,6 +30,9 @@ from ui.common.notification import get_notification_manager
 
 logger = logging.getLogger(__name__)
 
+# Constants
+SECONDS_PER_MINUTE = 60
+
 
 class OperationLogger:
     """
@@ -80,7 +83,7 @@ class OperationLogger:
         except Exception as e:
             logger.error(f"Failed to log operation: {e}")
 
-    def get_recent_operations(self, count: int = 10) -> list:
+    def get_recent_operations(self, count: int = None) -> list:
         """
         获取最近的操作记录
 
@@ -90,6 +93,11 @@ class OperationLogger:
         Returns:
             操作记录列表
         """
+        from config.constants import DEFAULT_RECENT_OPERATIONS_COUNT
+
+        if count is None:
+            count = DEFAULT_RECENT_OPERATIONS_COUNT
+
         if not self.log_file.exists():
             return []
 
@@ -180,8 +188,10 @@ class UserFeedback:
         notification_mgr = get_notification_manager()
         operation_logger = get_operation_logger()
 
-        minutes = int(duration / 60)
-        seconds = int(duration % 60)
+        from config.constants import SECONDS_PER_MINUTE
+
+        minutes = int(duration / SECONDS_PER_MINUTE)
+        seconds = int(duration % SECONDS_PER_MINUTE)
         time_str = f"{minutes}分{seconds}秒" if minutes > 0 else f"{seconds}秒"
 
         message = f"{file_name} 转录完成（耗时 {time_str}）"
@@ -211,8 +221,8 @@ class UserFeedback:
         notification_mgr = get_notification_manager()
         operation_logger = get_operation_logger()
 
-        minutes = int(duration / 60)
-        seconds = int(duration % 60)
+        minutes = int(duration / SECONDS_PER_MINUTE)
+        seconds = int(duration % SECONDS_PER_MINUTE)
         time_str = f"{minutes}分{seconds}秒" if minutes > 0 else f"{seconds}秒"
 
         message = f"录制完成（时长 {time_str}）"
@@ -389,16 +399,13 @@ class StatusUpdater:
         # 更新状态文本
         self.status_label.setText(message)
 
-        # 根据状态类型设置样式
-        style_map = {
-            "info": "color: #666;",
-            "success": "color: #28a745;",
-            "warning": "color: #ffc107;",
-            "error": "color: #dc3545;",
-        }
+        # 根据状态类型设置语义属性
+        self.status_label.setProperty("role", "user-feedback")
+        self.status_label.setProperty("state", status_type)
 
-        style = style_map.get(status_type, style_map["info"])
-        self.status_label.setStyleSheet(style)
+        # 强制样式更新
+        self.status_label.style().unpolish(self.status_label)
+        self.status_label.style().polish(self.status_label)
 
         logger.debug(f"Status updated: {message} ({status_type})")
 
@@ -406,4 +413,9 @@ class StatusUpdater:
         """清除状态"""
         if self.status_label is not None:
             self.status_label.setText("")
-            self.status_label.setStyleSheet("")
+            self.status_label.setProperty("role", None)
+            self.status_label.setProperty("state", None)
+
+            # 强制样式更新
+            self.status_label.style().unpolish(self.status_label)
+            self.status_label.style().polish(self.status_label)

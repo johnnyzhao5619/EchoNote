@@ -29,7 +29,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Dict, Optional, Tuple
 from urllib.parse import parse_qs, urlparse
 
-from PySide6.QtCore import Qt, QThread, QTimer, Signal
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QDialog,
     QHBoxLayout,
@@ -102,7 +102,6 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
 
     def log_message(self, format, *args):
         """Suppress default logging."""
-        pass
 
 
 class OAuthDialog(QDialog):
@@ -177,7 +176,11 @@ class OAuthDialog(QDialog):
     def setup_ui(self):
         """Set up the dialog UI."""
         # Set dialog properties
-        self.setWindowTitle(f"Connect {self.provider.capitalize()} Calendar")
+        self.setWindowTitle(
+            self.i18n.t(
+                "calendar_hub.oauth_dialog.connect_title", provider=self.provider.capitalize()
+            )
+        )
         self.setMinimumWidth(500)
         self.setModal(True)
 
@@ -201,9 +204,9 @@ class OAuthDialog(QDialog):
         layout.addWidget(self.progress_bar)
 
         # Status label
-        self.status_label = QLabel("Ready to authorize")
+        self.status_label = QLabel(self.i18n.t("calendar_hub.oauth_dialog.ready_to_authorize"))
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.status_label.setStyleSheet("color: #666; font-style: italic;")
+        self.status_label.setProperty("role", "oauth-status")
         layout.addWidget(self.status_label)
 
         # Buttons
@@ -230,7 +233,7 @@ class OAuthDialog(QDialog):
             <li>Grant EchoNote permission to access your calendar</li>
             <li>You will be redirected back to EchoNote automatically</li>
         </ol>
-        <p><strong>Note:</strong> EchoNote will only access your calendar data. 
+        <p><strong>Note:</strong> EchoNote will only access your calendar data.
         We never store your password.</p>
         """
 
@@ -254,7 +257,7 @@ class OAuthDialog(QDialog):
         buttons_layout.addWidget(self.cancel_btn)
 
         # Start authorization button
-        self.auth_btn = QPushButton("Start Authorization")
+        self.auth_btn = QPushButton(self.i18n.t("calendar_hub.oauth_dialog.start_authorization"))
         self.auth_btn.setObjectName("primary_button")
         self.auth_btn.clicked.connect(self._on_auth_clicked)
         buttons_layout.addWidget(self.auth_btn)
@@ -267,7 +270,9 @@ class OAuthDialog(QDialog):
             # Update UI
             self.auth_btn.setEnabled(False)
             self.progress_bar.setVisible(True)
-            self.status_label.setText("Waiting for authorization...")
+            self.status_label.setText(
+                self.i18n.t("calendar_hub.oauth_dialog.waiting_authorization")
+            )
 
             # Start callback server
             self._start_callback_server()
@@ -463,9 +468,15 @@ class OAuthDialog(QDialog):
         try:
             if self.auth_code:
                 if self.callback_state != self.expected_state:
-                    mismatch_message = "Authorization state mismatch detected. The flow was cancelled for your safety."
-                    self.status_label.setText("Authorization failed: state mismatch")
-                    self.status_label.setStyleSheet("color: red; font-weight: bold;")
+                    mismatch_message = (
+                        "Authorization state mismatch detected. "
+                        "The flow was cancelled for your safety."
+                    )
+                    self.status_label.setText(
+                        self.i18n.t("calendar_hub.oauth_dialog.authorization_failed")
+                    )
+                    self.status_label.setProperty("role", "oauth-status")
+                    self.status_label.setProperty("state", "error")
                     self._show_error(mismatch_message)
                     self.authorization_failed.emit(mismatch_message)
                     QTimer.singleShot(2000, self._reset_ui)
@@ -478,8 +489,11 @@ class OAuthDialog(QDialog):
                     return
 
                 # Success
-                self.status_label.setText("Authorization successful!")
-                self.status_label.setStyleSheet("color: green; font-weight: bold;")
+                self.status_label.setText(
+                    self.i18n.t("calendar_hub.oauth_dialog.authorization_successful")
+                )
+                self.status_label.setProperty("role", "oauth-status")
+                self.status_label.setProperty("state", "success")
 
                 # Emit signal
                 self.authorization_complete.emit(self.auth_code, self.code_verifier)
@@ -492,8 +506,11 @@ class OAuthDialog(QDialog):
             else:
                 # Failed
                 error_msg = self.auth_error or "Unknown error"
-                self.status_label.setText(f"Authorization failed: {error_msg}")
-                self.status_label.setStyleSheet("color: red; font-weight: bold;")
+                self.status_label.setText(
+                    self.i18n.t("calendar_hub.oauth_dialog.authorization_failed", error=error_msg)
+                )
+                self.status_label.setProperty("role", "oauth-status")
+                self.status_label.setProperty("state", "error")
 
                 # Emit signal
                 self.authorization_failed.emit(error_msg)
@@ -532,8 +549,8 @@ class OAuthDialog(QDialog):
         """Reset UI to initial state."""
         self.auth_btn.setEnabled(True)
         self.progress_bar.setVisible(False)
-        self.status_label.setText("Ready to authorize")
-        self.status_label.setStyleSheet("color: #666; font-style: italic;")
+        self.status_label.setText(self.i18n.t("calendar_hub.oauth_dialog.ready_to_authorize"))
+        # Style is already set via property
 
     def _on_cancel_clicked(self):
         """Handle cancel button click."""
@@ -552,7 +569,9 @@ class OAuthDialog(QDialog):
         Args:
             message: Error message
         """
-        QMessageBox.critical(self, "Authorization Error", message)
+        QMessageBox.critical(
+            self, self.i18n.t("calendar_hub.oauth_dialog.authorization_error"), message
+        )
 
     def closeEvent(self, event):
         """Handle dialog close event."""
@@ -607,10 +626,10 @@ class OAuthResultDialog(QDialog):
 
         # Icon and message
         icon = "✓" if self.success else "✗"
-        color = "green" if self.success else "red"
-
-        icon_label = QLabel(f"<h1 style='color: {color};'>{icon}</h1>")
+        icon_label = QLabel(f"<h1>{icon}</h1>")
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        icon_label.setProperty("role", "oauth-status")
+        icon_label.setProperty("state", "success" if self.success else "error")
         layout.addWidget(icon_label)
 
         message_label = QLabel(self.message)

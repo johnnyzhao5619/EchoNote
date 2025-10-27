@@ -22,8 +22,10 @@ Displays event information with different layouts for past and future events.
 import logging
 from typing import Any, Dict, Optional
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QColor, QFont, QPalette
+from PySide6.QtCore import Signal
+from PySide6.QtGui import QFont
+
+# QColor, QPalette imports removed - using semantic styling instead
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -66,20 +68,20 @@ class CurrentTimeIndicator(QFrame):
         left_line = QFrame()
         left_line.setFrameShape(QFrame.Shape.HLine)
         left_line.setFrameShadow(QFrame.Shadow.Plain)
-        left_line.setStyleSheet("background-color: #F44336; " "border: 1px dashed #F44336;")
+        left_line.setProperty("role", "current-time-line")
         left_line.setFixedHeight(2)
         layout.addWidget(left_line, stretch=1)
 
         # Label
         label = QLabel(self.i18n.t("timeline.current_time"))
-        label.setStyleSheet("color: #F44336; font-weight: bold;")
+        label.setProperty("role", "current-time")
         layout.addWidget(label)
 
         # Right line (red dashed)
         right_line = QFrame()
         right_line.setFrameShape(QFrame.Shape.HLine)
         right_line.setFrameShadow(QFrame.Shadow.Plain)
-        right_line.setStyleSheet("background-color: #F44336; " "border: 1px dashed #F44336;")
+        right_line.setProperty("role", "current-time-line")
         right_line.setFixedHeight(2)
         layout.addWidget(right_line, stretch=1)
 
@@ -236,41 +238,14 @@ class EventCard(QFrame):
         # Event type badge
         type_badge = QLabel(self._get_event_type_badge_text())
         type_badge.setObjectName("type_badge")
-        type_badge.setStyleSheet(
-            """
-            QLabel#type_badge {
-                background-color: rgba(33, 150, 243, 0.2);
-                color: #2196F3;
-                padding: 2px 8px;
-                border-radius: 10px;
-                font-size: 10px;
-            }
-        """
-        )
+        type_badge.setProperty("role", "event-type-badge")
         self.type_badge_label = type_badge
         time_layout.addWidget(type_badge)
 
-        # Source badge - get colors from configuration
-        # Default colors if not configured
-        default_colors = {"local": "#2196F3", "google": "#EA4335", "outlook": "#FF6F00"}
-
-        # Try to get colors from event_data if provided by manager
-        source_colors = self.event_data.get("source_colors", default_colors)
-        source_color = source_colors.get(self.event.source, "#666")
-
+        # Source badge - use semantic properties for theming
         source_badge = QLabel(self._get_source_badge_text())
-        source_badge.setObjectName("source_badge")
-        source_badge.setStyleSheet(
-            f"""
-            QLabel#source_badge {{
-                background-color: rgba({int(source_color[1:3], 16)}, {int(source_color[3:5], 16)}, {int(source_color[5:7], 16)}, 0.2);
-                color: {source_color};
-                padding: 2px 8px;
-                border-radius: 10px;
-                font-size: 10px;
-            }}
-        """
-        )
+        source_badge.setProperty("role", "event-indicator")
+        source_badge.setProperty("source", self.event.source)
         self.source_badge_label = source_badge
         time_layout.addWidget(source_badge)
 
@@ -325,7 +300,7 @@ class EventCard(QFrame):
             if len(self.event.description) > 100:
                 desc_label.setText(desc_label.text() + "...")
             desc_label.setObjectName("description_label")
-            desc_label.setStyleSheet("font-size: 11px;")
+            desc_label.setProperty("role", "event-description")
             desc_label.setWordWrap(True)
             details_layout.addWidget(desc_label)
 
@@ -436,7 +411,7 @@ class EventCard(QFrame):
         if not (has_recording or has_transcript or has_translation):
             no_artifacts_label = QLabel(self.i18n.t("timeline.no_artifacts"))
             no_artifacts_label.setObjectName("no_artifacts_label")
-            no_artifacts_label.setStyleSheet("font-style: italic;")
+            no_artifacts_label.setProperty("role", "no-artifacts")
             actions_layout.addWidget(no_artifacts_label)
 
         actions_layout.addStretch()

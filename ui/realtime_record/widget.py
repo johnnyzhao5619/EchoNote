@@ -481,8 +481,8 @@ class RealtimeRecordWidget(QWidget):
         layout.addWidget(duration_label)
 
         # 录制时长显示
-        self.duration_value_label = QLabel("00:00:00")
-        self.duration_value_label.setStyleSheet("font-size: 16px; font-weight: bold;")
+        self.duration_value_label = QLabel(self.i18n.t("realtime_record.default_duration"))
+        self.duration_value_label.setProperty("role", "duration-display")
         layout.addWidget(self.duration_value_label)
 
         layout.addStretch()
@@ -732,7 +732,7 @@ class RealtimeRecordWidget(QWidget):
 
         # Warning icon and message
         warning_label = QLabel("⚠️")
-        warning_label.setStyleSheet("font-size: 20px;")
+        warning_label.setProperty("role", "warning-large")
         guide_layout.addWidget(warning_label)
 
         message_label = QLabel(self.i18n.t("realtime_record.no_models_message"))
@@ -1036,11 +1036,14 @@ class RealtimeRecordWidget(QWidget):
             self.feedback_label.setVisible(False)
             return
 
-        palette = {"error": "#B3261E", "success": "#1B5E20", "info": "#1E88E5"}
-        color = palette.get(level, "#1E88E5")
-        self.feedback_label.setStyleSheet(f"color: {color}; font-weight: 600;")
+        self.feedback_label.setProperty("role", "feedback")
+        self.feedback_label.setProperty("state", level)  # "error", "success", or "info"
         self.feedback_label.setText(message)
         self.feedback_label.setVisible(True)
+
+        # Force style refresh to apply new properties
+        self.feedback_label.style().unpolish(self.feedback_label)
+        self.feedback_label.style().polish(self.feedback_label)
 
     def _show_error(self, error: str):
         """显示错误信息，并确保在主线程执行。"""
