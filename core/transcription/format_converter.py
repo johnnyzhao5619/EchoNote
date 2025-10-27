@@ -22,6 +22,10 @@ Converts internal transcription format to various output formats (TXT, SRT, MD).
 import logging
 from typing import Dict, List
 
+# Time constants
+SECONDS_PER_MINUTE = 60
+SECONDS_PER_HOUR = 3600
+
 logger = logging.getLogger("echonote.transcription.format_converter")
 
 

@@ -22,9 +22,9 @@ Provides navigation buttons for switching between different features.
 import logging
 from typing import Dict, Optional
 
-from PySide6.QtCore import Signal
-from PySide6.QtGui import QIcon
-from PySide6.QtWidgets import QPushButton, QSizePolicy, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QSizePolicy
+
+from ui.qt_imports import QIcon, QPushButton, QVBoxLayout, QWidget, Signal
 
 from utils.i18n import I18nQtManager
 

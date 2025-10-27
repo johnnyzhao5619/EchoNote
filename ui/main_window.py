@@ -23,9 +23,11 @@ content area for different features.
 import logging
 from typing import Any, Dict, Optional
 
-from PySide6.QtCore import QPoint, QSettings, QSize, Qt
+from PySide6.QtCore import QPoint, QSettings
 from PySide6.QtGui import QCloseEvent
-from PySide6.QtWidgets import QApplication, QHBoxLayout, QMainWindow, QStackedWidget, QWidget
+from PySide6.QtWidgets import QHBoxLayout, QMainWindow
+
+from ui.qt_imports import QApplication, QSize, QStackedWidget, Qt, QWidget
 
 from utils.i18n import I18nQtManager
 

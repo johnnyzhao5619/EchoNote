@@ -92,8 +92,8 @@ class TranscriptionManager:
                     os.chmod(default_path, 0o700)
                 except Exception as permission_error:
                     logger.warning(
-                        f"Could not set directory permissions for default save path {default_path}: "
-                        f"{permission_error}"
+                        f"Could not set directory permissions for default save path "
+                        f"{default_path}: {permission_error}"
                     )
                 self._default_save_path = str(default_path)
             except Exception as exc:
