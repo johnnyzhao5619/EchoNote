@@ -22,10 +22,6 @@ Converts internal transcription format to various output formats (TXT, SRT, MD).
 import logging
 from typing import Dict, List
 
-# Time constants
-SECONDS_PER_MINUTE = 60
-SECONDS_PER_HOUR = 3600
-
 logger = logging.getLogger("echonote.transcription.format_converter")
 
 
@@ -209,10 +205,10 @@ class FormatConverter:
         Returns:
             Formatted timestamp string
         """
+        from config.constants import SECONDS_PER_HOUR, SECONDS_PER_MINUTE, MARKDOWN_TIMESTAMP_FORMAT
+
         hours = int(seconds // SECONDS_PER_HOUR)
         minutes = int((seconds % SECONDS_PER_HOUR) // SECONDS_PER_MINUTE)
         secs = int(seconds % SECONDS_PER_MINUTE)
-
-        from config.constants import MARKDOWN_TIMESTAMP_FORMAT
 
         return MARKDOWN_TIMESTAMP_FORMAT.format(hours, minutes, secs)

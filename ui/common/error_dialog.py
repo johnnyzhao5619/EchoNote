@@ -160,7 +160,7 @@ class ErrorDialog(QDialog):
         if self.i18n:
             self.copy_button.setText(self.i18n.t("common.copied"))
         else:
-            self.copy_button.setText(self.i18n.t("common.copied"))
+            self.copy_button.setText("Copied!")
 
         # Reset button text after 2 seconds
         QTimer.singleShot(2000, self._update_copy_button_text)
