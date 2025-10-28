@@ -3,230 +3,114 @@
 **Release Date:** October 26, 2025  
 **Migration:** PySide6 + Apache 2.0 License
 
-## 🎉 Major Changes
+## 🎉 主要变更
 
-### UI Framework Migration: PyQt6 → PySide6
+### UI 框架迁移: PyQt6 → PySide6
 
-EchoNote has successfully migrated from PyQt6 to PySide6, resolving license compatibility issues and enabling unrestricted commercial distribution.
+成功从 PyQt6 迁移到 PySide6，解决许可证兼容性问题，支持无限制商业分发。
 
-**Key Benefits:**
+**核心优势:**
 
-- ✅ **License Compatibility**: PySide6 (LGPL v3) is fully compatible with Apache 2.0
-- ✅ **Commercial Freedom**: No licensing restrictions for commercial use
-- ✅ **Official Support**: PySide6 is officially maintained by The Qt Company
-- ✅ **Zero Functionality Impact**: All features work identically
+- ✅ **许可证兼容**: PySide6 (LGPL v3) 与 Apache 2.0 完全兼容
+- ✅ **商业自由**: 无商业使用限制
+- ✅ **官方支持**: Qt 公司官方维护
+- ✅ **零功能影响**: 所有功能保持一致
 
-### License Update: MIT → Apache 2.0
+### 许可证更新: MIT → Apache 2.0
 
-The project license has been updated to Apache 2.0 for better compatibility with the PySide6 ecosystem and to provide clearer patent protection.
+更新为 Apache 2.0 许可证，提供更好的专利保护和企业兼容性。
 
-**Benefits:**
+## 🔧 技术变更
 
-- 🛡️ **Patent Protection**: Explicit patent grant and protection
-- 🤝 **Enterprise Friendly**: Widely accepted in corporate environments
-- 📄 **Clear Attribution**: Standardized attribution requirements
-- 🔓 **Commercial Use**: Unrestricted commercial distribution
-
-## 🔧 Technical Changes
-
-### Dependencies Updated
+### 依赖更新
 
 ```diff
-# requirements.txt
 - PyQt6>=6.6.0
 + PySide6>=6.6.0
-
-# requirements-dev.txt
-- PyQt6-stubs
-+ PySide6-stubs>=6.5.0
 ```
 
-### Code Changes
-
-**Import Statements:**
+### 代码变更
 
 ```diff
-- from PyQt6.QtWidgets import QWidget, QVBoxLayout
-+ from PySide6.QtWidgets import QWidget, QVBoxLayout
-
 - from PyQt6.QtCore import pyqtSignal, pyqtSlot
 + from PySide6.QtCore import Signal, Slot
-```
 
-**Signal/Slot Syntax:**
-
-```diff
-- data_changed = pyqtSignal(str)
-+ data_changed = Signal(str)
-
-- @pyqtSlot()
-+ @Slot()
-```
-
-**QAction Import:**
-
-```diff
 - from PyQt6.QtWidgets import QAction
 + from PySide6.QtGui import QAction
 ```
 
-### Build System Updates
+## 📊 性能影响
 
-- **CI/CD**: Updated GitHub Actions to use PySide6
-- **Packaging**: Updated PyInstaller configuration for PySide6 plugins
-- **Docker**: Updated container images with PySide6 dependencies
+迁移性能测试显示影响最小:
 
-## 📊 Performance Impact
+| 指标     | PyQt6 基准 | PySide6 结果 | 变化   |
+| -------- | ---------- | ------------ | ------ |
+| 启动时间 | 3.2s       | 3.1s         | -3% ✅ |
+| 内存使用 | 285MB      | 292MB        | +2% ✅ |
 
-Migration performance testing shows minimal impact:
+## 🔄 升级指南
 
-| Metric              | PyQt6 Baseline | PySide6 Result | Change |
-| ------------------- | -------------- | -------------- | ------ |
-| Startup Time        | 3.2s           | 3.1s           | -3% ✅ |
-| Memory Usage (Idle) | 285MB          | 292MB          | +2% ✅ |
-| UI Response Time    | 45ms           | 43ms           | -4% ✅ |
-| Transcription Speed | 2.3x realtime  | 2.3x realtime  | 0% ✅  |
+### 最终用户
 
-**Conclusion:** Performance remains within acceptable variance (±10%).
+**无需任何操作** - 透明迁移:
 
-## 🔄 Upgrade Guide
+- 所有现有数据和配置保持不变
+- 所有功能工作方式完全一致
 
-### For End Users
+### 开发者
 
-**No Action Required** - This is a transparent migration:
+**贡献者更新环境:**
 
-- All existing data and configurations are preserved
-- All features work identically
-- No changes to user workflows
+```bash
+pip uninstall PyQt6 PyQt6-stubs
+pip install -r requirements-dev.txt
+```
 
-### For Developers
+**基于 EchoNote 开发:**
 
-**If you're contributing to EchoNote:**
+- 更新依赖使用 PySide6
+- 检查许可证兼容性 (Apache 2.0 + LGPL v3)
 
-1. **Update Development Environment:**
+## 📋 许可证合规
 
-   ```bash
-   pip uninstall PyQt6 PyQt6-stubs
-   pip install -r requirements-dev.txt
-   ```
+### Apache 2.0 要求
 
-2. **Update Import Statements:**
+分发时需要:
 
-   - Use PySide6 imports instead of PyQt6
-   - Use Signal/Slot instead of pyqtSignal/pyqtSlot
-   - Import QAction from QtGui instead of QtWidgets
+- ✅ 包含 LICENSE 文件
+- ✅ 保留源文件版权声明
 
-3. **Run Migration Verification:**
-   ```bash
-   python scripts/verify_pyside6_migration.py
-   ```
+### PySide6 (LGPL v3) 合规
 
-**If you're building on EchoNote:**
+通过动态链接符合 LGPL v3:
 
-- Update your dependencies to use PySide6
-- Review license compatibility (Apache 2.0 + LGPL v3)
-- No API changes required - PySide6 is API-compatible
+- ✅ 动态链接 PySide6 (非静态链接)
+- ✅ 用户可独立替换 PySide6 库
 
-## 📋 License Compliance
+## 🐛 已知问题
 
-### Apache 2.0 Requirements
+### 兼容性说明
 
-When distributing EchoNote or derivative works:
+- **Python**: 需要 Python 3.10+ (无变化)
+- **平台**: macOS, Linux, Windows (无变化)
 
-- ✅ Include the LICENSE file
-- ✅ Preserve copyright notices in source files
-- ✅ Document any modifications made
+## 🔄 回滚信息
 
-### PySide6 (LGPL v3) Requirements
+如发现关键问题，可执行回滚:
 
-EchoNote complies with LGPL v3 through dynamic linking:
+```bash
+git checkout pre-pyside6-migration
+pip install PyQt6>=6.6.0
+pip uninstall PySide6
+```
 
-- ✅ PySide6 is dynamically linked (not statically linked)
-- ✅ Source code links provided in THIRD_PARTY_LICENSES.md
-- ✅ Users can replace PySide6 library independently
-- ✅ No modifications made to PySide6 source code
+## 📞 支持
 
-**For Commercial Distribution:**
+### 问题报告
 
-- ✅ No additional licensing fees required
-- ✅ No source code disclosure required for your application
-- ✅ Standard LGPL compliance through dynamic linking
-
-## 🐛 Known Issues
-
-### Minor Issues
-
-- None identified during migration testing
-
-### Compatibility Notes
-
-- **Python**: Requires Python 3.10+ (unchanged)
-- **Platforms**: macOS, Linux, Windows (unchanged)
-- **Qt Version**: Now uses Qt 6.6+ via PySide6
-
-## 🔄 Rollback Information
-
-If critical issues are discovered, rollback procedures are available:
-
-1. **Code Rollback:**
-
-   ```bash
-   git checkout pre-pyside6-migration
-   ```
-
-2. **Dependency Rollback:**
-
-   ```bash
-   pip install PyQt6>=6.6.0
-   pip uninstall PySide6
-   ```
-
-3. **Verification:**
-   ```bash
-   python main.py  # Test application startup
-   pytest tests/   # Run test suite
-   ```
-
-**Rollback Time Estimate:** ~30 minutes
-
-## 🎯 Next Steps
-
-### Immediate (v1.1.x)
-
-- Monitor user feedback and performance metrics
-- Address any migration-related issues
-- Performance optimizations if needed
-
-### Future (v1.2.0+)
-
-- Leverage PySide6-specific features and optimizations
-- Enhanced Qt integration capabilities
-- Improved development tooling
-
-## 📞 Support
-
-### Reporting Issues
-
-- **GitHub Issues**: [Create an issue](https://github.com/echonote/echonote/issues)
-- **Migration Problems**: Tag with `migration` and `pyside6`
-- **License Questions**: Tag with `license` and `compliance`
-
-### Documentation
-
-- **Migration Guide**: `docs/PYSIDE6_MIGRATION_GUIDE.md`
-- **License Compliance**: `THIRD_PARTY_LICENSES.md`
-- **Developer Guide**: `docs/DEVELOPER_GUIDE.md`
-
-## 🙏 Acknowledgments
-
-Special thanks to:
-
-- The Qt Company for maintaining PySide6
-- The EchoNote community for testing and feedback
-- Contributors who helped with the migration process
+- **GitHub Issues**: 创建 issue 并标记`migration`和`pyside6`
+- **许可证问题**: 标记`license`和`compliance`
 
 ---
 
-**Full Changelog**: [v1.0.0...v1.1.0](docs/CHANGELOG.md#v110---2025-10-26)
-
-**Download**: [Release v1.1.0](https://github.com/echonote/echonote/releases/tag/v1.1.0)
+**完整变更日志**: [v1.0.0...v1.1.0](docs/CHANGELOG.md#v110---2025-10-26)
