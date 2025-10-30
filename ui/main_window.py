@@ -23,11 +23,20 @@ content area for different features.
 import logging
 from typing import Any, Dict, Optional
 
-from PySide6.QtCore import QPoint, QSettings
-from PySide6.QtGui import QCloseEvent
-from PySide6.QtWidgets import QHBoxLayout, QMainWindow
-
-from ui.qt_imports import QApplication, QSize, QStackedWidget, Qt, QWidget
+from ui.qt_imports import (
+    QApplication,
+    QCloseEvent,
+    QHBoxLayout,
+    QKeySequence,
+    QMainWindow,
+    QPoint,
+    QSettings,
+    QShortcut,
+    QSize,
+    QStackedWidget,
+    Qt,
+    QWidget,
+)
 
 from utils.i18n import I18nQtManager
 
@@ -86,7 +95,7 @@ class MainWindow(QMainWindow):
         # Restore window state
         self.restore_window_state()
 
-        logger.info("Main window initialized")
+        logger.info(self.i18n.t("logging.main_window.initialized"))
 
     def setup_ui(self):
         """Set up the main window UI layout."""
@@ -100,8 +109,7 @@ class MainWindow(QMainWindow):
 
         # Create main layout (horizontal: sidebar + content)
         main_layout = QHBoxLayout(central_widget)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(0)
+        # # main_layout.setSpacing(0)
 
         # Create sidebar
         self.sidebar = self.create_sidebar()
@@ -135,7 +143,7 @@ class MainWindow(QMainWindow):
         # Import here to avoid circular imports
         from ui.sidebar import Sidebar
 
-        sidebar = Sidebar(self.i18n)
+        sidebar = Sidebar(self.i18n, self)
 
         # Connect page change signal
         sidebar.page_changed.connect(self.switch_page)
@@ -496,7 +504,7 @@ class MainWindow(QMainWindow):
                 if reply != QMessageBox.StandardButton.Yes:
                     # User chose not to exit
                     event.ignore()
-                    logger.info("Application exit cancelled by user")
+                    logger.info(self.i18n.t("logging.main_window.exit_cancelled"))
                     return
 
                 # If Yes, continue with exit (force stop tasks)
@@ -511,7 +519,7 @@ class MainWindow(QMainWindow):
             # Accept the close event
             event.accept()
 
-            logger.info("Main window closed")
+            logger.info(self.i18n.t("logging.main_window.closed"))
 
         except Exception as e:
             logger.error(f"Error during window close: {e}")
@@ -593,14 +601,14 @@ class MainWindow(QMainWindow):
         import time
 
         try:
-            logger.info("Starting application cleanup...")
+            logger.info(self.i18n.t("logging.main_window.cleanup_starting"))
             cleanup_start = time.time()
 
             # Close all open transcript viewer windows
             try:
                 batch_widget = self.pages.get("batch_transcribe")
                 if batch_widget and hasattr(batch_widget, "close_all_viewers"):
-                    logger.info("Closing all transcript viewers...")
+                    logger.info(self.i18n.t("logging.main_window.closing_transcript_viewers"))
                     batch_widget.close_all_viewers()
             except Exception as e:
                 logger.error(f"Error closing transcript viewers: {e}")
@@ -610,7 +618,7 @@ class MainWindow(QMainWindow):
                 try:
                     transcription_manager = self.managers["transcription_manager"]
                     if hasattr(transcription_manager, "stop_all_tasks"):
-                        logger.info("Stopping transcription tasks...")
+                        logger.info(self.i18n.t("logging.main_window.stopping_transcription_tasks"))
                         transcription_manager.stop_all_tasks()
 
                         # Wait for tasks to stop (with timeout)
@@ -619,7 +627,9 @@ class MainWindow(QMainWindow):
                             time.sleep(0.1)
 
                         if transcription_manager._running:
-                            logger.warning("Transcription manager did not stop within timeout")
+                            logger.warning(
+                                self.i18n.t("logging.main_window.transcription_manager_timeout")
+                            )
                 except Exception as e:
                     logger.error(f"Error stopping transcription manager: {e}")
 
@@ -631,7 +641,7 @@ class MainWindow(QMainWindow):
                         hasattr(realtime_recorder, "is_recording")
                         and realtime_recorder.is_recording
                     ):
-                        logger.info("Stopping realtime recorder...")
+                        logger.info(self.i18n.t("logging.main_window.stopping_realtime_recorder"))
                         # Set flag to stop recording
                         realtime_recorder.is_recording = False
 
@@ -652,7 +662,7 @@ class MainWindow(QMainWindow):
                 try:
                     resource_monitor = self.managers["resource_monitor"]
                     if hasattr(resource_monitor, "stop"):
-                        logger.info("Stopping resource monitor...")
+                        logger.info(self.i18n.t("logging.main_window.stopping_resource_monitor"))
                         resource_monitor.stop()
                 except Exception as e:
                     logger.error(f"Error stopping resource monitor: {e}")
@@ -662,7 +672,7 @@ class MainWindow(QMainWindow):
                 try:
                     auto_task_scheduler = self.managers["auto_task_scheduler"]
                     if hasattr(auto_task_scheduler, "stop"):
-                        logger.info("Stopping auto task scheduler...")
+                        logger.info(self.i18n.t("logging.main_window.stopping_auto_task_scheduler"))
                         auto_task_scheduler.stop()
                 except Exception as e:
                     logger.error(f"Error stopping auto task scheduler: {e}")
@@ -671,7 +681,7 @@ class MainWindow(QMainWindow):
                 try:
                     sync_scheduler = self.managers["sync_scheduler"]
                     if hasattr(sync_scheduler, "stop"):
-                        logger.info("Stopping sync scheduler...")
+                        logger.info(self.i18n.t("logging.main_window.stopping_sync_scheduler"))
                         sync_scheduler.stop()
                 except Exception as e:
                     logger.error(f"Error stopping sync scheduler: {e}")
@@ -681,7 +691,7 @@ class MainWindow(QMainWindow):
                 try:
                     settings_manager = self.managers["settings_manager"]
                     if hasattr(settings_manager, "save_settings"):
-                        logger.info("Saving settings...")
+                        logger.info(self.i18n.t("logging.main_window.saving_settings"))
                         settings_manager.save_settings()
                 except Exception as e:
                     logger.error(f"Error saving settings: {e}")
@@ -691,7 +701,7 @@ class MainWindow(QMainWindow):
                 try:
                     db_connection = self.managers["db_connection"]
                     if hasattr(db_connection, "close_all"):
-                        logger.info("Closing database connection...")
+                        logger.info(self.i18n.t("logging.main_window.closing_database_connection"))
                         db_connection.close_all()
                 except Exception as e:
                     logger.error(f"Error closing database: {e}")
@@ -701,7 +711,7 @@ class MainWindow(QMainWindow):
                 try:
                     file_manager = self.managers["file_manager"]
                     if hasattr(file_manager, "cleanup_temp_files"):
-                        logger.info("Cleaning up old temporary files...")
+                        logger.info(self.i18n.t("logging.main_window.cleaning_temp_files"))
                         # Clean files older than 1 day (not current session files)
                         file_manager.cleanup_temp_files(older_than_days=1)
                 except Exception as e:
@@ -753,8 +763,6 @@ class MainWindow(QMainWindow):
 
     def _setup_keyboard_shortcuts(self):
         """Setup global keyboard shortcuts for accessibility."""
-        from PySide6.QtGui import QKeySequence, QShortcut
-
         # Navigation shortcuts (Ctrl+1-5)
         pages = ["batch_transcribe", "realtime_record", "calendar_hub", "timeline", "settings"]
         for i, page in enumerate(pages, 1):
@@ -770,7 +778,7 @@ class MainWindow(QMainWindow):
         quit_shortcut = QShortcut(QKeySequence("Ctrl+Q"), self)
         quit_shortcut.activated.connect(self.close)
 
-        logger.info("Keyboard shortcuts configured")
+        logger.info(self.i18n.t("logging.main_window.keyboard_shortcuts_configured"))
 
     def _on_api_keys_updated(self):
         """
@@ -779,14 +787,14 @@ class MainWindow(QMainWindow):
         This method is called when API keys are saved in settings.
         It notifies relevant components to reload their engines with new keys.
         """
-        logger.info("API keys updated, reloading cloud engines...")
+        logger.info(self.i18n.t("logging.main_window.api_keys_updated"))
 
         # Notify transcription manager to reload engines if needed
         transcription_manager = self.managers.get("transcription_manager")
         if transcription_manager and hasattr(transcription_manager, "reload_engine"):
             try:
                 transcription_manager.reload_engine()
-                logger.info("Transcription engine reloaded successfully")
+                logger.info(self.i18n.t("logging.main_window.transcription_engine_reloaded"))
             except Exception as e:
                 logger.error(f"Error reloading transcription engine: {e}")
 
@@ -795,11 +803,11 @@ class MainWindow(QMainWindow):
         if realtime_recorder and hasattr(realtime_recorder, "reload_engine"):
             try:
                 realtime_recorder.reload_engine()
-                logger.info("Realtime recorder engine reloaded successfully")
+                logger.info(self.i18n.t("logging.main_window.realtime_recorder_engine_reloaded"))
             except Exception as e:
                 logger.error(f"Error reloading realtime recorder engine: {e}")
 
-        logger.info("Cloud engines reload completed")
+        logger.info(self.i18n.t("logging.main_window.cloud_engines_reload_completed"))
 
     def add_page(self, page_name: str, page_widget: QWidget):
         """

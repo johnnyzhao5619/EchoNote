@@ -6,7 +6,6 @@ Integration tests for PySide6 migration verification.
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication
 
-
 def test_pyside6_qt_integration(qapp):
     """Test basic PySide6 Qt integration works."""
     timer = QTimer()
@@ -14,7 +13,6 @@ def test_pyside6_qt_integration(qapp):
     assert hasattr(timer, "timeout")
     assert hasattr(timer, "start")
     assert hasattr(timer, "stop")
-
 
 def test_pyside6_application_instance(qapp):
     """Test QApplication instance is properly created."""

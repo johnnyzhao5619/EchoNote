@@ -25,7 +25,6 @@ import re
 from pathlib import Path
 from typing import Tuple
 
-
 def validate_concurrent_tasks(value: int) -> Tuple[bool, str]:
     """
     Validate concurrent tasks count.
@@ -43,7 +42,6 @@ def validate_concurrent_tasks(value: int) -> Tuple[bool, str]:
         return False, "Concurrent tasks must be between 1 and 5"
 
     return True, ""
-
 
 def validate_file_path(path: str) -> Tuple[bool, str]:
     """
@@ -73,7 +71,6 @@ def validate_file_path(path: str) -> Tuple[bool, str]:
         return False, f"Path is not a file: {path}"
 
     return True, ""
-
 
 def validate_directory_path(path: str) -> Tuple[bool, str]:
     """
@@ -107,7 +104,6 @@ def validate_directory_path(path: str) -> Tuple[bool, str]:
         return False, f"Path is not a directory: {path}"
 
     return True, ""
-
 
 def validate_api_key(key: str, provider: str) -> Tuple[bool, str]:
     """
@@ -163,7 +159,6 @@ def validate_api_key(key: str, provider: str) -> Tuple[bool, str]:
 
     return True, ""
 
-
 def validate_email(email: str) -> Tuple[bool, str]:
     """
     Validate email address format.
@@ -187,7 +182,6 @@ def validate_email(email: str) -> Tuple[bool, str]:
         return False, "Invalid email format"
 
     return True, ""
-
 
 def validate_url(url: str) -> Tuple[bool, str]:
     """
@@ -225,7 +219,6 @@ def validate_url(url: str) -> Tuple[bool, str]:
 
     return True, ""
 
-
 def validate_language_code(code: str) -> Tuple[bool, str]:
     """
     Validate language code.
@@ -250,39 +243,31 @@ def validate_language_code(code: str) -> Tuple[bool, str]:
 
     return True, ""
 
-
 # Convenience functions that return only boolean
-
 
 def is_valid_concurrent_tasks(value: int) -> bool:
     """Check if concurrent tasks value is valid."""
     return validate_concurrent_tasks(value)[0]
 
-
 def is_valid_file_path(path: str) -> bool:
     """Check if file path is valid."""
     return validate_file_path(path)[0]
-
 
 def is_valid_directory_path(path: str) -> bool:
     """Check if directory path is valid."""
     return validate_directory_path(path)[0]
 
-
 def is_valid_api_key(key: str, provider: str) -> bool:
     """Check if API key is valid."""
     return validate_api_key(key, provider)[0]
-
 
 def is_valid_email(email: str) -> bool:
     """Check if email is valid."""
     return validate_email(email)[0]
 
-
 def is_valid_url(url: str) -> bool:
     """Check if URL is valid."""
     return validate_url(url)[0]
-
 
 def is_valid_language_code(code: str) -> bool:
     """Check if language code is valid."""

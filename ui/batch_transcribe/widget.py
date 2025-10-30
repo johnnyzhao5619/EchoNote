@@ -22,21 +22,33 @@ Provides UI for importing audio files and managing transcription tasks.
 import logging
 from typing import TYPE_CHECKING, Dict, Optional
 
-from PySide6.QtCore import QTimer, Signal
-from PySide6.QtWidgets import (
+from ui.qt_imports import (
     QComboBox,
     QFileDialog,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QListWidget,
     QListWidgetItem,
     QMessageBox,
     QPushButton,
+    QSize,
+    Qt,
+    QTimer,
     QVBoxLayout,
     QWidget,
+    Signal,
 )
 
 from core.transcription.manager import TranscriptionManager
+from ui.base_widgets import (
+    BaseWidget,
+    create_hbox,
+    create_vbox,
+    create_button,
+    create_primary_button,
+    connect_button_with_callback,
+)
 from ui.batch_transcribe.task_item import TaskItem
 from utils.i18n import I18nQtManager
 
@@ -46,7 +58,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger("echonote.ui.batch_transcribe")
 
 
-class BatchTranscribeWidget(QWidget):
+class BatchTranscribeWidget(BaseWidget):
     """
     Main widget for batch audio transcription.
 
@@ -72,10 +84,9 @@ class BatchTranscribeWidget(QWidget):
             model_manager: Model manager instance (optional)
             parent: Parent widget
         """
-        super().__init__(parent)
+        super().__init__(i18n, parent)
 
         self.transcription_manager = transcription_manager
-        self.i18n = i18n
         self.model_manager = model_manager
 
         # Task item widgets dictionary (task_id -> TaskItem)
@@ -103,21 +114,20 @@ class BatchTranscribeWidget(QWidget):
         self.refresh_timer.start(1000)  # Refresh every second
 
         # Start transcription processing
-        logger.info("Starting transcription task processing...")
+        logger.info(self.i18n.t("logging.batch_transcribe.starting_task_processing"))
         try:
             self.transcription_manager.start_processing()
-            logger.info("Transcription processing started")
+            logger.info(self.i18n.t("logging.batch_transcribe.processing_started"))
         except Exception as e:
             logger.error(f"Failed to start transcription processing: {e}")
 
-        logger.info("Batch transcribe widget initialized")
+        logger.info(self.i18n.t("logging.batch_transcribe.widget_initialized"))
 
     def setup_ui(self):
         """Set up the user interface."""
         # Main layout
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(15)
+        # # layout.setSpacing(15)
 
         # Title
         self.title_label = QLabel(self.i18n.t("batch_transcribe.title"))
@@ -125,27 +135,26 @@ class BatchTranscribeWidget(QWidget):
         layout.addWidget(self.title_label)
 
         # Toolbar
-        toolbar_layout = QHBoxLayout()
-        toolbar_layout.setSpacing(10)
+        toolbar_layout = create_hbox(spacing=10)
 
         # Import file button
         import_file_btn = QPushButton()
         import_file_btn.setObjectName("import_file_btn")
-        import_file_btn.clicked.connect(self._on_import_file)
+        connect_button_with_callback(import_file_btn, self._on_import_file)
         toolbar_layout.addWidget(import_file_btn)
         self.import_file_btn = import_file_btn
 
         # Import folder button
         import_folder_btn = QPushButton()
         import_folder_btn.setObjectName("import_folder_btn")
-        import_folder_btn.clicked.connect(self._on_import_folder)
+        connect_button_with_callback(import_folder_btn, self._on_import_folder)
         toolbar_layout.addWidget(import_folder_btn)
         self.import_folder_btn = import_folder_btn
 
         # Clear queue button
         clear_queue_btn = QPushButton()
         clear_queue_btn.setObjectName("clear_queue_btn")
-        clear_queue_btn.clicked.connect(self._on_clear_queue)
+        connect_button_with_callback(clear_queue_btn, self._on_clear_queue)
         toolbar_layout.addWidget(clear_queue_btn)
         self.clear_queue_btn = clear_queue_btn
 
@@ -193,7 +202,6 @@ class BatchTranscribeWidget(QWidget):
         # Task list
         task_list = QListWidget()
         task_list.setObjectName("task_list")
-        task_list.setSpacing(5)
         layout.addWidget(task_list)
         self.task_list = task_list
 
@@ -222,12 +230,12 @@ class BatchTranscribeWidget(QWidget):
                 logger.debug(f"Populated engines: {current_engine}")
             else:
                 # No engine available
-                combo.addItem("No engine configured")
+                combo.addItem(self.i18n.t("ui_strings.batch_transcribe.no_engine_configured"))
                 combo.setEnabled(False)
-                logger.warning("No speech engine available")
+                logger.warning(self.i18n.t("logging.batch_transcribe.no_speech_engine"))
         except Exception as e:
             logger.error(f"Error populating engines: {e}")
-            combo.addItem("Error loading engines")
+            combo.addItem(self.i18n.t("ui_strings.batch_transcribe.error_loading_engines"))
             combo.setEnabled(False)
 
     def _update_model_list(self):
@@ -253,7 +261,7 @@ class BatchTranscribeWidget(QWidget):
                 # Show download guide
                 self._show_download_guide()
 
-                logger.warning("No models downloaded")
+                logger.warning(self.i18n.t("logging.batch_transcribe.no_models_downloaded"))
             else:
                 # Enable combo box
                 self.model_combo.setEnabled(True)
@@ -271,20 +279,23 @@ class BatchTranscribeWidget(QWidget):
                 if index >= 0:
                     self.model_combo.setCurrentIndex(index)
                 else:
-                    # Select default model from config or first model
-                    default_model = self.model_manager._config.get(
-                        "transcription.faster_whisper.default_model"
-                    )
-                    if default_model:
-                        index = self.model_combo.findText(default_model)
-                        if index >= 0:
-                            self.model_combo.setCurrentIndex(index)
+                    # Select recommended model or first available model
+                    try:
+                        default_model = self.model_manager.recommend_model()
+                        if default_model:
+                            index = self.model_combo.findText(default_model)
+                            if index >= 0:
+                                self.model_combo.setCurrentIndex(index)
+                    except Exception as e:
+                        logger.debug(f"Could not get recommended model: {e}")
 
                 logger.info(f"Updated model list: {len(downloaded_models)} models")
 
         except Exception as e:
             logger.error(f"Error updating model list: {e}")
-            self.model_combo.addItem("Error loading models")
+            self.model_combo.addItem(
+                self.i18n.t("ui_strings.batch_transcribe.error_loading_models")
+            )
             self.model_combo.setEnabled(False)
 
     def _show_download_guide(self):
@@ -296,15 +307,11 @@ class BatchTranscribeWidget(QWidget):
 
         try:
             # Create download guide widget
-            from PySide6.QtCore import Qt
-            from PySide6.QtWidgets import QFrame
-
             guide_frame = QFrame()
             guide_frame.setObjectName("download_guide_frame")
             guide_frame.setFrameShape(QFrame.Shape.StyledPanel)
 
             guide_layout = QVBoxLayout(guide_frame)
-            guide_layout.setContentsMargins(20, 15, 20, 15)
 
             # Message label
             message_label = QLabel(self.i18n.t("batch_transcribe.no_models_message"))
@@ -313,9 +320,9 @@ class BatchTranscribeWidget(QWidget):
             guide_layout.addWidget(message_label)
 
             # Download button
-            download_btn = QPushButton(self.i18n.t("batch_transcribe.go_to_download"))
-            download_btn.setObjectName("primary_button")
-            download_btn.clicked.connect(self._on_go_to_download)
+            download_btn = create_button(self.i18n.t("batch_transcribe.go_to_download"))
+            download_btn = create_primary_button(download_btn.text())
+            connect_button_with_callback(download_btn, self._on_go_to_download)
             guide_layout.addWidget(download_btn, alignment=Qt.AlignmentFlag.AlignCenter)
 
             # Add to main layout (after toolbar, before task list)
@@ -343,15 +350,15 @@ class BatchTranscribeWidget(QWidget):
                 settings_widget = main_window.pages.get("settings")
                 if settings_widget and hasattr(settings_widget, "switch_to_page"):
                     # Give it a moment to switch pages
-                    from PySide6.QtCore import QTimer
-
                     QTimer.singleShot(
                         100, lambda: settings_widget.switch_to_page("model_management")
                     )
 
-                logger.info("Navigating to model management page")
+                logger.info(self.i18n.t("logging.batch_transcribe.navigating_to_model_management"))
             else:
-                logger.warning("Cannot navigate: main window not found")
+                logger.warning(
+                    self.i18n.t("logging.batch_transcribe.cannot_navigate_main_window_not_found")
+                )
 
         except Exception as e:
             logger.error(f"Error navigating to download page: {e}")
@@ -461,7 +468,7 @@ class BatchTranscribeWidget(QWidget):
                     self.transcription_manager.delete_task(task_id)
                     self._remove_task_item(task_id)
 
-                logger.info("Task queue cleared")
+                logger.info(self.i18n.t("logging.batch_transcribe.task_queue_cleared"))
 
         except Exception as e:
             logger.error(f"Error clearing queue: {e}")
@@ -580,8 +587,6 @@ class BatchTranscribeWidget(QWidget):
             # Add to list widget
             list_item = QListWidgetItem(self.task_list)
             # Set a fixed size hint to prevent overlapping
-            from PySide6.QtCore import QSize
-
             list_item.setSizeHint(QSize(800, 160))
             self.task_list.addItem(list_item)
             self.task_list.setItemWidget(list_item, task_item)
@@ -777,8 +782,7 @@ class BatchTranscribeWidget(QWidget):
             # Export
             self.transcription_manager.export_result(task_id, output_format, file_path)
 
-            QMessageBox.information(
-                self,
+            self.show_info(
                 self.i18n.t("common.success"),
                 self.i18n.t("batch_transcribe.export_success", path=file_path),
             )
@@ -808,7 +812,7 @@ class BatchTranscribeWidget(QWidget):
             title: Error title
             message: Error message
         """
-        QMessageBox.critical(self, title, message, QMessageBox.StandardButton.Ok)
+        self.show_error(title, message)
 
     def _set_tasks_pause_state(self, paused: bool):
         """Update pause button state for all task items."""
@@ -844,6 +848,6 @@ class BatchTranscribeWidget(QWidget):
             # Clear the dictionary
             self.open_viewers.clear()
 
-            logger.info("Closed all transcript viewers")
+            logger.info(self.i18n.t("logging.batch_transcribe.closed_all_transcript_viewers"))
         except Exception as e:
             logger.error(f"Error closing all viewers: {e}")

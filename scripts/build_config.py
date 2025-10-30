@@ -6,8 +6,6 @@
 
 import os
 import platform
-
-# import sys  # Removed unused import
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -63,7 +61,6 @@ DATA_FILES = [
 # Modules to exclude
 EXCLUDE_MODULES = ["PyQt6", "pytest", "black", "isort", "flake8", "mypy", "tkinter"]
 
-
 def get_platform_config() -> Dict[str, Any]:
     """Get platform-specific configuration."""
     system = platform.system().lower()
@@ -74,7 +71,6 @@ def get_platform_config() -> Dict[str, Any]:
         return {"icon": str(PROJECT_ROOT / "resources" / "icons" / "echonote.ico")}
     else:  # Linux
         return {"icon": str(PROJECT_ROOT / "resources" / "icons" / "echonote.png")}
-
 
 def get_pyside6_binaries() -> List[tuple]:
     """Get PySide6 binaries to include."""
@@ -99,7 +95,6 @@ def get_pyside6_binaries() -> List[tuple]:
     except ImportError:
         return []
 
-
 def clean_build_dirs():
     """Clean previous build directories."""
     import shutil
@@ -107,7 +102,6 @@ def clean_build_dirs():
     for path in [BUILD_DIR, DIST_DIR]:
         if path.exists():
             shutil.rmtree(path)
-
 
 def get_pyinstaller_args(console: bool = False) -> List[str]:
     """Get PyInstaller command line arguments."""
@@ -150,7 +144,6 @@ def get_pyinstaller_args(console: bool = False) -> List[str]:
         args.extend(["--exclude-module", module])
 
     return args
-
 
 if __name__ == "__main__":
     print(f"Project root: {PROJECT_ROOT}")

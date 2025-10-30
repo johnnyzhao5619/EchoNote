@@ -40,6 +40,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.base_widgets import (
+    BaseWidget,
+    create_button,
+    create_secondary_button,
+    create_hbox,
+    connect_button_with_callback,
+)
 from ui.common.notification import get_notification_manager
 from utils.i18n import LANGUAGE_OPTION_KEYS
 
@@ -76,11 +83,8 @@ class RealtimeRecorderSignals(QObject):
     # Signal emitted when a marker is added
     marker_added = Signal(object)
 
-    def __init__(self):
-        super().__init__()
 
-
-class RealtimeRecordWidget(QWidget):
+class RealtimeRecordWidget(BaseWidget):
     """实时录制主界面"""
 
     LANGUAGE_OPTIONS = LANGUAGE_OPTION_KEYS
@@ -105,11 +109,10 @@ class RealtimeRecordWidget(QWidget):
             model_manager: ModelManager 实例（可选）
             parent: 父窗口
         """
-        super().__init__(parent)
+        super().__init__(i18n_manager, parent)
         self.recorder = recorder
         self.audio_capture = audio_capture
         self._audio_available = audio_capture is not None
-        self.i18n = i18n_manager
         self.settings_manager = settings_manager
         self.model_manager = model_manager
 
@@ -192,12 +195,12 @@ class RealtimeRecordWidget(QWidget):
         self._init_async_loop()
 
         # 初始化 UI
-        self._init_ui()
+        self.setup_ui()
 
         # 连接语言切换信号
         self.i18n.language_changed.connect(self._update_ui_text)
 
-        logger.info("RealtimeRecordWidget initialized")
+        logger.info(self.i18n.t("logging.realtime_record.widget_initialized"))
 
     def _refresh_recording_preferences(self) -> None:
         """加载录音格式与保存策略设置。"""
@@ -228,13 +231,13 @@ class RealtimeRecordWidget(QWidget):
             """在独立线程中运行事件循环"""
             self._async_loop = asyncio.new_event_loop()
             asyncio.set_event_loop(self._async_loop)
-            logger.info("Async event loop started")
+            logger.info(self.i18n.t("logging.realtime_record.async_loop_started"))
             try:
                 self._async_loop.run_forever()
             finally:
-                logger.info("Async event loop stopping")
+                logger.info(self.i18n.t("logging.realtime_record.async_loop_stopping"))
                 self._async_loop.close()
-                logger.info("Async event loop stopped")
+                logger.info(self.i18n.t("logging.realtime_record.async_loop_stopped"))
 
         self._async_thread = threading.Thread(target=run_loop, daemon=True)
         self._async_thread.start()
@@ -248,45 +251,46 @@ class RealtimeRecordWidget(QWidget):
             time.sleep(0.1)
 
         if self._async_loop is None:
-            raise RuntimeError("Failed to initialize async event loop")
+            raise RuntimeError(
+                self.i18n.t("exceptions.realtime_record.failed_to_initialize_async_loop")
+            )
 
-    def _init_ui(self):
-        """初始化 UI 组件"""
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(12)
+    def setup_ui(self):
+        """初始化 UI 组件 - 使用标签页组织功能"""
+        from PySide6.QtWidgets import QTabWidget
 
-        # 标题
-        self.title_label = QLabel(self.i18n.t("realtime_record.title"))
-        self.title_label.setObjectName("page_title")
-        layout.addWidget(self.title_label)
+        main_layout = QVBoxLayout(self)
+        # # main_layout.setSpacing(16)
 
-        # 音频输入设置组
-        audio_group = self._create_audio_input_group()
-        layout.addWidget(audio_group)
+        # 标题和主控制按钮
+        header = self._create_header_section()
+        main_layout.addWidget(header)
 
-        # 语言设置组
-        language_group = self._create_language_group()
-        layout.addWidget(language_group)
+        # 标签页容器
+        self.tab_widget = QTabWidget()
+        self.tab_widget.setObjectName("main_tabs")
 
-        # 录制控制组
-        control_group = self._create_control_group()
-        layout.addWidget(control_group)
+        # 标签1: 录制控制
+        recording_tab = self._create_recording_tab()
+        self.tab_widget.addTab(
+            recording_tab, "🎙 " + self.i18n.t("realtime_record.recording_control")
+        )
 
-        # 状态反馈标签（用于展示录制成功/失败信息）
-        self.feedback_label = QLabel()
-        self.feedback_label.setObjectName("feedback_label")
-        self.feedback_label.setWordWrap(True)
-        self.feedback_label.setVisible(False)
-        layout.addWidget(self.feedback_label)
+        # 标签2: 转录结果
+        transcription_tab = self._create_transcription_tab()
+        self.tab_widget.addTab(
+            transcription_tab, "📝 " + self.i18n.t("realtime_record.transcription")
+        )
 
-        # 文本显示区域 - 使用水平分割器以避免堆叠
-        text_container = self._create_text_display_container()
-        layout.addWidget(text_container, stretch=1)
+        # 标签3: 翻译结果
+        translation_tab = self._create_translation_tab()
+        self.tab_widget.addTab(translation_tab, "🌐 " + self.i18n.t("realtime_record.translation"))
 
-        # 导出按钮组
-        export_group = self._create_export_group()
-        layout.addWidget(export_group)
+        # 标签4: 时间标记
+        markers_tab = self._create_markers_tab()
+        self.tab_widget.addTab(markers_tab, "📌 " + self.i18n.t("realtime_record.markers"))
+
+        main_layout.addWidget(self.tab_widget, stretch=1)
 
         # Update model list if model_manager is available
         if self.model_manager:
@@ -296,293 +300,431 @@ class RealtimeRecordWidget(QWidget):
         self._update_ui_text()
         self._update_audio_availability()
 
-    def _create_audio_input_group(self) -> QGroupBox:
-        """创建音频输入设置组"""
-        group = QGroupBox()
-        group.setObjectName("audio_input_group")
-        layout = QVBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(10)
+    def _create_recording_tab(self) -> QWidget:
+        """创建录制控制标签页"""
+        tab = QWidget()
+        tab.setObjectName("recording_tab")
+        layout = QVBoxLayout(tab)
+        # # layout.setSpacing(20)
 
-        # 音频输入源和增益控制
-        controls_layout = QHBoxLayout()
-        controls_layout.setSpacing(15)
+        # 设置区域
+        settings = self._create_settings_section()
+        layout.addWidget(settings)
 
-        # 音频输入源标签
-        input_label = QLabel()
-        input_label.setObjectName("input_label")
-        controls_layout.addWidget(input_label)
+        # 音频可视化
+        visualizer = self._create_visualizer_section()
+        layout.addWidget(visualizer)
 
-        # 音频输入源下拉框
-        self.input_combo = QComboBox()
-        self.input_combo.setMinimumWidth(200)
-        self.input_combo.setMaximumWidth(300)
-        self._populate_input_devices()
-        controls_layout.addWidget(self.input_combo)
-
-        controls_layout.addSpacing(30)
-
-        # 增益标签
-        gain_label = QLabel()
-        gain_label.setObjectName("gain_label")
-        controls_layout.addWidget(gain_label)
-
-        # 增益滑块
-        self.gain_slider = QSlider(Qt.Orientation.Horizontal)
-        self.gain_slider.setMinimum(10)  # 0.1x
-        self.gain_slider.setMaximum(200)  # 2.0x
-        self.gain_slider.setValue(100)  # 1.0x
-        self.gain_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
-        self.gain_slider.setTickInterval(10)
-        self.gain_slider.setMinimumWidth(150)
-        self.gain_slider.setMaximumWidth(250)
-        self.gain_slider.valueChanged.connect(self._on_gain_changed)
-        controls_layout.addWidget(self.gain_slider)
-
-        # 增益值显示
-        self.gain_value_label = QLabel("1.0x")
-        self.gain_value_label.setMinimumWidth(50)
-        controls_layout.addWidget(self.gain_value_label)
-
-        controls_layout.addStretch()
-
-        layout.addLayout(controls_layout)
-
-        # 音频可视化组件
-        from ui.realtime_record.audio_visualizer import AudioVisualizer
-
-        self.audio_visualizer = AudioVisualizer()
-        self.audio_visualizer.setMinimumHeight(50)
-        self.audio_visualizer.setMaximumHeight(70)
-        self.signals.audio_data_available.connect(
-            self.audio_visualizer.update_audio_data, Qt.ConnectionType.QueuedConnection
-        )
-        layout.addWidget(self.audio_visualizer)
-
-        self.audio_unavailable_label = QLabel()
-        self.audio_unavailable_label.setObjectName("audio_unavailable_label")
-        self.audio_unavailable_label.setWordWrap(True)
-        self.audio_unavailable_label.setVisible(False)
-        layout.addWidget(self.audio_unavailable_label)
-
-        group.setLayout(layout)
-        return group
-
-    def _create_language_group(self) -> QGroupBox:
-        """创建语言设置组"""
-        group = QGroupBox()
-        group.setObjectName("language_group")
-        layout = QHBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(15)
-
-        # Model selection (if model_manager is available)
-        if self.model_manager:
-            model_label = QLabel()
-            model_label.setObjectName("model_label")
-            layout.addWidget(model_label)
-
-            self.model_combo = QComboBox()
-            self.model_combo.setMinimumWidth(150)
-            self.model_combo.setMaximumWidth(200)
-            layout.addWidget(self.model_combo)
-
-            layout.addSpacing(20)
-
-        # 源语言标签
-        source_lang_label = QLabel()
-        source_lang_label.setObjectName("source_lang_label")
-        layout.addWidget(source_lang_label)
-
-        # 源语言下拉框
-        self.source_lang_combo = QComboBox()
-        self.source_lang_combo.setMinimumWidth(120)
-        self.source_lang_combo.setMaximumWidth(150)
-        for code, label_key in self.LANGUAGE_OPTIONS:
-            self.source_lang_combo.addItem(self.i18n.t(label_key), code)
-        layout.addWidget(self.source_lang_combo)
-
-        layout.addSpacing(20)
-
-        # 启用翻译复选框
-        self.enable_translation_checkbox = QCheckBox()
-        self.enable_translation_checkbox.setObjectName("enable_translation_checkbox")
-        self.enable_translation_checkbox.stateChanged.connect(self._on_translation_toggled)
-
-        # 检查翻译引擎是否可用
-        if not self.recorder.translation_engine:
-            tooltip = self.i18n.t("realtime_record.translation_disabled_tooltip")
-            self.enable_translation_checkbox.setEnabled(False)
-            self.enable_translation_checkbox.setToolTip(tooltip)
-        else:
-            self.enable_translation_checkbox.setToolTip("")
-
-        layout.addWidget(self.enable_translation_checkbox)
-
-        layout.addSpacing(10)
-
-        # 目标语言标签
-        target_lang_label = QLabel()
-        target_lang_label.setObjectName("target_lang_label")
-        layout.addWidget(target_lang_label)
-
-        # 目标语言下拉框
-        self.target_lang_combo = QComboBox()
-        self.target_lang_combo.setMinimumWidth(120)
-        self.target_lang_combo.setMaximumWidth(150)
-        for code, label_key in self.LANGUAGE_OPTIONS:
-            self.target_lang_combo.addItem(self.i18n.t(label_key), code)
-        # 默认禁用，只有勾选翻译复选框时才启用
-        self.target_lang_combo.setEnabled(False)
-
-        # 如果翻译引擎不可用，也禁用目标语言选择
-        if not self.recorder.translation_engine:
-            tooltip = self.i18n.t("realtime_record.translation_disabled_tooltip")
-            self.target_lang_combo.setToolTip(tooltip)
-        else:
-            self.target_lang_combo.setToolTip("")
-
-        layout.addWidget(self.target_lang_combo)
+        # 状态和操作
+        status_section = self._create_status_section()
+        layout.addWidget(status_section)
 
         layout.addStretch()
 
-        group.setLayout(layout)
-        return group
+        return tab
 
-    def _create_control_group(self) -> QGroupBox:
-        """创建录制控制组"""
-        group = QGroupBox()
-        group.setObjectName("control_group")
-        layout = QHBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(15)
+    def _create_transcription_tab(self) -> QWidget:
+        """创建转录结果标签页"""
+        tab = QWidget()
+        tab.setObjectName("transcription_tab")
+        layout = QVBoxLayout(tab)
+        # # layout.setSpacing(0)
 
-        # 开始/停止录制按钮
-        self.record_button = QPushButton()
-        self.record_button.setObjectName("record_button")
-        self.record_button.setMinimumHeight(40)
-        self.record_button.setMinimumWidth(150)
-        self.record_button.clicked.connect(self._toggle_recording)
-        layout.addWidget(self.record_button)
+        # 工具栏
+        toolbar = self._create_text_toolbar("transcription")
+        layout.addWidget(toolbar)
 
-        # 添加标记按钮
-        self.add_marker_button = QPushButton()
-        self.add_marker_button.setObjectName("add_marker_button")
-        self.add_marker_button.setMinimumHeight(40)
-        self.add_marker_button.setEnabled(False)
-        self.add_marker_button.clicked.connect(self._add_marker)
-        layout.addWidget(self.add_marker_button)
-
-        layout.addSpacing(30)
-
-        # 录制时长标签
-        duration_label = QLabel()
-        duration_label.setObjectName("duration_label")
-        layout.addWidget(duration_label)
-
-        # 录制时长显示
-        self.duration_value_label = QLabel(self.i18n.t("realtime_record.default_duration"))
-        self.duration_value_label.setProperty("role", "duration-display")
-        layout.addWidget(self.duration_value_label)
-
-        layout.addStretch()
-
-        group.setLayout(layout)
-        return group
-
-    def _create_text_display_container(self) -> QWidget:
-        """创建文本显示容器 - 使用水平布局避免堆叠"""
-        container = QWidget()
-        layout = QHBoxLayout(container)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(15)
-
-        # 转录文本显示组
-        transcription_group = QGroupBox()
-        transcription_group.setObjectName("transcription_group")
-        transcription_layout = QVBoxLayout()
-        transcription_layout.setContentsMargins(0, 0, 0, 0)
-        transcription_layout.setSpacing(0)
-
-        # 转录文本显示区域 - 使用 QPlainTextEdit 更轻量级
+        # 文本区域
         self.transcription_text = QPlainTextEdit()
         self.transcription_text.setObjectName("transcription_text")
         self.transcription_text.setReadOnly(True)
-        self.transcription_text.setMinimumHeight(150)
-        # 设置文档选项以避免线程问题
         self.transcription_text.setUndoRedoEnabled(False)
-        transcription_layout.addWidget(self.transcription_text)
+        layout.addWidget(self.transcription_text)
 
-        transcription_group.setLayout(transcription_layout)
-        layout.addWidget(transcription_group, stretch=1)
+        return tab
 
-        # 翻译文本显示组
-        translation_group = QGroupBox()
-        translation_group.setObjectName("translation_group")
-        translation_layout = QVBoxLayout()
-        translation_layout.setContentsMargins(0, 0, 0, 0)
-        translation_layout.setSpacing(0)
+    def _create_translation_tab(self) -> QWidget:
+        """创建翻译结果标签页"""
+        tab = QWidget()
+        tab.setObjectName("translation_tab")
+        layout = QVBoxLayout(tab)
+        # # layout.setSpacing(0)
 
-        # 翻译文本显示区域 - 使用 QPlainTextEdit 更轻量级
+        # 工具栏
+        toolbar = self._create_text_toolbar("translation")
+        layout.addWidget(toolbar)
+
+        # 文本区域
         self.translation_text = QPlainTextEdit()
         self.translation_text.setObjectName("translation_text")
         self.translation_text.setReadOnly(True)
-        self.translation_text.setMinimumHeight(150)
-        # 设置文档选项以避免线程问题
         self.translation_text.setUndoRedoEnabled(False)
-        translation_layout.addWidget(self.translation_text)
 
-        translation_group.setLayout(translation_layout)
-        layout.addWidget(translation_group, stretch=1)
+        if not self.recorder.translation_engine:
+            self.translation_text.setPlaceholderText(
+                self.i18n.t("realtime_record.translation_not_available")
+            )
 
-        # 标记列表组
-        markers_group = QGroupBox()
-        markers_group.setObjectName("markers_group")
-        markers_layout = QVBoxLayout()
-        markers_layout.setContentsMargins(0, 0, 0, 0)
-        markers_layout.setSpacing(0)
+        layout.addWidget(self.translation_text)
 
+        return tab
+
+    def _create_markers_tab(self) -> QWidget:
+        """创建时间标记标签页"""
+        tab = QWidget()
+        tab.setObjectName("markers_tab")
+        layout = QVBoxLayout(tab)
+        # # layout.setSpacing(0)
+
+        # 工具栏
+        toolbar = QWidget()
+        toolbar.setObjectName("markers_toolbar")
+        toolbar_layout = QHBoxLayout(toolbar)
+        # # toolbar_layout.setSpacing(8)
+
+        toolbar_layout.addStretch()
+
+        # 清除按钮
+        clear_btn = create_button(self.i18n.t("realtime_record.clear_markers"))
+        clear_btn = create_secondary_button(clear_btn.text())
+        connect_button_with_callback(clear_btn, self._reset_markers_ui)
+        toolbar_layout.addWidget(clear_btn)
+
+        layout.addWidget(toolbar)
+
+        # 标记列表
         self.markers_list = QListWidget()
         self.markers_list.setObjectName("markers_list")
         self.markers_list.setAlternatingRowColors(True)
         self.markers_list.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.markers_list.setSelectionMode(QListWidget.SelectionMode.NoSelection)
-        markers_layout.addWidget(self.markers_list)
+        layout.addWidget(self.markers_list)
 
-        markers_group.setLayout(markers_layout)
-        layout.addWidget(markers_group, stretch=0)
+        return tab
 
-        return container
+    def _create_text_toolbar(self, text_type: str) -> QWidget:
+        """创建文本工具栏"""
+        toolbar = QWidget()
+        toolbar.setObjectName("text_toolbar")
+        layout = QHBoxLayout(toolbar)
+        # # layout.setSpacing(8)
 
-    def _create_export_group(self) -> QWidget:
-        """创建导出按钮组"""
-        widget = QWidget()
-        layout = QHBoxLayout()
-        layout.setContentsMargins(0, 10, 0, 0)
-        layout.setSpacing(10)
+        # 字数统计
+        word_count_label = QLabel("0 " + self.i18n.t("common.words"))
+        word_count_label.setObjectName("word_count_label")
+        layout.addWidget(word_count_label)
 
-        # 导出转录按钮
-        self.export_transcription_button = QPushButton()
-        self.export_transcription_button.setObjectName("export_transcription_button")
-        self.export_transcription_button.clicked.connect(self._export_transcription)
-        layout.addWidget(self.export_transcription_button)
-
-        # 导出翻译按钮
-        self.export_translation_button = QPushButton()
-        self.export_translation_button.setObjectName("export_translation_button")
-        self.export_translation_button.clicked.connect(self._export_translation)
-        layout.addWidget(self.export_translation_button)
-
-        # 保存录音按钮
-        self.save_recording_button = QPushButton()
-        self.save_recording_button.setObjectName("save_recording_button")
-        self.save_recording_button.clicked.connect(self._save_recording)
-        layout.addWidget(self.save_recording_button)
+        if text_type == "transcription":
+            self.transcription_word_count = word_count_label
+        else:
+            self.translation_word_count = word_count_label
 
         layout.addStretch()
 
-        widget.setLayout(layout)
-        return widget
+        # 复制按钮
+        copy_btn = create_button("📋 " + self.i18n.t("common.copy"))
+        copy_btn = create_secondary_button(copy_btn.text())
+        copy_btn.clicked.connect(lambda: self._copy_text(text_type))
+        layout.addWidget(copy_btn)
+
+        # 导出按钮
+        export_btn = create_button("📥 " + self.i18n.t("realtime_record.export_" + text_type))
+        export_btn = create_secondary_button(export_btn.text())
+        if text_type == "transcription":
+            connect_button_with_callback(export_btn, self._export_transcription)
+            self.export_transcription_button = export_btn
+        else:
+            connect_button_with_callback(export_btn, self._export_translation)
+            self.export_translation_button = export_btn
+        layout.addWidget(export_btn)
+
+        return toolbar
+
+    def _create_status_section(self) -> QWidget:
+        """创建状态区域"""
+        section = QWidget()
+        section.setObjectName("status_section")
+        layout = QVBoxLayout(section)
+        # # layout.setSpacing(12)
+
+        # 反馈标签
+        self.feedback_label = QLabel()
+        self.feedback_label.setObjectName("feedback_label")
+        self.feedback_label.setWordWrap(True)
+        self.feedback_label.setVisible(False)
+        layout.addWidget(self.feedback_label)
+
+        # 状态栏
+        status_bar = QWidget()
+        status_bar.setObjectName("status_bar")
+        status_layout = QHBoxLayout(status_bar)
+        # # status_layout.setSpacing(12)
+
+        # 状态指示
+        self.status_indicator = QLabel("●")
+        self.status_indicator.setObjectName("status_indicator")
+        status_layout.addWidget(self.status_indicator)
+
+        self.status_text_label = QLabel(self.i18n.t("realtime_record.status_ready"))
+        self.status_text_label.setObjectName("status_text")
+        status_layout.addWidget(self.status_text_label)
+
+        status_layout.addStretch()
+
+        # 保存录音按钮
+        self.save_recording_button = create_secondary_button(
+            self.i18n.t("realtime_record.save_recording")
+        )
+        connect_button_with_callback(self.save_recording_button, self._save_recording)
+        status_layout.addWidget(self.save_recording_button)
+
+        layout.addWidget(status_bar)
+
+        return section
+
+    def _copy_text(self, text_type: str):
+        """复制文本到剪贴板"""
+        from PySide6.QtWidgets import QApplication
+
+        if text_type == "transcription":
+            text = self.transcription_text.toPlainText()
+        else:
+            text = self.translation_text.toPlainText()
+
+        if text:
+            clipboard = QApplication.clipboard()
+            clipboard.setText(text)
+            # 显示提示
+            if hasattr(self, "feedback_label"):
+                self.feedback_label.setText(self.i18n.t("common.copied"))
+                self.feedback_label.setProperty("state", "success")
+                self.feedback_label.setVisible(True)
+                self.feedback_label.style().unpolish(self.feedback_label)
+                self.feedback_label.style().polish(self.feedback_label)
+                # 3秒后隐藏
+                QTimer.singleShot(3000, lambda: self.feedback_label.setVisible(False))
+
+    def _create_header_section(self) -> QWidget:
+        """创建标题和主控制区域"""
+        container = QWidget()
+        container.setObjectName("header_section")
+        layout = QHBoxLayout(container)
+        # # layout.setSpacing(16)
+
+        # 标题
+        self.title_label = QLabel(self.i18n.t("realtime_record.title"))
+        self.title_label.setObjectName("page_title")
+        layout.addWidget(self.title_label)
+
+        layout.addStretch()
+
+        # 录制时长
+        self.duration_value_label = QLabel("00:00:00")
+        self.duration_value_label.setObjectName("duration_display")
+        layout.addWidget(self.duration_value_label)
+
+        # 添加标记按钮
+        self.add_marker_button = create_secondary_button(self.i18n.t("realtime_record.add_marker"))
+        self.add_marker_button.setMinimumHeight(36)
+        self.add_marker_button.setMinimumWidth(100)
+        self.add_marker_button.setEnabled(False)
+        self.add_marker_button.clicked.connect(self._add_marker)
+        layout.addWidget(self.add_marker_button)
+
+        # 录制按钮
+        self.record_button = QPushButton()
+        self.record_button.setObjectName("record_button")
+        self.record_button.setMinimumHeight(36)
+        self.record_button.setMinimumWidth(120)
+        connect_button_with_callback(self.record_button, self._toggle_recording)
+        layout.addWidget(self.record_button)
+
+        return container
+
+    def _create_settings_section(self) -> QWidget:
+        """创建设置区域 - 使用表单布局"""
+        from PySide6.QtWidgets import QFormLayout, QFrame
+
+        container = QFrame()
+        container.setObjectName("settings_frame")
+        form = QFormLayout(container)
+        # # form.setSpacing(12)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
+
+        # 第一行：音频设备和增益
+        row1 = create_hbox(spacing=24)
+
+        # 音频设备
+        device_container = QWidget()
+        device_layout = QHBoxLayout(device_container)
+        # # device_layout.setSpacing(8)
+
+        device_label = QLabel(self.i18n.t("realtime_record.audio_input") + ":")
+        device_label.setObjectName("form_label")
+        device_label.setMinimumWidth(100)
+        device_layout.addWidget(device_label)
+
+        self.input_combo = QComboBox()
+        self.input_combo.setObjectName("form_combo")
+        self.input_combo.setMinimumWidth(200)
+        self._populate_input_devices()
+        device_layout.addWidget(self.input_combo)
+
+        row1.addWidget(device_container)
+
+        # 增益
+        gain_container = QWidget()
+        gain_layout = QHBoxLayout(gain_container)
+        # # gain_layout.setSpacing(8)
+
+        gain_label = QLabel(self.i18n.t("realtime_record.gain") + ":")
+        gain_label.setObjectName("form_label")
+        gain_label.setMinimumWidth(80)
+        gain_layout.addWidget(gain_label)
+
+        self.gain_slider = QSlider(Qt.Orientation.Horizontal)
+        self.gain_slider.setObjectName("form_slider")
+        self.gain_slider.setMinimum(10)
+        self.gain_slider.setMaximum(200)
+        self.gain_slider.setValue(100)
+        self.gain_slider.setMinimumWidth(150)
+        self.gain_slider.setMaximumWidth(200)
+        self.gain_slider.valueChanged.connect(self._on_gain_changed)
+        gain_layout.addWidget(self.gain_slider)
+
+        self.gain_value_label = QLabel("1.0x")
+        self.gain_value_label.setObjectName("form_value")
+        self.gain_value_label.setMinimumWidth(40)
+        gain_layout.addWidget(self.gain_value_label)
+
+        row1.addWidget(gain_container)
+        row1.addStretch()
+
+        form.addRow(row1)
+
+        # 第二行：模型和源语言
+        row2 = create_hbox(spacing=24)
+
+        # 模型（如果可用）
+        if self.model_manager:
+            model_container = QWidget()
+            model_layout = QHBoxLayout(model_container)
+            # # model_layout.setSpacing(8)
+
+            model_label = QLabel(self.i18n.t("realtime_record.model") + ":")
+            model_label.setObjectName("form_label")
+            model_label.setMinimumWidth(100)
+            model_layout.addWidget(model_label)
+
+            self.model_combo = QComboBox()
+            self.model_combo.setObjectName("form_combo")
+            self.model_combo.setMinimumWidth(200)
+            model_layout.addWidget(self.model_combo)
+
+            row2.addWidget(model_container)
+
+        # 源语言
+        source_container = QWidget()
+        source_layout = QHBoxLayout(source_container)
+        # # source_layout.setSpacing(8)
+
+        source_label = QLabel(self.i18n.t("realtime_record.source_language") + ":")
+        source_label.setObjectName("form_label")
+        source_label.setMinimumWidth(80)
+        source_layout.addWidget(source_label)
+
+        self.source_lang_combo = QComboBox()
+        self.source_lang_combo.setObjectName("form_combo")
+        self.source_lang_combo.setMinimumWidth(150)
+        for code, label_key in self.LANGUAGE_OPTIONS:
+            self.source_lang_combo.addItem(self.i18n.t(label_key), code)
+        source_layout.addWidget(self.source_lang_combo)
+
+        row2.addWidget(source_container)
+        row2.addStretch()
+
+        form.addRow(row2)
+
+        # 第三行：翻译设置
+        row3 = create_hbox(spacing=24)
+
+        # 启用翻译
+        self.enable_translation_checkbox = QCheckBox(
+            self.i18n.t("realtime_record.enable_translation")
+        )
+        self.enable_translation_checkbox.setObjectName("form_checkbox")
+        self.enable_translation_checkbox.stateChanged.connect(self._on_translation_toggled)
+
+        if not self.recorder.translation_engine:
+            tooltip = self.i18n.t("realtime_record.translation_disabled_tooltip")
+            self.enable_translation_checkbox.setEnabled(False)
+            self.enable_translation_checkbox.setToolTip(tooltip)
+
+        row3.addWidget(self.enable_translation_checkbox)
+        row3.addSpacing(16)
+
+        # 目标语言
+        target_container = QWidget()
+        target_layout = QHBoxLayout(target_container)
+        # # target_layout.setSpacing(8)
+
+        target_label = QLabel(self.i18n.t("realtime_record.target_language") + ":")
+        target_label.setObjectName("form_label")
+        target_label.setMinimumWidth(80)
+        target_layout.addWidget(target_label)
+
+        self.target_lang_combo = QComboBox()
+        self.target_lang_combo.setObjectName("form_combo")
+        self.target_lang_combo.setMinimumWidth(150)
+        self.target_lang_combo.setEnabled(False)
+        for code, label_key in self.LANGUAGE_OPTIONS:
+            self.target_lang_combo.addItem(self.i18n.t(label_key), code)
+        target_layout.addWidget(self.target_lang_combo)
+
+        if not self.recorder.translation_engine:
+            tooltip = self.i18n.t("realtime_record.translation_disabled_tooltip")
+            self.target_lang_combo.setToolTip(tooltip)
+
+        row3.addWidget(target_container)
+        row3.addStretch()
+
+        form.addRow(row3)
+
+        return container
+
+    def _create_visualizer_section(self) -> QWidget:
+        """创建音频可视化区域"""
+        from ui.realtime_record.audio_visualizer import AudioVisualizer
+
+        container = QWidget()
+        container.setObjectName("visualizer_section")
+        layout = QVBoxLayout(container)
+        # # layout.setSpacing(0)
+
+        self.audio_visualizer = AudioVisualizer(parent=self, i18n=self.i18n)
+        self.audio_visualizer.setMinimumHeight(60)
+        self.audio_visualizer.setMaximumHeight(80)
+        self.signals.audio_data_available.connect(
+            self.audio_visualizer.update_audio_data, Qt.ConnectionType.QueuedConnection
+        )
+        layout.addWidget(self.audio_visualizer)
+
+        # 音频不可用提示
+        self.audio_unavailable_label = QLabel()
+        self.audio_unavailable_label.setObjectName("warning_label")
+        self.audio_unavailable_label.setWordWrap(True)
+        self.audio_unavailable_label.setVisible(False)
+        layout.addWidget(self.audio_unavailable_label)
+
+        # 反馈标签
+        self.feedback_label = QLabel()
+        self.feedback_label.setObjectName("feedback_label")
+        self.feedback_label.setWordWrap(True)
+        self.feedback_label.setVisible(False)
+        layout.addWidget(self.feedback_label)
+
+        return container
 
     def _populate_input_devices(self):
         """填充音频输入设备列表"""
@@ -607,7 +749,9 @@ class RealtimeRecordWidget(QWidget):
 
         except Exception as e:
             logger.error(f"Failed to populate input devices: {e}")
-            self.input_combo.addItem("Error loading devices", None)
+            self.input_combo.addItem(
+                self.i18n.t("ui_strings.realtime_record.error_loading_devices"), None
+            )
 
     def _update_audio_availability(self):
         """根据音频捕获可用性调整 UI 状态"""
@@ -683,7 +827,7 @@ class RealtimeRecordWidget(QWidget):
                 self.model_combo.addItem(self.i18n.t("realtime_record.no_models_available"), None)
                 self.model_combo.setEnabled(False)
                 self._show_download_guide()
-                logger.warning("No models downloaded")
+                logger.warning(self.i18n.t("logging.realtime_record.no_models_downloaded"))
             else:
                 # Enable combo box
                 self.model_combo.setEnabled(True)
@@ -703,13 +847,14 @@ class RealtimeRecordWidget(QWidget):
                         self.model_combo.setCurrentIndex(index)
                 else:
                     # Select default model from config or first model
-                    default_model = self.model_manager.config.get(
-                        "transcription.faster_whisper.default_model"
-                    )
-                    if default_model:
-                        index = self.model_combo.findText(default_model)
-                        if index >= 0:
-                            self.model_combo.setCurrentIndex(index)
+                    if self.settings_manager:
+                        default_model = self.settings_manager.get_setting(
+                            "transcription.faster_whisper.default_model"
+                        )
+                        if default_model:
+                            index = self.model_combo.findText(default_model)
+                            if index >= 0:
+                                self.model_combo.setCurrentIndex(index)
 
                 logger.info(f"Updated model list: {len(downloaded_models)} models")
 
@@ -740,8 +885,8 @@ class RealtimeRecordWidget(QWidget):
         guide_layout.addWidget(message_label, 1)
 
         # Download button
-        download_button = QPushButton(self.i18n.t("realtime_record.go_to_download"))
-        download_button.clicked.connect(self._navigate_to_model_management)
+        download_button = create_button(self.i18n.t("realtime_record.go_to_download"))
+        connect_button_with_callback(download_button, self._navigate_to_model_management)
         guide_layout.addWidget(download_button)
 
         # Insert guide widget after language group
@@ -756,7 +901,7 @@ class RealtimeRecordWidget(QWidget):
                         break
 
         self._download_guide_widget = guide_widget
-        logger.info("Download guide displayed")
+        logger.info(self.i18n.t("logging.realtime_record.download_guide_displayed"))
 
     def _navigate_to_model_management(self):
         """Navigate to model management page in settings."""
@@ -770,7 +915,9 @@ class RealtimeRecordWidget(QWidget):
                 settings_widget = main_window.pages.get("settings")
                 if settings_widget and hasattr(settings_widget, "show_page"):
                     settings_widget.show_page("model_management")
-                    logger.info("Navigated to model management page")
+                    logger.info(
+                        self.i18n.t("logging.realtime_record.navigated_to_model_management")
+                    )
         except Exception as e:
             logger.error(f"Failed to navigate to model management: {e}")
 
@@ -780,37 +927,129 @@ class RealtimeRecordWidget(QWidget):
         if hasattr(self, "title_label"):
             self.title_label.setText(self.i18n.t("realtime_record.title"))
 
-        # 音频输入组
-        audio_group = self.findChild(QGroupBox, "audio_input_group")
-        if audio_group:
-            audio_group.setTitle(self.i18n.t("realtime_record.audio_input"))
+        # 按钮文本
+        self._update_button_texts()
 
-        input_label = self.findChild(QLabel, "input_label")
-        if input_label:
-            text = self.i18n.t("realtime_record.audio_input") + ":"
-            input_label.setText(text)
+        # 表单标签
+        self._update_form_labels()
 
-        gain_label = self.findChild(QLabel, "gain_label")
-        if gain_label:
-            gain_label.setText(self.i18n.t("realtime_record.gain") + ":")
+        # 语言下拉框
+        self._update_language_combos()
 
-        # 语言组
-        language_group = self.findChild(QGroupBox, "language_group")
-        if language_group:
-            language_group.setTitle(self.i18n.t("realtime_record.language_settings"))
+        # 面板标题
+        self._update_panel_titles()
 
-        # Model label
-        model_label = self.findChild(QLabel, "model_label")
-        if model_label:
-            model_label.setText(self.i18n.t("realtime_record.model") + ":")
+        # 状态文本
+        self._update_status_texts()
 
-        source_lang_label = self.findChild(QLabel, "source_lang_label")
-        if source_lang_label:
-            source_lang_label.setText(self.i18n.t("realtime_record.source_language") + ":")
+        # 占位符文本
+        self._update_placeholders()
 
-        target_lang_label = self.findChild(QLabel, "target_lang_label")
-        if target_lang_label:
-            target_lang_label.setText(self.i18n.t("realtime_record.target_language") + ":")
+        # 更新音频可用性
+        self._update_audio_availability()
+
+    def _update_button_texts(self):
+        """更新按钮文本"""
+        if hasattr(self, "record_button"):
+            if self.recorder.is_recording:
+                self.record_button.setText(self.i18n.t("realtime_record.stop_recording"))
+            else:
+                self.record_button.setText(self.i18n.t("realtime_record.start_recording"))
+
+        if hasattr(self, "add_marker_button"):
+            self.add_marker_button.setText(self.i18n.t("realtime_record.add_marker"))
+
+        if hasattr(self, "save_recording_button"):
+            self.save_recording_button.setText(self.i18n.t("realtime_record.save_recording"))
+
+    def _update_form_labels(self):
+        """更新表单标签"""
+        # 使用字典映射简化代码
+        label_map = {
+            "form_label": {
+                "audio": "realtime_record.audio_input",
+                "gain": "realtime_record.gain",
+                "model": "realtime_record.model",
+                "source": "realtime_record.source_language",
+                "target": "realtime_record.target_language",
+            }
+        }
+
+        for object_name, keywords in label_map.items():
+            labels = self.findChildren(QLabel, object_name)
+            for label in labels:
+                text = label.text().lower().replace(":", "")
+                for keyword, i18n_key in keywords.items():
+                    if keyword in text or any(
+                        cn in text for cn in ["音频", "输入", "增益", "模型", "源语言", "目标语言"]
+                    ):
+                        label.setText(self.i18n.t(i18n_key) + ":")
+                        break
+
+        # 翻译复选框
+        if hasattr(self, "enable_translation_checkbox"):
+            self.enable_translation_checkbox.setText(
+                self.i18n.t("realtime_record.enable_translation")
+            )
+            if not self.recorder.translation_engine:
+                self.enable_translation_checkbox.setToolTip(
+                    self.i18n.t("realtime_record.translation_disabled_tooltip")
+                )
+
+    def _update_language_combos(self):
+        """更新语言下拉框"""
+        for combo_attr in ["source_lang_combo", "target_lang_combo"]:
+            if hasattr(self, combo_attr):
+                combo = getattr(self, combo_attr)
+                for index, (_, label_key) in enumerate(self.LANGUAGE_OPTIONS):
+                    if index < combo.count():
+                        combo.setItemText(index, self.i18n.t(label_key))
+
+    def _update_panel_titles(self):
+        """更新面板标题"""
+        panel_titles = self.findChildren(QLabel, "panel_title")
+        title_map = {
+            "transcription": "realtime_record.transcription_text",
+            "translation": "realtime_record.translation_text",
+            "marker": "realtime_record.markers",
+        }
+
+        for label in panel_titles:
+            text = label.text().lower()
+            for keyword, i18n_key in title_map.items():
+                if keyword in text or any(cn in text for cn in ["转录", "翻译", "标记"]):
+                    label.setText(self.i18n.t(i18n_key))
+                    break
+
+        # 导出按钮工具提示
+        if hasattr(self, "export_transcription_button"):
+            self.export_transcription_button.setToolTip(
+                self.i18n.t("realtime_record.export_transcription")
+            )
+
+        if hasattr(self, "export_translation_button"):
+            self.export_translation_button.setToolTip(
+                self.i18n.t("realtime_record.export_translation")
+            )
+
+    def _update_status_texts(self):
+        """更新状态文本"""
+        if hasattr(self, "status_text_label"):
+            if self.recorder.is_recording:
+                self.status_text_label.setText(self.i18n.t("realtime_record.status_recording"))
+            else:
+                self.status_text_label.setText(self.i18n.t("realtime_record.status_ready"))
+
+    def _update_placeholders(self):
+        """更新占位符文本"""
+        if hasattr(self, "translation_text") and not self.recorder.translation_engine:
+            self.translation_text.setPlaceholderText(
+                self.i18n.t("realtime_record.translation_not_available")
+            )
+
+        if hasattr(self, "markers_list") and hasattr(self.markers_list, "setPlaceholderText"):
+            self.markers_list.setPlaceholderText(self.i18n.t("realtime_record.markers_placeholder"))
+            self._refresh_markers_list()
 
         if hasattr(self, "source_lang_combo"):
             for index, (_, label_key) in enumerate(self.LANGUAGE_OPTIONS):
@@ -1073,26 +1312,46 @@ class RealtimeRecordWidget(QWidget):
 
     def _on_recording_started(self):
         """录制开始时的 UI 更新（主线程）"""
-        logger.info("Updating UI for recording started")
+        logger.info(self.i18n.t("logging.realtime_record.updating_ui_recording_started"))
         self.record_button.setText(self.i18n.t("realtime_record.stop_recording"))
         self.record_button.setProperty("recording", True)
         self.record_button.style().unpolish(self.record_button)
         self.record_button.style().polish(self.record_button)
         self.status_timer.start(100)
+
         if hasattr(self, "add_marker_button"):
             self.add_marker_button.setEnabled(True)
             self.add_marker_button.setToolTip("")
 
+        # 更新状态栏
+        if hasattr(self, "status_indicator"):
+            self.status_indicator.setProperty("state", "recording")
+            self.status_indicator.style().unpolish(self.status_indicator)
+            self.status_indicator.style().polish(self.status_indicator)
+
+        if hasattr(self, "status_text_label"):
+            self.status_text_label.setText(self.i18n.t("realtime_record.status_recording"))
+
     def _on_recording_stopped(self):
         """录制停止时的 UI 更新（主线程）"""
-        logger.info("Updating UI for recording stopped")
+        logger.info(self.i18n.t("logging.realtime_record.updating_ui_recording_stopped"))
         self.record_button.setText(self.i18n.t("realtime_record.start_recording"))
         self.record_button.setProperty("recording", False)
         self.record_button.style().unpolish(self.record_button)
         self.record_button.style().polish(self.record_button)
         self.status_timer.stop()
+
         if hasattr(self, "add_marker_button"):
             self.add_marker_button.setEnabled(False)
+
+        # 更新状态栏
+        if hasattr(self, "status_indicator"):
+            self.status_indicator.setProperty("state", "ready")
+            self.status_indicator.style().unpolish(self.status_indicator)
+            self.status_indicator.style().polish(self.status_indicator)
+
+        if hasattr(self, "status_text_label"):
+            self.status_text_label.setText(self.i18n.t("realtime_record.status_ready"))
 
     def _update_status(self):
         """定期更新状态"""
@@ -1282,7 +1541,7 @@ class RealtimeRecordWidget(QWidget):
             # 发射信号通知主线程更新 UI
             self.signals.recording_started.emit()
 
-            logger.info("Recording started")
+            logger.info(self.i18n.t("logging.realtime_record.recording_started"))
 
         except Exception as e:
             error_message = self.i18n.t("realtime_record.start_failed", error=str(e))
@@ -1350,7 +1609,7 @@ class RealtimeRecordWidget(QWidget):
         text = self.recorder.get_accumulated_transcription()
 
         if not text:
-            logger.warning("No transcription text to export")
+            logger.warning(self.i18n.t("logging.realtime_record.no_transcription_text_to_export"))
             return
 
         # 打开文件保存对话框
@@ -1378,7 +1637,7 @@ class RealtimeRecordWidget(QWidget):
         text = self.recorder.get_accumulated_translation()
 
         if not text:
-            logger.warning("No translation text to export")
+            logger.warning(self.i18n.t("logging.realtime_record.no_translation_text_to_export"))
             return
 
         # 打开文件保存对话框
@@ -1400,7 +1659,7 @@ class RealtimeRecordWidget(QWidget):
 
     def _save_recording(self):
         """保存录音"""
-        logger.info("Save recording - handled automatically on stop")
+        logger.info(self.i18n.t("logging.realtime_record.save_recording_handled_automatically"))
 
     # --- 清理与生命周期管理 ---
 
@@ -1465,7 +1724,7 @@ class RealtimeRecordWidget(QWidget):
         if thread and thread.is_alive():
             thread.join(timeout=5)
             if thread.is_alive():
-                logger.warning("Async event loop thread did not terminate within timeout")
+                logger.warning(self.i18n.t("logging.realtime_record.async_loop_thread_timeout"))
 
         self._async_loop = None
         self._async_thread = None

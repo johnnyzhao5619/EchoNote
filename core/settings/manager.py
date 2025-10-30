@@ -29,7 +29,6 @@ from PySide6.QtCore import QObject, Signal
 
 logger = logging.getLogger(__name__)
 
-
 class SettingsManager(QObject):
     """
     Manages application settings with validation and change notifications.

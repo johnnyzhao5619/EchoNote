@@ -36,7 +36,6 @@ from engines.speech.base import (
 
 logger = logging.getLogger(__name__)
 
-
 class AzureEngine(SpeechEngine):
     """Azure Speech API 引擎"""
 

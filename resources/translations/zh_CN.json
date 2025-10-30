@@ -25,7 +25,13 @@
     "copied": "已复制！",
     "show_details": "显示详情",
     "hide_details": "隐藏详情",
-    "refresh": "刷新"
+    "refresh": "刷新",
+    "words": "字",
+    "file_count": "{count} 个文件",
+    "file_count_plural": "{count} 个文件",
+    "task_status": "任务 {name} {status|已完成|进行中}",
+    "conditional_message": "{has_error|发生错误: {error}|操作成功}",
+    "complex_status": "处理了 {processed} 个文件，{success} 个成功，{failed} 个失败"
   },
   "search": {
     "placeholder": "搜索...",
@@ -122,15 +128,16 @@
     }
   },
   "realtime_record": {
-    "title": "实时录制与翻译",
-    "audio_input": "音频输入",
-    "language_settings": "语言设置",
+    "title": "实时录制",
+    "audio_settings": "音频设置",
+    "audio_input": "音频输入设备",
+    "language_settings": "语言与模型",
     "recording_control": "录制控制",
-    "gain": "增益",
-    "model": "模型",
+    "gain": "音频增益",
+    "model": "识别模型",
     "source_language": "源语言",
     "target_language": "目标语言",
-    "enable_translation": "启用翻译",
+    "enable_translation": "启用实时翻译",
     "default_duration": "00:00:00",
     "available_languages": {
       "zh": "中文",
@@ -144,9 +151,10 @@
     "recording_duration": "录制时长",
     "transcription_text": "转录文本",
     "translation_text": "翻译文本",
-    "export_transcription": "导出转录",
-    "export_translation": "导出翻译",
-    "save_recording": "保存录音",
+    "export_transcription": "导出转录文本",
+    "export_translation": "导出翻译文本",
+    "save_recording": "保存录音文件",
+    "clear_markers": "清除标记",
     "no_input_devices": "未检测到输入设备",
     "no_models_available": "请先下载模型",
     "no_models_message": "没有可用的模型。请先下载至少一个模型才能使用实时录制功能。",
@@ -159,31 +167,43 @@
     "audio_unavailable_message": "实时录制需要安装 PyAudio。请执行：{command}",
     "audio_unavailable_tooltip": "安装 PyAudio（pip install pyaudio）后可启用实时录制。",
     "add_marker": "添加标记",
-    "markers": "标记列表",
-    "markers_placeholder": "尚无标记，录制时点击“添加标记”。",
-    "marker_unavailable": "开始录制后才能添加标记。",
-    "marker_failed": "未能记录标记，请重试。",
-    "marker_item": "标记 {number} • {timestamp}",
-    "marker_item_with_label": "标记 {number} • {timestamp} – {label}",
+    "audio_unavailable": "音频不可用",
+    "audio_device_unknown": "未知音频设备",
+    "audio_error": "音频错误",
+    "model_error": "模型错误",
+    "markers": "时间标记",
+    "markers_placeholder": "录制时可添加时间标记",
+    "marker_unavailable": "录制未开始，无法添加标记",
+    "marker_failed": "添加标记失败",
+    "marker_item": "#{number} {timestamp}",
+    "marker_item_with_label": "#{number} {timestamp} - {label}",
     "async_loop_unavailable": "异步事件循环未初始化",
-    "start_failed": "无法开始录制：{error}",
-    "stop_failed": "无法停止录制：{error}",
+    "start_failed": "启动录制失败: {error}",
+    "stop_failed": "停止录制失败: {error}",
     "export_transcription_title": "导出转录文本",
     "export_translation_title": "导出翻译文本",
     "export_file_filter": "文本文件 (*.txt);;Markdown 文件 (*.md);;所有文件 (*)",
-    "export_failed": "导出失败：{error}",
+    "export_failed": "导出失败: {error}",
     "feedback": {
-      "error_prefix": "录制错误",
-      "success_prefix": "录制完成",
-      "success_detail": "时长 {duration}",
-      "success_detail_with_path": "时长 {duration} • 保存至 {path}"
+      "error_prefix": "错误",
+      "success_prefix": "成功",
+      "success_detail": "录制完成，时长: {duration}",
+      "success_detail_with_path": "录制完成，时长: {duration}，已保存至: {path}"
     },
     "calendar_event": {
       "title": "录音会话 - {timestamp}",
       "description": "录制时长: {duration} 秒",
       "db_missing": "未配置数据库连接，无法创建日历事件。请配置数据库以启用日历集成功能。",
       "creation_failed": "创建日历事件失败：{error}"
-    }
+    },
+    "marker_added": "已添加标记",
+    "recording_started": "录制已开始",
+    "recording_stopped": "录制已停止",
+    "status_ready": "就绪",
+    "status_recording": "录制中...",
+    "export_success": "导出成功",
+    "transcription": "转录",
+    "translation": "翻译"
   },
   "calendar_hub": {
     "title": "日历中心",
@@ -233,7 +253,9 @@
       "sync_error": "同步错误",
       "never_synced": "从未同步",
       "previous": "上一个",
-      "next": "下一个"
+      "next": "下一个",
+      "sync_now_tooltip": "立即同步日历数据",
+      "sync_now": "立即同步"
     },
     "calendar_view": {
       "no_events": "今天没有事件"
@@ -286,7 +308,12 @@
       "errors": {
         "service_missing": "播放失败：缺少 Qt 多媒体服务。请安装操作系统对应的 Qt Multimedia 组件后重启 EchoNote。",
         "format_error": "播放失败：音频格式不受支持。请将录音重新编码为 WAV 或 MP3，或安装缺失的编解码器。详情：{details}"
-      }
+      },
+      "loading": "加载中...",
+      "transcript": "转录文本",
+      "no_transcript": "暂无转录文本",
+      "show_timestamps": "显示时间戳",
+      "hide_timestamps": "隐藏时间戳"
     },
     "snippet": {
       "title_prefix": "标题",
@@ -466,10 +493,14 @@
       "api_key_placeholder": "sk-...",
       "azure_region_label": "区域：",
       "azure_region_placeholder": "例如：eastus",
+      "will_automatically_use": "将自动使用：{device_name} ({compute_type})",
       "error": {
         "empty_path": "保存路径不能为空",
         "invalid_path": "无效的路径: {error}"
-      }
+      },
+      "show_password": "显示密码",
+      "gpu_acceleration": "GPU加速",
+      "cpu_mode": "CPU模式"
     },
     "realtime": {
       "title": "实时录制设置",
@@ -734,6 +765,185 @@
       "next_steps": "接下来您可以：\n• 在批量转录中导入音频文件\n• 使用实时录制功能\n• 连接您的日历账户\n• 在设置中自定义更多选项"
     }
   },
+  "logging": {
+    "main_window": {
+      "initialized": "主窗口已初始化",
+      "exit_cancelled": "用户取消了应用程序退出",
+      "closed": "主窗口已关闭",
+      "cleanup_starting": "开始应用程序清理...",
+      "closing_transcript_viewers": "正在关闭所有转录查看器...",
+      "stopping_transcription_tasks": "正在停止转录任务...",
+      "transcription_manager_timeout": "转录管理器未在超时时间内停止",
+      "stopping_realtime_recorder": "正在停止实时录制器...",
+      "stopping_resource_monitor": "正在停止资源监控器...",
+      "stopping_auto_task_scheduler": "正在停止自动任务调度器...",
+      "stopping_sync_scheduler": "正在停止同步调度器...",
+      "saving_settings": "正在保存设置...",
+      "closing_database_connection": "正在关闭数据库连接...",
+      "cleaning_temp_files": "正在清理旧的临时文件...",
+      "keyboard_shortcuts_configured": "键盘快捷键已配置",
+      "api_keys_updated": "API 密钥已更新，正在重新加载云引擎...",
+      "transcription_engine_reloaded": "转录引擎重新加载成功",
+      "realtime_recorder_engine_reloaded": "实时录制器引擎重新加载成功",
+      "cloud_engines_reload_completed": "云引擎重新加载完成"
+    },
+    "batch_transcribe": {
+      "starting_task_processing": "开始转录任务处理...",
+      "processing_started": "转录处理已开始",
+      "widget_initialized": "批量转录组件已初始化",
+      "no_speech_engine": "没有可用的语音引擎",
+      "no_models_downloaded": "没有下载的模型",
+      "navigating_to_model_management": "正在导航到模型管理页面",
+      "cannot_navigate_main_window_not_found": "无法导航：未找到主窗口",
+      "task_queue_cleared": "任务队列已清空",
+      "closed_all_transcript_viewers": "已关闭所有转录查看器"
+    },
+    "realtime_record": {
+      "widget_initialized": "实时录制组件已初始化",
+      "async_loop_started": "异步事件循环已启动",
+      "async_loop_stopping": "异步事件循环正在停止",
+      "async_loop_stopped": "异步事件循环已停止",
+      "no_models_downloaded": "没有下载的模型",
+      "download_guide_displayed": "下载指南已显示",
+      "navigated_to_model_management": "已导航到模型管理页面",
+      "updating_ui_recording_started": "正在更新录制开始的界面",
+      "updating_ui_recording_stopped": "正在更新录制停止的界面",
+      "recording_started": "录制已开始",
+      "no_transcription_text_to_export": "没有转录文本可导出",
+      "no_translation_text_to_export": "没有翻译文本可导出",
+      "save_recording_handled_automatically": "保存录音 - 停止时自动处理",
+      "async_loop_thread_timeout": "异步事件循环线程未在超时时间内终止"
+    },
+    "settings": {
+      "widget_initialized": "设置组件已初始化",
+      "model_manager_not_available": "模型管理器不可用，跳过模型管理页面",
+      "saved_successfully": "设置保存成功",
+      "reset_to_defaults": "设置已重置为默认值",
+      "transcription_page": {
+        "no_models_downloaded_selector_disabled": "没有下载的模型，模型选择器已禁用",
+        "showed_ffmpeg_guide": "已显示 FFmpeg 安装指南",
+        "no_secrets_manager_skipping_api_key_loading": "没有可用的密钥管理器，跳过 API 密钥加载",
+        "no_secrets_manager_skipping_api_key_saving": "没有可用的密钥管理器，跳过 API 密钥保存",
+        "api_keys_encrypted_saved": "API 密钥已加密并保存成功",
+        "api_keys_updated_signal_emitted": "API 密钥更新信号已发出"
+      },
+      "calendar_page": {
+        "add_google_account_clicked": "点击了添加 Google 账户",
+        "add_outlook_account_clicked": "点击了添加 Outlook 账户"
+      },
+      "model_management_page": {
+        "initialized": "模型管理页面已初始化"
+      },
+      "data_management_page": {
+        "cleanup_completed_successfully": "数据清理成功完成"
+      }
+    },
+    "calendar_hub": {
+      "google_user_info_missing_email": "Google 用户信息响应缺少邮箱字段",
+      "outlook_user_info_missing_email": "Outlook 用户信息响应缺少邮箱字段"
+    },
+    "timeline": {
+      "widget_initialized": "时间线组件已初始化",
+      "refreshing_without_query_filter": "正在刷新时间线，无查询过滤器",
+      "transcript_copied_to_clipboard": "转录文本已复制到剪贴板",
+      "transcript_viewer_dialog_initialized": "转录查看器对话框已初始化",
+      "audio_player_dialog_initialized": "音频播放器对话框已初始化"
+    },
+    "batch_transcribe_viewer": {
+      "file_load_cancelled": "用户取消了文件加载",
+      "user_chose_retry_save": "用户选择重试保存操作",
+      "user_cancelled_save": "用户取消了保存操作",
+      "no_timestamps_found_creating_basic_srt": "未找到时间戳，正在创建基本 SRT",
+      "no_timestamps_found_creating_basic_markdown": "未找到时间戳，正在创建基本 Markdown",
+      "copied_all_transcript_to_clipboard": "已将所有转录内容复制到剪贴板"
+    },
+    "audio_visualizer": {
+      "initialized": "音频可视化器已初始化"
+    },
+    "common": {
+      "notification": {
+        "win10toast_not_installed": "win10toast 未安装，Windows 通知不可用",
+        "notify_send_not_found": "未找到 notify-send，Linux 通知不可用",
+        "macos_notification_timeout": "macOS 通知超时",
+        "windows_notifications_not_available": "Windows 通知不可用",
+        "linux_notifications_not_available": "Linux 通知不可用",
+        "linux_notification_timeout": "Linux 通知超时"
+      },
+      "splash_screen": {
+        "closed": "启动画面已关闭"
+      }
+    }
+  },
+  "ui_strings": {
+    "batch_transcribe": {
+      "no_engine_configured": "未配置引擎",
+      "error_loading_engines": "加载引擎时出错",
+      "error_loading_models": "加载模型时出错"
+    },
+    "realtime_record": {
+      "error_loading_devices": "加载设备时出错"
+    },
+    "common": {
+      "error_dialog": {
+        "copied": "已复制！"
+      },
+      "progress_bar": {
+        "zero_percent": "0%"
+      }
+    },
+    "timeline": {
+      "audio_player": {
+        "mute_icon": "🔇",
+        "low_volume_icon": "🔉",
+        "high_volume_icon": "🔊",
+        "pause_icon": "⏸",
+        "play_icon": "▶"
+      }
+    },
+    "gpu_detector": {
+      "device_names": {
+        "cpu": "CPU",
+        "cuda": "CUDA (NVIDIA GPU)",
+        "auto": "自动（推荐）"
+      }
+    }
+  },
+  "exceptions": {
+    "settings": {
+      "failed_to_save_to_disk": "无法将设置保存到磁盘"
+    },
+    "realtime_record": {
+      "failed_to_initialize_async_loop": "无法初始化异步事件循环"
+    },
+    "batch_transcribe_viewer": {
+      "output_path_not_set": "输出路径未设置",
+      "insufficient_disk_space": "磁盘空间不足",
+      "content_is_empty": "内容为空",
+      "no_content_to_export": "没有内容可导出"
+    },
+    "calendar_hub": {
+      "expected_authorization_request_payload": "期望包含状态和代码验证器的授权请求负载",
+      "authorization_request_missing_pkce": "授权请求缺少必需的 PKCE 参数",
+      "state_and_code_verifier_required": "OAuth 对话框必须提供状态和代码验证器",
+      "invalid_port_in_redirect_uri": "重定向 URI 中指定的端口无效",
+      "failed_to_parse_redirect_uri": "无法解析重定向 URI 的回调端口",
+      "invalid_port_in_configured_redirect_uri": "配置的重定向 URI 中指定的端口无效"
+    }
+  },
+  "dialogs": {
+    "settings": {
+      "data_management": {
+        "cleanup_failed": "清理失败"
+      }
+    },
+    "calendar_hub": {
+      "authorization_failed": "授权失败",
+      "disconnect_account": "断开账户连接",
+      "no_accounts": "没有账户",
+      "sync_complete": "同步完成",
+      "sync_completed_with_errors": "同步完成但有错误"
+    }
+  },
   "ffmpeg": {
     "dialog_title": "安装 FFmpeg ({platform})",
     "not_installed_title": "FFmpeg 未安装 ({platform})",
@@ -797,5 +1007,70 @@
     "verify_cmd": "   ffmpeg -version",
     "verify_cmd_probe": "   ffprobe -version",
     "skip_note": "注意：没有 FFmpeg，您仍然可以处理纯音频格式（WAV、MP3、FLAC）。"
-  }
+  },
+  "constants": {
+    "file_size": {
+      "bytes": "B",
+      "kilobytes": "KB",
+      "megabytes": "MB",
+      "gigabytes": "GB",
+      "terabytes": "TB"
+    },
+    "startup": {
+      "configuration": "配置",
+      "dependencies": "依赖项",
+      "database": "数据库",
+      "i18n": "国际化",
+      "managers": "管理器",
+      "speech_engine": "语音引擎",
+      "transcription": "转录",
+      "resource_monitor": "资源监控",
+      "realtime_recorder": "实时录制器",
+      "calendar": "日历",
+      "main_window": "主窗口",
+      "final": "完成"
+    },
+    "folders": {
+      "documents": "文档",
+      "recordings": "录音",
+      "transcripts": "转录"
+    },
+    "error_category": {
+      "file_format": "文件格式",
+      "network": "网络",
+      "authentication": "认证",
+      "api_limit": "API 限制",
+      "permission": "权限",
+      "resource": "资源",
+      "validation": "验证",
+      "unknown": "未知"
+    },
+    "task_status": {
+      "pending": "待处理",
+      "processing": "处理中",
+      "completed": "已完成",
+      "failed": "失败",
+      "cancelled": "已取消"
+    },
+    "errors": {
+      "unsupported_format": "不支持的文件格式: {format}",
+      "network_connection_failed": "网络连接失败",
+      "authentication_failed": "认证失败",
+      "api_rate_limit": "API 速率限制",
+      "insufficient_permissions": "权限不足",
+      "insufficient_resources": "系统资源不足",
+      "validation_failed": "输入验证失败"
+    },
+    "error_actions": {
+      "unsupported_format": "支持的格式: {formats}\n建议使用 FFmpeg 转换为支持的格式",
+      "network_connection_failed": "请检查网络连接后重试，或使用本地引擎（faster-whisper）",
+      "authentication_failed": "请检查 API Key 是否正确，或重新连接外部服务",
+      "api_rate_limit": "请稍后重试，或考虑升级 API 套餐",
+      "insufficient_permissions": "请检查文件/目录权限，或以管理员身份运行",
+      "insufficient_resources": "请释放磁盘空间或内存后重试",
+      "validation_failed": "请检查输入内容是否符合要求"
+    }
+  },
+  "settings.cleanup_warning": "⚠️ 警告：数据清理操作无法撤销！\n请确保您已备份任何重要数据。",
+  "calendar_hub.no_accounts_message": "未连接外部日历账户。请先添加账户。"
 }

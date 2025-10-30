@@ -52,7 +52,7 @@ class TranscriptViewerThemeManager:
         try:
             if not theme:
                 if self.settings_manager:
-                    theme = self.settings_manager.get("ui.theme", "auto")
+                    theme = self.settings_manager.get_setting("ui.theme") or "auto"
                 else:
                     theme = "auto"
 

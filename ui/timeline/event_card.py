@@ -38,6 +38,7 @@ from PySide6.QtWidgets import (
 )
 
 from core.timeline.manager import to_local_naive
+from ui.base_widgets import create_vbox, create_hbox, create_button
 from utils.i18n import LANGUAGE_OPTION_KEYS, I18nQtManager
 
 logger = logging.getLogger("echonote.ui.timeline.event_card")
@@ -55,14 +56,12 @@ class CurrentTimeIndicator(QFrame):
             parent: Parent widget
         """
         super().__init__(parent)
-
         self.i18n = i18n
         self.setup_ui()
 
     def setup_ui(self):
         """Set up the indicator UI."""
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 10, 0, 10)
 
         # Left line (red dashed)
         left_line = QFrame()
@@ -139,7 +138,7 @@ class EventCard(QFrame):
         super().__init__(parent)
 
         self.event_data = event_data
-        self.event = event_data["event"]
+        self.calendar_event = event_data["event"]
         self.is_future = is_future
         self.i18n = i18n
 
@@ -161,7 +160,7 @@ class EventCard(QFrame):
         # Store reference for future updates
         self.is_future = is_future
 
-        logger.debug(f"Event card created: {self.event.id}")
+        logger.debug(f"Event card created: {self.calendar_event.id}")
 
     def setup_ui(self):
         """Set up the card UI."""
@@ -173,8 +172,7 @@ class EventCard(QFrame):
 
         # Main layout
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(15, 15, 15, 15)
-        layout.setSpacing(10)
+        # # layout.setSpacing(10)
 
         # Header with title and time
         header_layout = self.create_header()
@@ -199,11 +197,10 @@ class EventCard(QFrame):
         Returns:
             Header layout
         """
-        header_layout = QVBoxLayout()
-        header_layout.setSpacing(5)
+        header_layout = create_vbox(spacing=5)
 
         # Title
-        title_label = QLabel(self.event.title)
+        title_label = QLabel(self.calendar_event.title)
         title_font = QFont()
         title_font.setPointSize(12)
         title_font.setBold(True)
@@ -212,11 +209,11 @@ class EventCard(QFrame):
         header_layout.addWidget(title_label)
 
         # Time and type
-        time_layout = QHBoxLayout()
+        time_layout = create_hbox()
 
         # Format time
-        start_value = self.event.start_time
-        end_value = self.event.end_time
+        start_value = self.calendar_event.start_time
+        end_value = self.calendar_event.end_time
 
         try:
             start_time = to_local_naive(start_value)
@@ -245,7 +242,7 @@ class EventCard(QFrame):
         # Source badge - use semantic properties for theming
         source_badge = QLabel(self._get_source_badge_text())
         source_badge.setProperty("role", "event-indicator")
-        source_badge.setProperty("source", self.event.source)
+        source_badge.setProperty("source", self.calendar_event.source)
         self.source_badge_label = source_badge
         time_layout.addWidget(source_badge)
 
@@ -261,16 +258,15 @@ class EventCard(QFrame):
         Returns:
             Details layout
         """
-        details_layout = QVBoxLayout()
-        details_layout.setSpacing(5)
+        details_layout = create_vbox(spacing=5)
 
         # Location
-        if self.event.location:
-            location_layout = QHBoxLayout()
+        if self.calendar_event.location:
+            location_layout = create_hbox()
             location_icon = QLabel("📍")
             location_layout.addWidget(location_icon)
 
-            location_label = QLabel(self.event.location)
+            location_label = QLabel(self.calendar_event.location)
             location_label.setObjectName("detail_label")
             location_layout.addWidget(location_label)
             location_layout.addStretch()
@@ -278,14 +274,14 @@ class EventCard(QFrame):
             details_layout.addLayout(location_layout)
 
         # Attendees
-        if self.event.attendees:
-            attendees_layout = QHBoxLayout()
+        if self.calendar_event.attendees:
+            attendees_layout = create_hbox()
             attendees_icon = QLabel("👥")
             attendees_layout.addWidget(attendees_icon)
 
-            attendees_text = ", ".join(self.event.attendees[:3])
-            if len(self.event.attendees) > 3:
-                attendees_text += f" +{len(self.event.attendees) - 3}"
+            attendees_text = ", ".join(self.calendar_event.attendees[:3])
+            if len(self.calendar_event.attendees) > 3:
+                attendees_text += f" +{len(self.calendar_event.attendees) - 3}"
 
             attendees_label = QLabel(attendees_text)
             attendees_label.setObjectName("detail_label")
@@ -295,9 +291,9 @@ class EventCard(QFrame):
             details_layout.addLayout(attendees_layout)
 
         # Description (truncated)
-        if self.event.description:
-            desc_label = QLabel(self.event.description[:100])
-            if len(self.event.description) > 100:
+        if self.calendar_event.description:
+            desc_label = QLabel(self.calendar_event.description[:100])
+            if len(self.calendar_event.description) > 100:
                 desc_label.setText(desc_label.text() + "...")
             desc_label.setObjectName("description_label")
             desc_label.setProperty("role", "event-description")
@@ -313,8 +309,7 @@ class EventCard(QFrame):
         Returns:
             Actions layout
         """
-        actions_layout = QHBoxLayout()
-        actions_layout.setSpacing(15)
+        actions_layout = create_hbox(spacing=15)
 
         # Get auto-task config
         auto_tasks = self.event_data.get("auto_tasks", {})
@@ -374,8 +369,7 @@ class EventCard(QFrame):
         Returns:
             Actions layout
         """
-        actions_layout = QHBoxLayout()
-        actions_layout.setSpacing(10)
+        actions_layout = create_hbox(spacing=10)
 
         # Lazy load artifacts if not loaded
         if not self.artifacts_loaded:
@@ -387,7 +381,7 @@ class EventCard(QFrame):
         has_translation = bool(self.artifacts.get("translation"))
 
         if has_recording:
-            self.recording_btn = QPushButton("🎵 " + self.i18n.t("timeline.play_recording"))
+            self.recording_btn = create_button("🎵 " + self.i18n.t("timeline.play_recording"))
             self.recording_btn.clicked.connect(self._on_play_recording)
             self.recording_btn.setObjectName("recording_btn")
             # Styling is handled by theme files (dark.qss / light.qss)
@@ -395,14 +389,14 @@ class EventCard(QFrame):
 
         # Transcript button
         if has_transcript:
-            self.transcript_btn = QPushButton("📄 " + self.i18n.t("timeline.view_transcript"))
+            self.transcript_btn = create_button("📄 " + self.i18n.t("timeline.view_transcript"))
             self.transcript_btn.clicked.connect(self._on_view_transcript)
             self.transcript_btn.setObjectName("transcript_btn")
             # Styling is handled by theme files (dark.qss / light.qss)
             actions_layout.addWidget(self.transcript_btn)
 
         if has_translation:
-            self.translation_btn = QPushButton("🌐 " + self.i18n.t("timeline.view_translation"))
+            self.translation_btn = create_button("🌐 " + self.i18n.t("timeline.view_translation"))
             self.translation_btn.clicked.connect(self._on_view_translation)
             self.translation_btn.setObjectName("translation_btn")
             actions_layout.addWidget(self.translation_btn)
@@ -469,7 +463,7 @@ class EventCard(QFrame):
             # Artifacts should already be in event_data
             # This is just a placeholder for future optimization
             self.artifacts_loaded = True
-            logger.debug(f"Artifacts loaded for event: {self.event.id}")
+            logger.debug(f"Artifacts loaded for event: {self.calendar_event.id}")
 
     def _on_auto_task_changed(self):
         """Handle auto-task configuration change."""
@@ -495,8 +489,8 @@ class EventCard(QFrame):
 
         self.event_data["auto_tasks"] = dict(config)
 
-        logger.debug(f"Auto-task changed for event {self.event.id}: {config}")
-        self.auto_task_changed.emit(self.event.id, config)
+        logger.debug(f"Auto-task changed for event {self.calendar_event.id}: {config}")
+        self.auto_task_changed.emit(self.calendar_event.id, config)
 
     def _on_translation_toggled(self):
         """Handle enable translation toggle changes."""

@@ -26,7 +26,6 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-
 class APIKeyValidator:
     """API 密钥验证器"""
 

@@ -28,7 +28,6 @@ from PySide6.QtCore import QThread, Signal
 
 logger = logging.getLogger(__name__)
 
-
 class BackgroundInitializer(QThread):
     """
     Background thread for initializing components after main window is shown.
@@ -76,7 +75,6 @@ class BackgroundInitializer(QThread):
         self.progress.emit("Initialization complete", 100)
         self.finished.emit(self.results)
 
-
 class LazyLoader:
     """
     Lazy loader for deferring component initialization.
@@ -123,7 +121,6 @@ class LazyLoader:
     def is_initialized(self) -> bool:
         """Check if component is initialized."""
         return self._initialized
-
 
 class StartupTimer:
     """

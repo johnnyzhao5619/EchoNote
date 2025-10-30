@@ -12,14 +12,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from build_config import APP_NAME, DIST_DIR, PROJECT_ROOT, clean_build_dirs, get_pyinstaller_args
 
-
 def build_executable():
     """Build the executable using PyInstaller."""
     args = ["pyinstaller"] + get_pyinstaller_args()
     result = subprocess.run(args, cwd=PROJECT_ROOT)
     if result.returncode != 0:
         sys.exit(1)
-
 
 def create_dmg():
     """Create DMG installer if requested."""
@@ -56,7 +54,6 @@ def create_dmg():
 
     shutil.rmtree(dmg_dir)
 
-
 def create_tarball():
     """Create tarball distribution."""
     app_bundle = DIST_DIR / f"{APP_NAME}.app"
@@ -66,7 +63,6 @@ def create_tarball():
     tarball_path = DIST_DIR / "echonote-macos-x64.tar.gz"
     cmd = ["tar", "-czf", str(tarball_path), "-C", str(DIST_DIR), f"{APP_NAME}.app"]
     subprocess.run(cmd)
-
 
 def main():
     """Main build function."""
@@ -78,7 +74,6 @@ def main():
     create_tarball()
 
     print(f"✅ macOS build completed: {DIST_DIR}")
-
 
 if __name__ == "__main__":
     main()

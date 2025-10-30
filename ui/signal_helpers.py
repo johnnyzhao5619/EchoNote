@@ -20,10 +20,12 @@ This module provides reusable functions for common signal/slot connection patter
 to reduce code duplication and ensure consistent behavior across the UI layer.
 """
 
+import logging
 from typing import Any, Callable, Optional
 
 from ui.qt_imports import QPushButton, QTimer
 
+logger = logging.getLogger(__name__)
 
 def connect_button_with_emit(button: QPushButton, signal: Any, value: Any) -> None:
     """
@@ -38,7 +40,6 @@ def connect_button_with_emit(button: QPushButton, signal: Any, value: Any) -> No
     """
     button.clicked.connect(lambda: signal.emit(value))
 
-
 def connect_button_with_callback(button: QPushButton, callback: Callable[[], None]) -> None:
     """
     Connect a button's clicked signal to a callback function.
@@ -48,7 +49,6 @@ def connect_button_with_callback(button: QPushButton, callback: Callable[[], Non
         callback: The callback function to call when button is clicked
     """
     button.clicked.connect(callback)
-
 
 def connect_dialog_buttons(
     ok_button: QPushButton,
@@ -80,7 +80,6 @@ def connect_dialog_buttons(
                 lambda: getattr(cancel_button.parent(), "reject", lambda: None)()
             )
 
-
 def connect_navigation_buttons(
     prev_button: QPushButton,
     next_button: QPushButton,
@@ -106,7 +105,6 @@ def connect_navigation_buttons(
         next_button.clicked.connect(next_callback)
     if today_button and today_callback:
         today_button.clicked.connect(today_callback)
-
 
 def connect_search_buttons(
     search_button: QPushButton,
@@ -140,7 +138,6 @@ def connect_search_buttons(
     if clear_button and clear_callback:
         clear_button.clicked.connect(clear_callback)
 
-
 def connect_with_delay(signal: Any, callback: Callable[[], None], delay_ms: int = None) -> None:
     """
     Connect a signal to a callback with a delay using QTimer.singleShot.
@@ -162,7 +159,6 @@ def connect_with_delay(signal: Any, callback: Callable[[], None], delay_ms: int 
 
     signal.connect(delayed_callback)
 
-
 def connect_view_buttons(
     month_button: QPushButton,
     week_button: QPushButton,
@@ -181,7 +177,6 @@ def connect_view_buttons(
     month_button.clicked.connect(lambda: view_changed_callback("month"))
     week_button.clicked.connect(lambda: view_changed_callback("week"))
     day_button.clicked.connect(lambda: view_changed_callback("day"))
-
 
 def connect_task_action_buttons(
     start_button: QPushButton,
@@ -229,3 +224,120 @@ def connect_task_action_buttons(
     connect_button_with_emit(view_button, view_signal, task_id)
     connect_button_with_emit(export_button, export_signal, task_id)
     connect_button_with_emit(retry_button, retry_signal, task_id)
+
+# Enhanced signal connection helpers
+
+def connect_text_changed(widget, handler: Callable[[str], None]) -> None:
+    """
+    Connect a text widget's textChanged signal to a handler.
+
+    Args:
+        widget: Widget with textChanged signal
+        handler: Handler function that accepts text string
+    """
+    if hasattr(widget, "textChanged"):
+        widget.textChanged.connect(handler)
+
+def connect_value_changed(widget, handler: Callable[[Any], None]) -> None:
+    """
+    Connect a widget's valueChanged signal to a handler.
+
+    Args:
+        widget: Widget with valueChanged signal
+        handler: Handler function that accepts the new value
+    """
+    if hasattr(widget, "valueChanged"):
+        widget.valueChanged.connect(handler)
+
+def connect_selection_changed(widget, handler: Callable[[], None]) -> None:
+    """
+    Connect a widget's selection changed signal to a handler.
+
+    Args:
+        widget: Widget with selection changed signal
+        handler: Handler function to call
+    """
+    # Try different selection change signal names
+    for signal_name in ["selectionChanged", "currentChanged", "itemSelectionChanged"]:
+        if hasattr(widget, signal_name):
+            signal = getattr(widget, signal_name)
+            signal.connect(handler)
+            break
+
+def connect_with_error_handling(
+    signal, handler: Callable, error_handler: Optional[Callable[[Exception], None]] = None
+) -> None:
+    """
+    Connect a signal to a handler with error handling.
+
+    Args:
+        signal: Signal to connect
+        handler: Handler function
+        error_handler: Optional error handler function
+    """
+
+    def wrapped_handler(*args, **kwargs):
+        try:
+            return handler(*args, **kwargs)
+        except Exception as e:
+            logger.error(f"Error in signal handler: {e}")
+            if error_handler:
+                error_handler(e)
+            else:
+                # Re-raise if no error handler provided
+                raise
+
+    signal.connect(wrapped_handler)
+
+def safe_disconnect(signal, handler: Optional[Callable] = None) -> bool:
+    """
+    Safely disconnect a signal from a handler.
+
+    Args:
+        signal: Signal to disconnect
+        handler: Specific handler to disconnect, or None to disconnect all
+
+    Returns:
+        True if disconnection was successful, False otherwise
+    """
+    try:
+        if handler:
+            signal.disconnect(handler)
+        else:
+            signal.disconnect()
+        return True
+    except (TypeError, RuntimeError) as e:
+        logger.debug(f"Signal disconnection failed: {e}")
+        return False
+
+def setup_form_validation(form_widgets: list, validation_handler: Callable[[], None]) -> None:
+    """
+    Setup validation for form widgets.
+
+    Args:
+        form_widgets: List of form widgets to monitor
+        validation_handler: Handler to call when any widget changes
+    """
+    for widget in form_widgets:
+        # Connect appropriate change signals based on widget type
+        widget_type = type(widget).__name__
+
+        if "LineEdit" in widget_type or "TextEdit" in widget_type:
+            connect_text_changed(widget, lambda _: validation_handler())
+        elif "ComboBox" in widget_type:
+            connect_selection_changed(widget, validation_handler)
+        elif "CheckBox" in widget_type or "RadioButton" in widget_type:
+            if hasattr(widget, "toggled"):
+                widget.toggled.connect(validation_handler)
+        elif "SpinBox" in widget_type or "Slider" in widget_type:
+            connect_value_changed(widget, lambda _: validation_handler())
+
+def setup_auto_save(widgets: list, save_handler: Callable[[], None]) -> None:
+    """
+    Setup automatic saving when widgets change.
+
+    Args:
+        widgets: List of widgets to monitor
+        save_handler: Handler to call when any widget changes
+    """
+    setup_form_validation(widgets, save_handler)

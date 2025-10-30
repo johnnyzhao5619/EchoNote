@@ -25,22 +25,25 @@ from collections import deque
 import numpy as np
 from PySide6.QtCore import QRect, QTimer
 from PySide6.QtGui import QColor, QPainter, QPen
-from PySide6.QtWidgets import QWidget
+
+from ui.base_widgets import BaseWidget
 
 logger = logging.getLogger(__name__)
 
 
-class AudioVisualizer(QWidget):
+class AudioVisualizer(BaseWidget):
     """音频波形可视化组件"""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, i18n=None):
         """
         初始化音频可视化组件
 
         Args:
             parent: 父窗口
+            i18n: 国际化管理器
         """
-        super().__init__(parent)
+        super().__init__(i18n, parent)
+        self.i18n = i18n
 
         # 波形数据缓冲区（保存最近的音频样本）
         self.waveform_buffer = deque(maxlen=1000)
@@ -65,7 +68,10 @@ class AudioVisualizer(QWidget):
         self.background_color = QColor(250, 250, 250)
         self.grid_color = QColor(220, 220, 220)
 
-        logger.info("AudioVisualizer initialized")
+        if self.i18n:
+            logger.info(self.i18n.t("logging.audio_visualizer.initialized"))
+        else:
+            logger.info("AudioVisualizer initialized")
 
     def update_audio_data(self, audio_chunk: np.ndarray):
         """

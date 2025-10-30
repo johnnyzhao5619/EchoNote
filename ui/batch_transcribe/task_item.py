@@ -34,13 +34,14 @@ from ui.qt_imports import (
     Signal,
 )
 
-# Removed over-engineered mixins
+# Import base widget
+from ui.base_widgets import BaseWidget, create_hbox, create_button
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.batch_transcribe.task_item")
 
 
-class TaskItem(QWidget):
+class TaskItem(BaseWidget):
     """
     Widget displaying a single transcription task.
 
@@ -89,8 +90,7 @@ class TaskItem(QWidget):
         """Set up the user interface."""
         # Main layout
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(8)
+        # # layout.setSpacing(8)
 
         # Set semantic properties for theming
         self.setProperty("role", "task-item")
@@ -145,8 +145,7 @@ class TaskItem(QWidget):
         self.error_label = error_label
 
         # Action buttons row
-        actions_layout = QHBoxLayout()
-        actions_layout.setSpacing(8)
+        actions_layout = create_hbox(spacing=8)
 
         # Create action buttons
         self.start_btn = QPushButton()

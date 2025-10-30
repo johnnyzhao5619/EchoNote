@@ -29,37 +29,35 @@ from typing import Any, Dict
 
 APP_DIR_NAME = ".echonote"
 
-
 def get_app_dir() -> Path:
     """Return the root directory for EchoNote user data."""
     return Path.home() / APP_DIR_NAME
 
-
 logger = logging.getLogger(__name__)
-
 
 class ConfigManager:
     """Manages application configuration with validation and persistence."""
 
-    def __init__(self):
+    def __init__(self, i18n_manager=None):
         """Initialize the configuration manager."""
         self.default_config_path = Path(__file__).parent / "default_config.json"
         self.user_config_dir = get_app_dir()
         self.user_config_path = self.user_config_dir / "app_config.json"
         self._config: Dict[str, Any] = {}
         self._default_config: Dict[str, Any] = {}
+        self._i18n_manager = i18n_manager
         self._load_config()
 
     def _load_config(self) -> None:
         """Load configuration from user config or default config."""
         try:
-            logger.info(f"Loading default configuration from " f"{self.default_config_path}")
+            logger.info(f"Loading default configuration from {self.default_config_path}")
             with open(self.default_config_path, "r", encoding="utf-8") as f:
                 self._default_config = json.load(f)
 
             user_config: Dict[str, Any] = {}
             if self.user_config_path.exists():
-                logger.info(f"Loading user configuration from " f"{self.user_config_path}")
+                logger.info(f"Loading user configuration from {self.user_config_path}")
                 with open(self.user_config_path, "r", encoding="utf-8") as f:
                     user_config = json.load(f)
 
@@ -306,7 +304,7 @@ class ConfigManager:
 
             try:
                 os.chmod(self.user_config_path, 0o600)
-                logger.debug(f"Set secure permissions for config file")
+                logger.debug("Set secure permissions for config file")
             except Exception as e:
                 logger.warning(f"Could not set file permissions: {e}")
 
@@ -372,3 +370,39 @@ class ConfigManager:
         if isinstance(value, list):
             return tuple(cls._deep_freeze(v) for v in value)
         return value
+
+    def get_i18n_default_paths(self) -> Dict[str, str]:
+        """
+        Get internationalized default paths for user directories.
+
+        Returns:
+            Dict with localized default paths
+        """
+        if self._i18n_manager is None:
+            # Fallback to English paths
+            return {
+                "transcripts": str(Path.home() / "Documents" / "EchoNote" / "Transcripts"),
+                "recordings": str(Path.home() / "Documents" / "EchoNote" / "Recordings"),
+            }
+
+        # Get localized folder names
+        documents_folder = self._i18n_manager.t("constants.folders.documents")
+        transcripts_folder = self._i18n_manager.t(
+            "constants.folders.transcripts", fallback="Transcripts"
+        )
+        recordings_folder = self._i18n_manager.t("constants.folders.recordings")
+
+        base_path = Path.home() / documents_folder / "EchoNote"
+        return {
+            "transcripts": str(base_path / transcripts_folder),
+            "recordings": str(base_path / recordings_folder),
+        }
+
+    def update_i18n_manager(self, i18n_manager) -> None:
+        """
+        Update the i18n manager reference.
+
+        Args:
+            i18n_manager: New i18n manager instance
+        """
+        self._i18n_manager = i18n_manager

@@ -15,9 +15,6 @@
 # limitations under the License.
 """模型管理模块公共接口。"""
 
-from .manager import ModelManager
-from .registry import ModelInfo, ModelRegistry
-
 __all__ = [
     "ModelInfo",
     "ModelRegistry",

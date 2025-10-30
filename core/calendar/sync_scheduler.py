@@ -28,7 +28,6 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 logger = logging.getLogger("echonote.calendar.sync_scheduler")
 
-
 class SyncScheduler:
     """
     Manages automatic periodic synchronization of external calendars.

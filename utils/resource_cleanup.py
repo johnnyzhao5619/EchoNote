@@ -15,13 +15,10 @@
 # limitations under the License.
 """资源清理辅助函数。"""
 
-from __future__ import annotations
-
 import asyncio
 import inspect
 import logging
 from typing import Any
-
 
 def close_lazy_loaded_engine(name: str, loader: Any, logger: logging.Logger) -> None:
     """关闭惰性加载的引擎实例。"""

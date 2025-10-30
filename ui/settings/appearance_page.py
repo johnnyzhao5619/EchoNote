@@ -44,7 +44,6 @@ class AppearanceSettingsPage(BaseSettingsPage):
             managers: Dictionary of other managers (for theme application)
         """
         super().__init__(settings_manager, i18n)
-
         self.managers = managers
 
         # Setup UI

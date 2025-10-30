@@ -25,7 +25,13 @@
     "copied": "Copied!",
     "show_details": "Show Details",
     "hide_details": "Hide Details",
-    "refresh": "Refresh"
+    "refresh": "Refresh",
+    "words": "words",
+    "file_count": "{count} file",
+    "file_count_plural": "{count} files",
+    "task_status": "Task {name} is {status|completed|in progress}",
+    "conditional_message": "{has_error|Error occurred: {error}|Operation successful}",
+    "complex_status": "Processed {processed} files, {success} successful, {failed} failed"
   },
   "search": {
     "placeholder": "Search...",
@@ -122,15 +128,15 @@
     }
   },
   "realtime_record": {
-    "title": "Real-time Recording & Translation",
-    "audio_input": "Audio Input",
-    "language_settings": "Language Settings",
+    "title": "Real-time Recording",
+    "audio_input": "Audio Input Device",
+    "language_settings": "Language & Model",
     "recording_control": "Recording Control",
-    "gain": "Gain",
-    "model": "Model",
+    "gain": "Audio Gain",
+    "model": "Recognition Model",
     "source_language": "Source Language",
     "target_language": "Target Language",
-    "enable_translation": "Enable Translation",
+    "enable_translation": "Enable Real-time Translation",
     "default_duration": "00:00:00",
     "available_languages": {
       "zh": "Chinese (Simplified)",
@@ -146,7 +152,7 @@
     "translation_text": "Translation Text",
     "export_transcription": "Export Transcription",
     "export_translation": "Export Translation",
-    "save_recording": "Save Recording",
+    "save_recording": "Save Recording File",
     "no_input_devices": "No input devices found",
     "no_models_available": "Please download a model first",
     "no_models_message": "No models available. Please download at least one model to use real-time recording.",
@@ -159,31 +165,45 @@
     "audio_unavailable_message": "Real-time recording requires PyAudio. Install it with: {command}",
     "audio_unavailable_tooltip": "Install PyAudio (pip install pyaudio) to enable real-time recording.",
     "add_marker": "Add Marker",
-    "markers": "Markers",
-    "markers_placeholder": "No markers yet. Click Add Marker during recording.",
-    "marker_unavailable": "Start recording before adding markers.",
-    "marker_failed": "Unable to capture the marker. Please try again.",
-    "marker_item": "#{number} • {timestamp}",
-    "marker_item_with_label": "#{number} • {timestamp} – {label}",
+    "markers": "Time Markers",
+    "markers_placeholder": "Add time markers during recording",
+    "marker_unavailable": "Recording not started, cannot add marker",
+    "marker_failed": "Failed to add marker",
+    "marker_item": "#{number} {timestamp}",
+    "marker_item_with_label": "#{number} {timestamp} - {label}",
     "async_loop_unavailable": "Async event loop not initialized",
     "start_failed": "Failed to start recording: {error}",
     "stop_failed": "Failed to stop recording: {error}",
     "export_transcription_title": "Export Transcription",
     "export_translation_title": "Export Translation",
     "export_file_filter": "Text Files (*.txt);;Markdown Files (*.md);;All Files (*)",
-    "export_failed": "Failed to export: {error}",
+    "export_failed": "Export failed: {error}",
     "feedback": {
-      "error_prefix": "Recording error",
-      "success_prefix": "Recording saved",
-      "success_detail": "Duration {duration}",
-      "success_detail_with_path": "Duration {duration} • Saved to {path}"
+      "error_prefix": "Error",
+      "success_prefix": "Success",
+      "success_detail": "Recording completed, duration: {duration}",
+      "success_detail_with_path": "Recording completed, duration: {duration}, saved to: {path}"
     },
     "calendar_event": {
       "title": "Recording session - {timestamp}",
       "description": "Recording duration: {duration} seconds",
       "db_missing": "Cannot create calendar event because no database connection is configured. Configure the database to enable calendar integrations.",
       "creation_failed": "Failed to create calendar event: {error}"
-    }
+    },
+    "audio_settings": "Audio Settings",
+    "clear_markers": "Clear Markers",
+    "audio_unavailable": "Audio Unavailable",
+    "audio_device_unknown": "Unknown Audio Device",
+    "audio_error": "Audio Error",
+    "model_error": "Model Error",
+    "marker_added": "Marker added",
+    "recording_started": "Recording started",
+    "recording_stopped": "Recording stopped",
+    "status_ready": "Ready",
+    "status_recording": "Recording...",
+    "export_success": "Export successful",
+    "transcription": "Transcription",
+    "translation": "Translation"
   },
   "calendar_hub": {
     "title": "Calendar Hub",
@@ -233,7 +253,9 @@
       "sync_error": "Sync Error",
       "never_synced": "Never synced",
       "previous": "Previous",
-      "next": "Next"
+      "next": "Next",
+      "sync_now_tooltip": "Sync calendar data immediately",
+      "sync_now": "Sync Now"
     },
     "calendar_view": {
       "no_events": "No events for this day"
@@ -286,7 +308,12 @@
       "errors": {
         "service_missing": "Playback unavailable: the Qt multimedia service is missing. Install the Qt Multimedia backend for your platform and restart EchoNote.",
         "format_error": "Playback failed: the media format is not supported. Re-encode the recording to WAV or MP3, or install the required codecs. Details: {details}"
-      }
+      },
+      "loading": "Loading...",
+      "transcript": "Transcript",
+      "no_transcript": "No transcript available",
+      "show_timestamps": "Show Timestamps",
+      "hide_timestamps": "Hide Timestamps"
     },
     "snippet": {
       "title_prefix": "Title",
@@ -466,6 +493,7 @@
       "api_key_placeholder": "sk-...",
       "azure_region_label": "Region:",
       "azure_region_placeholder": "e.g., eastus",
+      "will_automatically_use": "Will automatically use: {device_name} ({compute_type})",
       "gpu_acceleration": "NVIDIA GPU acceleration. Requires CUDA-compatible GPU.",
       "cpu_mode": "CPU mode. No GPU acceleration.",
       "show_password": "Show/Hide Password",
@@ -702,6 +730,185 @@
       }
     }
   },
+  "logging": {
+    "main_window": {
+      "initialized": "Main window initialized",
+      "exit_cancelled": "Application exit cancelled by user",
+      "closed": "Main window closed",
+      "cleanup_starting": "Starting application cleanup...",
+      "closing_transcript_viewers": "Closing all transcript viewers...",
+      "stopping_transcription_tasks": "Stopping transcription tasks...",
+      "transcription_manager_timeout": "Transcription manager did not stop within timeout",
+      "stopping_realtime_recorder": "Stopping realtime recorder...",
+      "stopping_resource_monitor": "Stopping resource monitor...",
+      "stopping_auto_task_scheduler": "Stopping auto task scheduler...",
+      "stopping_sync_scheduler": "Stopping sync scheduler...",
+      "saving_settings": "Saving settings...",
+      "closing_database_connection": "Closing database connection...",
+      "cleaning_temp_files": "Cleaning up old temporary files...",
+      "keyboard_shortcuts_configured": "Keyboard shortcuts configured",
+      "api_keys_updated": "API keys updated, reloading cloud engines...",
+      "transcription_engine_reloaded": "Transcription engine reloaded successfully",
+      "realtime_recorder_engine_reloaded": "Realtime recorder engine reloaded successfully",
+      "cloud_engines_reload_completed": "Cloud engines reload completed"
+    },
+    "batch_transcribe": {
+      "starting_task_processing": "Starting transcription task processing...",
+      "processing_started": "Transcription processing started",
+      "widget_initialized": "Batch transcribe widget initialized",
+      "no_speech_engine": "No speech engine available",
+      "no_models_downloaded": "No models downloaded",
+      "navigating_to_model_management": "Navigating to model management page",
+      "cannot_navigate_main_window_not_found": "Cannot navigate: main window not found",
+      "task_queue_cleared": "Task queue cleared",
+      "closed_all_transcript_viewers": "Closed all transcript viewers"
+    },
+    "realtime_record": {
+      "widget_initialized": "RealtimeRecordWidget initialized",
+      "async_loop_started": "Async event loop started",
+      "async_loop_stopping": "Async event loop stopping",
+      "async_loop_stopped": "Async event loop stopped",
+      "no_models_downloaded": "No models downloaded",
+      "download_guide_displayed": "Download guide displayed",
+      "navigated_to_model_management": "Navigated to model management page",
+      "updating_ui_recording_started": "Updating UI for recording started",
+      "updating_ui_recording_stopped": "Updating UI for recording stopped",
+      "recording_started": "Recording started",
+      "no_transcription_text_to_export": "No transcription text to export",
+      "no_translation_text_to_export": "No translation text to export",
+      "save_recording_handled_automatically": "Save recording - handled automatically on stop",
+      "async_loop_thread_timeout": "Async event loop thread did not terminate within timeout"
+    },
+    "settings": {
+      "widget_initialized": "Settings widget initialized",
+      "model_manager_not_available": "model_manager not available, skipping model management page",
+      "saved_successfully": "Settings saved successfully",
+      "reset_to_defaults": "Settings reset to defaults",
+      "transcription_page": {
+        "no_models_downloaded_selector_disabled": "No models downloaded, model selector disabled",
+        "showed_ffmpeg_guide": "Showed FFmpeg installation guide",
+        "no_secrets_manager_skipping_api_key_loading": "No secrets_manager available, skipping API key loading",
+        "no_secrets_manager_skipping_api_key_saving": "No secrets_manager available, skipping API key saving",
+        "api_keys_encrypted_saved": "API keys encrypted and saved successfully",
+        "api_keys_updated_signal_emitted": "API keys updated signal emitted"
+      },
+      "calendar_page": {
+        "add_google_account_clicked": "Add Google account clicked",
+        "add_outlook_account_clicked": "Add Outlook account clicked"
+      },
+      "model_management_page": {
+        "initialized": "Model management page initialized"
+      },
+      "data_management_page": {
+        "cleanup_completed_successfully": "Data cleanup completed successfully"
+      }
+    },
+    "calendar_hub": {
+      "google_user_info_missing_email": "Google user info response missing email field",
+      "outlook_user_info_missing_email": "Outlook user info response missing mail fields"
+    },
+    "timeline": {
+      "widget_initialized": "Timeline widget initialized",
+      "refreshing_without_query_filter": "Refreshing timeline without query filter",
+      "transcript_copied_to_clipboard": "Transcript copied to clipboard",
+      "transcript_viewer_dialog_initialized": "Transcript viewer dialog initialized",
+      "audio_player_dialog_initialized": "Audio player dialog initialized"
+    },
+    "batch_transcribe_viewer": {
+      "file_load_cancelled": "File load cancelled by user",
+      "user_chose_retry_save": "User chose to retry save operation",
+      "user_cancelled_save": "User cancelled save operation",
+      "no_timestamps_found_creating_basic_srt": "No timestamps found, creating basic SRT",
+      "no_timestamps_found_creating_basic_markdown": "No timestamps found, creating basic Markdown",
+      "copied_all_transcript_to_clipboard": "Copied all transcript content to clipboard"
+    },
+    "audio_visualizer": {
+      "initialized": "AudioVisualizer initialized"
+    },
+    "common": {
+      "notification": {
+        "win10toast_not_installed": "win10toast not installed, Windows notifications unavailable",
+        "notify_send_not_found": "notify-send not found, Linux notifications unavailable",
+        "macos_notification_timeout": "macOS notification timed out",
+        "windows_notifications_not_available": "Windows notifications not available",
+        "linux_notifications_not_available": "Linux notifications not available",
+        "linux_notification_timeout": "Linux notification timed out"
+      },
+      "splash_screen": {
+        "closed": "Splash screen closed"
+      }
+    }
+  },
+  "ui_strings": {
+    "batch_transcribe": {
+      "no_engine_configured": "No engine configured",
+      "error_loading_engines": "Error loading engines",
+      "error_loading_models": "Error loading models"
+    },
+    "realtime_record": {
+      "error_loading_devices": "Error loading devices"
+    },
+    "common": {
+      "error_dialog": {
+        "copied": "Copied!"
+      },
+      "progress_bar": {
+        "zero_percent": "0%"
+      }
+    },
+    "timeline": {
+      "audio_player": {
+        "mute_icon": "🔇",
+        "low_volume_icon": "🔉",
+        "high_volume_icon": "🔊",
+        "pause_icon": "⏸",
+        "play_icon": "▶"
+      }
+    },
+    "gpu_detector": {
+      "device_names": {
+        "cpu": "CPU",
+        "cuda": "CUDA (NVIDIA GPU)",
+        "auto": "Auto (Recommended)"
+      }
+    }
+  },
+  "exceptions": {
+    "settings": {
+      "failed_to_save_to_disk": "Failed to save settings to disk"
+    },
+    "realtime_record": {
+      "failed_to_initialize_async_loop": "Failed to initialize async event loop"
+    },
+    "batch_transcribe_viewer": {
+      "output_path_not_set": "Output path is not set",
+      "insufficient_disk_space": "Insufficient disk space",
+      "content_is_empty": "Content is empty",
+      "no_content_to_export": "No content to export"
+    },
+    "calendar_hub": {
+      "expected_authorization_request_payload": "Expected authorization request payload with state and code verifier.",
+      "authorization_request_missing_pkce": "Authorization request is missing required PKCE parameters.",
+      "state_and_code_verifier_required": "State and code_verifier must be provided for OAuth dialog",
+      "invalid_port_in_redirect_uri": "Invalid port specified in redirect URI.",
+      "failed_to_parse_redirect_uri": "Failed to parse redirect URI for callback port.",
+      "invalid_port_in_configured_redirect_uri": "Invalid port specified in configured redirect URI."
+    }
+  },
+  "dialogs": {
+    "settings": {
+      "data_management": {
+        "cleanup_failed": "Cleanup Failed"
+      }
+    },
+    "calendar_hub": {
+      "authorization_failed": "Authorization Failed",
+      "disconnect_account": "Disconnect Account",
+      "no_accounts": "No Accounts",
+      "sync_complete": "Sync Complete",
+      "sync_completed_with_errors": "Sync Completed with Errors"
+    }
+  },
   "ffmpeg": {
     "dialog_title": "Install FFmpeg ({platform})",
     "not_installed_title": "FFmpeg Not Installed ({platform})",
@@ -800,5 +1007,70 @@
       "message": "Congratulations! EchoNote is ready to use.",
       "next_steps": "Next, you can:\n• Import audio files in Batch Transcription\n• Use Real-time Recording features\n• Connect your calendar accounts\n• Customize more options in Settings"
     }
-  }
+  },
+  "constants": {
+    "file_size": {
+      "bytes": "B",
+      "kilobytes": "KB",
+      "megabytes": "MB",
+      "gigabytes": "GB",
+      "terabytes": "TB"
+    },
+    "startup": {
+      "configuration": "Configuration",
+      "dependencies": "Dependencies",
+      "database": "Database",
+      "i18n": "Internationalization",
+      "managers": "Managers",
+      "speech_engine": "Speech Engine",
+      "transcription": "Transcription",
+      "resource_monitor": "Resource Monitor",
+      "realtime_recorder": "Realtime Recorder",
+      "calendar": "Calendar",
+      "main_window": "Main Window",
+      "final": "Final"
+    },
+    "folders": {
+      "documents": "Documents",
+      "recordings": "Recordings",
+      "transcripts": "Transcripts"
+    },
+    "error_category": {
+      "file_format": "File Format",
+      "network": "Network",
+      "authentication": "Authentication",
+      "api_limit": "API Limit",
+      "permission": "Permission",
+      "resource": "Resource",
+      "validation": "Validation",
+      "unknown": "Unknown"
+    },
+    "task_status": {
+      "pending": "Pending",
+      "processing": "Processing",
+      "completed": "Completed",
+      "failed": "Failed",
+      "cancelled": "Cancelled"
+    },
+    "errors": {
+      "unsupported_format": "Unsupported file format: {format}",
+      "network_connection_failed": "Network connection failed",
+      "authentication_failed": "Authentication failed",
+      "api_rate_limit": "API rate limit exceeded",
+      "insufficient_permissions": "Insufficient permissions",
+      "insufficient_resources": "Insufficient system resources",
+      "validation_failed": "Input validation failed"
+    },
+    "error_actions": {
+      "unsupported_format": "Supported formats: {formats}\nSuggest using FFmpeg to convert to supported format",
+      "network_connection_failed": "Please check network connection and retry, or use local engine (faster-whisper)",
+      "authentication_failed": "Please check if API Key is correct, or reconnect external services",
+      "api_rate_limit": "Please retry later, or consider upgrading API plan",
+      "insufficient_permissions": "Please check file/directory permissions, or run as administrator",
+      "insufficient_resources": "Please free up disk space or memory and retry",
+      "validation_failed": "Please check if input content meets requirements"
+    }
+  },
+  "settings.cleanup_warning": "⚠️ Warning: Data cleanup operations cannot be undone!\nPlease make sure you have backed up any important data.",
+  "calendar_hub.no_accounts_message": "No external calendar accounts connected. Please add an account first."
 }

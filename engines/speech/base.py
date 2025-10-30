@@ -101,7 +101,6 @@ CHINESE_LANGUAGE_VARIANTS: Tuple[str, ...] = (
     "zh-TW",
 )
 
-
 def combine_languages(*groups: Iterable[str]) -> List[str]:
     """Combine language codes in order while removing duplicates."""
 
@@ -113,7 +112,6 @@ def combine_languages(*groups: Iterable[str]) -> List[str]:
                 combined.append(code)
                 seen.add(code)
     return combined
-
 
 def ensure_audio_sample_rate(
     audio_chunk: np.ndarray, source_rate: Optional[int], target_rate: Optional[int]
@@ -149,7 +147,6 @@ def ensure_audio_sample_rate(
     target_positions = np.linspace(0.0, duration, num=target_length, endpoint=False)
     resampled = np.interp(target_positions, source_positions, audio_chunk).astype(np.float32)
     return resampled, target_rate
-
 
 def convert_audio_to_wav_bytes(
     audio_path: str, target_rate: Optional[int] = None
@@ -228,7 +225,6 @@ def convert_audio_to_wav_bytes(
 
     return wav_bytes, effective_rate, source_rate, detected_format
 
-
 class SpeechEngine(ABC):
     """Abstract base class for speech recognition engines."""
 
@@ -286,7 +282,6 @@ class SpeechEngine(ABC):
                 return False
 
         return True
-
 
 # Unified list of audio/video extensions normalized to lowercase without dots.
 AUDIO_VIDEO_FORMATS: Tuple[str, ...] = (

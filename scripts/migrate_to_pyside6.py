@@ -30,12 +30,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-
 class MigrationError(Exception):
     """Custom exception for migration errors."""
 
     pass
-
 
 class MigrationStats:
     """Track migration statistics."""
@@ -66,7 +64,6 @@ class MigrationStats:
         """Add a successfully modified file."""
         self.files_modified += 1
         self.modified_files.append(filepath)
-
 
 class PyQt6ToPySide6Migrator:
     """Enhanced PyQt6 to PySide6 migration tool."""
@@ -492,7 +489,6 @@ class PyQt6ToPySide6Migrator:
 
         print("=" * 60)
 
-
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(
@@ -546,7 +542,6 @@ Examples:
 
     # Exit with appropriate code
     sys.exit(0 if success else 1)
-
 
 if __name__ == "__main__":
     main()

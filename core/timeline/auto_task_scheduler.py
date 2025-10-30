@@ -36,7 +36,6 @@ from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.timeline.auto_task_scheduler")
 
-
 class AutoTaskScheduler:
     """
     Automatic task scheduler for calendar events.

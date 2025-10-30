@@ -33,7 +33,6 @@ logger = logging.getLogger(__name__)
 # Constants
 SECONDS_PER_MINUTE = 60
 
-
 class OperationLogger:
     """
     操作日志记录器
@@ -122,10 +121,8 @@ class OperationLogger:
             logger.error(f"Failed to read operation log: {e}")
             return []
 
-
 # 全局操作日志记录器实例
 _operation_logger: Optional[OperationLogger] = None
-
 
 def get_operation_logger() -> OperationLogger:
     """
@@ -140,7 +137,6 @@ def get_operation_logger() -> OperationLogger:
         _operation_logger = OperationLogger()
 
     return _operation_logger
-
 
 class UserFeedback:
     """
@@ -357,7 +353,6 @@ class UserFeedback:
         )
 
         logger.error(f"Operation error feedback sent: {operation}")
-
 
 class StatusUpdater:
     """

@@ -42,6 +42,13 @@ from PySide6.QtWidgets import (
 )
 
 from core.models.registry import ModelInfo
+from ui.base_widgets import (
+    create_hbox,
+    create_vbox,
+    create_button,
+    create_primary_button,
+    connect_button_with_callback,
+)
 from ui.common.error_dialog import show_error_dialog
 from ui.settings.base_page import BaseSettingsPage
 from utils.i18n import I18nQtManager
@@ -63,7 +70,6 @@ class ModelManagementPage(BaseSettingsPage):
             model_manager: 模型管理器实例
         """
         super().__init__(settings_manager, i18n)
-
         self.model_manager = model_manager
 
         # 存储模型卡片的引用，用于更新进度
@@ -82,7 +88,7 @@ class ModelManagementPage(BaseSettingsPage):
         # 设置 UI
         self.setup_ui()
 
-        logger.info("Model management page initialized")
+        logger.info(self.i18n.t("logging.settings.model_management_page.initialized"))
 
     def setup_ui(self):
         """设置 UI 布局"""
@@ -222,10 +228,9 @@ class ModelManagementPage(BaseSettingsPage):
         card.setObjectName("model-card-downloaded")
 
         layout = QVBoxLayout(card)
-        layout.setSpacing(8)
 
         # 第一行：模型名称和按钮
-        header_layout = QHBoxLayout()
+        header_layout = create_hbox()
 
         # 模型名称
         name_label = QLabel(f"✓ {model.full_name}")
@@ -239,13 +244,13 @@ class ModelManagementPage(BaseSettingsPage):
         header_layout.addStretch()
 
         # 配置按钮
-        config_btn = QPushButton(self.i18n.t("settings.model_management.configure"))
+        config_btn = create_button(self.i18n.t("settings.model_management.configure"))
         config_btn.setMaximumWidth(80)
         config_btn.clicked.connect(lambda: self._on_config_clicked(model.name))
         header_layout.addWidget(config_btn)
 
         # 删除按钮
-        delete_btn = QPushButton(self.i18n.t("settings.model_management.delete"))
+        delete_btn = create_button(self.i18n.t("settings.model_management.delete"))
         delete_btn.setMaximumWidth(80)
         delete_btn.setProperty("role", "model-delete")
         delete_btn.clicked.connect(lambda: self._on_delete_clicked(model.name))
@@ -259,7 +264,7 @@ class ModelManagementPage(BaseSettingsPage):
         header_layout.addWidget(delete_btn)
 
         # 查看详情按钮
-        details_btn = QPushButton(self.i18n.t("settings.model_management.view_details"))
+        details_btn = create_button(self.i18n.t("settings.model_management.view_details"))
         details_btn.setMaximumWidth(80)
         details_btn.clicked.connect(lambda: self._on_view_details_clicked(model.name))
         header_layout.addWidget(details_btn)
@@ -267,7 +272,7 @@ class ModelManagementPage(BaseSettingsPage):
         layout.addLayout(header_layout)
 
         # 第二行：模型特征
-        features_layout = QHBoxLayout()
+        features_layout = create_hbox()
 
         # 大小
         size_text = f"{self.i18n.t('settings.model_management.size')}: " f"{model.size_mb} MB"
@@ -295,7 +300,7 @@ class ModelManagementPage(BaseSettingsPage):
         layout.addLayout(features_layout)
 
         # 第三行：使用统计
-        stats_layout = QHBoxLayout()
+        stats_layout = create_hbox()
 
         # 使用次数
         usage_text = self.i18n.t("settings.model_management.usage_count", count=model.usage_count)
@@ -337,10 +342,9 @@ class ModelManagementPage(BaseSettingsPage):
         card.setObjectName("model-card-available")
 
         layout = QVBoxLayout(card)
-        layout.setSpacing(8)
 
         # 第一行：模型名称和下载按钮
-        header_layout = QHBoxLayout()
+        header_layout = create_hbox()
 
         # 模型名称
         name_label = QLabel(model.full_name)
@@ -353,7 +357,7 @@ class ModelManagementPage(BaseSettingsPage):
         header_layout.addStretch()
 
         # 下载按钮
-        download_btn = QPushButton(self.i18n.t("settings.model_management.download"))
+        download_btn = create_button(self.i18n.t("settings.model_management.download"))
         download_btn.setObjectName(f"download_btn_{model.name}")
         download_btn.setMaximumWidth(100)
         download_btn.clicked.connect(lambda: self._on_download_clicked(model.name))
@@ -362,7 +366,7 @@ class ModelManagementPage(BaseSettingsPage):
         layout.addLayout(header_layout)
 
         # 第二行：模型特征
-        features_layout = QHBoxLayout()
+        features_layout = create_hbox()
 
         # 大小
         size_text = f"{self.i18n.t('settings.model_management.size')}: " f"{model.size_mb} MB"
@@ -390,7 +394,7 @@ class ModelManagementPage(BaseSettingsPage):
         layout.addLayout(features_layout)
 
         # 第三行：支持的语言
-        lang_layout = QHBoxLayout()
+        lang_layout = create_hbox()
 
         if "multi" in model.languages:
             lang_text = self.i18n.t("settings.model_management.multilingual")
@@ -413,7 +417,7 @@ class ModelManagementPage(BaseSettingsPage):
         layout.addWidget(progress_bar)
 
         # 取消下载按钮（初始隐藏）
-        cancel_btn = QPushButton(self.i18n.t("settings.model_management.cancel_download"))
+        cancel_btn = create_button(self.i18n.t("settings.model_management.cancel_download"))
         cancel_btn.setObjectName(f"cancel_btn_{model.name}")
         cancel_btn.setVisible(False)
         cancel_btn.setMaximumWidth(100)
@@ -559,8 +563,7 @@ class ModelManagementPage(BaseSettingsPage):
 
             if success:
                 # 显示成功通知
-                QMessageBox.information(
-                    self,
+                self.show_info(
                     self.i18n.t("settings.model_management.delete_success_title"),
                     self.i18n.t(
                         "settings.model_management.delete_success_message", model=model_name
@@ -815,7 +818,6 @@ class ModelManagementPage(BaseSettingsPage):
         card.setObjectName("recommendation-card")
 
         layout = QVBoxLayout(card)
-        layout.setSpacing(12)
 
         # 推荐标题
         title_label = QLabel(
@@ -838,7 +840,7 @@ class ModelManagementPage(BaseSettingsPage):
         layout.addWidget(reason_label)
 
         # 模型特征
-        features_layout = QHBoxLayout()
+        features_layout = create_hbox()
 
         # 大小
         size_text = (
@@ -871,7 +873,7 @@ class ModelManagementPage(BaseSettingsPage):
         layout.addLayout(features_layout)
 
         # 一键下载按钮
-        download_btn = QPushButton(self.i18n.t("settings.model_management.download_recommended"))
+        download_btn = create_button(self.i18n.t("settings.model_management.download_recommended"))
         download_btn.setMaximumWidth(200)
         download_btn.clicked.connect(lambda: self._on_download_recommended(recommended_model_name))
         layout.addWidget(download_btn)
@@ -968,8 +970,7 @@ class ModelManagementPage(BaseSettingsPage):
         logger.info(f"Download completed for model: {model_name}")
 
         # 显示成功通知
-        QMessageBox.information(
-            self,
+        self.show_info(
             self.i18n.t("settings.model_management.download_success_title"),
             self.i18n.t("settings.model_management.download_success_message", model=model_name),
         )
@@ -1090,7 +1091,6 @@ class ModelDetailsDialog(QDialog):
             parent: 父控件
         """
         super().__init__(parent)
-
         from pathlib import Path
 
         from PySide6.QtWidgets import QGridLayout
@@ -1103,8 +1103,7 @@ class ModelDetailsDialog(QDialog):
         self.setMinimumHeight(400)
 
         layout = QVBoxLayout(self)
-        layout.setSpacing(15)
-        layout.setContentsMargins(20, 20, 20, 20)
+        # # layout.setContentsMargins(20, 20, 20, 20)
 
         # 标题
         title_label = QLabel(model.full_name)
@@ -1122,7 +1121,6 @@ class ModelDetailsDialog(QDialog):
 
         # 详细信息网格
         info_layout = QGridLayout()
-        info_layout.setSpacing(10)
         info_layout.setColumnStretch(1, 1)
 
         row = 0
@@ -1221,21 +1219,23 @@ class ModelDetailsDialog(QDialog):
         layout.addStretch()
 
         # 按钮布局
-        button_layout = QHBoxLayout()
+        button_layout = create_hbox()
         button_layout.addStretch()
 
         # 在文件管理器中显示按钮
         if model.local_path:
-            show_in_explorer_btn = QPushButton(i18n.t("settings.model_management.show_in_explorer"))
+            show_in_explorer_btn = create_button(
+                i18n.t("settings.model_management.show_in_explorer")
+            )
             show_in_explorer_btn.clicked.connect(
                 lambda: self._on_show_in_explorer(model.local_path)
             )
             button_layout.addWidget(show_in_explorer_btn)
 
         # 关闭按钮
-        close_btn = QPushButton(i18n.t("settings.model_management.close"))
+        close_btn = create_button(i18n.t("settings.model_management.close"))
         close_btn.setDefault(True)
-        close_btn.clicked.connect(self.accept)
+        connect_button_with_callback(close_btn, self.accept)
         button_layout.addWidget(close_btn)
 
         layout.addLayout(button_layout)
@@ -1288,7 +1288,6 @@ class ModelConfigDialog(QDialog):
             parent: 父控件
         """
         super().__init__(parent)
-
         self.model = model
         self.settings_manager = settings_manager
         self.i18n = i18n
@@ -1297,8 +1296,7 @@ class ModelConfigDialog(QDialog):
         self.setMinimumWidth(450)
 
         layout = QVBoxLayout(self)
-        layout.setSpacing(15)
-        layout.setContentsMargins(20, 20, 20, 20)
+        # # layout.setContentsMargins(20, 20, 20, 20)
 
         # 标题
         title_label = QLabel(i18n.t("settings.model_management.config_description"))
@@ -1307,7 +1305,6 @@ class ModelConfigDialog(QDialog):
 
         # 配置表单
         form_layout = QFormLayout()
-        form_layout.setSpacing(10)
 
         # 计算设备选择
         device_label = QLabel(i18n.t("settings.model_management.compute_device") + ":")
@@ -1400,16 +1397,16 @@ class ModelConfigDialog(QDialog):
         layout.addStretch()
 
         # 按钮布局
-        button_layout = QHBoxLayout()
+        button_layout = create_hbox()
         button_layout.addStretch()
 
         # 取消按钮
-        cancel_btn = QPushButton(i18n.t("settings.model_management.cancel"))
-        cancel_btn.clicked.connect(self.reject)
+        cancel_btn = create_button(i18n.t("settings.model_management.cancel"))
+        connect_button_with_callback(cancel_btn, self.reject)
         button_layout.addWidget(cancel_btn)
 
         # 保存按钮
-        save_btn = QPushButton(i18n.t("settings.model_management.save"))
+        save_btn = create_button(i18n.t("settings.model_management.save"))
         save_btn.setDefault(True)
 
         def save_config():
@@ -1417,8 +1414,7 @@ class ModelConfigDialog(QDialog):
             selected_device = device_combo.currentText()
 
             if selected_device == "cuda" and not cuda_available:
-                QMessageBox.warning(
-                    self,
+                self.show_warning(
                     i18n.t("settings.model_management.validation_error"),
                     i18n.t("settings.model_management.cuda_not_available"),
                 )
@@ -1440,7 +1436,7 @@ class ModelConfigDialog(QDialog):
             logger.info(f"Configuration saved for model: {model.name}")
             self.accept()
 
-        save_btn.clicked.connect(save_config)
+        connect_button_with_callback(save_btn, save_config)
         button_layout.addWidget(save_btn)
 
         layout.addLayout(button_layout)

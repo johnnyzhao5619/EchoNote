@@ -23,7 +23,6 @@ import inspect
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
 
-
 class TranslationEngine(ABC):
     """Abstract base class for translation engines."""
 

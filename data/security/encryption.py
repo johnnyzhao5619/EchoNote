@@ -37,7 +37,6 @@ from config.app_config import get_app_dir
 
 logger = logging.getLogger("echonote.security")
 
-
 class SecurityManager:
     """
     Manages encryption and decryption of sensitive data.

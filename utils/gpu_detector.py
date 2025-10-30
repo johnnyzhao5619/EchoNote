@@ -25,7 +25,6 @@ from typing import Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
 
-
 class GPUDetector:
     """Detects available GPU and compute devices."""
 
@@ -109,18 +108,32 @@ class GPUDetector:
             return ("cpu", "int8")
 
     @staticmethod
-    def get_device_display_name(device: str) -> str:
+    def get_device_display_name(device: str, i18n=None) -> str:
         """
         Get user-friendly display name for device.
 
         Args:
             device: Device identifier ('cpu', 'cuda', 'auto')
+            i18n: Optional internationalization manager
 
         Returns:
             Display name
         """
-        display_names = {"cpu": "CPU", "cuda": "CUDA (NVIDIA GPU)", "auto": "Auto (Recommended)"}
-        return display_names.get(device, device.upper())
+        if i18n:
+            display_names = {
+                "cpu": i18n.t("ui_strings.gpu_detector.device_names.cpu"),
+                "cuda": i18n.t("ui_strings.gpu_detector.device_names.cuda"),
+                "auto": i18n.t("ui_strings.gpu_detector.device_names.auto"),
+            }
+            return display_names.get(device, device.upper())
+        else:
+            # Fallback for when i18n is not available
+            display_names = {
+                "cpu": "CPU",
+                "cuda": "CUDA (NVIDIA GPU)",
+                "auto": "Auto (Recommended)",
+            }
+            return display_names.get(device, device.upper())
 
     @staticmethod
     def validate_device_config(device: str, compute_type: str) -> Tuple[str, str, str]:

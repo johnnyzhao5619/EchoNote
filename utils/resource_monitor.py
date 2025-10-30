@@ -32,9 +32,6 @@ class ResourceMonitor(QObject):
     high_cpu_warning = Signal(float)  # CPU usage percentage
     resources_recovered = Signal()  # Resources back to normal
 
-    # Thresholds (imported from constants)
-    from config.constants import HIGH_CPU_THRESHOLD_PERCENT, LOW_MEMORY_THRESHOLD_MB
-
     # Constants
     BYTES_TO_MB = 1024 * 1024  # Conversion factor from bytes to megabytes
 
@@ -63,19 +60,27 @@ class ResourceMonitor(QObject):
         super().__init__(parent)
 
         self._threshold_source = settings_manager or config_manager
-        from config.constants import MAX_MEMORY_THRESHOLD_MB, MIN_MEMORY_THRESHOLD_MB
+
+        # Import constants
+        from config.constants import (
+            LOW_MEMORY_THRESHOLD_MB,
+            HIGH_CPU_THRESHOLD_PERCENT,
+            MAX_MEMORY_THRESHOLD_MB,
+            MIN_MEMORY_THRESHOLD_MB,
+            MAX_CPU_THRESHOLD_PERCENT,
+            MIN_CPU_THRESHOLD_PERCENT,
+        )
 
         self.low_memory_threshold_mb = self._resolve_threshold(
             key="resource_monitor.low_memory_mb",
-            default=float(self.LOW_MEMORY_THRESHOLD_MB),
+            default=float(LOW_MEMORY_THRESHOLD_MB),
             minimum=MIN_MEMORY_THRESHOLD_MB,
             maximum=MAX_MEMORY_THRESHOLD_MB,
         )
-        from config.constants import MAX_CPU_THRESHOLD_PERCENT, MIN_CPU_THRESHOLD_PERCENT
 
         self.high_cpu_threshold_percent = self._resolve_threshold(
             key="resource_monitor.high_cpu_percent",
-            default=float(self.HIGH_CPU_THRESHOLD_PERCENT),
+            default=float(HIGH_CPU_THRESHOLD_PERCENT),
             minimum=MIN_CPU_THRESHOLD_PERCENT,
             maximum=MAX_CPU_THRESHOLD_PERCENT,
         )

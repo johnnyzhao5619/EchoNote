@@ -222,3 +222,17 @@ test_transcripts/
 *.backup
 *.old
 migration_backup_*/
+
+# Editor files
+# OS files
+# Code quality reports
+reports/
+# Validation reports
+VALIDATION_REPORT.md
+CODE_QUALITY_IMPROVEMENT_REPORT.md
+# Temporary improvement files
+scripts/quick_fixes.py
+scripts/minimal_fixes.py
+scripts/fix_basewidget_issues.py
+scripts/final_cleanup.py
+scripts/

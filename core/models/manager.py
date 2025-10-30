@@ -15,8 +15,6 @@
 # limitations under the License.
 """模型管理器实现。"""
 
-from __future__ import annotations
-
 import logging
 import threading
 from dataclasses import replace
@@ -35,7 +33,6 @@ from data.database.models import ModelUsageStats
 from utils.gpu_detector import GPUDetector
 
 logger = logging.getLogger(__name__)
-
 
 class ModelManager(QObject):
     """管理可用模型及其生命周期。"""

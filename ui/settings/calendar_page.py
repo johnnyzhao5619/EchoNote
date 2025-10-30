@@ -24,15 +24,14 @@ from typing import Any, Dict, Tuple
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QHBoxLayout,
     QLabel,
     QListWidget,
     QListWidgetItem,
     QMessageBox,
-    QPushButton,
 )
 
 from ui.settings.base_page import BaseSettingsPage
+from ui.base_widgets import create_hbox, create_button
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.settings.calendar")
@@ -51,7 +50,6 @@ class CalendarSettingsPage(BaseSettingsPage):
             managers: Dictionary of other managers
         """
         super().__init__(settings_manager, i18n)
-
         self.managers = managers
 
         # Setup UI
@@ -86,17 +84,17 @@ class CalendarSettingsPage(BaseSettingsPage):
         self.content_layout.addWidget(self.accounts_list)
 
         # Buttons layout
-        buttons_layout = QHBoxLayout()
+        buttons_layout = create_hbox()
 
-        self.add_google_button = QPushButton(self.i18n.t("settings.calendar.add_google"))
+        self.add_google_button = create_button(self.i18n.t("settings.calendar.add_google"))
         self.add_google_button.clicked.connect(self._on_add_google_clicked)
         buttons_layout.addWidget(self.add_google_button)
 
-        self.add_outlook_button = QPushButton(self.i18n.t("settings.calendar.add_outlook"))
+        self.add_outlook_button = create_button(self.i18n.t("settings.calendar.add_outlook"))
         self.add_outlook_button.clicked.connect(self._on_add_outlook_clicked)
         buttons_layout.addWidget(self.add_outlook_button)
 
-        self.remove_button = QPushButton(self.i18n.t("settings.calendar.remove_account"))
+        self.remove_button = create_button(self.i18n.t("settings.calendar.remove_account"))
         self.remove_button.clicked.connect(self._on_remove_clicked)
         self.remove_button.setEnabled(False)
         buttons_layout.addWidget(self.remove_button)
@@ -131,8 +129,7 @@ class CalendarSettingsPage(BaseSettingsPage):
 
     def _on_add_google_clicked(self):
         """Handle add Google account button click."""
-        QMessageBox.information(
-            self,
+        self.show_info(
             self.i18n.t("settings.calendar.add_account"),
             self.i18n.t("settings.calendar.google_oauth_info"),
         )
@@ -142,12 +139,11 @@ class CalendarSettingsPage(BaseSettingsPage):
         # 2. Initiate OAuth flow
         # 3. Add account to list on success
 
-        logger.info("Add Google account clicked")
+        logger.info(self.i18n.t("logging.settings.calendar_page.add_google_account_clicked"))
 
     def _on_add_outlook_clicked(self):
         """Handle add Outlook account button click."""
-        QMessageBox.information(
-            self,
+        self.show_info(
             self.i18n.t("settings.calendar.add_account"),
             self.i18n.t("settings.calendar.outlook_oauth_info"),
         )
@@ -157,7 +153,7 @@ class CalendarSettingsPage(BaseSettingsPage):
         # 2. Initiate OAuth flow
         # 3. Add account to list on success
 
-        logger.info("Add Outlook account clicked")
+        logger.info(self.i18n.t("logging.settings.calendar_page.add_outlook_account_clicked"))
 
     def _on_remove_clicked(self):
         """Handle remove account button click."""

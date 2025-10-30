@@ -43,6 +43,7 @@ from PySide6.QtWidgets import (
 
 from core.transcription.format_converter import FormatConverter
 from data.database.models import TranscriptionTask
+from ui.base_widgets import create_hbox, connect_button_with_callback
 from ui.batch_transcribe.file_operations import FileExporter, FileLoadWorker
 from ui.batch_transcribe.search_widget import SearchWidget
 from ui.batch_transcribe.theme_manager import TranscriptViewerThemeManager
@@ -317,7 +318,7 @@ class TranscriptViewerDialog(QDialog):
             self.load_worker.deleteLater()
             self.load_worker = None
 
-        logger.info("File load cancelled by user")
+        logger.info(self.i18n.t("logging.batch_transcribe_viewer.file_load_cancelled"))
         self.close()
 
     def _optimize_text_edit(self):
@@ -391,8 +392,7 @@ class TranscriptViewerDialog(QDialog):
 
         # Main layout
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(0)
+        # # main_layout.setSpacing(0)
 
         # Metadata section
         metadata_frame = self._create_metadata_section()
@@ -430,8 +430,7 @@ class TranscriptViewerDialog(QDialog):
         frame.setFrameShape(QFrame.Shape.StyledPanel)
 
         layout = QVBoxLayout(frame)
-        layout.setContentsMargins(20, 15, 20, 15)
-        layout.setSpacing(8)
+        # # layout.setSpacing(8)
 
         # File name (larger font)
         self.file_name_label = QLabel()
@@ -442,8 +441,7 @@ class TranscriptViewerDialog(QDialog):
         layout.addWidget(self.file_name_label)
 
         # Metadata row 1: Duration, Language
-        metadata_row1 = QHBoxLayout()
-        metadata_row1.setSpacing(20)
+        metadata_row1 = create_hbox(spacing=20)
 
         self.duration_label = QLabel()
         metadata_row1.addWidget(self.duration_label)
@@ -455,8 +453,7 @@ class TranscriptViewerDialog(QDialog):
         layout.addLayout(metadata_row1)
 
         # Metadata row 2: Engine, Completed time
-        metadata_row2 = QHBoxLayout()
-        metadata_row2.setSpacing(20)
+        metadata_row2 = create_hbox(spacing=20)
 
         self.engine_label = QLabel()
         metadata_row2.addWidget(self.engine_label)
@@ -484,14 +481,13 @@ class TranscriptViewerDialog(QDialog):
         frame.setFrameShape(QFrame.Shape.NoFrame)
 
         layout = QHBoxLayout(frame)
-        layout.setContentsMargins(20, 12, 20, 12)
-        layout.setSpacing(12)
+        # # layout.setSpacing(12)
 
         # Edit/Save button
         self.edit_button = QPushButton()
         self.edit_button.setObjectName("edit_button")
         self.edit_button.setMinimumHeight(36)
-        self.edit_button.clicked.connect(self.toggle_edit_mode)
+        connect_button_with_callback(self.edit_button, self.toggle_edit_mode)
         layout.addWidget(self.edit_button)
 
         # Export button with dropdown menu
@@ -505,14 +501,14 @@ class TranscriptViewerDialog(QDialog):
         self.copy_button = QPushButton()
         self.copy_button.setObjectName("copy_button")
         self.copy_button.setMinimumHeight(36)
-        self.copy_button.clicked.connect(self.copy_all)
+        connect_button_with_callback(self.copy_button, self.copy_all)
         layout.addWidget(self.copy_button)
 
         # Search button
         self.search_button = QPushButton()
         self.search_button.setObjectName("search_button")
         self.search_button.setMinimumHeight(36)
-        self.search_button.clicked.connect(self._toggle_search)
+        connect_button_with_callback(self.search_button, self._toggle_search)
         layout.addWidget(self.search_button)
 
         layout.addStretch()
@@ -557,8 +553,7 @@ class TranscriptViewerDialog(QDialog):
         frame.setObjectName("text_frame")
 
         layout = QVBoxLayout(frame)
-        layout.setContentsMargins(20, 10, 20, 20)
-        layout.setSpacing(0)
+        # # layout.setSpacing(0)
 
         # Text editor
         self.text_edit = QTextEdit()
@@ -653,7 +648,9 @@ class TranscriptViewerDialog(QDialog):
         try:
             # Validate output path exists
             if not output_path:
-                raise ValueError("Output path is not set")
+                raise ValueError(
+                    self.i18n.t("exceptions.batch_transcribe_viewer.output_path_not_set")
+                )
 
             # Check directory exists
             output_dir = os.path.dirname(output_path)
@@ -673,7 +670,9 @@ class TranscriptViewerDialog(QDialog):
 
             stat = shutil.disk_usage(output_dir)
             if stat.free < 1024 * 1024:  # Less than 1MB free
-                raise OSError("Insufficient disk space")
+                raise OSError(
+                    self.i18n.t("exceptions.batch_transcribe_viewer.insufficient_disk_space")
+                )
 
             # Write to file
             with open(output_path, "w", encoding="utf-8") as f:
@@ -686,9 +685,7 @@ class TranscriptViewerDialog(QDialog):
             self.edit_button.setText(self.i18n.t("common.edit"))
 
             # Show success notification
-            QMessageBox.information(
-                self, self.i18n.t("common.success"), self.i18n.t("viewer.save_success")
-            )
+            self.show_info(self.i18n.t("common.success"), self.i18n.t("viewer.save_success"))
 
             logger.info(f"Saved changes to {output_path}")
 
@@ -737,11 +734,11 @@ class TranscriptViewerDialog(QDialog):
         # Check which button was clicked
         if msg_box.clickedButton() == retry_button:
             # User wants to retry
-            logger.info("User chose to retry save operation")
+            logger.info(self.i18n.t("logging.batch_transcribe_viewer.user_chose_retry_save"))
             self.save_changes()
         else:
             # User cancelled - stay in edit mode with unsaved changes
-            logger.info("User cancelled save operation")
+            logger.info(self.i18n.t("logging.batch_transcribe_viewer.user_cancelled_save"))
             # Keep is_modified = True so user doesn't lose changes
 
     def _on_text_changed(self):
@@ -846,8 +843,7 @@ class TranscriptViewerDialog(QDialog):
                 self._export_md(save_path, content)
 
             # Show success notification
-            QMessageBox.information(
-                self,
+            self.show_info(
                 self.i18n.t("common.success"),
                 self.i18n.t("viewer.export_success", format=format.upper()),
             )
@@ -874,7 +870,7 @@ class TranscriptViewerDialog(QDialog):
         try:
             # Validate content
             if not content or not content.strip():
-                raise ValueError("Content is empty")
+                raise ValueError(self.i18n.t("exceptions.batch_transcribe_viewer.content_is_empty"))
 
             # Check directory exists
             save_dir = os.path.dirname(save_path)
@@ -896,7 +892,9 @@ class TranscriptViewerDialog(QDialog):
 
             stat = shutil.disk_usage(save_dir if save_dir else ".")
             if stat.free < 1024 * 1024:  # Less than 1MB free
-                raise OSError("Insufficient disk space")
+                raise OSError(
+                    self.i18n.t("exceptions.batch_transcribe_viewer.insufficient_disk_space")
+                )
 
             # Remove timestamp markers like [00:00:15] if present
             import re
@@ -949,7 +947,7 @@ class TranscriptViewerDialog(QDialog):
         try:
             # Validate content
             if not content or not content.strip():
-                raise ValueError("Content is empty")
+                raise ValueError(self.i18n.t("exceptions.batch_transcribe_viewer.content_is_empty"))
 
             # Check directory exists
             save_dir = os.path.dirname(save_path)
@@ -978,7 +976,11 @@ class TranscriptViewerDialog(QDialog):
 
             if not segments:
                 # If no timestamps found, create simple segments
-                logger.warning("No timestamps found, creating basic SRT")
+                logger.warning(
+                    self.i18n.t(
+                        "logging.batch_transcribe_viewer.no_timestamps_found_creating_basic_srt"
+                    )
+                )
                 segments = self._create_basic_segments(content)
 
             if not segments:
@@ -1108,7 +1110,7 @@ class TranscriptViewerDialog(QDialog):
         try:
             # Validate content
             if not content or not content.strip():
-                raise ValueError("Content is empty")
+                raise ValueError(self.i18n.t("exceptions.batch_transcribe_viewer.content_is_empty"))
 
             # Check directory exists
             save_dir = os.path.dirname(save_path)
@@ -1141,7 +1143,11 @@ class TranscriptViewerDialog(QDialog):
                 md_content = converter._to_md(segments)
             else:
                 # If no timestamps, create simple markdown
-                logger.warning("No timestamps found, creating basic Markdown")
+                logger.warning(
+                    self.i18n.t(
+                        "logging.batch_transcribe_viewer.no_timestamps_found_creating_basic_markdown"
+                    )
+                )
                 md_content = self._create_basic_markdown(content)
 
             if not md_content or md_content.strip() == "# Transcription":
@@ -1245,11 +1251,13 @@ class TranscriptViewerDialog(QDialog):
             # Show temporary notification
             self._show_copy_notification()
 
-            logger.info("Copied all transcript content to clipboard")
+            logger.info(
+                self.i18n.t("logging.batch_transcribe_viewer.copied_all_transcript_to_clipboard")
+            )
 
         except Exception as e:
             logger.error(f"Failed to copy to clipboard: {e}")
-            QMessageBox.warning(self, self.i18n.t("common.error"), self.i18n.t("viewer.copy_error"))
+            self.show_warning(self.i18n.t("common.error"), self.i18n.t("viewer.copy_error"))
 
     def _show_copy_notification(self):
         """

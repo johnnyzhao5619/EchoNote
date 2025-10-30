@@ -26,12 +26,13 @@ from PySide6.QtCore import Signal
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QLabel, QScrollArea, QVBoxLayout, QWidget
 
+from ui.base_widgets import BaseWidget
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.settings.base")
 
 
-class BaseSettingsPage(QWidget):
+class BaseSettingsPage(BaseWidget):
     """
     Base class for settings pages.
 
@@ -41,15 +42,16 @@ class BaseSettingsPage(QWidget):
     # Signal emitted when settings change
     settings_changed = Signal()
 
-    def __init__(self, settings_manager, i18n: I18nQtManager):
+    def __init__(self, settings_manager, i18n: I18nQtManager, parent=None):
         """
         Initialize base settings page.
 
         Args:
             settings_manager: SettingsManager instance
             i18n: Internationalization manager
+            parent: Parent widget
         """
-        super().__init__()
+        super().__init__(i18n, parent)
 
         self.settings_manager = settings_manager
         self.i18n = i18n

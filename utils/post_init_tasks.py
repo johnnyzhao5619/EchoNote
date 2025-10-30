@@ -58,19 +58,10 @@ def check_model_availability(config, model_manager, i18n, main_window):
     from utils.first_run_setup import FirstRunSetup
 
     downloaded_models = model_manager.get_downloaded_models()
-    model_size = config.get("transcription.faster_whisper.model_size", "base")
 
-    # Check if configured model is available (without loading the engine)
-    configured_model_available = model_manager.is_model_downloaded(model_size)
-
-    if not downloaded_models or not configured_model_available:
-        if not downloaded_models:
-            logger.info("No models downloaded, showing recommendation dialog...")
-        else:
-            logger.warning(
-                f"Configured model '{model_size}' is not available, "
-                f"showing recommendation dialog..."
-            )
+    # Only show dialog if NO models are downloaded at all
+    if not downloaded_models:
+        logger.info("No models downloaded, showing recommendation dialog...")
 
         user_downloaded = FirstRunSetup.show_model_recommendation_dialog(
             model_manager, i18n, main_window
@@ -88,7 +79,9 @@ def check_model_availability(config, model_manager, i18n, main_window):
                 QMessageBox.StandardButton.Ok,
             )
     else:
-        logger.info(f"Found {len(downloaded_models)} downloaded model(s)")
+        logger.info(f"Found {len(downloaded_models)} downloaded model(s), skipping dialog")
+        # Note: If configured model is not available, the engine will automatically
+        # use a fallback model (implemented in FasterWhisperEngine)
 
 
 def start_background_services(managers, config, db, logger):

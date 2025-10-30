@@ -15,6 +15,4 @@
 # limitations under the License.
 """Settings management logic."""
 
-from .manager import SettingsManager
-
 __all__ = ["SettingsManager"]

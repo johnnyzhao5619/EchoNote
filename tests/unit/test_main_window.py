@@ -3,7 +3,6 @@
 Unit tests for PySide6 migration verification.
 """
 
-
 def test_pyside6_imports():
     """Test that UI modules use PySide6 imports correctly."""
     import ui.common.error_dialog
@@ -20,7 +19,6 @@ def test_pyside6_imports():
                 assert "PyQt6" not in str(
                     value.__module__
                 ), f"Found PyQt6 reference in {module.__name__}.{key}"
-
 
 def test_pyside6_signal_imports():
     """Test that Signal imports are from PySide6."""

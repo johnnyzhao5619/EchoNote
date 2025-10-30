@@ -14,123 +14,184 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-Centralized PySide6 imports for UI components.
+Centralized PySide6 imports for the UI layer.
 
-This module provides commonly used PySide6 classes to reduce import duplication
-and ensure consistent import patterns across the UI layer.
+This module provides a single location for all PySide6 imports used throughout
+the UI layer, making it easier to manage dependencies and ensure consistent
+import patterns across the UI layer.
 """
 
 # Core Qt classes
 from PySide6.QtCore import (
     QDate,
     QDateTime,
+    QTime,
+    QPoint,
     QRect,
+    QSettings,
     QSize,
     Qt,
-    QThread,
-    QTime,
     QTimer,
-    QUrl,
     Signal,
     Slot,
+    QObject,
+    QThread,
+    QEvent,
 )
 
 # GUI classes
 from PySide6.QtGui import (
     QAction,
-    QClipboard,
     QColor,
     QFont,
-    QFontMetrics,
     QIcon,
+    QKeySequence,
     QPainter,
-    QPen,
+    QPalette,
     QPixmap,
-    QTextCharFormat,
+    QBrush,
+    QPen,
+    QClipboard,
+    QCloseEvent,
+    QKeyEvent,
+    QMouseEvent,
+    QWheelEvent,
+    QResizeEvent,
+    QPaintEvent,
     QTextCursor,
     QTextDocument,
+    QMoveEvent,
+    QShowEvent,
+    QHideEvent,
+    QFocusEvent,
+    QShortcut,
 )
-
-# Multimedia classes
-from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
 
 # Widget classes
 from PySide6.QtWidgets import (
     QApplication,
-    QButtonGroup,
-    QCheckBox,
-    QComboBox,
+    QWidget,
+    QMainWindow,
     QDialog,
+    QMessageBox,
     QFileDialog,
-    QFrame,
-    QGridLayout,
-    QGroupBox,
+    QInputDialog,
+    QProgressDialog,
+    QSplashScreen,
+    # Layout classes
+    QVBoxLayout,
     QHBoxLayout,
+    QGridLayout,
+    QFormLayout,
+    QStackedLayout,
+    # Container widgets
+    QFrame,
+    QGroupBox,
+    QScrollArea,
+    QSplitter,
+    QStackedWidget,
+    QTabWidget,
+    # Input widgets
+    QLineEdit,
+    QTextEdit,
+    QPlainTextEdit,
+    QSpinBox,
+    QDoubleSpinBox,
+    QComboBox,
+    QCheckBox,
+    QRadioButton,
+    QPushButton,
+    QToolButton,
+    QButtonGroup,
+    QSlider,
+    QScrollBar,
+    QDateEdit,
+    QTimeEdit,
+    QDateTimeEdit,
+    # Display widgets
     QLabel,
+    QProgressBar,
+    # Item widgets
     QListWidget,
     QListWidgetItem,
+    QTreeWidget,
+    QTreeWidgetItem,
+    QTableWidget,
+    QTableWidgetItem,
+    # Item views
+    QAbstractItemView,
+    QListView,
+    QTreeView,
+    QTableView,
+    # Menu and toolbar
+    QMenuBar,
     QMenu,
-    QMessageBox,
-    QProgressBar,
-    QPushButton,
-    QSplashScreen,
-    QStackedWidget,
-    QTextEdit,
-    QVBoxLayout,
-    QWidget,
+    QToolBar,
+    QStatusBar,
+    # Spacers
+    QSpacerItem,
+    QSizePolicy,
 )
 
-# Common widget combinations for specific use cases
+# Re-export commonly used items for convenience
 __all__ = [
     # Core
-    "QDate",
-    "QDateTime",
-    "QRect",
-    "QSize",
-    "QThread",
-    "QTime",
-    "QTimer",
-    "QUrl",
+    "QApplication",
+    "QWidget",
+    "QMainWindow",
+    "QDialog",
+    "QObject",
     "Qt",
     "Signal",
     "Slot",
-    # GUI
-    "QAction",
-    "QClipboard",
+    "QTimer",
+    "QThread",
+    # Layouts
+    "QVBoxLayout",
+    "QHBoxLayout",
+    "QGridLayout",
+    "QFormLayout",
+    # Common widgets
+    "QLabel",
+    "QPushButton",
+    "QLineEdit",
+    "QTextEdit",
+    "QComboBox",
+    "QCheckBox",
+    "QRadioButton",
+    "QSlider",
+    "QProgressBar",
+    "QListWidget",
+    "QTreeWidget",
+    "QTableWidget",
+    # Containers
+    "QFrame",
+    "QGroupBox",
+    "QScrollArea",
+    "QSplitter",
+    "QStackedWidget",
+    "QTabWidget",
+    # Dialogs
+    "QMessageBox",
+    "QFileDialog",
+    "QInputDialog",
+    # Events
+    "QCloseEvent",
+    "QKeyEvent",
+    "QMouseEvent",
+    "QPaintEvent",
+    # Graphics and styling
+    "QPixmap",
+    "QIcon",
     "QColor",
     "QFont",
-    "QFontMetrics",
-    "QIcon",
     "QPainter",
+    "QBrush",
     "QPen",
-    "QPixmap",
-    "QTextCharFormat",
-    "QTextCursor",
-    "QTextDocument",
-    # Widgets
-    "QApplication",
-    "QButtonGroup",
-    "QCheckBox",
-    "QComboBox",
-    "QDialog",
-    "QFileDialog",
-    "QFrame",
-    "QGridLayout",
-    "QGroupBox",
-    "QHBoxLayout",
-    "QLabel",
-    "QListWidget",
-    "QListWidgetItem",
-    "QMenu",
-    "QMessageBox",
-    "QProgressBar",
-    "QPushButton",
-    "QSplashScreen",
-    "QStackedWidget",
-    "QTextEdit",
-    "QVBoxLayout",
-    "QWidget",
-    # Multimedia
-    "QAudioOutput",
-    "QMediaPlayer",
+    # Utility
+    "QSettings",
+    "QSize",
+    "QPoint",
+    "QRect",
+    "QKeySequence",
 ]

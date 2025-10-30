@@ -27,11 +27,12 @@ from PySide6.QtWidgets import QSizePolicy
 from ui.qt_imports import QIcon, QPushButton, QVBoxLayout, QWidget, Signal
 
 from utils.i18n import I18nQtManager
+from ui.base_widgets import BaseWidget
 
 logger = logging.getLogger("echonote.ui.sidebar")
 
 
-class Sidebar(QWidget):
+class Sidebar(BaseWidget):
     """
     Sidebar navigation widget with buttons for different pages.
 
@@ -41,22 +42,20 @@ class Sidebar(QWidget):
     # Signal emitted when page changes
     page_changed = Signal(str)
 
-    def __init__(self, i18n: I18nQtManager):
+    def __init__(self, i18n: I18nQtManager, parent=None):
         """
         Initialize sidebar.
 
         Args:
             i18n: Internationalization manager
+            parent: Parent widget
         """
-        super().__init__()
-
-        self.i18n = i18n
-
-        # Dictionary to store navigation buttons
+        # Initialize attributes before calling parent constructor
+        # This is needed because BaseWidget.__init__ calls setup_ui()
         self.nav_buttons: Dict[str, QPushButton] = {}
-
-        # Current active page
         self.current_page: Optional[str] = None
+
+        super().__init__(i18n, parent)
 
         # Setup UI
         self.setup_ui()
@@ -78,8 +77,6 @@ class Sidebar(QWidget):
 
         # Create layout
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
 
         from ui.constants import DEFAULT_LAYOUT_SPACING
 

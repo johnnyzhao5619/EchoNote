@@ -27,13 +27,12 @@ from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
-    QHBoxLayout,
     QLabel,
-    QPushButton,
     QTextEdit,
     QVBoxLayout,
 )
 
+from ui.base_widgets import create_hbox, create_button, connect_button_with_callback
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.dialogs.ffmpeg_install")
@@ -89,11 +88,10 @@ class FFmpegInstallDialog(QDialog):
             instructions: Installation instructions text
         """
         layout = QVBoxLayout(self)
-        layout.setSpacing(15)
-        layout.setContentsMargins(20, 20, 20, 20)
+        # # layout.setContentsMargins(20, 20, 20, 20)
 
         # Icon and title
-        header_layout = QHBoxLayout()
+        header_layout = create_hbox()
 
         # Warning icon (using emoji for simplicity)
         icon_label = QLabel("⚠️")
@@ -149,18 +147,18 @@ class FFmpegInstallDialog(QDialog):
         layout.addWidget(self.dont_show_checkbox)
 
         # Buttons
-        button_layout = QHBoxLayout()
+        button_layout = create_hbox()
         button_layout.addStretch()
 
         # Later button
-        later_btn = QPushButton(self.i18n.t("ffmpeg.install_later"))
-        later_btn.clicked.connect(self.on_later)
+        later_btn = create_button(self.i18n.t("ffmpeg.install_later"))
+        connect_button_with_callback(later_btn, self.on_later)
         button_layout.addWidget(later_btn)
 
         # OK button
-        ok_btn = QPushButton(self.i18n.t("ffmpeg.got_it"))
+        ok_btn = create_button(self.i18n.t("ffmpeg.got_it"))
         ok_btn.setDefault(True)
-        ok_btn.clicked.connect(self.accept)
+        connect_button_with_callback(ok_btn, self.accept)
         button_layout.addWidget(ok_btn)
 
         layout.addLayout(button_layout)

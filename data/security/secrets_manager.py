@@ -29,7 +29,6 @@ from data.security.encryption import SecurityManager
 
 logger = logging.getLogger("echonote.security.secrets")
 
-
 class SecretsManager:
     """
     Manages encrypted storage of API keys and sensitive configuration.

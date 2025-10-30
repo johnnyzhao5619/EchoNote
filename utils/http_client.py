@@ -27,7 +27,6 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-
 class RetryableHttpClient:
     """
     可重试的 HTTP 客户端
@@ -287,7 +286,6 @@ class RetryableHttpClient:
     def patch(self, url: str, **kwargs) -> httpx.Response:
         """发送 PATCH 请求"""
         return self.request("PATCH", url, **kwargs)
-
 
 class AsyncRetryableHttpClient:
     """

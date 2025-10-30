@@ -28,7 +28,6 @@ from typing import List, Optional
 
 logger = logging.getLogger("echonote.storage")
 
-
 class FileManager:
     """
     Manages file storage operations with security and organization.

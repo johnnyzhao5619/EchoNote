@@ -172,16 +172,105 @@ FILE_SIZE_THRESHOLD = 1024.0
 # User Feedback
 DEFAULT_RECENT_OPERATIONS_COUNT = 10
 
-
-# Default Paths (platform-aware)
+# Default Paths (platform-aware) - Deprecated, use get_i18n_default_recordings_path instead
 def get_default_recordings_path() -> str:
-    """Get the default recordings path based on the platform."""
+    """
+    Get the default recordings path based on the platform.
+
+    Deprecated: Use get_i18n_default_recordings_path() for internationalized paths.
+    """
     from pathlib import Path
 
     return str(Path.home() / "Documents" / "EchoNote" / "Recordings")
 
-
 DEFAULT_RECORDINGS_PATH = get_default_recordings_path()
+
+# ============================================================================
+# Internationalized User-Visible Constants
+# ============================================================================
+
+def get_i18n_file_size_units(i18n_manager=None) -> list[str]:
+    """
+    Get internationalized file size units.
+
+    Args:
+        i18n_manager: I18n manager instance for translation
+
+    Returns:
+        List of translated file size units
+    """
+    if i18n_manager is None:
+        return FILE_SIZE_UNITS
+
+    return [
+        i18n_manager.t("constants.file_size.bytes"),
+        i18n_manager.t("constants.file_size.kilobytes"),
+        i18n_manager.t("constants.file_size.megabytes"),
+        i18n_manager.t("constants.file_size.gigabytes"),
+        i18n_manager.t("constants.file_size.terabytes"),
+    ]
+
+def get_i18n_startup_progress_labels(i18n_manager=None) -> dict[str, str]:
+    """
+    Get internationalized startup progress step labels.
+
+    Args:
+        i18n_manager: I18n manager instance for translation
+
+    Returns:
+        Dict mapping step keys to translated labels
+    """
+    if i18n_manager is None:
+        return {
+            "configuration": "Configuration",
+            "dependencies": "Dependencies",
+            "database": "Database",
+            "i18n": "Internationalization",
+            "managers": "Managers",
+            "speech_engine": "Speech Engine",
+            "transcription": "Transcription",
+            "resource_monitor": "Resource Monitor",
+            "realtime_recorder": "Realtime Recorder",
+            "calendar": "Calendar",
+            "main_window": "Main Window",
+            "final": "Final",
+        }
+
+    return {
+        "configuration": i18n_manager.t("constants.startup.configuration"),
+        "dependencies": i18n_manager.t("constants.startup.dependencies"),
+        "database": i18n_manager.t("constants.startup.database"),
+        "i18n": i18n_manager.t("constants.startup.i18n"),
+        "managers": i18n_manager.t("constants.startup.managers"),
+        "speech_engine": i18n_manager.t("constants.startup.speech_engine"),
+        "transcription": i18n_manager.t("constants.startup.transcription"),
+        "resource_monitor": i18n_manager.t("constants.startup.resource_monitor"),
+        "realtime_recorder": i18n_manager.t("constants.startup.realtime_recorder"),
+        "calendar": i18n_manager.t("constants.startup.calendar"),
+        "main_window": i18n_manager.t("constants.startup.main_window"),
+        "final": i18n_manager.t("constants.startup.final"),
+    }
+
+def get_i18n_default_recordings_path(i18n_manager=None) -> str:
+    """
+    Get internationalized default recordings path.
+
+    Args:
+        i18n_manager: I18n manager instance for translation
+
+    Returns:
+        Localized default recordings path
+    """
+    from pathlib import Path
+
+    if i18n_manager is None:
+        return str(Path.home() / "Documents" / "EchoNote" / "Recordings")
+
+    # Get localized folder names
+    documents_folder = i18n_manager.t("constants.folders.documents")
+    recordings_folder = i18n_manager.t("constants.folders.recordings")
+
+    return str(Path.home() / documents_folder / "EchoNote" / recordings_folder)
 
 # ============================================================================
 # Accessibility Constants

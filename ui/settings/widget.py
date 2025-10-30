@@ -37,12 +37,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.base_widgets import BaseWidget, create_hbox, create_vbox, create_button
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.settings")
 
 
-class SettingsWidget(QWidget):
+class SettingsWidget(BaseWidget):
     """
     Main settings widget with categorized navigation and pages.
 
@@ -53,7 +54,9 @@ class SettingsWidget(QWidget):
     # Signal emitted when settings are saved
     settings_saved = Signal()
 
-    def __init__(self, settings_manager, i18n: I18nQtManager, managers: Dict[str, Any]):
+    def __init__(
+        self, settings_manager, i18n: I18nQtManager, managers: Dict[str, Any], parent=None
+    ):
         """
         Initialize settings widget.
 
@@ -61,11 +64,11 @@ class SettingsWidget(QWidget):
             settings_manager: SettingsManager instance
             i18n: Internationalization manager
             managers: Dictionary of other managers (for API key testing, etc.)
+            parent: Parent widget
         """
-        super().__init__()
+        super().__init__(i18n, parent)
 
         self.settings_manager = settings_manager
-        self.i18n = i18n
         self.managers = managers
 
         # Track unsaved changes
@@ -86,14 +89,13 @@ class SettingsWidget(QWidget):
         # Connect language change signal
         self.i18n.language_changed.connect(self._on_language_changed)
 
-        logger.info("Settings widget initialized")
+        logger.info(self.i18n.t("logging.settings.widget_initialized"))
 
     def setup_ui(self):
         """Set up the settings UI layout."""
         # Main layout
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(20, 20, 20, 20)
-        main_layout.setSpacing(10)
+        # # main_layout.setSpacing(10)
 
         # Title
         self.title_label = QLabel(self.i18n.t("settings.title"))
@@ -101,8 +103,7 @@ class SettingsWidget(QWidget):
         main_layout.addWidget(self.title_label)
 
         # Content layout (category list + pages)
-        content_layout = QHBoxLayout()
-        content_layout.setSpacing(20)
+        content_layout = create_hbox(spacing=20)
 
         # Category list
         self.category_list = self._create_category_list()
@@ -126,21 +127,21 @@ class SettingsWidget(QWidget):
         main_layout.addWidget(separator)
 
         # Button layout
-        button_layout = QHBoxLayout()
+        button_layout = create_hbox()
         button_layout.addStretch()
 
         # Reset button
-        self.reset_button = QPushButton(self.i18n.t("settings.reset"))
+        self.reset_button = create_button(self.i18n.t("settings.reset"))
         self.reset_button.clicked.connect(self._on_reset_clicked)
         button_layout.addWidget(self.reset_button)
 
         # Cancel button
-        self.cancel_button = QPushButton(self.i18n.t("settings.cancel"))
+        self.cancel_button = create_button(self.i18n.t("settings.cancel"))
         self.cancel_button.clicked.connect(self._on_cancel_clicked)
         button_layout.addWidget(self.cancel_button)
 
         # Save button
-        self.save_button = QPushButton(self.i18n.t("settings.save"))
+        self.save_button = create_button(self.i18n.t("settings.save"))
         self.save_button.clicked.connect(self._on_save_clicked)
         self.save_button.setDefault(True)
         button_layout.addWidget(self.save_button)
@@ -158,7 +159,6 @@ class SettingsWidget(QWidget):
         """
         category_list = QListWidget()
         category_list.setFixedWidth(200)
-        category_list.setSpacing(2)
 
         # Define categories
         categories = [
@@ -221,7 +221,7 @@ class SettingsWidget(QWidget):
                 # Insert after realtime page (index 2)
                 pages.insert(2, ("model_management", model_management_page))
             else:
-                logger.warning("model_manager not available, skipping model management page")
+                logger.warning(self.i18n.t("logging.settings.model_manager_not_available"))
 
             # Add pages to container
             for page_id, page_widget in pages:
@@ -292,8 +292,7 @@ class SettingsWidget(QWidget):
 
         except Exception as e:
             logger.error(f"Error loading settings: {e}")
-            QMessageBox.critical(
-                self,
+            self.show_error(
                 self.i18n.t("settings.error.title"),
                 self.i18n.t("settings.error.load_failed", error=str(e)),
             )
@@ -311,9 +310,7 @@ class SettingsWidget(QWidget):
                 if hasattr(page_widget, "validate_settings"):
                     is_valid, error_msg = page_widget.validate_settings()
                     if not is_valid:
-                        QMessageBox.warning(
-                            self, self.i18n.t("settings.validation.title"), error_msg
-                        )
+                        self.show_warning(self.i18n.t("settings.validation.title"), error_msg)
                         # Switch to the page with error
                         page_index = list(self.settings_pages.keys()).index(page_id)
                         self.category_list.setCurrentRow(page_index)
@@ -326,7 +323,7 @@ class SettingsWidget(QWidget):
 
             # Persist to disk
             if not self.settings_manager.save_settings():
-                raise Exception("Failed to save settings to disk")
+                raise Exception(self.i18n.t("exceptions.settings.failed_to_save_to_disk"))
 
             # Update original settings
             self.original_settings = self.settings_manager.get_all_settings()
@@ -339,17 +336,16 @@ class SettingsWidget(QWidget):
             self.settings_saved.emit()
 
             # Show success message
-            QMessageBox.information(
-                self, self.i18n.t("settings.success.title"), self.i18n.t("settings.success.saved")
+            self.show_info(
+                self.i18n.t("settings.success.title"), self.i18n.t("settings.success.saved")
             )
 
-            logger.info("Settings saved successfully")
+            logger.info(self.i18n.t("logging.settings.saved_successfully"))
             return True
 
         except Exception as e:
             logger.error(f"Error saving settings: {e}")
-            QMessageBox.critical(
-                self,
+            self.show_error(
                 self.i18n.t("settings.error.title"),
                 self.i18n.t("settings.error.save_failed", error=str(e)),
             )
@@ -404,18 +400,16 @@ class SettingsWidget(QWidget):
                 # Reload settings
                 self.load_settings()
 
-                QMessageBox.information(
-                    self,
+                self.show_info(
                     self.i18n.t("settings.success.title"),
                     self.i18n.t("settings.success.reset"),
                 )
 
-                logger.info("Settings reset to defaults")
+                logger.info(self.i18n.t("logging.settings.reset_to_defaults"))
 
             except Exception as e:
                 logger.error(f"Error resetting settings: {e}")
-                QMessageBox.critical(
-                    self,
+                self.show_error(
                     self.i18n.t("settings.error.title"),
                     self.i18n.t("settings.error.reset_failed", error=str(e)),
                 )

@@ -15,12 +15,9 @@
 # limitations under the License.
 """模型下载线程工具。"""
 
-from __future__ import annotations
-
 import asyncio
 import logging
 from typing import Callable, Optional
-
 
 def run_model_download(
     model_manager,

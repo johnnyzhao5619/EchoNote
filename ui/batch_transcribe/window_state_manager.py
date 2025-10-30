@@ -26,7 +26,6 @@ from PySide6.QtWidgets import QApplication
 
 logger = logging.getLogger("echonote.ui.window_state_manager")
 
-
 class WindowStateManager:
     """Manages window state persistence for transcript viewer."""
 

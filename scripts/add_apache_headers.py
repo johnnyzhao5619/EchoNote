@@ -27,16 +27,13 @@ APACHE_HEADER = """# SPDX-License-Identifier: Apache-2.0
 
 """
 
-
 def has_apache_header(content: str) -> bool:
     """Check if the file already has an Apache 2.0 header."""
     return "SPDX-License-Identifier: Apache-2.0" in content
 
-
 def has_shebang(content: str) -> bool:
     """Check if the file starts with a shebang."""
     return content.startswith("#!")
-
 
 def add_header_to_file(file_path: Path) -> bool:
     """Add Apache 2.0 header to a Python file. Returns True if modified."""
@@ -86,7 +83,6 @@ def add_header_to_file(file_path: Path) -> bool:
         print(f"ERROR: {file_path} - {e}")
         return False
 
-
 def find_python_files(root_dir: Path) -> List[Path]:
     """Find all Python files in the project, excluding certain directories."""
     exclude_dirs = {
@@ -113,7 +109,6 @@ def find_python_files(root_dir: Path) -> List[Path]:
                 python_files.append(file_path)
 
     return sorted(python_files)
-
 
 def main():
     """Main function to add Apache headers to all Python files."""
@@ -145,7 +140,6 @@ def main():
     print(f"Summary: Modified {modified_count} out of {len(python_files)} files")
 
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(main())

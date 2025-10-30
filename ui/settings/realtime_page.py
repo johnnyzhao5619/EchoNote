@@ -37,6 +37,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from ui.base_widgets import create_hbox, create_vbox, create_button
 from ui.settings.base_page import BaseSettingsPage
 from utils.i18n import I18nQtManager
 
@@ -55,7 +56,6 @@ class RealtimeSettingsPage(BaseSettingsPage):
             i18n: Internationalization manager
         """
         super().__init__(settings_manager, i18n)
-
         self._mp3_supported = self._detect_mp3_support()
 
         # Setup UI
@@ -77,7 +77,7 @@ class RealtimeSettingsPage(BaseSettingsPage):
         self.content_layout.addWidget(self.audio_input_title)
 
         # Default input source
-        source_layout = QHBoxLayout()
+        source_layout = create_hbox()
         self.source_label = QLabel(self.i18n.t("settings.realtime.input_source"))
         self.source_label.setMinimumWidth(200)
         self.source_combo = QComboBox()
@@ -94,11 +94,11 @@ class RealtimeSettingsPage(BaseSettingsPage):
         self.content_layout.addLayout(source_layout)
 
         # Gain level
-        gain_layout = QVBoxLayout()
+        gain_layout = create_vbox()
         self.gain_label = QLabel(self.i18n.t("settings.realtime.gain_level"))
         gain_layout.addWidget(self.gain_label)
 
-        gain_slider_layout = QHBoxLayout()
+        gain_slider_layout = create_hbox()
         self.gain_slider = QSlider(Qt.Orientation.Horizontal)
         self.gain_slider.setMinimum(10)  # 0.1 * 100
         self.gain_slider.setMaximum(200)  # 2.0 * 100
@@ -128,7 +128,7 @@ class RealtimeSettingsPage(BaseSettingsPage):
         self.content_layout.addWidget(self.recording_title)
 
         # Recording format
-        format_layout = QHBoxLayout()
+        format_layout = create_hbox()
         self.format_label = QLabel(self.i18n.t("settings.realtime.recording_format"))
         self.format_label.setMinimumWidth(200)
         self.format_combo = QComboBox()
@@ -155,12 +155,12 @@ class RealtimeSettingsPage(BaseSettingsPage):
         self.content_layout.addWidget(self.format_hint_label)
 
         # Recording save path
-        path_layout = QHBoxLayout()
+        path_layout = create_hbox()
         self.path_label = QLabel(self.i18n.t("settings.realtime.recording_path"))
         self.path_label.setMinimumWidth(200)
         self.path_edit = QLineEdit()
         self.path_edit.textChanged.connect(self._emit_changed)
-        self.browse_button = QPushButton(self.i18n.t("settings.realtime.browse"))
+        self.browse_button = create_button(self.i18n.t("settings.realtime.browse"))
         self.browse_button.clicked.connect(self._on_browse_clicked)
         path_layout.addWidget(self.path_label)
         path_layout.addWidget(self.path_edit, stretch=1)
@@ -180,7 +180,7 @@ class RealtimeSettingsPage(BaseSettingsPage):
         self.content_layout.addWidget(self.translation_title)
 
         # Translation engine
-        translation_layout = QHBoxLayout()
+        translation_layout = create_hbox()
         self.translation_label = QLabel(self.i18n.t("settings.realtime.translation_engine"))
         self.translation_label.setMinimumWidth(200)
         self.translation_combo = QComboBox()

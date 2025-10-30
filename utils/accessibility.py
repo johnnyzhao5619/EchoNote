@@ -29,7 +29,6 @@ from PySide6.QtWidgets import QComboBox, QLineEdit, QPushButton, QTextEdit, QWid
 
 logger = logging.getLogger("echonote.utils.accessibility")
 
-
 class AccessibilityHelper:
     """
     Helper class for managing accessibility features.
@@ -155,7 +154,6 @@ class AccessibilityHelper:
 
         logger.debug(f"Announced to screen reader: {message}")
 
-
 class KeyboardShortcutFilter(QEvent):
     """Event filter for handling keyboard shortcuts."""
 
@@ -191,7 +189,6 @@ class KeyboardShortcutFilter(QEvent):
                 return True
 
         return False
-
 
 class FocusManager:
     """
@@ -242,7 +239,6 @@ class FocusManager:
 
         logger.debug(f"Trapped focus in {container.__class__.__name__}")
 
-
 def make_accessible_button(
     button: QPushButton,
     name: str,
@@ -275,7 +271,6 @@ def make_accessible_button(
 
     return button
 
-
 def make_accessible_input(
     input_widget: QWidget,
     label_text: str,
@@ -307,7 +302,6 @@ def make_accessible_input(
 
     return input_widget
 
-
 def make_accessible_combobox(
     combobox: QComboBox, label_text: str, description: Optional[str] = None
 ) -> QComboBox:
@@ -331,7 +325,6 @@ def make_accessible_combobox(
     combobox.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
     return combobox
-
 
 # Global focus manager instance
 focus_manager = FocusManager()

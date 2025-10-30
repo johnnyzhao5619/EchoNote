@@ -22,7 +22,6 @@ from typing import Dict, List, Set
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-
 class VerificationIssue:
     """Represents a verification issue found during migration check."""
 
@@ -60,7 +59,6 @@ class VerificationIssue:
             f"[{self.issue_type}] {self.description}"
         )
 
-
 class VerificationStats:
     """Track verification statistics."""
 
@@ -87,7 +85,6 @@ class VerificationStats:
     def finalize(self):
         """Finalize statistics calculation."""
         self.files_with_issues = len(self.problematic_files)
-
 
 class PySide6MigrationVerifier:
     """Enhanced PySide6 migration verification tool."""
@@ -584,7 +581,6 @@ class PySide6MigrationVerifier:
 
         print("\n" + "=" * 60)
 
-
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(
@@ -656,7 +652,6 @@ Examples:
 
     # Exit with appropriate code
     sys.exit(0 if success else 1)
-
 
 if __name__ == "__main__":
     main()

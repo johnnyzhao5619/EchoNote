@@ -20,7 +20,6 @@ EchoNote - Intelligent Voice Transcription and Calendar Management Application
 Main entry point for the application.
 """
 
-
 import sys
 
 from config.app_config import ConfigManager
@@ -28,7 +27,6 @@ from utils.exception_handler import install_exception_hook
 from utils.first_run_setup import FirstRunSetup
 from utils.logger import setup_logging
 from utils.resource_cleanup import close_lazy_loaded_engine
-
 
 def main():
     """Application entry point."""
@@ -464,7 +462,6 @@ def main():
 
         traceback.print_exc()
         return 1
-
 
 if __name__ == "__main__":
     sys.exit(main())

@@ -24,7 +24,6 @@ from typing import Dict, List
 
 logger = logging.getLogger("echonote.transcription.format_converter")
 
-
 class FormatConverter:
     """
     Converts internal transcription format to various output formats.
@@ -62,7 +61,7 @@ class FormatConverter:
 
         # Validate data
         if not internal_format or "segments" not in internal_format:
-            raise ValueError("Invalid internal format: missing 'segments' key")
+            raise ValueError(self.i18n.t("core.invalid_format_error"))
 
         segments = internal_format["segments"]
         if not segments:

@@ -27,7 +27,6 @@ from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 
-
 class UsageTracker:
     """API 使用量跟踪器"""
 
@@ -170,7 +169,7 @@ class UsageTracker:
                 # 构建查询
                 if engine:
                     query = """
-                        SELECT 
+                        SELECT
                             engine,
                             SUM(duration_seconds) as total_duration,
                             SUM(cost) as total_cost,
@@ -182,7 +181,7 @@ class UsageTracker:
                     cursor.execute(query, (engine, start_date, end_date))
                 else:
                     query = """
-                        SELECT 
+                        SELECT
                             engine,
                             SUM(duration_seconds) as total_duration,
                             SUM(cost) as total_cost,

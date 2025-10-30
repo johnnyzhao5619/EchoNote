@@ -39,10 +39,8 @@ from ui.common.notification import get_notification_manager
 
 logger = logging.getLogger("echonote.transcription.manager")
 
-
 class TaskNotFoundError(Exception):
     """Raised when a transcription task cannot be found."""
-
 
 class TranscriptionManager:
     """
@@ -834,7 +832,6 @@ class TranscriptionManager:
             return False
 
         import asyncio
-        import concurrent.futures
 
         # Cancel in queue (schedule in background event loop)
         future = asyncio.run_coroutine_threadsafe(self.task_queue.cancel_task(task_id), self._loop)

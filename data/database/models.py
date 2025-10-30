@@ -30,16 +30,13 @@ from data.database.encryption_helper import decrypt_sensitive_field, encrypt_sen
 
 logger = logging.getLogger("echonote.database.models")
 
-
 def generate_uuid() -> str:
     """Generate a new UUID string."""
     return str(uuid.uuid4())
 
-
 def current_timestamp() -> str:
     """Get current timestamp as ISO format string."""
     return datetime.now().isoformat()
-
 
 @dataclass
 class TranscriptionTask:
@@ -137,7 +134,6 @@ class TranscriptionTask:
         query = "DELETE FROM transcription_tasks WHERE id = ?"
         db_connection.execute(query, (self.id,), commit=True)
         logger.debug(f"Deleted transcription task: {self.id}")
-
 
 @dataclass
 class CalendarEvent:
@@ -423,7 +419,6 @@ class CalendarEvent:
         db_connection.execute(query, (self.id,), commit=True)
         logger.debug(f"Deleted calendar event: {self.id}")
 
-
 @dataclass
 class CalendarEventLink:
     """Mapping between local events and provider-specific identifiers."""
@@ -490,7 +485,6 @@ class CalendarEventLink:
         query = "SELECT * FROM calendar_event_links WHERE event_id = ?"
         rows = db_connection.execute(query, (event_id,))
         return [CalendarEventLink.from_db_row(row) for row in rows]
-
 
 @dataclass
 class EventAttachment:
@@ -625,7 +619,6 @@ class EventAttachment:
         db_connection.execute(query, (self.id,), commit=True)
         logger.debug(f"Deleted event attachment: {self.id}")
 
-
 @dataclass
 class AutoTaskConfig:
     """Model for automatic task configurations."""
@@ -703,7 +696,6 @@ class AutoTaskConfig:
         query = "DELETE FROM auto_task_configs WHERE id = ?"
         db_connection.execute(query, (self.id,), commit=True)
         logger.debug(f"Deleted auto task config: {self.id}")
-
 
 @dataclass
 class CalendarSyncStatus:
@@ -804,7 +796,6 @@ class CalendarSyncStatus:
         db_connection.execute(query, (self.id,), commit=True)
         logger.debug(f"Deleted calendar sync status: {self.id}")
 
-
 @dataclass
 class APIUsage:
     """Model for API usage tracking."""
@@ -860,7 +851,6 @@ class APIUsage:
             }
 
         return {"count": 0, "total_duration": 0.0, "total_cost": 0.0}
-
 
 @dataclass
 class ModelUsageStats:

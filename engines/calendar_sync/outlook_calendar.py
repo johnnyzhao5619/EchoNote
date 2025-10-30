@@ -28,7 +28,6 @@ from engines.calendar_sync.base import OAuthCalendarAdapter, OAuthEndpoints
 
 logger = logging.getLogger("echonote.calendar_sync.outlook")
 
-
 DEFAULT_IANA_TO_WINDOWS_MAP = {
     "UTC": "UTC",
     "Etc/UTC": "UTC",
@@ -52,7 +51,6 @@ DEFAULT_IANA_TO_WINDOWS_MAP = {
 IANA_TO_WINDOWS_MAP = DEFAULT_IANA_TO_WINDOWS_MAP
 
 WINDOWS_TO_IANA_MAP = {value: key for key, value in DEFAULT_IANA_TO_WINDOWS_MAP.items()}
-
 
 class OutlookCalendarAdapter(OAuthCalendarAdapter):
     """Outlook Calendar synchronization adapter."""

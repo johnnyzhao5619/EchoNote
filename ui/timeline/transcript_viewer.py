@@ -24,26 +24,24 @@ from pathlib import Path
 from typing import Optional
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QTextCharFormat, QTextCursor
+from PySide6.QtGui import QColor, QTextCharFormat, QTextCursor
 from PySide6.QtWidgets import (
     QDialog,
     QFileDialog,
-    QHBoxLayout,
     QLabel,
     QLineEdit,
-    QMessageBox,
-    QPushButton,
     QTextEdit,
     QVBoxLayout,
     QWidget,
 )
 
+from ui.base_widgets import BaseWidget, create_hbox, create_button, connect_button_with_callback
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.timeline.transcript_viewer")
 
 
-class TranscriptViewer(QWidget):
+class TranscriptViewer(BaseWidget):
     """
     Transcript viewer widget with search and export.
 
@@ -66,7 +64,7 @@ class TranscriptViewer(QWidget):
             i18n: Internationalization manager
             parent: Parent widget
         """
-        super().__init__(parent)
+        super().__init__(i18n, parent)
 
         self.file_path = file_path
         self.i18n = i18n
@@ -95,8 +93,7 @@ class TranscriptViewer(QWidget):
     def setup_ui(self):
         """Set up the viewer UI."""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(10)
+        # # layout.setSpacing(10)
 
         # File name label
         file_name = Path(self.file_path).name
@@ -105,35 +102,34 @@ class TranscriptViewer(QWidget):
         layout.addWidget(self.file_label)
 
         # Search bar
-        search_layout = QHBoxLayout()
-        search_layout.setSpacing(5)
+        search_layout = create_hbox(spacing=5)
 
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText(self.i18n.t("transcript.search_placeholder"))
         self.search_input.returnPressed.connect(self._on_search)
         search_layout.addWidget(self.search_input, stretch=1)
 
-        self.search_button = QPushButton(self.i18n.t("transcript.search"))
-        self.search_button.clicked.connect(self._on_search)
+        self.search_button = create_button(self.i18n.t("transcript.search"))
+        connect_button_with_callback(self.search_button, self._on_search)
         search_layout.addWidget(self.search_button)
 
         # Previous/Next match buttons
-        self.prev_button = QPushButton(self.i18n.t("transcript.previous_match_button"))
+        self.prev_button = create_button(self.i18n.t("transcript.previous_match_button"))
         self.prev_button.setToolTip(self.i18n.t("transcript.previous_match_tooltip"))
         self.prev_button.setMaximumWidth(40)
-        self.prev_button.clicked.connect(self._on_previous_match)
+        connect_button_with_callback(self.prev_button, self._on_previous_match)
         self.prev_button.setEnabled(False)
         search_layout.addWidget(self.prev_button)
 
-        self.next_button = QPushButton(self.i18n.t("transcript.next_match_button"))
+        self.next_button = create_button(self.i18n.t("transcript.next_match_button"))
         self.next_button.setToolTip(self.i18n.t("transcript.next_match_tooltip"))
         self.next_button.setMaximumWidth(40)
-        self.next_button.clicked.connect(self._on_next_match)
+        connect_button_with_callback(self.next_button, self._on_next_match)
         self.next_button.setEnabled(False)
         search_layout.addWidget(self.next_button)
 
-        self.clear_search_button = QPushButton(self.i18n.t("transcript.clear_search"))
-        self.clear_search_button.clicked.connect(self._on_clear_search)
+        self.clear_search_button = create_button(self.i18n.t("transcript.clear_search"))
+        connect_button_with_callback(self.clear_search_button, self._on_clear_search)
         search_layout.addWidget(self.clear_search_button)
 
         layout.addLayout(search_layout)
@@ -146,17 +142,16 @@ class TranscriptViewer(QWidget):
         layout.addWidget(self.text_edit)
 
         # Action buttons
-        button_layout = QHBoxLayout()
-        button_layout.setSpacing(10)
+        button_layout = create_hbox(spacing=10)
 
-        self.copy_button = QPushButton(self.i18n.t("transcript.copy_all"))
-        self.copy_button.clicked.connect(self._on_copy_all)
+        self.copy_button = create_button(self.i18n.t("transcript.copy_all"))
+        connect_button_with_callback(self.copy_button, self._on_copy_all)
         self.copy_button.setObjectName("timeline_copy_btn")
         # Styling is handled by theme files (dark.qss / light.qss)
         button_layout.addWidget(self.copy_button)
 
-        self.export_button = QPushButton(self.i18n.t("transcript.export"))
-        self.export_button.clicked.connect(self._on_export)
+        self.export_button = create_button(self.i18n.t("transcript.export"))
+        connect_button_with_callback(self.export_button, self._on_export)
         self.export_button.setObjectName("timeline_export_btn")
         # Styling is handled by theme files (dark.qss / light.qss)
         button_layout.addWidget(self.export_button)
@@ -281,6 +276,12 @@ class TranscriptViewer(QWidget):
         self.prev_button.setEnabled(False)
         self.next_button.setEnabled(False)
 
+    def _get_theme_highlight_color(self) -> QColor:
+        """Get theme-appropriate highlight color for search results."""
+        # Use yellow for light theme, orange for dark theme
+        # This provides good contrast in both cases
+        return QColor("#FFD700")  # Gold color works well in both themes
+
     def _clear_highlights(self):
         """Clear all search highlights."""
         cursor = self.text_edit.textCursor()
@@ -301,7 +302,7 @@ class TranscriptViewer(QWidget):
         clipboard = QApplication.clipboard()
         clipboard.setText(self.transcript_text)
 
-        logger.info("Transcript copied to clipboard")
+        logger.info(self.i18n.t("logging.timeline.transcript_copied_to_clipboard"))
 
         # Show feedback (could use a toast notification)
         self.copy_button.setText(self.i18n.t("transcript.copied"))
@@ -335,15 +336,13 @@ class TranscriptViewer(QWidget):
             self.export_requested.emit(file_path)
 
             # Show success message
-            QMessageBox.information(
-                self, self.i18n.t("common.success"), self.i18n.t("transcript.export_success")
-            )
+            self.show_info(self.i18n.t("common.success"), self.i18n.t("transcript.export_success"))
 
         except Exception as e:
             error_msg = f"Failed to export transcript: {e}"
             logger.error(error_msg)
 
-            QMessageBox.critical(self, self.i18n.t("common.error"), error_msg)
+            self.show_error(self.i18n.t("common.error"), error_msg)
 
     def update_translations(self):
         """Update UI text when language changes."""
@@ -406,25 +405,23 @@ class TranscriptViewerDialog(QDialog):
 
         # Layout
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
 
         # Transcript viewer
         self.viewer = TranscriptViewer(file_path, i18n, self)
         layout.addWidget(self.viewer)
 
         # Close button
-        button_layout = QHBoxLayout()
-        button_layout.setContentsMargins(10, 0, 10, 10)
+        button_layout = create_hbox(margins=(10, 0, 10, 10))
         button_layout.addStretch()
 
-        self.close_button = QPushButton(i18n.t("common.close"))
-        self.close_button.clicked.connect(self.close)
+        self.close_button = create_button(i18n.t("common.close"))
+        connect_button_with_callback(self.close_button, self.close)
         self.close_button.setObjectName("timeline_close_btn")
         button_layout.addWidget(self.close_button)
 
         layout.addLayout(button_layout)
 
-        logger.info("Transcript viewer dialog initialized")
+        logger.info(self.i18n.t("logging.timeline.transcript_viewer_dialog_initialized"))
 
         # Language change handling
         self._language_signal = getattr(self.i18n, "language_changed", None)

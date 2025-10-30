@@ -90,14 +90,27 @@ class FasterWhisperEngine(SpeechEngine):
                     f"Using ModelManager: model={model_size}, " f"path={model_info.local_path}"
                 )
             else:
-                # 模型未下载，记录警告但不阻止初始化
-                logger.warning(
-                    f"Model '{model_size}' is not downloaded. "
-                    f"Transcription will be unavailable until model is downloaded. "
-                    f"Please download it from Settings > Model Management."
-                )
-                self._model_available = False
-                self.download_root = None
+                # 模型未下载，尝试查找已下载的模型作为备选
+                downloaded_models = self.model_manager.get_downloaded_models()
+                if downloaded_models:
+                    # 选择第一个已下载的模型作为备选
+                    fallback_model = downloaded_models[0]
+                    logger.warning(
+                        f"Model '{model_size}' is not downloaded. "
+                        f"Using '{fallback_model.name}' as fallback."
+                    )
+                    self.model_size = fallback_model.name
+                    self.download_root = str(Path(fallback_model.local_path).parent)
+                    self._model_available = True
+                else:
+                    # 没有任何已下载的模型
+                    logger.warning(
+                        f"Model '{model_size}' is not downloaded and no fallback models available. "
+                        f"Transcription will be unavailable until a model is downloaded. "
+                        f"Please download a model from Settings > Model Management."
+                    )
+                    self._model_available = False
+                    self.download_root = None
         else:
             # 向后兼容：使用传统的 download_root 参数
             self.download_root = download_root or str(get_app_dir() / "models")
@@ -132,6 +145,10 @@ class FasterWhisperEngine(SpeechEngine):
 
     def _load_model(self):
         """延迟加载模型"""
+        # 如果模型已加载，直接返回
+        if self.model is not None:
+            return
+
         # 每次尝试加载前都重新检查模型状态，以反映最新的下载结果
         if self.model_manager:
             self._refresh_model_status()
@@ -139,10 +156,27 @@ class FasterWhisperEngine(SpeechEngine):
         if self.model is None:
             # 首先检查模型是否可用
             if not self._model_available:
-                error_msg = (
-                    f"Model '{self.model_size}' is not downloaded. "
-                    f"Please download it from Settings > Model Management."
-                )
+                # 提供更详细的错误信息
+                if self.model_manager:
+                    downloaded_models = self.model_manager.get_downloaded_models()
+                    if downloaded_models:
+                        available_names = ", ".join(m.name for m in downloaded_models)
+                        error_msg = (
+                            f"Model '{self.model_size}' is not downloaded. "
+                            f"Available models: {available_names}. "
+                            f"Please select an available model in Settings > Transcription, "
+                            f"or download '{self.model_size}' from Settings > Model Management."
+                        )
+                    else:
+                        error_msg = (
+                            "No speech recognition models are downloaded. "
+                            "Please download a model from Settings > Model Management."
+                        )
+                else:
+                    error_msg = (
+                        f"Model '{self.model_size}' is not available. "
+                        "Please check your model configuration."
+                    )
                 logger.error(error_msg)
                 raise ValueError(error_msg)
 
@@ -250,6 +284,7 @@ class FasterWhisperEngine(SpeechEngine):
         Returns:
             bool: 模型是否已下载并可用
         """
+        # 每次检查时都刷新状态，确保反映最新的下载结果
         if self.model_manager:
             self._refresh_model_status()
 
@@ -536,9 +571,8 @@ class FasterWhisperEngine(SpeechEngine):
                     text_parts.append(seg.text.strip())
 
                 text = " ".join(text_parts)
-                logger.debug(
-                    f"Transcription result: '{text}' (language: {info.language if hasattr(info, 'language') else 'unknown'})"
-                )
+                language = info.language if hasattr(info, "language") else "unknown"
+                logger.debug(f"Transcription result: '{text}' (language: {language})")
                 return text
 
             finally:

@@ -16,7 +16,6 @@ import tempfile
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
 
 import psutil
 
@@ -25,7 +24,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from scripts.benchmark_config import BenchmarkConfig
 from utils.logger import setup_logging
-
 
 class UnifiedBenchmark:
     """Unified performance benchmark."""
@@ -100,21 +98,21 @@ start_time = time.time()
 try:
     from PySide6.QtWidgets import QApplication
     from PySide6.QtCore import QTimer
-    
+
     app = QApplication(sys.argv)
-    
+
     from config.app_config import ConfigManager
     from utils.i18n import I18nQtManager
-    
+
     config = ConfigManager()
     i18n = I18nQtManager()
-    
+
     startup_time = time.time() - start_time
     print(f"STARTUP_TIME:{{startup_time:.3f}}")
-    
+
     QTimer.singleShot(100, app.quit)
     app.exec()
-    
+
 except Exception as e:
     print(f"ERROR:{{e}}")
     sys.exit(1)
@@ -150,8 +148,7 @@ except Exception as e:
         self.logger.info("Measuring UI response times...")
 
         try:
-            from PySide6.QtCore import Qt
-            from PySide6.QtWidgets import (
+
                 QApplication,
                 QDialog,
                 QLabel,
@@ -537,7 +534,6 @@ except Exception as e:
 
         print("=" * 60)
 
-
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(description="Unified performance benchmark")
@@ -561,7 +557,6 @@ def main():
         failed = sum(1 for comp in results["comparison"].values() if not comp.get("pass", False))
         if failed > 0:
             sys.exit(1)
-
 
 if __name__ == "__main__":
     main()

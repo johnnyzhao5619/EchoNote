@@ -17,9 +17,6 @@
 
 import logging
 
-from ui.timeline.event_card import CurrentTimeIndicator, EventCard
-from ui.timeline.widget import TimelineWidget
-
 logger = logging.getLogger("echonote.ui.timeline")
 
 try:
@@ -32,8 +29,6 @@ except ImportError as exc:  # pragma: no cover - exercised in degraded environme
         "operate without inline audio playback.",
         exc,
     )
-
-from ui.timeline.transcript_viewer import TranscriptViewer, TranscriptViewerDialog
 
 __all__ = [
     "TimelineWidget",

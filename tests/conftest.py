@@ -8,7 +8,6 @@ import sys
 import pytest
 from PySide6.QtWidgets import QApplication
 
-
 @pytest.fixture(scope="session")
 def qapp():
     """Create QApplication instance for PySide6 testing."""

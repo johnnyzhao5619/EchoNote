@@ -22,12 +22,9 @@ Provides a customizable progress bar with percentage display.
 import logging
 from typing import Optional
 
-from ui.qt_imports import QHBoxLayout, QLabel, QProgressBar, Qt, QVBoxLayout, QWidget, Signal
-
 logger = logging.getLogger("echonote.ui.progress_bar")
 
-
-class ProgressBar(QWidget):
+class ProgressBar(BaseWidget):
     """
     Custom progress bar widget with label and percentage display.
 
@@ -77,12 +74,10 @@ class ProgressBar(QWidget):
         """
         # Create layout
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(5)
+        # # layout.setSpacing(5)
 
         # Create top row with label and percentage
-        top_layout = QHBoxLayout()
-        top_layout.setContentsMargins(0, 0, 0, 0)
+        top_layout = create_hbox(margins=(0, 0, 0, 0))
 
         # Create label
         self.label = QLabel(label_text)
@@ -266,4 +261,6 @@ class ProgressBar(QWidget):
             self.progress_bar.setMinimum(0)
             self.progress_bar.setMaximum(100)
             if self.show_percentage:
-                self.percentage_label.setText("0%")
+                self.percentage_label.setText(
+                    self.i18n.t("ui_strings.common.progress_bar.zero_percent")
+                )

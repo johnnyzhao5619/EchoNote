@@ -41,7 +41,6 @@ logger = logging.getLogger("echonote.calendar_sync.base")
 SECONDS_PER_MINUTE = 60
 CALENDAR_API_TIMEOUT_SECONDS = 30
 
-
 class CalendarSyncAdapter(ABC):
     """
     Abstract base class for calendar synchronization adapters.
@@ -351,7 +350,6 @@ class CalendarSyncAdapter(ABC):
                 logger.warning("Unknown timezone identifier: %s", identifier)
         return timezone.utc
 
-
 @dataclass(frozen=True)
 class OAuthEndpoints:
     """OAuth 2.0 endpoint bundle for calendar providers."""
@@ -361,7 +359,6 @@ class OAuthEndpoints:
     api_base_url: str
     revoke_url: Optional[str] = None
 
-
 @dataclass
 class OAuthTokenState:
     """In-memory snapshot of the provider OAuth tokens."""
@@ -370,7 +367,6 @@ class OAuthTokenState:
     refresh_token: Optional[str] = None
     expires_at: Optional[str] = None
     token_type: Optional[str] = None
-
 
 class OAuthHttpClient:
     """Encapsulates OAuth token handling and retryable HTTP requests."""
@@ -599,7 +595,6 @@ class OAuthHttpClient:
                 "Invalid expires_in value %r; defaulting to %s", expires_in, default
             )
             return default
-
 
 class OAuthCalendarAdapter(CalendarSyncAdapter):
     """Calendar adapter base that provides OAuth + HTTP helpers."""

@@ -26,7 +26,6 @@ from typing import Any, Callable, Dict, Optional
 
 logger = logging.getLogger("echonote.transcription.task_queue")
 
-
 class TaskStatus(Enum):
     """Task status enumeration."""
 
@@ -36,6 +35,28 @@ class TaskStatus(Enum):
     FAILED = "failed"
     CANCELLED = "cancelled"
 
+    def get_display_name(self, i18n_manager=None) -> str:
+        """
+        Get internationalized display name for task status.
+
+        Args:
+            i18n_manager: I18n manager instance for translation
+
+        Returns:
+            Translated display name
+        """
+        if i18n_manager is None:
+            # Fallback to English names
+            display_names = {
+                TaskStatus.PENDING: "Pending",
+                TaskStatus.PROCESSING: "Processing",
+                TaskStatus.COMPLETED: "Completed",
+                TaskStatus.FAILED: "Failed",
+                TaskStatus.CANCELLED: "Cancelled",
+            }
+            return display_names.get(self, "Unknown")
+
+        return i18n_manager.t(f"constants.task_status.{self.value}")
 
 class TaskQueue:
     """

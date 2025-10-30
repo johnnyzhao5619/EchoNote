@@ -25,37 +25,42 @@ import math
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, cast
 
-from PySide6.QtCore import QDate, QDateTime, Qt, QTime, QTimer, Signal
+from ui.qt_imports import (
+    QComboBox,
+    QDate,
+    QDateEdit,
+    QDateTime,
+    QLabel,
+    QLineEdit,
+    Qt,
+    QScrollArea,
+    QTime,
+    QTimer,
+    QVBoxLayout,
+    QWidget,
+    Signal,
+)
+from ui.signal_helpers import (
+    connect_button_with_callback,
+    connect_text_changed,
+    connect_value_changed,
+)
 
 if TYPE_CHECKING:
     from ui.timeline.audio_player import AudioPlayerDialog
     from ui.timeline.transcript_viewer import TranscriptViewerDialog
 
-# QPalette import removed - using semantic styling instead
-from PySide6.QtWidgets import (
-    QComboBox,
-    QDateEdit,
-    QHBoxLayout,
-    QLabel,
-    QLineEdit,
-    QMessageBox,
-    QPushButton,
-    QScrollArea,
-    QVBoxLayout,
-    QWidget,
-)
-
 from core.timeline.manager import to_local_naive
+from ui.base_widgets import BaseWidget, create_vbox, create_hbox, create_button
 from utils.i18n import I18nQtManager
 
 if TYPE_CHECKING:  # pragma: no cover - imported for type checking only
     from ui.timeline.event_card import EventCard
 
-
 logger = logging.getLogger("echonote.ui.timeline.widget")
 
 
-class TimelineWidget(QWidget):
+class TimelineWidget(BaseWidget):
     """
     Timeline view widget showing past and future events.
 
@@ -85,10 +90,9 @@ class TimelineWidget(QWidget):
             i18n: Internationalization manager
             parent: Parent widget
         """
-        super().__init__(parent)
+        super().__init__(i18n, parent)
 
         self.timeline_manager = timeline_manager
-        self.i18n = i18n
         self.settings_manager = settings_manager
         self._settings_signal_connected = False
 
@@ -121,14 +125,13 @@ class TimelineWidget(QWidget):
         # Load initial data
         QTimer.singleShot(100, self.load_timeline_events)
 
-        logger.info("Timeline widget initialized")
+        logger.info(self.i18n.t("logging.timeline.widget_initialized"))
 
     def setup_ui(self):
         """Set up the timeline UI."""
         # Main layout
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(10)
+        # # layout.setSpacing(10)
 
         # Title
         self.title_label = QLabel(self.i18n.t("timeline.title"))
@@ -158,7 +161,7 @@ class TimelineWidget(QWidget):
         layout.addWidget(self.scroll_area)
 
         # Connect scroll event for pagination
-        self.scroll_area.verticalScrollBar().valueChanged.connect(self._on_scroll)
+        connect_value_changed(self.scroll_area.verticalScrollBar(), self._on_scroll)
 
         logger.debug("Timeline UI setup complete")
 
@@ -169,30 +172,28 @@ class TimelineWidget(QWidget):
         Returns:
             Header layout (VBoxLayout with search and filter rows)
         """
-        header_layout = QVBoxLayout()
-        header_layout.setSpacing(10)
+        header_layout = create_vbox(spacing=10)
 
         # First row: Search
-        search_row = QHBoxLayout()
-        search_row.setSpacing(10)
+        search_row = create_hbox(spacing=10)
 
         # Search box
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText(self.i18n.t("timeline.search_placeholder"))
         self.search_input.setClearButtonEnabled(True)
         self.search_input.returnPressed.connect(self._on_search)
+        connect_text_changed(self.search_input, lambda text: None)  # Could add live search later
         search_row.addWidget(self.search_input, stretch=2)
 
         # Search button
-        self.search_button = QPushButton(self.i18n.t("timeline.search"))
-        self.search_button.clicked.connect(self._on_search)
+        self.search_button = create_button(self.i18n.t("timeline.search"))
+        connect_button_with_callback(self.search_button, self._on_search)
         search_row.addWidget(self.search_button)
 
         header_layout.addLayout(search_row)
 
         # Second row: Filters
-        filter_row = QHBoxLayout()
-        filter_row.setSpacing(10)
+        filter_row = create_hbox(spacing=10)
 
         # Date range filter
         self.date_range_label = QLabel(self.i18n.t("timeline.filter_date_range_label"))
@@ -421,13 +422,21 @@ class TimelineWidget(QWidget):
 
         try:
             if hasattr(manager, "get_setting"):
+                # SettingsManager.get_setting() only takes one argument (key)
                 value = getattr(manager, "get_setting")(key)
+                # If value is None, use default
+                if value is None:
+                    value = default
             elif hasattr(manager, "get"):
+                # ConfigManager.get() can take two arguments (key, default)
                 getter = getattr(manager, "get")
                 try:
                     value = getter(key, default)
                 except TypeError:
+                    # If it doesn't support default, just get the value
                     value = getter(key)
+                    if value is None:
+                        value = default
             else:
                 return default
         except Exception as exc:  # pragma: no cover - defensive logging
@@ -598,7 +607,7 @@ class TimelineWidget(QWidget):
         # Insert card at appropriate position
         if is_future:
             # Future events stay grouped above the current time indicator.
-            new_start = to_local_naive(card.event.start_time)
+            new_start = to_local_naive(card.calendar_event.start_time)
 
             indicator_index = next(
                 (
@@ -614,7 +623,7 @@ class TimelineWidget(QWidget):
             insert_pos = search_limit
             for i in range(search_limit):
                 existing_card = self.event_cards[i]
-                existing_start = to_local_naive(existing_card.event.start_time)
+                existing_start = to_local_naive(existing_card.calendar_event.start_time)
                 if existing_start > new_start:
                     insert_pos = i
                     break
@@ -661,7 +670,7 @@ class TimelineWidget(QWidget):
 
         if is_future:
             auto_tasks = event_data.get("auto_tasks") or {}
-            self._auto_task_state_cache[card.event.id] = dict(auto_tasks)
+            self._auto_task_state_cache[card.calendar_event.id] = dict(auto_tasks)
 
     def get_event_card_by_id(self, event_id: str) -> Optional["EventCard"]:
         """Return the event card associated with the given event id."""
@@ -713,7 +722,7 @@ class TimelineWidget(QWidget):
         if query:
             logger.info(f"Searching timeline: {query}")
         else:
-            logger.info("Refreshing timeline without query filter")
+            logger.info(self.i18n.t("logging.timeline.refreshing_without_query_filter"))
 
         self._refresh_timeline(reset=True)
 
@@ -769,7 +778,7 @@ class TimelineWidget(QWidget):
         """Inform the user that audio playback components are unavailable."""
         title = self.i18n.t("timeline.audio_player_unavailable_title")
         message = self.i18n.t("timeline.audio_player_unavailable_message")
-        QMessageBox.warning(self, title, message)
+        self.show_warning(title, message)
 
     def _on_auto_task_changed(self, event_id: str, config: Dict[str, Any]):
         """
@@ -819,7 +828,7 @@ class TimelineWidget(QWidget):
 
             title = self.i18n.t("timeline.auto_task_save_failed_title")
             message = self.i18n.t("timeline.auto_task_save_failed_message").format(error=str(exc))
-            QMessageBox.warning(self, title, message)
+            self.show_warning(title, message)
 
     def _on_view_recording(self, file_path: str):
         """
@@ -861,7 +870,7 @@ class TimelineWidget(QWidget):
             message = self.i18n.t("timeline.audio_player_open_failed_message").format(
                 error=str(exc)
             )
-            QMessageBox.critical(self, title, message)
+            self.show_error(title, message)
             return
 
         self._audio_player_dialogs[file_path] = dialog
@@ -888,7 +897,7 @@ class TimelineWidget(QWidget):
             message = self.i18n.t("timeline.audio_player_open_failed_message").format(
                 error=str(exc)
             )
-            QMessageBox.critical(self, title, message)
+            self.show_error(title, message)
 
     def _open_text_viewer(self, file_path: str, title_key: str):
         """Open a text viewer dialog for timeline artifacts."""

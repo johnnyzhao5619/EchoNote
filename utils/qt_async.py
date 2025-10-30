@@ -28,7 +28,6 @@ from PySide6.QtCore import QObject, Signal
 
 logger = logging.getLogger("echonote.utils.qt_async")
 
-
 class AsyncRunner(QObject):
     """
     Helper class to run async coroutines in a Qt application.
@@ -107,10 +106,8 @@ class AsyncRunner(QObject):
         """Clean up resources."""
         self.executor.shutdown(wait=False)
 
-
 # Global async runner instance
 _async_runner: Optional[AsyncRunner] = None
-
 
 def get_async_runner() -> AsyncRunner:
     """
@@ -125,7 +122,6 @@ def get_async_runner() -> AsyncRunner:
         _async_runner = AsyncRunner()
 
     return _async_runner
-
 
 def run_async(
     coro: Coroutine,

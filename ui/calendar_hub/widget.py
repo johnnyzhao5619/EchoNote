@@ -39,12 +39,20 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.base_widgets import (
+    BaseWidget,
+    create_button,
+    create_hbox,
+    create_vbox,
+    create_primary_button,
+    connect_button_with_callback,
+)
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.calendar_hub")
 
 
-class CalendarHubWidget(QWidget):
+class CalendarHubWidget(BaseWidget):
     """
     Main calendar hub widget with view switching and navigation.
 
@@ -77,11 +85,10 @@ class CalendarHubWidget(QWidget):
             i18n: Internationalization manager
             parent: Parent widget
         """
-        super().__init__(parent)
+        super().__init__(i18n, parent)
 
         self.calendar_manager = calendar_manager
         self.oauth_manager = oauth_manager
-        self.i18n = i18n
         self._config_manager = None
 
         # Current view and date
@@ -106,8 +113,7 @@ class CalendarHubWidget(QWidget):
         """Set up the calendar hub UI."""
         # Main layout
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(15)
+        # # layout.setSpacing(15)
 
         # Title
         self.title_label = QLabel(self.i18n.t("calendar_hub.title"))
@@ -135,25 +141,24 @@ class CalendarHubWidget(QWidget):
         """
         toolbar = QWidget()
         toolbar_layout = QHBoxLayout(toolbar)
-        toolbar_layout.setContentsMargins(0, 0, 0, 0)
-        toolbar_layout.setSpacing(10)
+        # # toolbar_layout.setSpacing(10)
 
         # View switching buttons
         view_group = QButtonGroup(self)
         view_group.setExclusive(True)
 
-        self.month_btn = QPushButton(self.i18n.t("calendar_hub.view_month"))
+        self.month_btn = create_button(self.i18n.t("calendar_hub.view_month"))
         self.month_btn.setCheckable(True)
         self.month_btn.setObjectName("view_button")
         view_group.addButton(self.month_btn)
 
-        self.week_btn = QPushButton(self.i18n.t("calendar_hub.view_week"))
+        self.week_btn = create_button(self.i18n.t("calendar_hub.view_week"))
         self.week_btn.setCheckable(True)
         self.week_btn.setChecked(True)  # Default view
         self.week_btn.setObjectName("view_button")
         view_group.addButton(self.week_btn)
 
-        self.day_btn = QPushButton(self.i18n.t("calendar_hub.view_day"))
+        self.day_btn = create_button(self.i18n.t("calendar_hub.view_day"))
         self.day_btn.setCheckable(True)
         self.day_btn.setObjectName("view_button")
         view_group.addButton(self.day_btn)
@@ -170,14 +175,14 @@ class CalendarHubWidget(QWidget):
         toolbar_layout.addSpacing(20)
 
         # Date navigation
-        self.prev_btn = QPushButton("<")
+        self.prev_btn = create_button("<")
         from ui.constants import BUTTON_FIXED_WIDTH_LARGE
 
         self.prev_btn.setFixedWidth(BUTTON_FIXED_WIDTH_LARGE)
         self.prev_btn.setToolTip(self.i18n.t("calendar_hub.widget.previous"))
-        self.today_btn = QPushButton(self.i18n.t("calendar_hub.today"))
+        self.today_btn = create_button(self.i18n.t("calendar_hub.today"))
 
-        self.next_btn = QPushButton(">")
+        self.next_btn = create_button(">")
         self.next_btn.setFixedWidth(BUTTON_FIXED_WIDTH_LARGE)
         self.next_btn.setToolTip(self.i18n.t("calendar_hub.widget.next"))
 
@@ -200,8 +205,8 @@ class CalendarHubWidget(QWidget):
         toolbar_layout.addStretch()
 
         # Create event button
-        self.create_event_btn = QPushButton(self.i18n.t("calendar_hub.create_event"))
-        self.create_event_btn.setObjectName("primary_button")
+        self.create_event_btn = create_button(self.i18n.t("calendar_hub.create_event"))
+        self.create_event_btn = create_primary_button(self.create_event_btn.text())
         self.create_event_btn.clicked.connect(lambda: self._show_event_dialog())
         toolbar_layout.addWidget(self.create_event_btn)
 
@@ -216,8 +221,7 @@ class CalendarHubWidget(QWidget):
         """
         accounts_widget = QWidget()
         accounts_layout = QHBoxLayout(accounts_widget)
-        accounts_layout.setContentsMargins(0, 0, 0, 0)
-        accounts_layout.setSpacing(10)
+        # # accounts_layout.setSpacing(10)
 
         # Connected accounts label
         self.accounts_label = QLabel(self.i18n.t("calendar_hub.connected_accounts") + ":")
@@ -238,13 +242,13 @@ class CalendarHubWidget(QWidget):
         accounts_layout.addWidget(self.sync_status_label)
 
         # Sync now button
-        self.sync_now_btn = QPushButton("🔄 " + self.i18n.t("calendar_hub.sync_now"))
+        self.sync_now_btn = create_button("🔄 " + self.i18n.t("calendar_hub.sync_now"))
         self.sync_now_btn.setToolTip(self.i18n.t("calendar_hub.sync_now_tooltip"))
         self.sync_now_btn.clicked.connect(self._on_sync_now_clicked)
         accounts_layout.addWidget(self.sync_now_btn)
 
         # Add account button
-        self.add_account_btn = QPushButton("+ " + self.i18n.t("calendar_hub.add_account"))
+        self.add_account_btn = create_button("+ " + self.i18n.t("calendar_hub.add_account"))
         self.add_account_btn.clicked.connect(self.show_add_account_dialog)
         accounts_layout.addWidget(self.add_account_btn)
 
@@ -412,8 +416,7 @@ class CalendarHubWidget(QWidget):
                 except Exception as e:
                     logger.error(f"Error saving event: {e}")
 
-                    QMessageBox.critical(
-                        self,
+                    self.show_error(
                         self.i18n.t("common.error"),
                         self.i18n.t("calendar.error.save_failed", error=str(e)),
                     )
@@ -438,8 +441,7 @@ class CalendarHubWidget(QWidget):
             self._refresh_current_view()
 
             # Show success message
-            QMessageBox.information(
-                self,
+            self.show_info(
                 self.i18n.t("common.success"),
                 self.i18n.t("calendar.success.event_created"),
             )
@@ -472,8 +474,7 @@ class CalendarHubWidget(QWidget):
 
             # Show success message
 
-            QMessageBox.information(
-                self,
+            self.show_info(
                 self.i18n.t("common.success"),
                 self.i18n.t("calendar.success.event_updated"),
             )
@@ -503,18 +504,18 @@ class CalendarHubWidget(QWidget):
         layout = QVBoxLayout(dialog)
 
         # Google Calendar button
-        google_btn = QPushButton(self.i18n.t("calendar_hub.widget.connect_google"))
+        google_btn = create_button(self.i18n.t("calendar_hub.widget.connect_google"))
         google_btn.clicked.connect(lambda: self._start_oauth_flow("google", dialog))
         layout.addWidget(google_btn)
 
         # Outlook Calendar button
-        outlook_btn = QPushButton(self.i18n.t("calendar_hub.widget.connect_outlook"))
+        outlook_btn = create_button(self.i18n.t("calendar_hub.widget.connect_outlook"))
         outlook_btn.clicked.connect(lambda: self._start_oauth_flow("outlook", dialog))
         layout.addWidget(outlook_btn)
 
         # Cancel button
-        cancel_btn = QPushButton(self.i18n.t("common.cancel"))
-        cancel_btn.clicked.connect(dialog.reject)
+        cancel_btn = create_button(self.i18n.t("common.cancel"))
+        connect_button_with_callback(cancel_btn, dialog.reject)
         layout.addWidget(cancel_btn)
 
         dialog.exec()
@@ -532,8 +533,7 @@ class CalendarHubWidget(QWidget):
             if provider not in self.calendar_manager.sync_adapters:
 
                 provider_name = self._get_provider_display_name(provider)
-                QMessageBox.warning(
-                    self,
+                self.show_warning(
                     self.i18n.t("common.error"),
                     self.i18n.t("calendar.error.sync_not_configured", provider=provider_name),
                 )
@@ -545,7 +545,7 @@ class CalendarHubWidget(QWidget):
             auth_request = adapter.get_authorization_url()
             if not isinstance(auth_request, dict):
                 raise TypeError(
-                    "Expected authorization request payload with state and code verifier."
+                    self.i18n.t("exceptions.calendar_hub.expected_authorization_request_payload")
                 )
 
             authorization_url = auth_request.get("authorization_url")
@@ -553,7 +553,9 @@ class CalendarHubWidget(QWidget):
             code_verifier = auth_request.get("code_verifier")
 
             if not authorization_url or not state or not code_verifier:
-                raise ValueError("Authorization request is missing required PKCE parameters.")
+                raise ValueError(
+                    self.i18n.t("exceptions.calendar_hub.authorization_request_missing_pkce")
+                )
 
             # Close parent dialog
             parent_dialog.accept()
@@ -587,8 +589,7 @@ class CalendarHubWidget(QWidget):
         except Exception as e:
             logger.error(f"Error starting OAuth flow: {e}")
 
-            QMessageBox.critical(
-                self,
+            self.show_error(
                 self.i18n.t("common.error"),
                 self.i18n.t("calendar.error.auth_failed", error=str(e)),
             )
@@ -739,8 +740,7 @@ class CalendarHubWidget(QWidget):
             # Show success message
 
             provider_name = self._get_provider_display_name(provider)
-            QMessageBox.information(
-                self,
+            self.show_info(
                 self.i18n.t("common.success"),
                 self.i18n.t("calendar.success.connected", provider=provider_name),
             )
@@ -793,7 +793,9 @@ class CalendarHubWidget(QWidget):
                     email = data.get("email")
                     if email:
                         return email
-                    logger.warning("Google user info response missing email field")
+                    logger.warning(
+                        self.i18n.t("logging.calendar_hub.google_user_info_missing_email")
+                    )
                 else:
                     logger.warning(
                         "Google user info request failed with status %s",
@@ -813,7 +815,9 @@ class CalendarHubWidget(QWidget):
                     email = data.get("mail") or data.get("userPrincipalName")
                     if email:
                         return email
-                    logger.warning("Outlook user info response missing mail fields")
+                    logger.warning(
+                        self.i18n.t("logging.calendar_hub.outlook_user_info_missing_email")
+                    )
                 else:
                     logger.warning(
                         "Outlook user info request failed with status %s",
@@ -841,9 +845,8 @@ class CalendarHubWidget(QWidget):
 
         provider_name = self._get_provider_display_name(provider)
 
-        QMessageBox.critical(
-            self,
-            "Authorization Failed",
+        self.show_error(
+            self.i18n.t("dialogs.calendar_hub.authorization_failed"),
             f"Failed to connect {provider_name} calendar:\n{error}",
         )
 
@@ -921,8 +924,7 @@ class CalendarHubWidget(QWidget):
         badge.setObjectName(f"account_badge_{provider}")
         badge.setProperty("role", "account-badge")
         badge_layout = QHBoxLayout(badge)
-        badge_layout.setContentsMargins(8, 4, 8, 4)
-        badge_layout.setSpacing(5)
+        # # badge_layout.setSpacing(5)
 
         # Status indicator
         indicator = QLabel("●")
@@ -937,7 +939,7 @@ class CalendarHubWidget(QWidget):
         badge_layout.addWidget(info_label)
 
         # Disconnect button
-        disconnect_btn = QPushButton("×")
+        disconnect_btn = create_button("×")
         disconnect_btn.setFixedSize(20, 20)
         disconnect_btn.setProperty("role", "account-disconnect")
         disconnect_btn.clicked.connect(lambda: self.disconnect_account(provider))
@@ -987,7 +989,7 @@ class CalendarHubWidget(QWidget):
             # Confirm with user
             reply = QMessageBox.question(
                 self,
-                "Disconnect Account",
+                self.i18n.t("dialogs.calendar_hub.disconnect_account"),
                 f"Are you sure you want to disconnect {provider_name} calendar?\n\n"
                 f"This will:\n"
                 f"- Remove all synced events from {provider_name}\n"
@@ -1027,8 +1029,7 @@ class CalendarHubWidget(QWidget):
             self._refresh_current_view()
 
             # Show success message
-            QMessageBox.information(
-                self,
+            self.show_info(
                 self.i18n.t("common.success"),
                 self.i18n.t("calendar.success.disconnected", provider=provider_name),
             )
@@ -1038,8 +1039,7 @@ class CalendarHubWidget(QWidget):
         except Exception as e:
             logger.error(f"Error disconnecting account: {e}")
 
-            QMessageBox.critical(
-                self,
+            self.show_error(
                 self.i18n.t("common.error"),
                 self.i18n.t("calendar.error.disconnect_failed", error=str(e)),
             )
@@ -1049,9 +1049,8 @@ class CalendarHubWidget(QWidget):
         try:
             if not self.connected_accounts:
 
-                QMessageBox.information(
-                    self,
-                    "No Accounts",
+                self.show_info(
+                    self.i18n.t("dialogs.calendar_hub.no_accounts"),
                     "No external calendar accounts connected. " "Please add an account first.",
                 )
                 return
@@ -1083,15 +1082,13 @@ class CalendarHubWidget(QWidget):
             # Show result
 
             if error_count == 0:
-                QMessageBox.information(
-                    self,
-                    "Sync Complete",
+                self.show_info(
+                    self.i18n.t("dialogs.calendar_hub.sync_complete"),
                     f"Successfully synced {success_count} calendar(s).",
                 )
             else:
-                QMessageBox.warning(
-                    self,
-                    "Sync Completed with Errors",
+                self.show_warning(
+                    self.i18n.t("dialogs.calendar_hub.sync_completed_with_errors"),
                     f"Synced {success_count} calendar(s), "
                     f"{error_count} failed. Check logs for details.",
                 )
@@ -1099,8 +1096,7 @@ class CalendarHubWidget(QWidget):
         except Exception as e:
             logger.error(f"Error during manual sync: {e}")
 
-            QMessageBox.critical(
-                self,
+            self.show_error(
                 self.i18n.t("calendar_hub.widget.sync_error"),
                 f"Failed to sync calendars: {str(e)}",
             )

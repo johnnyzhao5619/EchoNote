@@ -22,8 +22,8 @@ Provides UI for configuring timeline view and auto-task settings.
 import logging
 from typing import Tuple
 
-from PySide6.QtWidgets import QCheckBox, QComboBox, QHBoxLayout, QLabel, QSpinBox
-
+from PySide6.QtWidgets import QCheckBox, QComboBox, QLabel, QSpinBox
+from ui.base_widgets import create_hbox
 from ui.settings.base_page import BaseSettingsPage
 from utils.i18n import I18nQtManager
 
@@ -62,7 +62,7 @@ class TimelineSettingsPage(BaseSettingsPage):
         self.content_layout.addWidget(self.view_range_title)
 
         # Past days
-        past_layout = QHBoxLayout()
+        past_layout = create_hbox()
         self.past_label = QLabel(self.i18n.t("settings.timeline.past_days"))
         self.past_label.setMinimumWidth(200)
         self.past_days_spin = QSpinBox()
@@ -77,7 +77,7 @@ class TimelineSettingsPage(BaseSettingsPage):
         self.content_layout.addLayout(past_layout)
 
         # Future days
-        future_layout = QHBoxLayout()
+        future_layout = create_hbox()
         self.future_label = QLabel(self.i18n.t("settings.timeline.future_days"))
         self.future_label.setMinimumWidth(200)
         self.future_days_spin = QSpinBox()
@@ -99,7 +99,7 @@ class TimelineSettingsPage(BaseSettingsPage):
         self.content_layout.addWidget(self.notifications_title)
 
         # Reminder time
-        reminder_layout = QHBoxLayout()
+        reminder_layout = create_hbox()
         self.reminder_label = QLabel(self.i18n.t("settings.timeline.reminder_time"))
         self.reminder_label.setMinimumWidth(200)
         self.reminder_combo = QComboBox()

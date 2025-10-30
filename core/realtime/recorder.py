@@ -225,6 +225,16 @@ class RealtimeRecorder:
                 "Audio capture is not available. Install PyAudio to enable real-time recording."
             )
 
+        # 检查语音识别引擎是否可用
+        if hasattr(self.speech_engine, "is_model_available"):
+            if not self.speech_engine.is_model_available():
+                error_msg = (
+                    "Speech recognition model is not available. "
+                    "Please download a model from Settings > Model Management before recording."
+                )
+                logger.error(error_msg)
+                raise RuntimeError(error_msg)
+
         # Store the loop reference so that thread-safe queue operations work.
         if event_loop is not None:
             self._event_loop = event_loop

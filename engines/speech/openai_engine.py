@@ -40,7 +40,6 @@ from utils.http_client import AsyncRetryableHttpClient
 
 logger = logging.getLogger(__name__)
 
-
 class OpenAIEngine(SpeechEngine):
     """OpenAI Whisper API 引擎"""
 

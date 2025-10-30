@@ -24,7 +24,14 @@
     "copy": "Copier",
     "copied": "Copié !",
     "show_details": "Afficher les Détails",
-    "hide_details": "Masquer les Détails"
+    "hide_details": "Masquer les Détails",
+    "refresh": "Actualiser",
+    "words": "mots",
+    "file_count": "{count} fichier",
+    "file_count_plural": "{count} fichiers",
+    "task_status": "Tâche {name} est {status|terminée|en cours}",
+    "conditional_message": "{has_error|Erreur survenue: {error}|Opération réussie}",
+    "complex_status": "Traité {processed} fichiers, {success} réussis, {failed} échoués"
   },
   "data_management": {
     "title": "Gestion des Données",
@@ -176,7 +183,21 @@
       "description": "Durée de l'enregistrement : {duration} secondes",
       "db_missing": "Impossible de créer l'événement calendrier car aucune connexion à la base de données n'est configurée. Configurez la base de données pour activer l'intégration au calendrier.",
       "creation_failed": "Échec de la création de l'événement calendrier : {error}"
-    }
+    },
+    "marker_added": "Marqueur Ajouté",
+    "recording_stopped": "Enregistrement Arrêté",
+    "clear_markers": "Effacer les Marqueurs",
+    "audio_settings": "Paramètres Audio",
+    "export_success": "Exportation Réussie",
+    "status_ready": "Prêt",
+    "model_error": "Erreur de Modèle",
+    "status_recording": "Enregistrement",
+    "audio_unavailable": "Audio Indisponible",
+    "transcription": "Transcription",
+    "translation": "Traduction",
+    "recording_started": "Enregistrement Commencé",
+    "audio_error": "Erreur Audio",
+    "audio_device_unknown": "Périphérique Audio Inconnu"
   },
   "calendar_hub": {
     "title": "Centre de Calendrier",
@@ -230,7 +251,9 @@
     },
     "calendar_view": {
       "no_events": "Aucun événement pour ce jour"
-    }
+    },
+    "sync_now_tooltip": "Synchroniser les données du calendrier immédiatement",
+    "sync_now": "Synchroniser Maintenant"
   },
   "timeline": {
     "title": "Chronologie Intelligente",
@@ -279,7 +302,12 @@
       "errors": {
         "service_missing": "Lecture impossible : le service multimédia Qt est absent. Installez le backend Qt Multimedia de votre plateforme puis redémarrez EchoNote.",
         "format_error": "Lecture impossible : le format du média n'est pas pris en charge. Ré-encodez l'enregistrement en WAV ou MP3, ou installez les codecs requis. Détails : {details}"
-      }
+      },
+      "show_timestamps": "Afficher les Horodatages",
+      "no_transcript": "Aucune Transcription",
+      "hide_timestamps": "Masquer les Horodatages",
+      "transcript": "Transcription",
+      "loading": "Chargement"
     },
     "snippet": {
       "title_prefix": "Titre",
@@ -459,12 +487,14 @@
       "api_key_placeholder": "sk-...",
       "azure_region_label": "Région :",
       "azure_region_placeholder": "par ex., eastus",
+      "will_automatically_use": "Utilisera automatiquement : {device_name} ({compute_type})",
       "gpu_acceleration": "Accélération GPU NVIDIA. Nécessite un GPU compatible CUDA.",
       "cpu_mode": "Mode CPU. Pas d'accélération GPU.",
       "error": {
         "empty_path": "Le chemin de sauvegarde ne peut pas être vide",
         "invalid_path": "Chemin invalide : {error}"
-      }
+      },
+      "show_password": "Afficher le Mot de Passe"
     },
     "realtime": {
       "title": "Paramètres d'Enregistrement en Temps Réel",
@@ -694,6 +724,185 @@
       }
     }
   },
+  "logging": {
+    "main_window": {
+      "initialized": "Fenêtre principale initialisée",
+      "exit_cancelled": "Sortie de l'application annulée par l'utilisateur",
+      "closed": "Fenêtre principale fermée",
+      "cleanup_starting": "Démarrage du nettoyage de l'application...",
+      "closing_transcript_viewers": "Fermeture de tous les visualiseurs de transcription...",
+      "stopping_transcription_tasks": "Arrêt des tâches de transcription...",
+      "transcription_manager_timeout": "Le gestionnaire de transcription ne s'est pas arrêté dans les délais",
+      "stopping_realtime_recorder": "Arrêt de l'enregistreur en temps réel...",
+      "stopping_resource_monitor": "Arrêt du moniteur de ressources...",
+      "stopping_auto_task_scheduler": "Arrêt du planificateur de tâches automatiques...",
+      "stopping_sync_scheduler": "Arrêt du planificateur de synchronisation...",
+      "saving_settings": "Sauvegarde des paramètres...",
+      "closing_database_connection": "Fermeture de la connexion à la base de données...",
+      "cleaning_temp_files": "Nettoyage des anciens fichiers temporaires...",
+      "keyboard_shortcuts_configured": "Raccourcis clavier configurés",
+      "api_keys_updated": "Clés API mises à jour, rechargement des moteurs cloud...",
+      "transcription_engine_reloaded": "Moteur de transcription rechargé avec succès",
+      "realtime_recorder_engine_reloaded": "Moteur d'enregistrement en temps réel rechargé avec succès",
+      "cloud_engines_reload_completed": "Rechargement des moteurs cloud terminé"
+    },
+    "batch_transcribe": {
+      "starting_task_processing": "Démarrage du traitement des tâches de transcription...",
+      "processing_started": "Traitement de transcription démarré",
+      "widget_initialized": "Widget de transcription par lots initialisé",
+      "no_speech_engine": "Aucun moteur de reconnaissance vocale disponible",
+      "no_models_downloaded": "Aucun modèle téléchargé",
+      "navigating_to_model_management": "Navigation vers la page de gestion des modèles",
+      "cannot_navigate_main_window_not_found": "Impossible de naviguer : fenêtre principale introuvable",
+      "task_queue_cleared": "File de tâches vidée",
+      "closed_all_transcript_viewers": "Tous les visualiseurs de transcription fermés"
+    },
+    "realtime_record": {
+      "widget_initialized": "Widget d'enregistrement en temps réel initialisé",
+      "async_loop_started": "Boucle d'événements asynchrone démarrée",
+      "async_loop_stopping": "Arrêt de la boucle d'événements asynchrone",
+      "async_loop_stopped": "Boucle d'événements asynchrone arrêtée",
+      "no_models_downloaded": "Aucun modèle téléchargé",
+      "download_guide_displayed": "Guide de téléchargement affiché",
+      "navigated_to_model_management": "Navigation vers la gestion des modèles effectuée",
+      "updating_ui_recording_started": "Mise à jour de l'interface pour l'enregistrement démarré",
+      "updating_ui_recording_stopped": "Mise à jour de l'interface pour l'enregistrement arrêté",
+      "recording_started": "Enregistrement démarré",
+      "no_transcription_text_to_export": "Aucun texte de transcription à exporter",
+      "no_translation_text_to_export": "Aucun texte de traduction à exporter",
+      "save_recording_handled_automatically": "Sauvegarde de l'enregistrement - gérée automatiquement à l'arrêt",
+      "async_loop_thread_timeout": "Le thread de la boucle d'événements asynchrone ne s'est pas terminé dans les délais"
+    },
+    "settings": {
+      "widget_initialized": "Widget des paramètres initialisé",
+      "model_manager_not_available": "Gestionnaire de modèles non disponible, page de gestion des modèles ignorée",
+      "saved_successfully": "Paramètres sauvegardés avec succès",
+      "reset_to_defaults": "Paramètres réinitialisés aux valeurs par défaut",
+      "transcription_page": {
+        "no_models_downloaded_selector_disabled": "Aucun modèle téléchargé, sélecteur de modèle désactivé",
+        "showed_ffmpeg_guide": "Guide d'installation FFmpeg affiché",
+        "no_secrets_manager_skipping_api_key_loading": "Aucun gestionnaire de secrets disponible, chargement des clés API ignoré",
+        "no_secrets_manager_skipping_api_key_saving": "Aucun gestionnaire de secrets disponible, sauvegarde des clés API ignorée",
+        "api_keys_encrypted_saved": "Clés API chiffrées et sauvegardées avec succès",
+        "api_keys_updated_signal_emitted": "Signal de mise à jour des clés API émis"
+      },
+      "calendar_page": {
+        "add_google_account_clicked": "Ajout de compte Google cliqué",
+        "add_outlook_account_clicked": "Ajout de compte Outlook cliqué"
+      },
+      "model_management_page": {
+        "initialized": "Page de gestion des modèles initialisée"
+      },
+      "data_management_page": {
+        "cleanup_completed_successfully": "Nettoyage des données terminé avec succès"
+      }
+    },
+    "calendar_hub": {
+      "google_user_info_missing_email": "Réponse d'informations utilisateur Google manquant le champ email",
+      "outlook_user_info_missing_email": "Réponse d'informations utilisateur Outlook manquant les champs mail"
+    },
+    "timeline": {
+      "widget_initialized": "Widget de chronologie initialisé",
+      "refreshing_without_query_filter": "Actualisation de la chronologie sans filtre de requête",
+      "transcript_copied_to_clipboard": "Transcription copiée dans le presse-papiers",
+      "transcript_viewer_dialog_initialized": "Dialogue du visualiseur de transcription initialisé",
+      "audio_player_dialog_initialized": "Dialogue du lecteur audio initialisé"
+    },
+    "batch_transcribe_viewer": {
+      "file_load_cancelled": "Chargement de fichier annulé par l'utilisateur",
+      "user_chose_retry_save": "L'utilisateur a choisi de réessayer l'opération de sauvegarde",
+      "user_cancelled_save": "L'utilisateur a annulé l'opération de sauvegarde",
+      "no_timestamps_found_creating_basic_srt": "Aucun horodatage trouvé, création d'un SRT basique",
+      "no_timestamps_found_creating_basic_markdown": "Aucun horodatage trouvé, création d'un Markdown basique",
+      "copied_all_transcript_to_clipboard": "Tout le contenu de transcription copié dans le presse-papiers"
+    },
+    "audio_visualizer": {
+      "initialized": "Visualiseur audio initialisé"
+    },
+    "common": {
+      "notification": {
+        "win10toast_not_installed": "win10toast non installé, notifications Windows indisponibles",
+        "notify_send_not_found": "notify-send introuvable, notifications Linux indisponibles",
+        "macos_notification_timeout": "Notification macOS expirée",
+        "windows_notifications_not_available": "Notifications Windows non disponibles",
+        "linux_notifications_not_available": "Notifications Linux non disponibles",
+        "linux_notification_timeout": "Notification Linux expirée"
+      },
+      "splash_screen": {
+        "closed": "Écran de démarrage fermé"
+      }
+    }
+  },
+  "ui_strings": {
+    "batch_transcribe": {
+      "no_engine_configured": "Aucun moteur configuré",
+      "error_loading_engines": "Erreur lors du chargement des moteurs",
+      "error_loading_models": "Erreur lors du chargement des modèles"
+    },
+    "realtime_record": {
+      "error_loading_devices": "Erreur lors du chargement des périphériques"
+    },
+    "common": {
+      "error_dialog": {
+        "copied": "Copié !"
+      },
+      "progress_bar": {
+        "zero_percent": "0%"
+      }
+    },
+    "timeline": {
+      "audio_player": {
+        "mute_icon": "🔇",
+        "low_volume_icon": "🔉",
+        "high_volume_icon": "🔊",
+        "pause_icon": "⏸",
+        "play_icon": "▶"
+      }
+    },
+    "gpu_detector": {
+      "device_names": {
+        "cpu": "CPU",
+        "cuda": "CUDA (GPU NVIDIA)",
+        "auto": "Automatique (Recommandé)"
+      }
+    }
+  },
+  "exceptions": {
+    "settings": {
+      "failed_to_save_to_disk": "Échec de la sauvegarde des paramètres sur le disque"
+    },
+    "realtime_record": {
+      "failed_to_initialize_async_loop": "Échec de l'initialisation de la boucle d'événements asynchrone"
+    },
+    "batch_transcribe_viewer": {
+      "output_path_not_set": "Chemin de sortie non défini",
+      "insufficient_disk_space": "Espace disque insuffisant",
+      "content_is_empty": "Le contenu est vide",
+      "no_content_to_export": "Aucun contenu à exporter"
+    },
+    "calendar_hub": {
+      "expected_authorization_request_payload": "Charge utile de demande d'autorisation attendue avec état et vérificateur de code.",
+      "authorization_request_missing_pkce": "La demande d'autorisation manque des paramètres PKCE requis.",
+      "state_and_code_verifier_required": "L'état et le vérificateur de code doivent être fournis pour le dialogue OAuth",
+      "invalid_port_in_redirect_uri": "Port invalide spécifié dans l'URI de redirection.",
+      "failed_to_parse_redirect_uri": "Échec de l'analyse de l'URI de redirection pour le port de rappel.",
+      "invalid_port_in_configured_redirect_uri": "Port invalide spécifié dans l'URI de redirection configuré."
+    }
+  },
+  "dialogs": {
+    "settings": {
+      "data_management": {
+        "cleanup_failed": "Échec du Nettoyage"
+      }
+    },
+    "calendar_hub": {
+      "authorization_failed": "Échec de l'Autorisation",
+      "disconnect_account": "Déconnecter le Compte",
+      "no_accounts": "Aucun Compte",
+      "sync_complete": "Synchronisation Terminée",
+      "sync_completed_with_errors": "Synchronisation Terminée avec des Erreurs"
+    }
+  },
   "ffmpeg": {
     "dialog_title": "Installer FFmpeg ({platform})",
     "not_installed_title": "FFmpeg Non Installé ({platform})",
@@ -792,5 +1001,76 @@
       "message": "Félicitations ! EchoNote est prêt à être utilisé.",
       "next_steps": "Ensuite, vous pouvez :\n• Importer des fichiers audio dans Transcription par Lots\n• Utiliser les fonctionnalités d'Enregistrement en Temps Réel\n• Connecter vos comptes de calendrier\n• Personnaliser plus d'options dans les Paramètres"
     }
-  }
+  },
+  "constants": {
+    "file_size": {
+      "bytes": "o",
+      "kilobytes": "Ko",
+      "megabytes": "Mo",
+      "gigabytes": "Go",
+      "terabytes": "To"
+    },
+    "startup": {
+      "configuration": "Configuration",
+      "dependencies": "Dépendances",
+      "database": "Base de données",
+      "i18n": "Internationalisation",
+      "managers": "Gestionnaires",
+      "speech_engine": "Moteur vocal",
+      "transcription": "Transcription",
+      "resource_monitor": "Moniteur de ressources",
+      "realtime_recorder": "Enregistreur temps réel",
+      "calendar": "Calendrier",
+      "main_window": "Fenêtre principale",
+      "final": "Final"
+    },
+    "folders": {
+      "documents": "Documents",
+      "recordings": "Enregistrements",
+      "transcripts": "Transcriptions"
+    },
+    "error_category": {
+      "file_format": "Format de fichier",
+      "network": "Réseau",
+      "authentication": "Authentification",
+      "api_limit": "Limite API",
+      "permission": "Permission",
+      "resource": "Ressource",
+      "validation": "Validation",
+      "unknown": "Inconnu"
+    },
+    "task_status": {
+      "pending": "En attente",
+      "processing": "En cours",
+      "completed": "Terminé",
+      "failed": "Échoué",
+      "cancelled": "Annulé"
+    },
+    "errors": {
+      "unsupported_format": "Format de fichier non pris en charge : {format}",
+      "network_connection_failed": "Échec de la connexion réseau",
+      "authentication_failed": "Échec de l'authentification",
+      "api_rate_limit": "Limite de débit API dépassée",
+      "insufficient_permissions": "Permissions insuffisantes",
+      "insufficient_resources": "Ressources système insuffisantes",
+      "validation_failed": "Échec de la validation d'entrée"
+    },
+    "error_actions": {
+      "unsupported_format": "Formats pris en charge : {formats}\nSuggérer d'utiliser FFmpeg pour convertir au format pris en charge",
+      "network_connection_failed": "Veuillez vérifier la connexion réseau et réessayer, ou utiliser le moteur local (faster-whisper)",
+      "authentication_failed": "Veuillez vérifier si la clé API est correcte, ou reconnecter les services externes",
+      "api_rate_limit": "Veuillez réessayer plus tard, ou envisager de mettre à niveau le plan API",
+      "insufficient_permissions": "Veuillez vérifier les permissions de fichier/répertoire, ou exécuter en tant qu'administrateur",
+      "insufficient_resources": "Veuillez libérer de l'espace disque ou de la mémoire et réessayer",
+      "validation_failed": "Veuillez vérifier si le contenu d'entrée répond aux exigences"
+    }
+  },
+  "search": {
+    "next": "[À traduire] Next",
+    "placeholder": "[À traduire] Placeholder",
+    "previous": "[À traduire] Previous",
+    "close": "[À traduire] Close"
+  },
+  "settings.cleanup_warning": "⚠️ Attention : Les opérations de nettoyage des données ne peuvent pas être annulées !\nVeuillez vous assurer d'avoir sauvegardé toutes les données importantes.",
+  "calendar_hub.no_accounts_message": "Aucun compte de calendrier externe connecté. Veuillez d'abord ajouter un compte."
 }

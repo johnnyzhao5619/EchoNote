@@ -23,6 +23,8 @@ import logging
 import platform
 from typing import Optional
 
+from utils.i18n import I18nQtManager
+
 logger = logging.getLogger("echonote.ui.notification")
 
 
@@ -34,8 +36,9 @@ class NotificationManager:
     macOS, and Linux.
     """
 
-    def __init__(self):
+    def __init__(self, i18n: I18nQtManager, parent=None):
         """Initialize notification manager."""
+        self.i18n = i18n
         self.system = platform.system()
         self._check_availability()
 
@@ -50,7 +53,11 @@ class NotificationManager:
                 self.windows_available = True
             except ImportError:
                 self.windows_available = False
-                logger.warning("win10toast not installed, Windows notifications unavailable")
+                logger.warning(
+                    self.i18n.t("logging.common.notification.win10toast_not_installed")
+                    if hasattr(self, "i18n") and self.i18n
+                    else "win10toast not installed, Windows notifications unavailable"
+                )
         elif self.system == "Linux":
             # Check if notify-send is available
             import subprocess
@@ -237,9 +244,12 @@ class NotificationManager:
 _notification_manager: Optional[NotificationManager] = None
 
 
-def get_notification_manager() -> NotificationManager:
+def get_notification_manager(i18n: I18nQtManager = None) -> NotificationManager:
     """
     Get the global notification manager instance.
+
+    Args:
+        i18n: I18nQtManager instance (required for first initialization)
 
     Returns:
         NotificationManager instance
@@ -247,6 +257,11 @@ def get_notification_manager() -> NotificationManager:
     global _notification_manager
 
     if _notification_manager is None:
-        _notification_manager = NotificationManager()
+        if i18n is None:
+            # Create a minimal i18n manager for fallback
+            from utils.i18n import I18nQtManager
+
+            i18n = I18nQtManager()
+        _notification_manager = NotificationManager(i18n)
 
     return _notification_manager

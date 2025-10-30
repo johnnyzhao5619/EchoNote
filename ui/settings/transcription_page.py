@@ -37,6 +37,7 @@ from PySide6.QtWidgets import (
 )
 
 from core.models.registry import get_default_model_names
+from ui.base_widgets import create_hbox, create_vbox, create_button
 from ui.settings.base_page import BaseSettingsPage
 from utils.i18n import I18nQtManager
 
@@ -56,7 +57,6 @@ class TranscriptionSettingsPage(BaseSettingsPage):
             managers: Dictionary of other managers
         """
         super().__init__(settings_manager, i18n)
-
         self.managers = managers
 
         # Get model_manager from managers dictionary
@@ -85,7 +85,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         self.content_layout.addWidget(self.general_title)
 
         # Default output format
-        format_layout = QHBoxLayout()
+        format_layout = create_hbox()
         self.format_label = QLabel(self.i18n.t("settings.transcription.output_format"))
         self.format_label.setMinimumWidth(200)
         self.format_combo = QComboBox()
@@ -97,7 +97,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         self.content_layout.addLayout(format_layout)
 
         # Concurrent tasks
-        concurrent_layout = QHBoxLayout()
+        concurrent_layout = create_hbox()
         self.concurrent_label = QLabel(self.i18n.t("settings.transcription.concurrent_tasks"))
         self.concurrent_label.setMinimumWidth(200)
         self.concurrent_spin = QSpinBox()
@@ -118,7 +118,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         self.content_layout.addWidget(self.ffmpeg_title)
 
         # FFmpeg status display
-        ffmpeg_status_layout = QHBoxLayout()
+        ffmpeg_status_layout = create_hbox()
         self.ffmpeg_status_label = QLabel(self.i18n.t("ffmpeg.ffmpeg_label"))
         self.ffmpeg_status_label.setMinimumWidth(200)
 
@@ -137,13 +137,13 @@ class TranscriptionSettingsPage(BaseSettingsPage):
                 self.i18n.t("settings.transcription.ffmpeg_not_installed")
             )
             self.ffmpeg_status_text.setProperty("role", "ffmpeg-status")
-        {}.setProperty("state", "missing")
+            self.ffmpeg_status_text.setProperty("state", "missing")
 
         ffmpeg_status_layout.addWidget(self.ffmpeg_status_label)
         ffmpeg_status_layout.addWidget(self.ffmpeg_status_text)
 
         # Installation guide button
-        self.ffmpeg_install_btn = QPushButton(
+        self.ffmpeg_install_btn = create_button(
             self.i18n.t("settings.transcription.ffmpeg_view_guide")
         )
         self.ffmpeg_install_btn.clicked.connect(self._on_show_ffmpeg_guide)
@@ -161,12 +161,12 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         self.add_spacing(20)
 
         # Default save path
-        path_layout = QHBoxLayout()
+        path_layout = create_hbox()
         self.path_label = QLabel(self.i18n.t("settings.transcription.save_path"))
         self.path_label.setMinimumWidth(200)
         self.path_edit = QLineEdit()
         self.path_edit.textChanged.connect(self._emit_changed)
-        self.browse_button = QPushButton(self.i18n.t("settings.transcription.browse"))
+        self.browse_button = create_button(self.i18n.t("settings.transcription.browse"))
         self.browse_button.clicked.connect(self._on_browse_clicked)
         path_layout.addWidget(self.path_label)
         path_layout.addWidget(self.path_edit, stretch=1)
@@ -181,7 +181,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         self.content_layout.addWidget(self.engine_title)
 
         # Engine selection
-        engine_layout = QHBoxLayout()
+        engine_layout = create_hbox()
         self.engine_label = QLabel(self.i18n.t("settings.transcription.engine_select"))
         self.engine_label.setMinimumWidth(200)
         self.engine_combo = QComboBox()
@@ -218,7 +218,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         self.device_label = QLabel(self.i18n.t("settings.transcription.device"))
 
         # Add device info label
-        device_layout = QVBoxLayout()
+        device_layout = create_vbox()
         device_layout.addWidget(self.device_combo)
         self.device_info_label = QLabel()
         self.device_info_label.setProperty("role", "device-info")
@@ -242,7 +242,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
 
         # Cloud engine configuration (will be shown/hidden based on selection)
         self.cloud_group = QGroupBox(self.i18n.t("settings.transcription.cloud_config"))
-        cloud_layout = QVBoxLayout()
+        cloud_layout = create_vbox()
 
         # Note about API keys
         self.note_label = QLabel(self.i18n.t("settings.transcription.api_key_note"))
@@ -254,9 +254,11 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         self._create_api_key_section(cloud_layout)
 
         # Add refresh button for usage statistics
-        refresh_layout = QHBoxLayout()
+        refresh_layout = create_hbox()
         refresh_layout.addStretch()
-        self.refresh_usage_button = QPushButton(self.i18n.t("settings.transcription.refresh_usage"))
+        self.refresh_usage_button = create_button(
+            self.i18n.t("settings.transcription.refresh_usage")
+        )
         self.refresh_usage_button.clicked.connect(self._load_usage_statistics)
         refresh_layout.addWidget(self.refresh_usage_button)
         cloud_layout.addLayout(refresh_layout)
@@ -286,7 +288,11 @@ class TranscriptionSettingsPage(BaseSettingsPage):
                 self.i18n.t("settings.transcription.please_download_model")
             )
             self.model_size_combo.setEnabled(False)
-            logger.info("No models downloaded, model selector disabled")
+            logger.info(
+                self.i18n.t(
+                    "logging.settings.transcription_page.no_models_downloaded_selector_disabled"
+                )
+            )
         else:
             # Add downloaded models
             self.model_size_combo.setEnabled(True)
@@ -340,10 +346,10 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         )
         self.openai_key_edit.textChanged.connect(self._emit_changed)
 
-        key_layout = QHBoxLayout()
+        key_layout = create_hbox()
         key_layout.addWidget(self.openai_key_edit)
 
-        self.openai_show_button = QPushButton("👁")
+        self.openai_show_button = create_button("👁")
         self.openai_show_button.setMaximumWidth(40)
         self.openai_show_button.setCheckable(True)
         self.openai_show_button.clicked.connect(
@@ -351,7 +357,9 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         )
         key_layout.addWidget(self.openai_show_button)
 
-        self.openai_test_button = QPushButton(self.i18n.t("settings.transcription.test_connection"))
+        self.openai_test_button = create_button(
+            self.i18n.t("settings.transcription.test_connection")
+        )
         self.openai_test_button.clicked.connect(lambda: self._test_api_key("openai"))
         key_layout.addWidget(self.openai_test_button)
 
@@ -377,10 +385,10 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         self.google_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
         self.google_key_edit.textChanged.connect(self._emit_changed)
 
-        google_key_layout = QHBoxLayout()
+        google_key_layout = create_hbox()
         google_key_layout.addWidget(self.google_key_edit)
 
-        self.google_show_button = QPushButton("👁")
+        self.google_show_button = create_button("👁")
         self.google_show_button.setMaximumWidth(40)
         self.google_show_button.setCheckable(True)
         self.google_show_button.clicked.connect(
@@ -388,7 +396,9 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         )
         google_key_layout.addWidget(self.google_show_button)
 
-        self.google_test_button = QPushButton(self.i18n.t("settings.transcription.test_connection"))
+        self.google_test_button = create_button(
+            self.i18n.t("settings.transcription.test_connection")
+        )
         self.google_test_button.clicked.connect(lambda: self._test_api_key("google"))
         google_key_layout.addWidget(self.google_test_button)
 
@@ -413,10 +423,10 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         self.azure_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
         self.azure_key_edit.textChanged.connect(self._emit_changed)
 
-        azure_key_layout = QHBoxLayout()
+        azure_key_layout = create_hbox()
         azure_key_layout.addWidget(self.azure_key_edit)
 
-        self.azure_show_button = QPushButton("👁")
+        self.azure_show_button = create_button("👁")
         self.azure_show_button.setMaximumWidth(40)
         self.azure_show_button.setCheckable(True)
         self.azure_show_button.clicked.connect(
@@ -424,7 +434,9 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         )
         azure_key_layout.addWidget(self.azure_show_button)
 
-        self.azure_test_button = QPushButton(self.i18n.t("settings.transcription.test_connection"))
+        self.azure_test_button = create_button(
+            self.i18n.t("settings.transcription.test_connection")
+        )
         self.azure_test_button.clicked.connect(lambda: self._test_api_key("azure"))
         azure_key_layout.addWidget(self.azure_test_button)
 
@@ -486,8 +498,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
             return
 
         if not api_key or not api_key.strip():
-            QMessageBox.warning(
-                self,
+            self.show_warning(
                 self.i18n.t("settings.transcription.test_failed"),
                 self.i18n.t("settings.transcription.empty_api_key"),
             )
@@ -518,8 +529,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
                 elif provider == "azure":
                     region = self.azure_region_edit.text().strip()
                     if not region:
-                        QMessageBox.warning(
-                            self,
+                        self.show_warning(
                             self.i18n.t("settings.transcription.test_failed"),
                             self.i18n.t("settings.transcription.empty_region"),
                         )
@@ -533,15 +543,13 @@ class TranscriptionSettingsPage(BaseSettingsPage):
 
                 # Show result
                 if is_valid:
-                    QMessageBox.information(
-                        self,
+                    self.show_info(
                         self.i18n.t("settings.transcription.test_success"),
                         self.i18n.t("settings.transcription.test_success_message", message=message),
                     )
                     logger.info(f"{provider} API key validation successful")
                 else:
-                    QMessageBox.warning(
-                        self,
+                    self.show_warning(
                         self.i18n.t("settings.transcription.test_failed"),
                         self.i18n.t("settings.transcription.test_failed_message", message=message),
                     )
@@ -552,8 +560,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
 
         except Exception as e:
             logger.error(f"Error testing {provider} API key: {e}")
-            QMessageBox.critical(
-                self,
+            self.show_error(
                 self.i18n.t("settings.transcription.test_error"),
                 self.i18n.t("settings.transcription.test_error_message", error=str(e)),
             )
@@ -646,8 +653,12 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         if device_id == "auto":
             # Show recommended device
             recommended_device, recommended_compute = GPUDetector.get_recommended_device()
-            device_name = GPUDetector.get_device_display_name(recommended_device)
-            info_text = f"Will automatically use: {device_name} ({recommended_compute})"
+            device_name = GPUDetector.get_device_display_name(recommended_device, self.i18n)
+            info_text = self.i18n.t(
+                "settings.transcription.will_automatically_use",
+                device_name=device_name,
+                compute_type=recommended_compute,
+            )
             self.device_info_label.setText(info_text)
         elif device_id == "cuda":
             self.device_info_label.setText(self.i18n.t("settings.transcription.gpu_acceleration"))
@@ -686,7 +697,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
             self.ffmpeg_status_text.setProperty("role", "ffmpeg-status")
             self.ffmpeg_status_text.setProperty("state", "missing")
 
-        logger.info("Showed FFmpeg installation guide")
+        logger.info(self.i18n.t("logging.settings.transcription_page.showed_ffmpeg_guide"))
 
     def _on_browse_clicked(self):
         """Handle browse button click."""
@@ -777,7 +788,11 @@ class TranscriptionSettingsPage(BaseSettingsPage):
     def _load_api_keys(self):
         """Load encrypted API keys."""
         if "secrets_manager" not in self.managers:
-            logger.warning("No secrets_manager available, skipping API key loading")
+            logger.warning(
+                self.i18n.t(
+                    "logging.settings.transcription_page.no_secrets_manager_skipping_api_key_loading"
+                )
+            )
             return
 
         secrets_manager = self.managers["secrets_manager"]
@@ -865,7 +880,11 @@ class TranscriptionSettingsPage(BaseSettingsPage):
     def _save_api_keys(self):
         """Save API keys with encryption."""
         if "secrets_manager" not in self.managers:
-            logger.warning("No secrets_manager available, skipping API key saving")
+            logger.warning(
+                self.i18n.t(
+                    "logging.settings.transcription_page.no_secrets_manager_skipping_api_key_saving"
+                )
+            )
             return
 
         secrets_manager = self.managers["secrets_manager"]
@@ -899,12 +918,14 @@ class TranscriptionSettingsPage(BaseSettingsPage):
             else:
                 secrets_manager.delete_secret("azure_region")
 
-            logger.info("API keys encrypted and saved successfully")
+            logger.info(self.i18n.t("logging.settings.transcription_page.api_keys_encrypted_saved"))
 
             # Emit signal to notify that API keys have been updated
             # This will trigger engine reloading
             self.settings_manager.api_keys_updated.emit()
-            logger.info("API keys updated signal emitted")
+            logger.info(
+                self.i18n.t("logging.settings.transcription_page.api_keys_updated_signal_emitted")
+            )
 
         except Exception as e:
             logger.error(f"Error saving API keys: {e}")

@@ -34,10 +34,8 @@ from data.storage.file_manager import FileManager
 
 logger = logging.getLogger("echonote.calendar.manager")
 
-
 if TYPE_CHECKING:
-    from data.security.oauth_manager import OAuthManager
-
+    pass  # Type checking imports would go here if needed
 
 _MIN_EXTERNAL_EVENT_DURATION = timedelta(minutes=1)
 

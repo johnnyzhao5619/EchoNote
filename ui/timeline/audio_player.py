@@ -36,12 +36,19 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.base_widgets import (
+    BaseWidget,
+    create_vbox,
+    create_hbox,
+    create_button,
+    connect_button_with_callback,
+)
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.timeline.audio_player")
 
 
-class AudioPlayer(QWidget):
+class AudioPlayer(BaseWidget):
     """
     Audio player widget with playback controls.
 
@@ -50,10 +57,29 @@ class AudioPlayer(QWidget):
     - Progress slider with seek
     - Volume control
     - Time display
+    - Optional transcript display
     """
 
     # Signals
     playback_error = Signal(str)  # error_message
+
+    # Constants - 避免硬编码
+    DEFAULT_VOLUME = 70  # 默认音量 (0-100)
+    TRANSCRIPT_AREA_HEIGHT = 220  # 转录区域固定高度
+    CONTROLS_WIDTH = 400  # 控制栏总宽度
+    SIDE_CONTROL_WIDTH = 148  # 左右侧控制区域宽度
+    CENTER_CONTROL_WIDTH = 104  # 中间播放按钮区域宽度
+    PLAY_BUTTON_SIZE = 56  # 播放按钮尺寸
+    CONTROL_BUTTON_SIZE = 40  # 控制按钮尺寸
+    VOLUME_SLIDER_WIDTH = 100  # 音量滑块宽度
+
+    # Layout constants - 布局常量
+    CONTENT_MARGIN = 20  # 内容区域边距
+    CONTENT_SPACING = 8  # 内容区域间距
+    CONTROL_BAR_SPACING = 12  # 控制栏间距
+    CONTROLS_SPACING = 20  # 控制按钮间距
+    INFO_BOTTOM_MARGIN = 16  # 信息区域底部边距
+    TRANSCRIPT_BOTTOM_MARGIN = 12  # 转录区域底部边距
 
     _ERROR_TRANSLATIONS = {
         QMediaPlayer.Error.ResourceError: "timeline.audio_player.errors.resource_error",
@@ -86,14 +112,19 @@ class AudioPlayer(QWidget):
         self._initial_time_text = self.i18n.t("timeline.audio_player.initial_time")
         self._playback_state = QMediaPlayer.PlaybackState.StoppedState
 
-        # Media player
+        # Media player setup
         self.player = QMediaPlayer(self)
         self.audio_output = QAudioOutput(self)
+        self.audio_output.setVolume(self.DEFAULT_VOLUME / 100.0)
         self.player.setAudioOutput(self.audio_output)
 
         # State
         self.is_seeking = False
         self._media_status = QMediaPlayer.MediaStatus.NoMedia
+        self._is_muted = False
+        self._transcript_format = None  # 'segments' or 'text'
+        self._transcript_segments = None  # 原始segments数据
+        self._transcript_view_mode = "formatted"  # 'formatted' or 'plain'
 
         # Setup UI
         self.setup_ui()
@@ -117,74 +148,200 @@ class AudioPlayer(QWidget):
         logger.info(f"Audio player initialized: {file_path}")
 
     def setup_ui(self):
-        """Set up the player UI."""
+        """Set up the player UI - 简洁居中设计."""
+        self.setObjectName("audio_player")
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(10)
+        # # layout.setSpacing(0)
 
-        # File name label
+        # 转录文本显示区域 - 顶部，默认隐藏
+        self.transcript_area = self._create_transcript_area()
+        layout.addWidget(self.transcript_area)
+
+        # 中间信息区域
+        info_container = QWidget()
+        info_layout = QVBoxLayout(info_container)
+        info_layout.setContentsMargins(
+            self.CONTENT_MARGIN,
+            self.CONTENT_MARGIN,
+            self.CONTENT_MARGIN,
+            self.INFO_BOTTOM_MARGIN,
+        )
+        info_layout.setSpacing(self.CONTENT_SPACING)
+
+        # 文件名标签 - 居中
         file_name = Path(self.file_path).name
         self.file_label = QLabel(file_name)
-        self.file_label.setProperty("role", "audio-file")
-        layout.addWidget(self.file_label)
+        self.file_label.setObjectName("player_title")
+        self.file_label.setWordWrap(True)
+        self.file_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        info_layout.addWidget(self.file_label)
 
-        # Progress slider
+        layout.addWidget(info_container)
+
+        # 底部控制栏
+        control_bar = self._create_control_bar()
+        layout.addWidget(control_bar)
+
+    def _create_transcript_area(self) -> QWidget:
+        """创建转录文本显示区域 - 替代封面位置，固定高度避免堆叠."""
+        from PySide6.QtWidgets import QTextEdit
+
+        container = QWidget()
+        container.setObjectName("transcript_container")
+        container.setFixedHeight(self.TRANSCRIPT_AREA_HEIGHT)  # 使用常量，避免硬编码
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(
+            self.CONTENT_MARGIN,
+            self.CONTENT_MARGIN,
+            self.CONTENT_MARGIN,
+            self.TRANSCRIPT_BOTTOM_MARGIN,
+        )
+        layout.setSpacing(self.CONTENT_SPACING)
+
+        # 标题
+        title = QLabel(self.i18n.t("timeline.audio_player.transcript"))
+        title.setObjectName("transcript_title")
+        title.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        layout.addWidget(title)
+
+        # 文本显示区域
+        self.transcript_text = QTextEdit()
+        self.transcript_text.setObjectName("transcript_text")
+        self.transcript_text.setReadOnly(True)
+        self.transcript_text.setPlaceholderText(self.i18n.t("timeline.audio_player.no_transcript"))
+        layout.addWidget(self.transcript_text)
+
+        # 格式切换按钮（仅在有segments时显示）
+        self.format_toggle_button = QPushButton()
+        self.format_toggle_button.setObjectName("transcript_format_toggle")
+        connect_button_with_callback(self.format_toggle_button, self._toggle_transcript_format)
+        self.format_toggle_button.setVisible(False)  # 默认隐藏
+        layout.addWidget(self.format_toggle_button)
+
+        # 默认隐藏
+        container.setVisible(False)
+
+        return container
+
+    def _create_control_bar(self) -> QWidget:
+        """创建控制栏 - 简洁的三列布局."""
+        container = QWidget()
+        container.setObjectName("player_control_bar")
+        main_layout = QVBoxLayout(container)
+        main_layout.setContentsMargins(
+            self.CONTENT_MARGIN, 0, self.CONTENT_MARGIN, self.CONTENT_MARGIN
+        )
+        main_layout.setSpacing(self.CONTROL_BAR_SPACING)
+
+        # 进度条区域
+        progress_layout = create_vbox(spacing=6)
+
         self.progress_slider = QSlider(Qt.Orientation.Horizontal)
+        self.progress_slider.setObjectName("player_progress")
         self.progress_slider.setRange(0, 0)
         self.progress_slider.setEnabled(False)
         self.progress_slider.sliderPressed.connect(self._on_slider_pressed)
         self.progress_slider.sliderReleased.connect(self._on_slider_released)
         self.progress_slider.sliderMoved.connect(self._on_slider_moved)
-        layout.addWidget(self.progress_slider)
+        progress_layout.addWidget(self.progress_slider)
 
-        # Time labels
-        time_layout = QHBoxLayout()
+        # 时间显示
+        time_layout = create_hbox(spacing=0)
+
         self.current_time_label = QLabel(self._initial_time_text)
-        self.current_time_label.setProperty("role", "time-display")
+        self.current_time_label.setObjectName("player_time")
         time_layout.addWidget(self.current_time_label)
 
         time_layout.addStretch()
 
         self.total_time_label = QLabel(self._initial_time_text)
-        self.total_time_label.setProperty("role", "time-display")
+        self.total_time_label.setObjectName("player_time")
         time_layout.addWidget(self.total_time_label)
 
-        layout.addLayout(time_layout)
+        progress_layout.addLayout(time_layout)
+        main_layout.addLayout(progress_layout)
 
-        # Controls
-        controls_layout = QHBoxLayout()
-        controls_layout.setSpacing(10)
+        # 控制按钮行 - 简单的三列布局，垂直居中对齐
+        controls_layout = create_hbox()
+        controls_layout.setSpacing(self.CONTROLS_SPACING)
+        controls_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
-        # Play/Pause button
-        self.play_button = QPushButton(self.i18n.t("timeline.audio_player.play_button_label"))
-        self.play_button.setFixedSize(40, 40)
-        self.play_button.clicked.connect(self.toggle_playback)
-        self.play_button.setProperty("role", "audio-play")
-        controls_layout.addWidget(self.play_button)
+        # 左侧：音量控制
+        self.volume_button = create_button("🔊")
+        self.volume_button.setObjectName("player_control_button")
+        self.volume_button.setFixedSize(self.CONTROL_BUTTON_SIZE, self.CONTROL_BUTTON_SIZE)
+        connect_button_with_callback(self.volume_button, self._toggle_mute)
+        controls_layout.addWidget(self.volume_button, alignment=Qt.AlignmentFlag.AlignVCenter)
 
-        # Volume label
-        self.volume_label = QLabel(self.i18n.t("timeline.audio_player.volume_icon"))
-        controls_layout.addWidget(self.volume_label)
-
-        # Volume slider
         self.volume_slider = QSlider(Qt.Orientation.Horizontal)
+        self.volume_slider.setObjectName("player_volume")
         self.volume_slider.setRange(0, 100)
-        self.volume_slider.setValue(70)
-        self.volume_slider.setMaximumWidth(100)
+        self.volume_slider.setValue(self.DEFAULT_VOLUME)
+        self.volume_slider.setFixedWidth(self.VOLUME_SLIDER_WIDTH)
         self.volume_slider.valueChanged.connect(self._on_volume_changed)
-        self.volume_slider.setEnabled(False)
-        controls_layout.addWidget(self.volume_slider)
+        controls_layout.addWidget(self.volume_slider, alignment=Qt.AlignmentFlag.AlignVCenter)
 
+        # 弹性空间
         controls_layout.addStretch()
 
-        layout.addLayout(controls_layout)
+        # 中间：播放按钮
+        self.play_button = create_button("▶")
+        self.play_button.setObjectName("player_play_button")
+        self.play_button.setFixedSize(self.PLAY_BUTTON_SIZE, self.PLAY_BUTTON_SIZE)
+        connect_button_with_callback(self.play_button, self.toggle_playback)
+        controls_layout.addWidget(self.play_button, alignment=Qt.AlignmentFlag.AlignVCenter)
 
-        # Set initial volume
-        self.audio_output.setVolume(0.7)
+        # 弹性空间
+        controls_layout.addStretch()
+
+        # 右侧：转录按钮
+        self.show_transcript_button = create_button("📝")
+        self.show_transcript_button.setObjectName("player_control_button")
+        self.show_transcript_button.setFixedSize(self.CONTROL_BUTTON_SIZE, self.CONTROL_BUTTON_SIZE)
+        self.show_transcript_button.setCheckable(True)
+        connect_button_with_callback(
+            self.show_transcript_button, self._toggle_transcript_visibility
+        )
+        controls_layout.addWidget(
+            self.show_transcript_button, alignment=Qt.AlignmentFlag.AlignVCenter
+        )
+
+        main_layout.addLayout(controls_layout)
+
+        return container
+
+    def _toggle_transcript_visibility(self):
+        """切换转录区域的显示/隐藏."""
+        is_visible = self.transcript_area.isVisible()
+        new_visible = not is_visible
+
+        self.transcript_area.setVisible(new_visible)
+        self.show_transcript_button.setChecked(new_visible)
+
+        # 更新格式切换按钮的可见性（仅在有segments格式时显示）
+        if new_visible and self._transcript_format == "segments":
+            self.format_toggle_button.setVisible(True)
+        else:
+            self.format_toggle_button.setVisible(False)
+
+        # 动态调整对话框高度
+        if self.parent() and isinstance(self.parent(), QDialog):
+            dialog = self.parent()
+            if not is_visible:
+                # 展开转录文本 - 增加高度
+                new_height = dialog.height() + self.TRANSCRIPT_AREA_HEIGHT
+                dialog.resize(dialog.width(), new_height)
+            else:
+                # 收起转录文本 - 减少高度
+                new_height = max(
+                    AudioPlayerDialog.MIN_DIALOG_HEIGHT,
+                    dialog.height() - self.TRANSCRIPT_AREA_HEIGHT,
+                )
+                dialog.resize(dialog.width(), new_height)
 
     def load_file(self, file_path: str):
         """
-        Load audio file.
+        Load audio file and associated transcript.
 
         Args:
             file_path: Path to audio file
@@ -206,10 +363,158 @@ class AudioPlayer(QWidget):
             url = QUrl.fromLocalFile(self.file_path)
             self.player.setSource(url)
 
+            # Load transcript if available
+            self._load_transcript(resolved_path)
+
             logger.info(f"Audio file loaded: {file_path}")
 
         except Exception as e:
             self._emit_playback_error("timeline.audio_player.load_failed", error=str(e))
+
+    def _load_transcript(self, audio_path: Path):
+        """
+        Load transcript file associated with audio file.
+
+        Supports multiple formats:
+        - JSON format with segments (timestamped subtitles)
+        - Plain text format (.txt)
+
+        Args:
+            audio_path: Path to audio file
+        """
+        # Try JSON format first (with segments/timestamps)
+        json_path = audio_path.with_suffix(".json")
+        txt_path = audio_path.with_suffix(".txt")
+
+        transcript_content = None
+        transcript_format = None
+
+        # Try JSON format (segments with timestamps)
+        if json_path.exists():
+            try:
+                import json
+
+                with open(json_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+
+                if "segments" in data and isinstance(data["segments"], list):
+                    # Format: JSON with segments (timestamped)
+                    transcript_content = self._format_segments_transcript(data["segments"])
+                    transcript_format = "segments"
+                    logger.info(f"Transcript loaded (segments): {json_path}")
+                elif isinstance(data, dict) and "text" in data:
+                    # Format: JSON with plain text
+                    transcript_content = data["text"]
+                    transcript_format = "text"
+                    logger.info(f"Transcript loaded (text): {json_path}")
+                else:
+                    logger.warning(f"Unknown JSON format in: {json_path}")
+            except Exception as e:
+                logger.warning(f"Failed to load JSON transcript: {e}")
+
+        # Try plain text format if JSON not found or failed
+        if transcript_content is None and txt_path.exists():
+            try:
+                with open(txt_path, "r", encoding="utf-8") as f:
+                    transcript_content = f.read()
+
+                if transcript_content.strip():
+                    transcript_format = "text"
+                    logger.info(f"Transcript loaded (text): {txt_path}")
+            except Exception as e:
+                logger.warning(f"Failed to load text transcript: {e}")
+
+        # Update UI
+        if transcript_content and transcript_content.strip():
+            self.transcript_text.setPlainText(transcript_content)
+            self._transcript_format = transcript_format
+            # 格式切换按钮在转录区域显示时才可见
+            # 不自动显示转录区域，让用户点击按钮显示
+        else:
+            self.transcript_text.clear()
+            self._transcript_format = None
+            self._transcript_segments = None
+            if hasattr(self, "format_toggle_button"):
+                self.format_toggle_button.setVisible(False)
+            logger.debug(f"No transcript found for: {audio_path}")
+
+    def _format_segments_transcript(self, segments: list) -> str:
+        """
+        Format segments with timestamps into readable text.
+
+        Args:
+            segments: List of segment dictionaries with 'start', 'end', 'text'
+
+        Returns:
+            Formatted transcript string
+        """
+        # 保存原始segments数据
+        self._transcript_segments = segments
+
+        # 格式切换按钮在转录区域显示时才可见，这里只设置文本
+        if hasattr(self, "format_toggle_button"):
+            self.format_toggle_button.setText(
+                "📄 " + self.i18n.t("timeline.audio_player.hide_timestamps")
+            )
+
+        lines = []
+        for i, segment in enumerate(segments, 1):
+            start = segment.get("start", 0)
+            end = segment.get("end", 0)
+            text = segment.get("text", "").strip()
+
+            if text:
+                # Format: [00:00 - 00:05] Text content
+                start_time = self._format_timestamp(start)
+                end_time = self._format_timestamp(end)
+                lines.append(f"[{start_time} - {end_time}] {text}")
+
+        return "\n".join(lines)
+
+    def _toggle_transcript_format(self):
+        """切换转录文本显示格式（带时间戳 vs 纯文本）."""
+        if self._transcript_format != "segments" or not self._transcript_segments:
+            return
+
+        # 切换显示模式
+        if self._transcript_view_mode == "formatted":
+            # 切换到纯文本模式
+            plain_text = " ".join(
+                segment.get("text", "").strip() for segment in self._transcript_segments
+            )
+            self.transcript_text.setPlainText(plain_text)
+            self._transcript_view_mode = "plain"
+            self.format_toggle_button.setText(
+                "📝 " + self.i18n.t("timeline.audio_player.show_timestamps")
+            )
+        else:
+            # 切换回带时间戳模式
+            formatted_text = self._format_segments_transcript(self._transcript_segments)
+            self.transcript_text.setPlainText(formatted_text)
+            self._transcript_view_mode = "formatted"
+            self.format_toggle_button.setText(
+                "📄 " + self.i18n.t("timeline.audio_player.hide_timestamps")
+            )
+
+    def _format_timestamp(self, seconds: float) -> str:
+        """
+        Format seconds to MM:SS or HH:MM:SS.
+
+        Args:
+            seconds: Time in seconds
+
+        Returns:
+            Formatted timestamp string
+        """
+        total_seconds = int(seconds)
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+        secs = total_seconds % 60
+
+        if hours > 0:
+            return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+        else:
+            return f"{minutes:02d}:{secs:02d}"
 
     def toggle_playback(self):
         """Toggle play/pause."""
@@ -299,6 +604,22 @@ class AudioPlayer(QWidget):
         """
         self.current_time_label.setText(self._format_time(position))
 
+    def _toggle_mute(self):
+        """切换静音状态."""
+        self._is_muted = not self._is_muted
+
+        if self._is_muted:
+            self.audio_output.setVolume(0.0)
+            self.volume_button.setText(self.i18n.t("ui_strings.timeline.audio_player.mute_icon"))
+            self.volume_slider.setEnabled(False)
+        else:
+            volume = self.volume_slider.value() / 100.0
+            self.audio_output.setVolume(volume)
+            self.volume_button.setText(
+                self.i18n.t("ui_strings.timeline.audio_player.high_volume_icon")
+            )
+            self.volume_slider.setEnabled(True)
+
     def _on_volume_changed(self, value: int):
         """
         Handle volume change.
@@ -306,8 +627,23 @@ class AudioPlayer(QWidget):
         Args:
             value: Volume value (0-100)
         """
-        volume = value / 100.0
-        self.audio_output.setVolume(volume)
+        if not self._is_muted:
+            volume = value / 100.0
+            self.audio_output.setVolume(volume)
+
+            # 根据音量更新图标
+            if value == 0:
+                self.volume_button.setText(
+                    self.i18n.t("ui_strings.timeline.audio_player.mute_icon")
+                )
+            elif value < 50:
+                self.volume_button.setText(
+                    self.i18n.t("ui_strings.timeline.audio_player.low_volume_icon")
+                )
+            else:
+                self.volume_button.setText(
+                    self.i18n.t("ui_strings.timeline.audio_player.high_volume_icon")
+                )
 
     def _format_time(self, milliseconds: int) -> str:
         """
@@ -349,17 +685,15 @@ class AudioPlayer(QWidget):
         if self.progress_slider.maximum() == 0:
             self.total_time_label.setText(self._initial_time_text)
 
+        # 更新播放按钮图标和提示
         if self._playback_state == QMediaPlayer.PlaybackState.PlayingState:
-            button_label = self.i18n.t("timeline.audio_player.pause_button_label")
+            self.play_button.setText(self.i18n.t("ui_strings.timeline.audio_player.pause_icon"))
             button_tooltip = self.i18n.t("timeline.audio_player.pause_tooltip")
         else:
-            button_label = self.i18n.t("timeline.audio_player.play_button_label")
+            self.play_button.setText(self.i18n.t("ui_strings.timeline.audio_player.play_icon"))
             button_tooltip = self.i18n.t("timeline.audio_player.play_tooltip")
 
-        self.play_button.setText(button_label)
         self.play_button.setToolTip(button_tooltip)
-
-        self.volume_label.setText(self.i18n.t("timeline.audio_player.volume_icon"))
         self.volume_slider.setToolTip(self.i18n.t("timeline.audio_player.volume_tooltip"))
         self.progress_slider.setToolTip(self.i18n.t("timeline.audio_player.progress_tooltip"))
 
@@ -379,7 +713,6 @@ class AudioPlayer(QWidget):
             self._on_duration_changed(self.player.duration())
         elif status in (
             QMediaPlayer.MediaStatus.NoMedia,
-            QMediaPlayer.MediaStatus.UnknownMediaStatus,
             QMediaPlayer.MediaStatus.LoadingMedia,
         ):
             # Keep controls disabled until we know media is playable
@@ -413,6 +746,12 @@ class AudioPlayer(QWidget):
 class AudioPlayerDialog(QDialog):
     """Dialog wrapper for audio player."""
 
+    # Constants - 避免硬编码
+    MIN_DIALOG_WIDTH = 500  # 对话框最小宽度
+    MIN_DIALOG_HEIGHT = 180  # 对话框最小高度（不含转录区域）
+    DIALOG_MARGIN = 20  # 对话框边距
+    DIALOG_SPACING = 16  # 对话框内部间距
+
     def __init__(self, file_path: str, i18n: I18nQtManager, parent: Optional[QWidget] = None):
         """
         Initialize audio player dialog.
@@ -427,14 +766,19 @@ class AudioPlayerDialog(QDialog):
         self.i18n = i18n
 
         # Setup dialog
+        self.setObjectName("audio_player_dialog")
         self.setWindowTitle(i18n.t("timeline.audio_player_title"))
-        self.setMinimumWidth(400)
+        self.setMinimumWidth(self.MIN_DIALOG_WIDTH)
+        self.setMinimumHeight(self.MIN_DIALOG_HEIGHT)
         self.setWindowModality(Qt.WindowModality.NonModal)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
 
         # Layout
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(
+            self.DIALOG_MARGIN, self.DIALOG_MARGIN, self.DIALOG_MARGIN, self.DIALOG_MARGIN
+        )
+        layout.setSpacing(self.DIALOG_SPACING)
 
         # Audio player
         self.player = AudioPlayer(
@@ -449,20 +793,10 @@ class AudioPlayerDialog(QDialog):
         # Explicitly load after signals are connected so initialization errors propagate.
         self.player.load_file(file_path)
 
-        # Close button
-        button_layout = QHBoxLayout()
-        button_layout.addStretch()
-
-        self.close_button = QPushButton(i18n.t("common.close"))
-        self.close_button.clicked.connect(self.close)
-        button_layout.addWidget(self.close_button)
-
-        layout.addLayout(button_layout)
-
         self.i18n.language_changed.connect(self.update_translations)
         self.update_translations()
 
-        logger.info("Audio player dialog initialized")
+        logger.info(self.i18n.t("logging.timeline.audio_player_dialog_initialized"))
 
     def _on_playback_error(self, error_msg: str):
         """
@@ -471,8 +805,7 @@ class AudioPlayerDialog(QDialog):
         Args:
             error_msg: Error message
         """
-        QMessageBox.critical(
-            self,
+        self.show_error(
             self.i18n.t("common.error"),
             self.i18n.t("timeline.audio_player.dialog_error_body", message=error_msg),
         )
@@ -485,5 +818,4 @@ class AudioPlayerDialog(QDialog):
     def update_translations(self):
         """Refresh dialog-level translations when the language changes."""
         self.setWindowTitle(self.i18n.t("timeline.audio_player_title"))
-        self.close_button.setText(self.i18n.t("common.close"))
         self.player.update_translations()

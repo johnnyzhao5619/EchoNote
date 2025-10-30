@@ -28,7 +28,6 @@ from config.app_config import get_app_dir
 
 logger = logging.getLogger("echonote.cleanup")
 
-
 class DataCleanup:
     """
     Manages cleanup of all user data.
@@ -327,7 +326,6 @@ class DataCleanup:
             size_bytes /= FILE_SIZE_THRESHOLD
         return f"{size_bytes:.1f} TB"
 
-
 def cleanup_all_data(config_dir: Optional[str] = None, data_dir: Optional[str] = None) -> dict:
     """
     Convenience function to cleanup all user data.
@@ -341,7 +339,6 @@ def cleanup_all_data(config_dir: Optional[str] = None, data_dir: Optional[str] =
     """
     cleanup = DataCleanup(config_dir, data_dir)
     return cleanup.cleanup_all_data()
-
 
 def get_cleanup_summary(config_dir: Optional[str] = None, data_dir: Optional[str] = None) -> dict:
     """

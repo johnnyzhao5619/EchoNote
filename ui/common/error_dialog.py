@@ -35,6 +35,13 @@ from ui.qt_imports import (
     QWidget,
 )
 from utils.i18n import I18nQtManager
+from ui.base_widgets import (
+    BaseWidget,
+    I18nMixin,
+    ThemeMixin,
+    ErrorHandlerMixin,
+    connect_button_with_callback,
+)
 
 logger = logging.getLogger("echonote.ui.error_dialog")
 
@@ -88,7 +95,6 @@ class ErrorDialog(QDialog):
 
         # Create layout
         layout = QVBoxLayout(self)
-        layout.setSpacing(15)
 
         # Create error message label
         message_label = QLabel(self.error_message)
@@ -111,26 +117,26 @@ class ErrorDialog(QDialog):
             # Create show/hide details button
             self.details_button = QPushButton()
             self._update_details_button_text(False)
-            self.details_button.clicked.connect(self._toggle_details)
+            connect_button_with_callback(self.details_button, self._toggle_details)
 
             layout.addWidget(self.details_button)
             layout.addWidget(self.details_text)
 
         # Create button layout
-        button_layout = QHBoxLayout()
+        button_layout = create_hbox()
         button_layout.addStretch()
 
         # Create copy button if details are provided
         if self.error_details:
             self.copy_button = QPushButton()
             self._update_copy_button_text()
-            self.copy_button.clicked.connect(self._copy_to_clipboard)
+            connect_button_with_callback(self.copy_button, self._copy_to_clipboard)
             button_layout.addWidget(self.copy_button)
 
         # Create OK button
         self.ok_button = QPushButton()
         self._update_ok_button_text()
-        self.ok_button.clicked.connect(self.accept)
+        connect_button_with_callback(self.ok_button, self.accept)
         self.ok_button.setDefault(True)
         button_layout.addWidget(self.ok_button)
 
@@ -160,7 +166,7 @@ class ErrorDialog(QDialog):
         if self.i18n:
             self.copy_button.setText(self.i18n.t("common.copied"))
         else:
-            self.copy_button.setText("Copied!")
+            self.copy_button.setText(self.i18n.t("ui_strings.common.error_dialog.copied"))
 
         # Reset button text after 2 seconds
         QTimer.singleShot(2000, self._update_copy_button_text)

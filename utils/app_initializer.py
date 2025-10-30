@@ -24,13 +24,11 @@ import logging
 
 logger = logging.getLogger("echonote.app_initializer")
 
-
 def create_sync_scheduler(calendar_manager, sync_interval):
     """Create sync scheduler (for background initialization)."""
     from core.calendar.sync_scheduler import SyncScheduler
 
     return SyncScheduler(calendar_manager, sync_interval)
-
 
 def create_auto_task_scheduler(
     timeline_manager,
@@ -53,7 +51,6 @@ def create_auto_task_scheduler(
         settings_manager=settings_manager,
         i18n_manager=i18n_manager,
     )
-
 
 def create_resource_monitor_handlers(transcription_manager, i18n, logger):
     """Create handlers for resource monitor signals."""
@@ -95,7 +92,6 @@ def create_resource_monitor_handlers(transcription_manager, i18n, logger):
 
     return on_low_memory, on_resources_recovered
 
-
 def initialize_database(config, security_manager):
     """Initialize database connection with encryption if enabled."""
     from data.database.connection import DatabaseConnection
@@ -128,7 +124,6 @@ def initialize_database(config, security_manager):
         logger.info(f"Database schema version: {schema_version}")
 
     return db
-
 
 def initialize_speech_engine(config, model_manager):
     """Initialize speech engine with lazy loading."""
@@ -164,7 +159,6 @@ def initialize_speech_engine(config, model_manager):
 
     return speech_engine_loader
 
-
 def initialize_translation_engine(config):
     """Initialize translation engine with lazy loading."""
     from utils.startup_optimizer import LazyLoader
@@ -191,7 +185,6 @@ def initialize_translation_engine(config):
     logger.info("Translation engine configured (will load on first use)")
 
     return translation_engine_loader
-
 
 def initialize_calendar_adapters(config, oauth_manager):
     """Initialize calendar sync adapters."""
@@ -274,7 +267,6 @@ def initialize_calendar_adapters(config, oauth_manager):
 
     return sync_adapters
 
-
 def initialize_audio_capture():
     """Initialize audio capture with error handling."""
     from engines.audio.capture import AudioCapture
@@ -298,7 +290,6 @@ def initialize_audio_capture():
 
     return audio_capture
 
-
 class EngineProxy:
     """Proxy class for lazy-loaded engines."""
 
@@ -313,7 +304,6 @@ class EngineProxy:
             return self._loader.get() is not None
         except Exception:
             return False
-
 
 class TranslationEngineProxy(EngineProxy):
     """Proxy class specifically for translation engine."""

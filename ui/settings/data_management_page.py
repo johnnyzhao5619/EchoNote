@@ -22,7 +22,6 @@ Provides UI for managing user data, including cleanup functionality.
 import logging
 
 from PySide6.QtCore import Qt, QThread, Signal
-from PySide6.QtWidgets import (
     QGroupBox,
     QLabel,
     QMessageBox,
@@ -36,16 +35,13 @@ from utils.data_cleanup import DataCleanup
 
 logger = logging.getLogger(__name__)
 
-
 class CleanupWorker(QThread):
     """Worker thread for data cleanup operations."""
 
     finished = Signal(dict)  # Emits cleanup results
     error = Signal(str)  # Emits error message
 
-    def __init__(self, cleanup_manager: DataCleanup):
-        super().__init__()
-        self.cleanup_manager = cleanup_manager
+    def __init__(self, cleanup_manager: DataCleanup):        self.cleanup_manager = cleanup_manager
 
     def run(self):
         """Execute cleanup operation."""
@@ -55,7 +51,6 @@ class CleanupWorker(QThread):
         except Exception as e:
             logger.error(f"Cleanup worker error: {e}")
             self.error.emit(str(e))
-
 
 class DataManagementPage(BasePage):
     """
@@ -75,14 +70,14 @@ class DataManagementPage(BasePage):
             settings_manager: SettingsManager instance
             parent: Parent widget
         """
-        super().__init__(settings_manager, parent)
+        super().__init__(settings_manager, i18n)
         self.cleanup_manager = DataCleanup()
         self.cleanup_worker = None
         self._init_ui()
 
     def _init_ui(self):
         """Initialize the user interface."""
-        layout = QVBoxLayout()
+        layout = create_vbox()
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         # Page title
@@ -105,8 +100,8 @@ class DataManagementPage(BasePage):
 
     def _create_storage_summary_group(self) -> QGroupBox:
         """Create storage summary group."""
-        group = QGroupBox("Storage Summary")
-        layout = QVBoxLayout()
+        group = QGroupBox(self.i18n.t("settings.storage_summary"))
+        layout = create_vbox()
 
         # Summary labels
         self.database_label = QLabel(self.i18n.t("data_management.storage_labels.database"))
@@ -126,8 +121,8 @@ class DataManagementPage(BasePage):
         layout.addWidget(self.total_label)
 
         # Refresh button
-        refresh_btn = QPushButton("Refresh")
-        refresh_btn.clicked.connect(self._refresh_storage_summary)
+        refresh_btn = create_button("Refresh")
+        connect_button_with_callback(refresh_btn, self._refresh_storage_summary)
         layout.addWidget(refresh_btn)
 
         group.setLayout(layout)
@@ -139,8 +134,8 @@ class DataManagementPage(BasePage):
 
     def _create_cleanup_group(self) -> QGroupBox:
         """Create data cleanup group."""
-        group = QGroupBox("Data Cleanup")
-        layout = QVBoxLayout()
+        group = QGroupBox(self.i18n.t("settings.data_cleanup"))
+        layout = create_vbox()
 
         # Warning label
         warning = QLabel(
@@ -152,9 +147,9 @@ class DataManagementPage(BasePage):
         layout.addWidget(warning)
 
         # Clear all data button
-        clear_all_btn = QPushButton(self.i18n.t("data_management.clear_all"))
+        clear_all_btn = create_button(self.i18n.t("data_management.clear_all"))
         clear_all_btn.setProperty("role", "data-delete-all")
-        clear_all_btn.clicked.connect(self._confirm_clear_all_data)
+        connect_button_with_callback(clear_all_btn, self._confirm_clear_all_data)
         layout.addWidget(clear_all_btn)
 
         # Description
@@ -199,8 +194,7 @@ class DataManagementPage(BasePage):
 
         except Exception as e:
             logger.error(f"Failed to refresh storage summary: {e}")
-            QMessageBox.critical(
-                self, self.i18n.t("common.error"), f"Failed to calculate storage summary:\n{str(e)}"
+            self.show_error(self.i18n.t("common.error"), f"Failed to calculate storage summary:\n{str(e)}"
             )
 
     def _confirm_clear_all_data(self):
@@ -284,7 +278,9 @@ class DataManagementPage(BasePage):
             # Refresh summary
             self._refresh_storage_summary()
 
-            logger.info("Data cleanup completed successfully")
+            logger.info(
+                self.i18n.t("logging.settings.data_management_page.cleanup_completed_successfully")
+            )
         else:
             # Show error message
             error_details = "\n".join(results["errors"][:5])  # Show first 5 errors
@@ -317,8 +313,7 @@ class DataManagementPage(BasePage):
         """Handle cleanup error."""
         progress.close()
 
-        QMessageBox.critical(
-            self, "Cleanup Failed", f"An error occurred during cleanup:\n\n{error}"
+        self.show_error(self.i18n.t("dialogs.settings.data_management.cleanup_failed"), f"An error occurred during cleanup:\n\n{error}",
         )
 
         logger.error(f"Data cleanup failed: {error}")

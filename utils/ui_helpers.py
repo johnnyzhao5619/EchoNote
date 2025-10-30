@@ -28,7 +28,6 @@ from PySide6.QtWidgets import QFrame, QGraphicsOpacityEffect, QLabel, QWidget
 
 logger = logging.getLogger("echonote.utils.ui_helpers")
 
-
 class UIHelper:
     """
     Helper class for UI operations.
@@ -324,7 +323,6 @@ class UIHelper:
         widget.style().unpolish(widget)
         widget.style().polish(widget)
 
-
 def create_icon_button(icon_text: str, tooltip: str = ""):
     """
     Create an icon button with emoji or text.
@@ -350,7 +348,6 @@ def create_icon_button(icon_text: str, tooltip: str = ""):
 
     return button
 
-
 def create_badge(text: str, color: str = None) -> QLabel:
     """
     Create a badge label.
@@ -368,7 +365,6 @@ def create_badge(text: str, color: str = None) -> QLabel:
     badge.setFixedHeight(20)
 
     return badge
-
 
 def show_success_message(parent: QWidget, message: str, i18n=None):
     """
@@ -388,7 +384,6 @@ def show_success_message(parent: QWidget, message: str, i18n=None):
     msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
     msg_box.exec()
 
-
 def show_error_message(parent: QWidget, message: str, details: Optional[str] = None):
     """
     Show an error message to the user.
@@ -401,7 +396,6 @@ def show_error_message(parent: QWidget, message: str, details: Optional[str] = N
     from ui.common.error_dialog import show_error_dialog
 
     show_error_dialog("Error", message, details, parent=parent)
-
 
 def confirm_action(parent: QWidget, title: str, message: str) -> bool:
     """

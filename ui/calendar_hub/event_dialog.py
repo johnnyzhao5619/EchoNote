@@ -33,10 +33,15 @@ from PySide6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QLineEdit,
-    QMessageBox,
-    QPushButton,
     QTextEdit,
     QVBoxLayout,
+)
+
+from ui.base_widgets import (
+    create_button,
+    create_primary_button,
+    create_hbox,
+    connect_button_with_callback,
 )
 
 from utils.i18n import I18nQtManager
@@ -97,7 +102,6 @@ class EventDialog(QDialog):
 
         # Main layout
         layout = QVBoxLayout(self)
-        layout.setSpacing(15)
 
         # Create form
         form = self._create_form()
@@ -120,7 +124,6 @@ class EventDialog(QDialog):
             Form layout
         """
         form = QFormLayout()
-        form.setSpacing(10)
 
         # Title (required)
         self.title_input = QLineEdit()
@@ -202,7 +205,7 @@ class EventDialog(QDialog):
         Returns:
             Sync options group box
         """
-        group = QGroupBox("Sync to External Calendars")
+        group = QGroupBox(self.i18n.t("calendar_hub.sync_external_calendars"))
         layout = QVBoxLayout(group)
 
         # Create checkbox for each connected account
@@ -222,12 +225,12 @@ class EventDialog(QDialog):
         Returns:
             Buttons layout
         """
-        buttons_layout = QHBoxLayout()
+        buttons_layout = create_hbox()
         buttons_layout.addStretch()
 
         # Cancel button
-        cancel_btn = QPushButton(self.i18n.t("common.cancel"))
-        cancel_btn.clicked.connect(self.reject)
+        cancel_btn = create_button(self.i18n.t("common.cancel"))
+        connect_button_with_callback(cancel_btn, self.reject)
         buttons_layout.addWidget(cancel_btn)
 
         # Save button
@@ -236,9 +239,9 @@ class EventDialog(QDialog):
             if self.is_edit_mode
             else self.i18n.t("calendar_hub.create_event")
         )
-        save_btn = QPushButton(save_text)
-        save_btn.setObjectName("primary_button")
-        save_btn.clicked.connect(self._on_save_clicked)
+        save_btn = create_button(save_text)
+        save_btn = create_primary_button(save_btn.text())
+        connect_button_with_callback(save_btn, self._on_save_clicked)
         buttons_layout.addWidget(save_btn)
 
         return buttons_layout
@@ -318,8 +321,7 @@ class EventDialog(QDialog):
         """
         # Check required fields
         if not self.title_input.text().strip():
-            QMessageBox.warning(
-                self,
+            self.show_warning(
                 self.i18n.t("calendar_hub.event_dialog.validation_error"),
                 self.i18n.t("calendar_hub.event_dialog.title_required"),
             )
@@ -331,8 +333,7 @@ class EventDialog(QDialog):
         end_time = self.end_time_input.dateTime().toPyDateTime()
 
         if start_time >= end_time:
-            QMessageBox.warning(
-                self,
+            self.show_warning(
                 self.i18n.t("calendar_hub.event_dialog.validation_error"),
                 self.i18n.t("calendar_hub.event_dialog.end_after_start"),
             )
@@ -345,8 +346,7 @@ class EventDialog(QDialog):
             emails = [e.strip() for e in attendees_text.split(",")]
             for email in emails:
                 if email and "@" not in email:
-                    QMessageBox.warning(
-                        self,
+                    self.show_warning(
                         self.i18n.t("calendar_hub.event_dialog.validation_error"),
                         self.i18n.t("calendar_hub.event_dialog.invalid_email").format(email=email),
                     )

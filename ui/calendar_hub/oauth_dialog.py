@@ -34,13 +34,17 @@ from PySide6.QtWidgets import (
     QDialog,
     QHBoxLayout,
     QLabel,
-    QMessageBox,
     QProgressBar,
-    QPushButton,
     QTextEdit,
     QVBoxLayout,
 )
 
+from ui.base_widgets import (
+    create_button,
+    create_primary_button,
+    create_hbox,
+    connect_button_with_callback,
+)
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.oauth_dialog")
@@ -150,7 +154,9 @@ class OAuthDialog(QDialog):
         )
 
         if not state or not code_verifier:
-            raise ValueError("State and code_verifier must be provided for OAuth dialog")
+            raise ValueError(
+                self.i18n.t("exceptions.calendar_hub.state_and_code_verifier_required")
+            )
 
         self.expected_state = state
         self.code_verifier = code_verifier
@@ -186,7 +192,6 @@ class OAuthDialog(QDialog):
 
         # Main layout
         layout = QVBoxLayout(self)
-        layout.setSpacing(15)
 
         # Title
         title_label = QLabel(f"<h2>Connect {self.provider.capitalize()} Calendar</h2>")
@@ -248,17 +253,17 @@ class OAuthDialog(QDialog):
         Returns:
             Buttons layout
         """
-        buttons_layout = QHBoxLayout()
+        buttons_layout = create_hbox()
         buttons_layout.addStretch()
 
         # Cancel button
-        self.cancel_btn = QPushButton(self.i18n.t("common.cancel"))
+        self.cancel_btn = create_button(self.i18n.t("common.cancel"))
         self.cancel_btn.clicked.connect(self._on_cancel_clicked)
         buttons_layout.addWidget(self.cancel_btn)
 
         # Start authorization button
-        self.auth_btn = QPushButton(self.i18n.t("calendar_hub.oauth_dialog.start_authorization"))
-        self.auth_btn.setObjectName("primary_button")
+        self.auth_btn = create_button(self.i18n.t("calendar_hub.oauth_dialog.start_authorization"))
+        self.auth_btn = create_primary_button(self.auth_btn.text())
         self.auth_btn.clicked.connect(self._on_auth_clicked)
         buttons_layout.addWidget(self.auth_btn)
 
@@ -391,13 +396,15 @@ class OAuthDialog(QDialog):
                 port = redirect_parsed.port
             except ValueError:
                 logger.error("Invalid port detected in redirect URI: %s", redirect_uri)
-                raise ValueError("Invalid port specified in redirect URI.")
+                raise ValueError(
+                    self.i18n.t("exceptions.calendar_hub.invalid_port_in_redirect_uri")
+                )
 
             return host, port
 
         except ValueError as exc:
             logger.error("Failed to parse authorization redirect URI: %s", exc)
-            raise ValueError("Failed to parse redirect URI for callback port.")
+            raise ValueError(self.i18n.t("exceptions.calendar_hub.failed_to_parse_redirect_uri"))
 
         except Exception:
             logger.exception("Unexpected error while parsing redirect URI")
@@ -420,7 +427,11 @@ class OAuthDialog(QDialog):
                     port = redirect_parsed.port
                 except ValueError:
                     logger.error("Invalid port in configured redirect URI: %s", redirect_uri)
-                    raise ValueError("Invalid port specified in configured redirect URI.")
+                    raise ValueError(
+                        self.i18n.t(
+                            "exceptions.calendar_hub.invalid_port_in_configured_redirect_uri"
+                        )
+                    )
 
             config_port = config.get("calendar.oauth.callback_port")
             if config_port is not None:
@@ -569,9 +580,7 @@ class OAuthDialog(QDialog):
         Args:
             message: Error message
         """
-        QMessageBox.critical(
-            self, self.i18n.t("calendar_hub.oauth_dialog.authorization_error"), message
-        )
+        self.show_error(self.i18n.t("calendar_hub.oauth_dialog.authorization_error"), message)
 
     def closeEvent(self, event):
         """Handle dialog close event."""
@@ -622,7 +631,6 @@ class OAuthResultDialog(QDialog):
 
         # Main layout
         layout = QVBoxLayout(self)
-        layout.setSpacing(15)
 
         # Icon and message
         icon = "✓" if self.success else "✗"
@@ -638,6 +646,6 @@ class OAuthResultDialog(QDialog):
         layout.addWidget(message_label)
 
         # OK button
-        ok_btn = QPushButton(self.i18n.t("common.ok"))
-        ok_btn.clicked.connect(self.accept)
+        ok_btn = create_button(self.i18n.t("common.ok"))
+        connect_button_with_callback(ok_btn, self.accept)
         layout.addWidget(ok_btn)

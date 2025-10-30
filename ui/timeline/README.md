@@ -48,18 +48,48 @@ Event card component with different layouts for past and future events:
 
 ### 3. AudioPlayer (`audio_player.py`)
 
-Built-in audio player for recordings:
+Built-in audio player for recordings with modern, centered design:
 
-- **Playback controls** (play/pause)
+**Core Features:**
+
+- **Playback controls** (play/pause with large circular button)
 - **Progress slider** with seek functionality
-- **Volume control**
-- **Time display** (current/total)
-- **Error handling** for missing or unsupported files
+- **Volume control** with mute/unmute toggle
+- **Time display** (current/total in MM:SS format)
+- **Transcript display** (collapsible, auto-loads from .txt file)
+
+**Design Improvements (2025-10-28 Refactor):**
+
+- **Centered layout** with fixed-width control container for perfect alignment
+- **No hardcoded values** - all dimensions extracted as class constants
+- **Modular UI creation** - separate methods for each control section
+- **Enhanced volume control** - dynamic icon updates (🔊/🔉/🔇) based on volume level
+- **Smart transcript loading** - automatically finds and loads matching .txt file
+- **Three-theme support** - fully styled for dark, light, and high contrast themes
+
+**Error Handling:**
+
 - **Automatic reset on errors** so progress indicators clear and playback controls return to the initial state when decoding fails
 - **Immediate feedback** when recordings are missing so users understand the failure reason
-- **Instant translation refresh** when the application language changes
+- **Graceful degradation** when QtMultimedia components are unavailable
 
-Uses PySide6's QMediaPlayer and QAudioOutput.
+**Technical Details:**
+
+- Uses PySide6's QMediaPlayer and QAudioOutput
+- Implements proper state management with `_playback_state` and `_media_status`
+- Supports internationalization with dynamic translation updates
+- Clean resource management with `cleanup()` method
+
+**Constants:**
+
+- `DEFAULT_VOLUME = 70` - Default volume level (0-100)
+- `TRANSCRIPT_AREA_HEIGHT = 220` - Fixed height for transcript area
+- `CONTROLS_WIDTH = 400` - Total width of control bar
+- `PLAY_BUTTON_SIZE = 56` - Size of main play button
+- `CONTROL_BUTTON_SIZE = 40` - Size of secondary control buttons
+- `VOLUME_SLIDER_WIDTH = 100` - Width of volume slider
+
+For detailed refactoring information, see `AUDIO_PLAYER_REFACTOR.md`.
 
 > ℹ️ If QtMultimedia components are unavailable (e.g., package not installed),
 > the timeline continues to load events, but playback controls are disabled and

@@ -24,24 +24,32 @@ import logging
 import re
 from typing import List, Optional
 
-from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QTextCursor, QTextDocument
-from PySide6.QtWidgets import (
+from ui.qt_imports import (
     QCheckBox,
+    QColor,
     QHBoxLayout,
     QLabel,
     QLineEdit,
-    QPushButton,
+    Qt,
+    QTextCursor,
+    QTextDocument,
     QTextEdit,
+    QTimer,
     QWidget,
+    Signal,
+)
+from ui.signal_helpers import (
+    connect_button_with_callback,
+    connect_text_changed,
 )
 
+from ui.base_widgets import BaseWidget, create_button
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.search_widget")
 
 
-class SearchWidget(QWidget):
+class SearchWidget(BaseWidget):
     """
     Search widget for finding and highlighting text in QTextEdit.
 
@@ -92,7 +100,17 @@ class SearchWidget(QWidget):
         self._search_timer = QTimer()
         self._search_timer.setSingleShot(True)
         self._search_timer.timeout.connect(self._perform_search)
-        self._search_delay_ms = 300  # 300ms debounce
+        # Get debounce delay from constants or settings
+        from ui.constants import SEARCH_DEBOUNCE_DELAY_MS
+
+        # Get debounce delay from settings or use default
+        if self.settings_manager:
+            self._search_delay_ms = (
+                self.settings_manager.get_setting("ui.search_debounce_ms")
+                or SEARCH_DEBOUNCE_DELAY_MS
+            )
+        else:
+            self._search_delay_ms = SEARCH_DEBOUNCE_DELAY_MS
 
         # Initialize UI
         self._init_ui()
@@ -115,8 +133,7 @@ class SearchWidget(QWidget):
 
         # Main layout
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(20, 8, 20, 8)
-        layout.setSpacing(10)
+        # # layout.setSpacing(10)
 
         # Search input
         self.search_input = QLineEdit()
@@ -128,7 +145,7 @@ class SearchWidget(QWidget):
         self.search_input.setMinimumWidth(SEARCH_INPUT_MIN_WIDTH)
 
         # Connect search input signals
-        self.search_input.textChanged.connect(self._on_search_text_changed)
+        connect_text_changed(self.search_input, self._on_search_text_changed)
         self.search_input.returnPressed.connect(self.find_next)
 
         layout.addWidget(self.search_input)
@@ -140,21 +157,21 @@ class SearchWidget(QWidget):
         layout.addWidget(self.case_sensitive_checkbox)
 
         # Previous button
-        self.prev_button = QPushButton("↑")
+        self.prev_button = create_button("↑")
         self.prev_button.setObjectName("prev_button")
         from ui.constants import BUTTON_FIXED_WIDTH_LARGE
 
         self.prev_button.setFixedWidth(BUTTON_FIXED_WIDTH_LARGE)
         self.prev_button.setToolTip(self.i18n.t("search.previous"))
-        self.prev_button.clicked.connect(self.find_previous)
+        connect_button_with_callback(self.prev_button, self.find_previous)
         layout.addWidget(self.prev_button)
 
         # Next button
-        self.next_button = QPushButton("↓")
+        self.next_button = create_button("↓")
         self.next_button.setObjectName("next_button")
         self.next_button.setFixedWidth(BUTTON_FIXED_WIDTH_LARGE)
         self.next_button.setToolTip(self.i18n.t("search.next"))
-        self.next_button.clicked.connect(self.find_next)
+        connect_button_with_callback(self.next_button, self.find_next)
         layout.addWidget(self.next_button)
 
         # Match count label
@@ -164,13 +181,13 @@ class SearchWidget(QWidget):
         layout.addWidget(self.match_label)
 
         # Close button
-        self.close_button = QPushButton("×")
+        self.close_button = create_button("×")
         self.close_button.setObjectName("close_button")
         from ui.constants import BUTTON_FIXED_WIDTH_MEDIUM
 
         self.close_button.setFixedWidth(BUTTON_FIXED_WIDTH_MEDIUM)
         self.close_button.setToolTip(self.i18n.t("search.close"))
-        self.close_button.clicked.connect(self._on_close_clicked)
+        connect_button_with_callback(self.close_button, self._on_close_clicked)
         layout.addWidget(self.close_button)
 
         layout.addStretch()
@@ -284,8 +301,9 @@ class SearchWidget(QWidget):
         # Use optimized regex search for large documents
         content = self.text_edit.toPlainText()
 
-        # For very large documents (> 50K chars), use regex
-        if len(content) > 50000:
+        # For very large documents, use regex for better performance
+        LARGE_DOCUMENT_THRESHOLD = 50000
+        if len(content) > LARGE_DOCUMENT_THRESHOLD:
             self.matches = self._regex_search(query, content, case_sensitive)
         else:
             # For smaller documents, use Qt's built-in search

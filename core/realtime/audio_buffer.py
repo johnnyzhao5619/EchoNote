@@ -28,7 +28,6 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-
 class AudioBuffer:
     """音频缓冲区，支持滑动窗口访问"""
 

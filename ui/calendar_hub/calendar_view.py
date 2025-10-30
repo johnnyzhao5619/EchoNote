@@ -33,6 +33,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.base_widgets import BaseWidget
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.calendar_view")
@@ -45,17 +46,16 @@ class EventCard(QFrame):
 
     clicked = Signal(str)  # event_id
 
-    def __init__(self, event: Any, parent: Optional[QWidget] = None):
+    def __init__(self, calendar_event: Any, parent: Optional[QWidget] = None):
         """
         Initialize event card.
 
         Args:
-            event: CalendarEvent instance
+            calendar_event: CalendarEvent instance
             parent: Parent widget
         """
         super().__init__(parent)
-
-        self.event = event
+        self.calendar_event = calendar_event
 
         self.setup_ui()
 
@@ -67,26 +67,25 @@ class EventCard(QFrame):
 
         # Set semantic properties for theming
         self.setProperty("role", "event-card")
-        self.setProperty("source", self.event.source)
+        self.setProperty("source", self.calendar_event.source)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(4, 4, 4, 4)
-        layout.setSpacing(2)
+        # # layout.setSpacing(2)
 
         # Event title
-        title_label = QLabel(self.event.title)
+        title_label = QLabel(self.calendar_event.title)
         title_label.setWordWrap(True)
         title_label.setProperty("role", "event-title")
         layout.addWidget(title_label)
 
         # Event time
         # Parse datetime if it's a string
-        if isinstance(self.event.start_time, str):
-            start_dt = datetime.fromisoformat(self.event.start_time)
-            end_dt = datetime.fromisoformat(self.event.end_time)
+        if isinstance(self.calendar_event.start_time, str):
+            start_dt = datetime.fromisoformat(self.calendar_event.start_time)
+            end_dt = datetime.fromisoformat(self.calendar_event.end_time)
         else:
-            start_dt = self.event.start_time
-            end_dt = self.event.end_time
+            start_dt = self.calendar_event.start_time
+            end_dt = self.calendar_event.end_time
 
         start_time = start_dt.strftime("%H:%M")
         end_time = end_dt.strftime("%H:%M")
@@ -94,13 +93,13 @@ class EventCard(QFrame):
         time_label.setProperty("role", "event-time")
         layout.addWidget(time_label)
 
-    def mousePressEvent(self, event):
+    def mousePressEvent(self, mouse_event):
         """Handle mouse press event."""
-        self.clicked.emit(self.event.id)
-        super().mousePressEvent(event)
+        self.clicked.emit(self.calendar_event.id)
+        super().mousePressEvent(mouse_event)
 
 
-class MonthView(QWidget):
+class MonthView(BaseWidget):
     """
     Month calendar view.
     """
@@ -118,7 +117,6 @@ class MonthView(QWidget):
             parent: Parent widget
         """
         super().__init__(parent)
-
         self.calendar_manager = calendar_manager
         self.i18n = i18n
 
@@ -133,8 +131,7 @@ class MonthView(QWidget):
     def setup_ui(self):
         """Set up month view UI."""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(10)
+        # # layout.setSpacing(10)
 
         # Month/year header
         self.header_label = QLabel()
@@ -192,17 +189,17 @@ class MonthView(QWidget):
 
         # Group events by day
         events_by_day: Dict[int, List[Any]] = {}
-        for event in events:
+        for calendar_event in events:
             # Parse start_time if it's a string
-            if isinstance(event.start_time, str):
-                start_dt = datetime.fromisoformat(event.start_time)
+            if isinstance(calendar_event.start_time, str):
+                start_dt = datetime.fromisoformat(calendar_event.start_time)
             else:
-                start_dt = event.start_time
+                start_dt = calendar_event.start_time
 
             day = start_dt.day
             if day not in events_by_day:
                 events_by_day[day] = []
-            events_by_day[day].append(event)
+            events_by_day[day].append(calendar_event)
 
         # Create calendar cells
         row = 1
@@ -236,8 +233,7 @@ class MonthView(QWidget):
         cell.setMinimumHeight(80)
 
         layout = QVBoxLayout(cell)
-        layout.setContentsMargins(4, 4, 4, 4)
-        layout.setSpacing(2)
+        # # layout.setSpacing(2)
 
         # Day number
         day_label = QLabel(str(day))
@@ -245,10 +241,10 @@ class MonthView(QWidget):
         layout.addWidget(day_label)
 
         # Event indicators (show up to 3 events)
-        for event in events[:3]:
+        for calendar_event in events[:3]:
             indicator = QLabel("●")
             indicator.setProperty("role", "event-indicator")
-            indicator.setProperty("source", event.source)
+            indicator.setProperty("source", calendar_event.source)
             layout.addWidget(indicator)
 
         # Show "+N more" if there are more events
@@ -311,7 +307,7 @@ class MonthView(QWidget):
         self.set_date(datetime.now())
 
 
-class WeekView(QWidget):
+class WeekView(BaseWidget):
     """
     Week calendar view.
     """
@@ -328,8 +324,7 @@ class WeekView(QWidget):
             i18n: Internationalization manager
             parent: Parent widget
         """
-        super().__init__(parent)
-
+        super().__init__(i18n, parent)
         self.calendar_manager = calendar_manager
         self.i18n = i18n
 
@@ -344,8 +339,7 @@ class WeekView(QWidget):
     def setup_ui(self):
         """Set up week view UI."""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(10)
+        # # layout.setSpacing(10)
 
         # Week header
         self.header_label = QLabel()
@@ -400,17 +394,17 @@ class WeekView(QWidget):
 
         # Group events by day
         events_by_day: Dict[int, List[Any]] = {}
-        for event in events:
+        for calendar_event in events:
             # Parse start_time if it's a string
-            if isinstance(event.start_time, str):
-                start_dt = datetime.fromisoformat(event.start_time)
+            if isinstance(calendar_event.start_time, str):
+                start_dt = datetime.fromisoformat(calendar_event.start_time)
             else:
-                start_dt = event.start_time
+                start_dt = calendar_event.start_time
 
             weekday = start_dt.weekday()
             if weekday not in events_by_day:
                 events_by_day[weekday] = []
-            events_by_day[weekday].append(event)
+            events_by_day[weekday].append(calendar_event)
 
         # Create day columns
         for col in range(7):
@@ -430,8 +424,7 @@ class WeekView(QWidget):
         """
         column = QWidget()
         layout = QVBoxLayout(column)
-        layout.setContentsMargins(4, 4, 4, 4)
-        layout.setSpacing(4)
+        # # layout.setSpacing(4)
 
         # Sort events by start time
         def get_start_time(e):
@@ -442,8 +435,8 @@ class WeekView(QWidget):
         sorted_events = sorted(events, key=get_start_time)
 
         # Add event cards
-        for event in sorted_events:
-            card = EventCard(event)
+        for calendar_event in sorted_events:
+            card = EventCard(calendar_event)
             card.clicked.connect(self.event_clicked.emit)
             layout.addWidget(card)
 
@@ -495,7 +488,7 @@ class WeekView(QWidget):
         self.set_date(datetime.now())
 
 
-class DayView(QWidget):
+class DayView(BaseWidget):
     """
     Day calendar view.
     """
@@ -512,8 +505,7 @@ class DayView(QWidget):
             i18n: Internationalization manager
             parent: Parent widget
         """
-        super().__init__(parent)
-
+        super().__init__(i18n, parent)
         self.calendar_manager = calendar_manager
         self.i18n = i18n
 
@@ -528,8 +520,7 @@ class DayView(QWidget):
     def setup_ui(self):
         """Set up day view UI."""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(10)
+        # # layout.setSpacing(10)
 
         # Day header
         self.header_label = QLabel()
@@ -579,8 +570,8 @@ class DayView(QWidget):
 
         # Add event cards
         if sorted_events:
-            for event in sorted_events:
-                card = EventCard(event)
+            for calendar_event in sorted_events:
+                card = EventCard(calendar_event)
                 card.clicked.connect(self.event_clicked.emit)
                 self.events_layout.addWidget(card)
         else:

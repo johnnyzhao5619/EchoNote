@@ -93,6 +93,31 @@ Released under the [Apache 2.0 License](LICENSE).
 3. Run `python main.py`
 4. On first launch complete the guided setup (storage paths, FFmpeg check, model download recommendation).
 
+#### Model Management
+
+EchoNote uses Faster-Whisper models for speech recognition. Before using transcription features:
+
+1. **Download a model**:
+
+   - Open Settings > Model Management
+   - Choose a model based on your needs:
+     - `tiny`: Fastest, lower accuracy (~75MB)
+     - `base`: Balanced speed and accuracy (~142MB) - **Recommended for most users**
+     - `small`: Slower, higher accuracy (~462MB)
+     - `medium/large`: Slowest, highest accuracy (1.5-3GB)
+   - Click "Download" and wait for completion
+
+2. **Select the model**:
+
+   - Open Settings > Transcription
+   - Select your downloaded model from the "Default Model" dropdown
+   - Click "Save"
+
+3. **Troubleshooting**:
+   - If you see "Model not downloaded" errors, ensure at least one model is downloaded
+   - The application will automatically use any available downloaded model as fallback
+   - For detailed troubleshooting, see `docs/TROUBLESHOOTING.md`
+
 #### Feature Highlights
 
 1. **Batch Transcription** – `core/transcription` coordinates Faster-Whisper engines, resumable queues, and export formatting.
@@ -148,6 +173,38 @@ Released under the [Apache 2.0 License](LICENSE).
 - **运行原则**：隐私优先、加密持久化、主动的资源诊断
 
 #### 快速启动清单
+
+1. 创建并激活虚拟环境
+2. `pip install -r requirements.txt`（安装 `requests>=2.31.0` 以支持模型下载；离线环境请提前下载 wheel 文件）
+3. 运行 `python main.py`
+4. 首次启动时完成引导设置（存储路径、FFmpeg 检查、模型下载推荐）
+
+#### 模型管理
+
+EchoNote 使用 Faster-Whisper 模型进行语音识别。使用转录功能前：
+
+1. **下载模型**：
+
+   - 打开 设置 > 模型管理
+   - 根据需求选择模型：
+     - `tiny`: 最快，准确度较低（~75MB）
+     - `base`: 速度和准确度平衡（~142MB）- **推荐大多数用户使用**
+     - `small`: 较慢，准确度高（~462MB）
+     - `medium/large`: 最慢，准确度最高（1.5-3GB）
+   - 点击"下载"并等待完成
+
+2. **选择模型**：
+
+   - 打开 设置 > 转录
+   - 从"默认模型"下拉菜单中选择已下载的模型
+   - 点击"保存"
+
+3. **故障排查**：
+   - 如果看到"模型未下载"错误，请确保至少下载了一个模型
+   - 应用程序会自动使用任何可用的已下载模型作为备选
+   - 详细的故障排查请参见 `docs/TROUBLESHOOTING.md`
+
+#### 快速启动清单（续）
 
 1. 创建并激活虚拟环境。
 2. 执行 `pip install -r requirements.txt` 安装依赖（其中包含 `requests>=2.31.0`，用于模型下载；离线环境需提前准备相应的 wheel 包）。
@@ -260,3 +317,17 @@ Released under the [Apache 2.0 License](LICENSE).
 - Démarrage rapide : `docs/quick-start/README.md`
 - Présentation du projet : `docs/project-overview/README.md`
 - Ressources développeur : `docs/DEVELOPER_GUIDE.md`, `docs/API_REFERENCE.md`
+
+## Code Quality Improvements
+
+This project has undergone comprehensive code quality improvements:
+
+- ✅ **Internationalization**: All user-visible strings are properly internationalized
+- ✅ **Code Deduplication**: Removed duplicate code patterns and created reusable components
+- ✅ **Clean Code**: Removed obsolete code, unused imports, and temporary files
+- ✅ **Error Handling**: Standardized error handling across all components
+- ✅ **UI Components**: Refactored to use consistent base classes and helper functions
+
+### Quality Metrics
+
+Run `python scripts/code_quality_analyzer.py` to see current quality metrics.
