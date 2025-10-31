@@ -6,7 +6,7 @@
   <img src="https://img.shields.io/badge/Desktop-Local%20First-0EA5E9.svg" alt="Desktop local-first badge">
 </p>
 
-> 📢 v1.1.0 正式发布，完整变更可查阅 [CHANGELOG](docs/CHANGELOG.md#v110---2025-10-26)。
+> 📢 v1.1.1 维护版本发布，项目清理和文档重组完成。完整变更可查阅 [CHANGELOG](docs/CHANGELOG.md#v111---2025-10-31)。
 
 ## 🌐 Language Overview
 
@@ -86,6 +86,7 @@ Released under the [Apache 2.0 License](LICENSE).
 - **Framework**: PySide6 entry point in `main.py`
 - **Core Domains**: batch/real-time transcription, calendar sync, task automation, settings management
 - **Operating Principles**: privacy-first, encrypted persistence, proactive resource checks
+- **Project Status**: Production-ready with clean, maintainable structure (v1.1.1)
 
 #### Quick Start Checklist
 
@@ -145,6 +146,7 @@ EchoNote uses Faster-Whisper models for speech recognition:
 - Quick start: `docs/quick-start/README.md`
 - Project overview: `docs/project-overview/README.md`
 - Developer resources: `docs/DEVELOPER_GUIDE.md`, `docs/API_REFERENCE.md`
+- Project status: `docs/PROJECT_STATUS.md` - Current metrics, roadmap, and maintenance history
 
 ---
 
@@ -155,6 +157,7 @@ EchoNote uses Faster-Whisper models for speech recognition:
 - **框架**：PySide6 桌面应用，入口位于 `main.py`
 - **核心领域**：批量/实时转录、日历同步、自动任务、设置管理
 - **运行原则**：隐私优先、加密持久化、主动的资源诊断
+- **项目状态**：生产就绪，结构清晰易维护 (v1.1.1)
 
 #### 快速启动清单
 
@@ -239,6 +242,7 @@ EchoNote 使用 Faster-Whisper 模型进行语音识别。使用转录功能前�
 - 快速入门：`docs/quick-start/README.md`
 - 项目说明：`docs/project-overview/README.md`
 - 开发者参考：`docs/DEVELOPER_GUIDE.md`、`docs/API_REFERENCE.md`
+- 项目状态：`docs/PROJECT_STATUS.md` - 当前指标、路线图和维护历史
 
 ---
 
@@ -249,6 +253,7 @@ EchoNote 使用 Faster-Whisper 模型进行语音识别。使用转录功能前�
 - **Cadre** : application PySide6 dont le point d’entrée est `main.py`
 - **Domaines clés** : transcription batch/temps réel, synchronisation calendrier, automatisation des tâches, gestion des paramètres
 - **Principes opérationnels** : confidentialité par défaut, persistance chiffrée, surveillance proactive des ressources
+- **Statut du projet** : Prêt pour la production avec une structure claire et maintenable (v1.1.1)
 
 #### Démarrage rapide
 
@@ -301,13 +306,14 @@ EchoNote 使用 Faster-Whisper 模型进行语音识别。使用转录功能前�
 - Démarrage rapide : `docs/quick-start/README.md`
 - Présentation du projet : `docs/project-overview/README.md`
 - Ressources développeur : `docs/DEVELOPER_GUIDE.md`, `docs/API_REFERENCE.md`
+- Statut du projet : `docs/PROJECT_STATUS.md` - Métriques actuelles, feuille de route et historique de maintenance
 
 ## Project Status
 
-- **Version**: v1.1.0 (Production Ready)
+- **Version**: v1.1.1 (Latest maintenance release)
 - **Test Coverage**: 607 tests, 100% pass rate
 - **Code Quality**: Excellent (PEP 8 compliant, type-annotated)
-- **Documentation**: Complete (user guides, API reference, developer docs)
+- **Documentation**: Complete and restructured (user guides, API reference, developer docs)
 - **Project Structure**: Clean and maintainable (88% reduction in temporary files)
-- **Version**: v1.1.1 (Latest maintenance release)
+- **Maintenance**: Comprehensive cleanup completed (60 files removed, 8 core scripts retained)
 - **License**: Apache 2.0 (fully compliant)
