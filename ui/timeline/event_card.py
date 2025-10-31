@@ -38,7 +38,7 @@ from PySide6.QtWidgets import (
 )
 
 from core.timeline.manager import to_local_naive
-from ui.base_widgets import create_vbox, create_hbox, create_button
+from ui.base_widgets import create_button, create_hbox, create_vbox
 from utils.i18n import LANGUAGE_OPTION_KEYS, I18nQtManager
 
 logger = logging.getLogger("echonote.ui.timeline.event_card")

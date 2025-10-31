@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 
-from core.transcription.manager import TranscriptionManager, TaskNotFoundError
+from core.transcription.manager import TaskNotFoundError, TranscriptionManager
 from data.database.models import TranscriptionTask
 
 
@@ -38,7 +38,7 @@ class MockDatabaseConnection:
                     count = sum(1 for t in self.tasks.values() if t.get("status") == status)
                     return [{"count": count}]
                 return [{"count": len(self.tasks)}]
-            
+
             if "WHERE id = ?" in query and params:
                 task_id = params[0]
                 if task_id in self.tasks:
@@ -389,7 +389,7 @@ class TestTranscriptionManager:
     def test_pause_and_resume_processing(self, manager):
         """Test pausing and resuming task processing."""
         import time
-        
+
         manager.start_processing()
         time.sleep(0.1)  # Give time for thread to start
 
@@ -456,6 +456,7 @@ class TestTranscriptionManager:
 
     def test_manager_with_i18n(self, mock_db, mock_engine):
         """Test manager with i18n support."""
+
         class MockI18n:
             def t(self, key, **kwargs):
                 return f"translated_{key}"

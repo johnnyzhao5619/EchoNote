@@ -26,6 +26,7 @@ from typing import Optional, Tuple
 
 logger = logging.getLogger("echonote.utils.ffmpeg_checker")
 
+
 class FFmpegChecker:
     """
     Utility class to check ffmpeg/ffprobe availability.
@@ -366,8 +367,10 @@ class FFmpegChecker:
 
             return False
 
+
 # Global instance
 _checker = None
+
 
 def get_ffmpeg_checker() -> FFmpegChecker:
     """

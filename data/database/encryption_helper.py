@@ -26,6 +26,7 @@ from data.security.encryption import SecurityManager
 
 logger = logging.getLogger("echonote.database.encryption")
 
+
 class DatabaseEncryptionHelper:
     """
     Helper class for encrypting/decrypting sensitive database fields.
@@ -107,8 +108,10 @@ class DatabaseEncryptionHelper:
         except Exception:
             return False
 
+
 # Global instance (will be initialized by main.py)
 _encryption_helper: Optional[DatabaseEncryptionHelper] = None
+
 
 def initialize_encryption_helper(security_manager: SecurityManager):
     """
@@ -121,6 +124,7 @@ def initialize_encryption_helper(security_manager: SecurityManager):
     _encryption_helper = DatabaseEncryptionHelper(security_manager)
     logger.info("Global database encryption helper initialized")
 
+
 def get_encryption_helper() -> Optional[DatabaseEncryptionHelper]:
     """
     Get the global encryption helper instance.
@@ -129,6 +133,7 @@ def get_encryption_helper() -> Optional[DatabaseEncryptionHelper]:
         DatabaseEncryptionHelper instance or None if not initialized
     """
     return _encryption_helper
+
 
 def encrypt_sensitive_field(value: Optional[str]) -> Optional[str]:
     """
@@ -146,6 +151,7 @@ def encrypt_sensitive_field(value: Optional[str]) -> Optional[str]:
     else:
         logger.warning("Encryption helper not initialized, returning plain value")
         return value
+
 
 def decrypt_sensitive_field(encrypted_value: Optional[str]) -> Optional[str]:
     """

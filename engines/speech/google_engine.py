@@ -38,6 +38,7 @@ from engines.speech.base import (
 
 logger = logging.getLogger(__name__)
 
+
 class GoogleEngine(SpeechEngine):
     """Google Speech-to-Text 引擎"""
 

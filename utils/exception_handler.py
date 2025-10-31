@@ -28,10 +28,12 @@ from utils.error_handler import ErrorHandler
 # Global logger for exception hook
 _logger: Optional[object] = None
 
+
 def set_global_logger(logger):
     """Set the global logger for exception handling."""
     global _logger
     _logger = logger
+
 
 def exception_hook(exctype, value, tb):
     """
@@ -82,6 +84,7 @@ def exception_hook(exctype, value, tb):
         # If dialog fails, just print to stderr
         print(f"Failed to show error dialog: {dialog_error}", file=sys.stderr)
         print(f"Original error:\n{error_msg}", file=sys.stderr)
+
 
 def install_exception_hook(logger):
     """Install the global exception hook with the given logger."""

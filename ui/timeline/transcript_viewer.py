@@ -35,7 +35,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ui.base_widgets import BaseWidget, create_hbox, create_button, connect_button_with_callback
+from ui.base_widgets import BaseWidget, connect_button_with_callback, create_button, create_hbox
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.timeline.transcript_viewer")

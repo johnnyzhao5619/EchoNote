@@ -30,6 +30,7 @@ from engines.calendar_sync.base import (
 
 logger = logging.getLogger("echonote.calendar_sync.google")
 
+
 class GoogleCalendarAdapter(OAuthCalendarAdapter):
     """Google Calendar synchronization adapter."""
 

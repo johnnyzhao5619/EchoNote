@@ -37,7 +37,7 @@ from PySide6.QtWidgets import (
 )
 
 from core.models.registry import get_default_model_names
-from ui.base_widgets import create_hbox, create_vbox, create_button
+from ui.base_widgets import create_button, create_hbox, create_vbox
 from ui.settings.base_page import BaseSettingsPage
 from utils.i18n import I18nQtManager
 

@@ -19,6 +19,7 @@ from build_config import (
     get_pyinstaller_args,
 )
 
+
 def create_version_info():
     """Create version info file for Windows executable."""
     version_content = f"""VSVersionInfo(
@@ -40,6 +41,7 @@ def create_version_info():
         f.write(version_content)
     return version_file
 
+
 def build_executable():
     """Build the executable using PyInstaller."""
     create_version_info()
@@ -50,6 +52,7 @@ def build_executable():
     if result.returncode != 0:
         sys.exit(1)
 
+
 def create_zip():
     """Create ZIP distribution."""
     app_dir = DIST_DIR / APP_NAME
@@ -58,6 +61,7 @@ def create_zip():
 
     zip_path = DIST_DIR / "echonote-windows-x64"
     shutil.make_archive(str(zip_path), "zip", str(DIST_DIR), APP_NAME)
+
 
 def main():
     """Main build function."""
@@ -68,6 +72,7 @@ def main():
     create_zip()
 
     print(f"✅ Windows build completed: {DIST_DIR}")
+
 
 if __name__ == "__main__":
     main()

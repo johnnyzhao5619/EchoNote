@@ -9,7 +9,7 @@ of recordings, and error handling.
 import asyncio
 import time
 from datetime import datetime, timedelta
-from unittest.mock import Mock, MagicMock, patch, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 
@@ -36,7 +36,7 @@ class MockTimelineManager:
                 event_start = datetime.fromisoformat(event.start_time).replace(tzinfo=None)
             else:
                 event_start = event.start_time.replace(tzinfo=None)
-            
+
             if isinstance(event.end_time, str):
                 event_end = datetime.fromisoformat(event.end_time).replace(tzinfo=None)
             else:
@@ -54,10 +54,12 @@ class MockTimelineManager:
 
     def add_event(self, event, auto_tasks):
         """Add event to mock timeline."""
-        self.events.append({
-            "event": event,
-            "auto_tasks": auto_tasks,
-        })
+        self.events.append(
+            {
+                "event": event,
+                "auto_tasks": auto_tasks,
+            }
+        )
 
 
 class MockRealtimeRecorder:
@@ -71,11 +73,13 @@ class MockRealtimeRecorder:
 
     async def start_recording(self, input_source=None, options=None, event_loop=None):
         """Mock start recording."""
-        self.start_calls.append({
-            "input_source": input_source,
-            "options": options,
-            "event_loop": event_loop,
-        })
+        self.start_calls.append(
+            {
+                "input_source": input_source,
+                "options": options,
+                "event_loop": event_loop,
+            }
+        )
         self.is_recording = True
         # Simulate async operation
         await asyncio.sleep(0.01)
@@ -101,35 +105,43 @@ class MockNotificationManager:
 
     def send_info(self, title, message):
         """Mock send info notification."""
-        self.notifications.append({
-            "type": "info",
-            "title": title,
-            "message": message,
-        })
+        self.notifications.append(
+            {
+                "type": "info",
+                "title": title,
+                "message": message,
+            }
+        )
 
     def send_success(self, title, message):
         """Mock send success notification."""
-        self.notifications.append({
-            "type": "success",
-            "title": title,
-            "message": message,
-        })
+        self.notifications.append(
+            {
+                "type": "success",
+                "title": title,
+                "message": message,
+            }
+        )
 
     def send_warning(self, title, message):
         """Mock send warning notification."""
-        self.notifications.append({
-            "type": "warning",
-            "title": title,
-            "message": message,
-        })
+        self.notifications.append(
+            {
+                "type": "warning",
+                "title": title,
+                "message": message,
+            }
+        )
 
     def send_error(self, title, message):
         """Mock send error notification."""
-        self.notifications.append({
-            "type": "error",
-            "title": title,
-            "message": message,
-        })
+        self.notifications.append(
+            {
+                "type": "error",
+                "title": title,
+                "message": message,
+            }
+        )
 
 
 @pytest.fixture
@@ -161,10 +173,12 @@ def mock_settings_manager():
     """Create mock settings manager."""
     manager = Mock()
     manager.get_language = Mock(return_value="en_US")
-    manager.get_realtime_preferences = Mock(return_value={
-        "recording_format": "wav",
-        "auto_save": True,
-    })
+    manager.get_realtime_preferences = Mock(
+        return_value={
+            "recording_format": "wav",
+            "auto_save": True,
+        }
+    )
     manager.setting_changed = Mock()
     manager.setting_changed.connect = Mock()
     return manager
@@ -186,7 +200,10 @@ def auto_task_scheduler(
     mock_notification_manager,
 ):
     """Create AutoTaskScheduler instance."""
-    with patch("core.timeline.auto_task_scheduler.get_notification_manager", return_value=mock_notification_manager):
+    with patch(
+        "core.timeline.auto_task_scheduler.get_notification_manager",
+        return_value=mock_notification_manager,
+    ):
         scheduler = AutoTaskScheduler(
             timeline_manager=mock_timeline_manager,
             realtime_recorder=mock_realtime_recorder,
@@ -232,7 +249,10 @@ class TestAutoTaskSchedulerInitialization:
         mock_notification_manager,
     ):
         """Test initialization with default reminder minutes."""
-        with patch("core.timeline.auto_task_scheduler.get_notification_manager", return_value=mock_notification_manager):
+        with patch(
+            "core.timeline.auto_task_scheduler.get_notification_manager",
+            return_value=mock_notification_manager,
+        ):
             scheduler = AutoTaskScheduler(
                 timeline_manager=mock_timeline_manager,
                 realtime_recorder=mock_realtime_recorder,
@@ -254,7 +274,10 @@ class TestAutoTaskSchedulerInitialization:
         mock_notification_manager,
     ):
         """Test initialization with custom reminder minutes."""
-        with patch("core.timeline.auto_task_scheduler.get_notification_manager", return_value=mock_notification_manager):
+        with patch(
+            "core.timeline.auto_task_scheduler.get_notification_manager",
+            return_value=mock_notification_manager,
+        ):
             scheduler = AutoTaskScheduler(
                 timeline_manager=mock_timeline_manager,
                 realtime_recorder=mock_realtime_recorder,
@@ -273,7 +296,10 @@ class TestAutoTaskSchedulerInitialization:
         mock_notification_manager,
     ):
         """Test that negative reminder minutes are clamped to zero."""
-        with patch("core.timeline.auto_task_scheduler.get_notification_manager", return_value=mock_notification_manager):
+        with patch(
+            "core.timeline.auto_task_scheduler.get_notification_manager",
+            return_value=mock_notification_manager,
+        ):
             scheduler = AutoTaskScheduler(
                 timeline_manager=mock_timeline_manager,
                 realtime_recorder=mock_realtime_recorder,
@@ -388,9 +414,7 @@ class TestReminderNotifications:
         # Create event starting in exactly 5 minutes (within the 5:00-5:01 window)
         # Use a fixed time to avoid timing issues
         now = datetime.now()
-        event = create_test_event(
-            start_time=now + timedelta(minutes=5, seconds=15)
-        )
+        event = create_test_event(start_time=now + timedelta(minutes=5, seconds=15))
 
         auto_tasks = {
             "enable_transcription": True,
@@ -422,9 +446,7 @@ class TestReminderNotifications:
     ):
         """Test that reminder is not sent twice for same event."""
         now = datetime.now()
-        event = create_test_event(
-            start_time=now + timedelta(minutes=5, seconds=15)
-        )
+        event = create_test_event(start_time=now + timedelta(minutes=5, seconds=15))
 
         auto_tasks = {
             "enable_transcription": True,
@@ -456,9 +478,7 @@ class TestReminderNotifications:
         mock_notification_manager,
     ):
         """Test that no reminder is sent for events without auto tasks."""
-        event = create_test_event(
-            start_time=datetime.now() + timedelta(minutes=5, seconds=15)
-        )
+        event = create_test_event(start_time=datetime.now() + timedelta(minutes=5, seconds=15))
 
         auto_tasks = {
             "enable_transcription": False,
@@ -489,9 +509,7 @@ class TestAutoStartTasks:
         """Test successfully starting auto tasks."""
         # Create event starting within 1 minute (within the -60 to +60 second window)
         now = datetime.now()
-        event = create_test_event(
-            start_time=now + timedelta(seconds=15)
-        )
+        event = create_test_event(start_time=now + timedelta(seconds=15))
 
         auto_tasks = {
             "enable_transcription": True,
@@ -519,8 +537,7 @@ class TestAutoStartTasks:
 
         # Should send success notification
         success_notifications = [
-            n for n in mock_notification_manager.notifications
-            if n["type"] == "success"
+            n for n in mock_notification_manager.notifications if n["type"] == "success"
         ]
         assert len(success_notifications) >= 1
 
@@ -537,9 +554,7 @@ class TestAutoStartTasks:
         # Set recorder as already recording
         mock_realtime_recorder.is_recording = True
 
-        event = create_test_event(
-            start_time=datetime.now() + timedelta(seconds=15)
-        )
+        event = create_test_event(start_time=datetime.now() + timedelta(seconds=15))
 
         auto_tasks = {
             "enable_transcription": True,
@@ -556,8 +571,7 @@ class TestAutoStartTasks:
 
         # Should send warning notification
         warning_notifications = [
-            n for n in mock_notification_manager.notifications
-            if n["type"] == "warning"
+            n for n in mock_notification_manager.notifications if n["type"] == "warning"
         ]
         assert len(warning_notifications) == 1
 
@@ -570,9 +584,7 @@ class TestAutoStartTasks:
         mock_realtime_recorder,
     ):
         """Test that auto tasks are not started twice for same event."""
-        event = create_test_event(
-            start_time=datetime.now() + timedelta(seconds=15)
-        )
+        event = create_test_event(start_time=datetime.now() + timedelta(seconds=15))
 
         auto_tasks = {
             "enable_transcription": True,
@@ -610,17 +622,23 @@ class TestAutoStopTasks:
         event = create_test_event()
 
         # Set up recording result
-        mock_realtime_recorder.set_recording_result({
-            "duration": 3600.0,
-            "recording_path": "/tmp/test_recording.wav",
-            "transcript_path": "/tmp/test_transcript.txt",
-        })
+        mock_realtime_recorder.set_recording_result(
+            {
+                "duration": 3600.0,
+                "recording_path": "/tmp/test_recording.wav",
+                "transcript_path": "/tmp/test_transcript.txt",
+            }
+        )
 
         # Create a simple event loop
         loop = asyncio.new_event_loop()
-        
+
         # Add to active recordings
-        start_time_dt = datetime.fromisoformat(event.start_time) if isinstance(event.start_time, str) else event.start_time
+        start_time_dt = (
+            datetime.fromisoformat(event.start_time)
+            if isinstance(event.start_time, str)
+            else event.start_time
+        )
         auto_task_scheduler.active_recordings[event.id] = {
             "event": event,
             "auto_tasks": {},
@@ -631,6 +649,7 @@ class TestAutoStopTasks:
 
         # Start the loop in background
         import threading
+
         def run_loop():
             asyncio.set_event_loop(loop)
             try:
@@ -640,13 +659,13 @@ class TestAutoStopTasks:
                 pending = asyncio.all_tasks(loop)
                 for task in pending:
                     task.cancel()
-        
+
         thread = threading.Thread(target=run_loop, daemon=True)
         thread.start()
-        
+
         # Give loop time to start
         time.sleep(0.1)
-        
+
         # Call stop directly
         auto_task_scheduler._stop_auto_tasks(event)
 
@@ -659,7 +678,7 @@ class TestAutoStopTasks:
         # Should remove from active recordings (this happens after successful stop)
         # Note: The removal happens in the try block, so if there's an error it might not be removed
         # For this test, we just verify the stop was called
-        
+
         # Clean up
         if thread.is_alive():
             thread.join(timeout=1.0)
@@ -736,9 +755,7 @@ class TestErrorHandling:
     ):
         """Test that errors in check_upcoming_events don't stop scheduler."""
         # Make timeline manager raise error
-        mock_timeline_manager.get_timeline_events = Mock(
-            side_effect=RuntimeError("Test error")
-        )
+        mock_timeline_manager.get_timeline_events = Mock(side_effect=RuntimeError("Test error"))
 
         auto_task_scheduler.start()
 
@@ -758,15 +775,14 @@ class TestErrorHandling:
         mock_notification_manager,
     ):
         """Test that errors in start_auto_tasks send error notification."""
+
         # Make recorder raise error
         async def failing_start(*args, **kwargs):
             raise RuntimeError("Recording failed")
 
         mock_realtime_recorder.start_recording = failing_start
 
-        event = create_test_event(
-            start_time=datetime.now() + timedelta(seconds=15)
-        )
+        event = create_test_event(start_time=datetime.now() + timedelta(seconds=15))
 
         auto_tasks = {
             "enable_transcription": True,
@@ -782,8 +798,7 @@ class TestErrorHandling:
 
         # Should send error notification
         error_notifications = [
-            n for n in mock_notification_manager.notifications
-            if n["type"] == "error"
+            n for n in mock_notification_manager.notifications if n["type"] == "error"
         ]
         assert len(error_notifications) == 1
 
@@ -811,7 +826,7 @@ class TestCleanupTracking:
         recent_event = create_test_event(
             event_id="recent-event",
             start_time=datetime.now() - timedelta(minutes=30),
-            end_time=datetime.now() - timedelta(minutes=10)
+            end_time=datetime.now() - timedelta(minutes=10),
         )
         auto_task_scheduler.notified_events.add(recent_event.id)
 

@@ -38,7 +38,7 @@ class TestTaskQueueBasics:
     async def test_add_task_success(self):
         """Test adding a task to the queue."""
         queue = TaskQueue()
-        
+
         async def sample_task(cancel_event):
             return "result"
 
@@ -51,7 +51,7 @@ class TestTaskQueueBasics:
     async def test_start_and_stop_queue(self):
         """Test starting and stopping the task queue."""
         queue = TaskQueue(max_concurrent=2)
-        
+
         await queue.start()
         assert queue.running
         assert len(queue.worker_tasks) == 2
@@ -250,6 +250,7 @@ class TestTaskStatus:
 
     def test_get_display_name_with_i18n(self):
         """Test getting display name with i18n manager."""
+
         class MockI18n:
             def t(self, key):
                 return f"translated_{key}"

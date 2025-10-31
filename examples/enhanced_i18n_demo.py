@@ -29,6 +29,7 @@ sys.path.insert(0, str(project_root))
 
 from utils.i18n import I18nManager
 
+
 class TranscriptionStatusDemo:
     """Demo class showing enhanced i18n usage in a transcription context."""
 
@@ -133,6 +134,7 @@ class TranscriptionStatusDemo:
 
         print(f"Time for 1000 translations: {end_time - start_time:.4f} seconds")
 
+
 def main():
     """Main demo function."""
     print("Enhanced I18n Demo - EchoNote Dynamic Strings")
@@ -151,6 +153,7 @@ def main():
     demo.show_performance_stats()
 
     print(f"\n✓ Enhanced I18n demo completed successfully!")
+
 
 if __name__ == "__main__":
     main()

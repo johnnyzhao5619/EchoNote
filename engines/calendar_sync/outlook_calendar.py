@@ -52,6 +52,7 @@ IANA_TO_WINDOWS_MAP = DEFAULT_IANA_TO_WINDOWS_MAP
 
 WINDOWS_TO_IANA_MAP = {value: key for key, value in DEFAULT_IANA_TO_WINDOWS_MAP.items()}
 
+
 class OutlookCalendarAdapter(OAuthCalendarAdapter):
     """Outlook Calendar synchronization adapter."""
 

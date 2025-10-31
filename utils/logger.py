@@ -36,6 +36,7 @@ LOG_LEVELS = {
     "CRITICAL": logging.CRITICAL,
 }
 
+
 class SensitiveDataFilter(logging.Filter):
     """
     过滤敏感数据的日志过滤器
@@ -105,6 +106,7 @@ class SensitiveDataFilter(logging.Filter):
             masked = re.sub(pattern, replacement, masked, flags=re.IGNORECASE)
 
         return masked
+
 
 def setup_logging(
     log_dir: str = None, level: str = None, console_output: bool = True
@@ -181,6 +183,7 @@ def setup_logging(
 
     return logger
 
+
 def get_logger(name: str) -> logging.Logger:
     """
     获取特定模块的日志器实例
@@ -202,6 +205,7 @@ def get_logger(name: str) -> logging.Logger:
     # 否则添加前缀
     return logging.getLogger(f"echonote.{name}")
 
+
 def set_log_level(level: str):
     """
     动态设置日志级别
@@ -222,6 +226,7 @@ def set_log_level(level: str):
 
     logger.info(f"日志级别已更改为: {level}")
 
+
 def get_log_file_path() -> Path:
     """
     获取当前日志文件路径
@@ -237,6 +242,7 @@ def get_log_file_path() -> Path:
 
     # 如果没有找到文件处理器，返回默认路径
     return get_app_dir() / "logs" / "echonote.log"
+
 
 def get_recent_logs(lines: int = None) -> list:
     """

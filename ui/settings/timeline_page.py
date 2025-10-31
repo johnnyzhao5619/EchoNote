@@ -23,6 +23,7 @@ import logging
 from typing import Tuple
 
 from PySide6.QtWidgets import QCheckBox, QComboBox, QLabel, QSpinBox
+
 from ui.base_widgets import create_hbox
 from ui.settings.base_page import BaseSettingsPage
 from utils.i18n import I18nQtManager

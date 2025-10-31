@@ -42,10 +42,10 @@ from PySide6.QtWidgets import (
 
 from ui.base_widgets import (
     BaseWidget,
-    create_button,
-    create_secondary_button,
-    create_hbox,
     connect_button_with_callback,
+    create_button,
+    create_hbox,
+    create_secondary_button,
 )
 from ui.common.notification import get_notification_manager
 from utils.i18n import LANGUAGE_OPTION_KEYS

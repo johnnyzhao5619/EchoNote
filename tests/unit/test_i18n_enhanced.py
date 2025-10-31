@@ -18,11 +18,14 @@ Tests for enhanced i18n functionality including complex dynamic strings,
 conditional text, and performance optimizations.
 """
 
-import pytest
-import tempfile
 import json
+import tempfile
 from pathlib import Path
+
+import pytest
+
 from utils.i18n import I18nManager
+
 
 class TestI18nEnhanced:
     """Test enhanced i18n functionality."""

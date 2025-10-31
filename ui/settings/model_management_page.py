@@ -43,11 +43,11 @@ from PySide6.QtWidgets import (
 
 from core.models.registry import ModelInfo
 from ui.base_widgets import (
-    create_hbox,
-    create_vbox,
-    create_button,
-    create_primary_button,
     connect_button_with_callback,
+    create_button,
+    create_hbox,
+    create_primary_button,
+    create_vbox,
 )
 from ui.common.error_dialog import show_error_dialog
 from ui.settings.base_page import BaseSettingsPage

@@ -3,8 +3,9 @@
 Tests for batch transcribe widget.
 """
 
+from unittest.mock import MagicMock, Mock, patch
+
 import pytest
-from unittest.mock import Mock, patch, MagicMock
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFileDialog
 
@@ -17,11 +18,11 @@ class TestBatchTranscribeWidget:
     @pytest.fixture
     def widget(self, qapp, mock_transcription_manager, mock_i18n, mock_model_manager):
         """Create a batch transcribe widget for testing."""
-        with patch.object(mock_transcription_manager, 'start_processing'):
+        with patch.object(mock_transcription_manager, "start_processing"):
             widget = BatchTranscribeWidget(
                 transcription_manager=mock_transcription_manager,
                 i18n=mock_i18n,
-                model_manager=mock_model_manager
+                model_manager=mock_model_manager,
             )
         return widget
 
@@ -33,16 +34,16 @@ class TestBatchTranscribeWidget:
 
     def test_widget_has_ui_elements(self, widget):
         """Test widget has required UI elements."""
-        assert hasattr(widget, 'title_label')
-        assert hasattr(widget, 'import_file_btn')
-        assert hasattr(widget, 'import_folder_btn')
-        assert hasattr(widget, 'clear_queue_btn')
-        assert hasattr(widget, 'task_list')
+        assert hasattr(widget, "title_label")
+        assert hasattr(widget, "import_file_btn")
+        assert hasattr(widget, "import_folder_btn")
+        assert hasattr(widget, "clear_queue_btn")
+        assert hasattr(widget, "task_list")
 
     def test_widget_has_model_combo(self, widget):
         """Test widget has model combo when model_manager is provided."""
-        assert hasattr(widget, 'model_combo')
-        assert hasattr(widget, 'model_label')
+        assert hasattr(widget, "model_combo")
+        assert hasattr(widget, "model_label")
 
     def test_import_file_button_exists(self, widget):
         """Test import file button exists and is clickable."""
@@ -64,19 +65,19 @@ class TestBatchTranscribeWidget:
 
     def test_task_items_dictionary(self, widget):
         """Test task items dictionary is initialized."""
-        assert hasattr(widget, 'task_items')
+        assert hasattr(widget, "task_items")
         assert isinstance(widget.task_items, dict)
         assert len(widget.task_items) == 0
 
     def test_open_viewers_dictionary(self, widget):
         """Test open viewers dictionary is initialized."""
-        assert hasattr(widget, 'open_viewers')
+        assert hasattr(widget, "open_viewers")
         assert isinstance(widget.open_viewers, dict)
         assert len(widget.open_viewers) == 0
 
     def test_refresh_timer_started(self, widget):
         """Test refresh timer is started."""
-        assert hasattr(widget, 'refresh_timer')
+        assert hasattr(widget, "refresh_timer")
         assert widget.refresh_timer.isActive()
 
     def test_transcription_manager_started(self, widget, mock_transcription_manager):
@@ -86,27 +87,27 @@ class TestBatchTranscribeWidget:
         # But we can verify the manager is set
         assert widget.transcription_manager == mock_transcription_manager
 
-    @patch('ui.batch_transcribe.widget.QFileDialog.getOpenFileNames')
+    @patch("ui.batch_transcribe.widget.QFileDialog.getOpenFileNames")
     def test_import_file_dialog(self, mock_dialog, widget, mock_transcription_manager):
         """Test import file opens file dialog."""
-        mock_dialog.return_value = (['/test/file.mp3'], 'Audio Files (*.mp3)')
-        mock_transcription_manager.add_task.return_value = 'test-task-id'
-        
+        mock_dialog.return_value = (["/test/file.mp3"], "Audio Files (*.mp3)")
+        mock_transcription_manager.add_task.return_value = "test-task-id"
+
         # Trigger import file
         widget._on_import_file()
-        
+
         # Verify dialog was opened
         mock_dialog.assert_called_once()
 
-    @patch('ui.batch_transcribe.widget.QFileDialog.getExistingDirectory')
+    @patch("ui.batch_transcribe.widget.QFileDialog.getExistingDirectory")
     def test_import_folder_dialog(self, mock_dialog, widget, mock_transcription_manager):
         """Test import folder opens directory dialog."""
-        mock_dialog.return_value = '/test/folder'
-        mock_transcription_manager.add_tasks_from_folder.return_value = ['task-1', 'task-2']
-        
+        mock_dialog.return_value = "/test/folder"
+        mock_transcription_manager.add_tasks_from_folder.return_value = ["task-1", "task-2"]
+
         # Trigger import folder
         widget._on_import_folder()
-        
+
         # Verify dialog was opened
         mock_dialog.assert_called_once()
 
@@ -127,19 +128,17 @@ class TestBatchTranscribeWidgetWithoutModelManager:
     @pytest.fixture
     def widget_no_model(self, qapp, mock_transcription_manager, mock_i18n):
         """Create a batch transcribe widget without model manager."""
-        with patch.object(mock_transcription_manager, 'start_processing'):
+        with patch.object(mock_transcription_manager, "start_processing"):
             widget = BatchTranscribeWidget(
-                transcription_manager=mock_transcription_manager,
-                i18n=mock_i18n,
-                model_manager=None
+                transcription_manager=mock_transcription_manager, i18n=mock_i18n, model_manager=None
             )
         return widget
 
     def test_widget_has_engine_combo(self, widget_no_model):
         """Test widget has engine combo when model_manager is not provided."""
-        assert hasattr(widget_no_model, 'engine_combo')
-        assert hasattr(widget_no_model, 'engine_label')
+        assert hasattr(widget_no_model, "engine_combo")
+        assert hasattr(widget_no_model, "engine_label")
 
     def test_widget_no_model_combo(self, widget_no_model):
         """Test widget doesn't have model combo when model_manager is not provided."""
-        assert not hasattr(widget_no_model, 'model_combo')
+        assert not hasattr(widget_no_model, "model_combo")

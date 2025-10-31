@@ -22,6 +22,16 @@ Provides UI for importing audio files and managing transcription tasks.
 import logging
 from typing import TYPE_CHECKING, Dict, Optional
 
+from core.transcription.manager import TranscriptionManager
+from ui.base_widgets import (
+    BaseWidget,
+    connect_button_with_callback,
+    create_button,
+    create_hbox,
+    create_primary_button,
+    create_vbox,
+)
+from ui.batch_transcribe.task_item import TaskItem
 from ui.qt_imports import (
     QComboBox,
     QFileDialog,
@@ -39,17 +49,6 @@ from ui.qt_imports import (
     QWidget,
     Signal,
 )
-
-from core.transcription.manager import TranscriptionManager
-from ui.base_widgets import (
-    BaseWidget,
-    create_hbox,
-    create_vbox,
-    create_button,
-    create_primary_button,
-    connect_button_with_callback,
-)
-from ui.batch_transcribe.task_item import TaskItem
 from utils.i18n import I18nQtManager
 
 if TYPE_CHECKING:

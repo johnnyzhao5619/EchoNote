@@ -22,6 +22,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Dict, Iterable, List, Optional, Tuple
 
+
 @dataclass
 class ModelInfo:
     """记录单个语音模型的元数据与状态。"""
@@ -74,6 +75,7 @@ class ModelInfo:
         self.local_path = None
         self.download_date = None
         self.is_downloaded = False
+
 
 class ModelRegistry:
     """维护应用内置的可用模型列表。"""
@@ -215,11 +217,13 @@ class ModelRegistry:
 
         return self._order[0]
 
+
 @lru_cache(maxsize=1)
 def get_default_model_registry() -> "ModelRegistry":
     """返回缓存的默认模型注册表实例。"""
 
     return ModelRegistry()
+
 
 @lru_cache(maxsize=1)
 def get_default_model_names() -> Tuple[str, ...]:
@@ -227,6 +231,7 @@ def get_default_model_names() -> Tuple[str, ...]:
 
     registry = get_default_model_registry()
     return tuple(model.name for model in registry.list_models())
+
 
 @lru_cache(maxsize=1)
 def get_model_size_metadata() -> MappingProxyType:

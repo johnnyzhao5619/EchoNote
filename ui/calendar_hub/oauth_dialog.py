@@ -40,10 +40,10 @@ from PySide6.QtWidgets import (
 )
 
 from ui.base_widgets import (
-    create_button,
-    create_primary_button,
-    create_hbox,
     connect_button_with_callback,
+    create_button,
+    create_hbox,
+    create_primary_button,
 )
 from utils.i18n import I18nQtManager
 

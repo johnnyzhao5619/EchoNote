@@ -187,7 +187,7 @@ class FormatConverter:
         Returns:
             Formatted timestamp string
         """
-        from config.constants import SECONDS_PER_HOUR, SECONDS_PER_MINUTE, MILLISECONDS_PER_SECOND
+        from config.constants import MILLISECONDS_PER_SECOND, SECONDS_PER_HOUR, SECONDS_PER_MINUTE
 
         hours = int(seconds // SECONDS_PER_HOUR)
         minutes = int((seconds % SECONDS_PER_HOUR) // SECONDS_PER_MINUTE)
@@ -208,7 +208,7 @@ class FormatConverter:
         Returns:
             Formatted timestamp string
         """
-        from config.constants import SECONDS_PER_HOUR, SECONDS_PER_MINUTE, MARKDOWN_TIMESTAMP_FORMAT
+        from config.constants import MARKDOWN_TIMESTAMP_FORMAT, SECONDS_PER_HOUR, SECONDS_PER_MINUTE
 
         hours = int(seconds // SECONDS_PER_HOUR)
         minutes = int((seconds % SECONDS_PER_HOUR) // SECONDS_PER_MINUTE)

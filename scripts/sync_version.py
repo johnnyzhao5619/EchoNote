@@ -31,7 +31,7 @@ from typing import Dict, List, Tuple
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from config.__version__ import __version__, VERSION_INFO
+from config.__version__ import VERSION_INFO, __version__
 
 
 class VersionSyncer:

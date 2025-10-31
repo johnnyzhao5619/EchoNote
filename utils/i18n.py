@@ -25,8 +25,8 @@ import json
 import logging
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Union
 from string import Template
+from typing import Any, Dict, List, Union
 
 try:
     from PySide6.QtCore import QObject, Signal
@@ -54,6 +54,7 @@ LANGUAGE_OPTION_KEYS = [
     ("ja", "realtime_record.available_languages.ja"),
     ("ko", "realtime_record.available_languages.ko"),
 ]
+
 
 class I18nManager:
     """Basic translation manager without Qt dependencies with enhanced dynamic string support."""
@@ -460,6 +461,7 @@ class I18nManager:
             "template_cache_size": len(self._template_cache),
             "parameter_cache_size": len(self._parameter_cache),
         }
+
 
 if QT_AVAILABLE:
 

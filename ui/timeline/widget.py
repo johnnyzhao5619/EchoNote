@@ -32,8 +32,8 @@ from ui.qt_imports import (
     QDateTime,
     QLabel,
     QLineEdit,
-    Qt,
     QScrollArea,
+    Qt,
     QTime,
     QTimer,
     QVBoxLayout,
@@ -51,7 +51,7 @@ if TYPE_CHECKING:
     from ui.timeline.transcript_viewer import TranscriptViewerDialog
 
 from core.timeline.manager import to_local_naive
-from ui.base_widgets import BaseWidget, create_vbox, create_hbox, create_button
+from ui.base_widgets import BaseWidget, create_button, create_hbox, create_vbox
 from utils.i18n import I18nQtManager
 
 if TYPE_CHECKING:  # pragma: no cover - imported for type checking only

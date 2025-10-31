@@ -279,7 +279,7 @@ class TestFormatConverter:
             "segments": [
                 {"start": 0.0, "end": 1.0, "text": "Line with\nnewline"},
                 {"start": 1.0, "end": 2.0, "text": "Tab\there"},
-                {"start": 2.0, "end": 3.0, "text": "Quote: \"Hello\""},
+                {"start": 2.0, "end": 3.0, "text": 'Quote: "Hello"'},
             ]
         }
 

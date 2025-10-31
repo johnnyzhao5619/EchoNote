@@ -19,6 +19,7 @@ import asyncio
 import logging
 from typing import Callable, Optional
 
+
 def run_model_download(
     model_manager,
     model_name: str,

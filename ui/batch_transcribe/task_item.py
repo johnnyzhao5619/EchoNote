@@ -22,6 +22,8 @@ Displays individual transcription task information and controls.
 import logging
 from typing import Any, Dict, Optional
 
+# Import base widget
+from ui.base_widgets import BaseWidget, create_button, create_hbox
 from ui.qt_imports import (
     QAction,
     QHBoxLayout,
@@ -33,9 +35,6 @@ from ui.qt_imports import (
     QWidget,
     Signal,
 )
-
-# Import base widget
-from ui.base_widgets import BaseWidget, create_hbox, create_button
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.batch_transcribe.task_item")

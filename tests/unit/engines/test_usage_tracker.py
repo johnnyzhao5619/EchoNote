@@ -7,7 +7,7 @@ Tests API usage tracking, cost calculation, and statistics retrieval.
 
 from datetime import datetime, timedelta
 from decimal import Decimal
-from unittest.mock import Mock, MagicMock
+from unittest.mock import MagicMock, Mock
 
 import pytest
 
@@ -162,6 +162,7 @@ class TestRecordUsage:
 
     def test_record_usage_error_handling(self, usage_tracker, mock_db):
         """Test error handling in record_usage."""
+
         # Make cursor raise error
         def raise_error(*args, **kwargs):
             raise RuntimeError("Database error")
@@ -271,9 +272,7 @@ class TestUsageHistory:
     def test_get_usage_history_filtered_by_engine(self, usage_tracker, mock_db):
         """Test getting usage history filtered by engine."""
         now = datetime.now()
-        mock_db.cursor.fetchall_results = [
-            [("id1", "openai", 60.0, 0.006, now)]
-        ]
+        mock_db.cursor.fetchall_results = [[("id1", "openai", 60.0, 0.006, now)]]
 
         history = usage_tracker.get_usage_history("openai")
 

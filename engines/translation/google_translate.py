@@ -30,6 +30,7 @@ from engines.translation.base import TranslationEngine
 
 logger = logging.getLogger(__name__)
 
+
 class GoogleTranslateEngine(TranslationEngine):
     """Google Translate engine implementation."""
 

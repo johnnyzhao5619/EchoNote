@@ -27,6 +27,7 @@ from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 
+
 class UsageTracker:
     """API 使用量跟踪器"""
 

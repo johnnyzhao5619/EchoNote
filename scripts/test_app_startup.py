@@ -21,10 +21,10 @@
 测试EchoNote应用程序是否能够完全启动到主窗口显示阶段
 """
 
+import logging
 import sys
 import time
 from pathlib import Path
-import logging
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -48,11 +48,11 @@ def test_app_startup():
         logger.info("Testing key component imports...")
 
         from config.app_config import ConfigManager
-        from utils.i18n import I18nQtManager
-        from ui.main_window import MainWindow
-        from core.transcription.manager import TranscriptionManager
         from core.calendar.manager import CalendarManager
         from core.timeline.manager import TimelineManager
+        from core.transcription.manager import TranscriptionManager
+        from ui.main_window import MainWindow
+        from utils.i18n import I18nQtManager
         from utils.resource_monitor import get_resource_monitor
 
         logger.info("✅ All key components imported successfully")

@@ -159,9 +159,7 @@ class TestAudioBuffer:
         buffer.append(audio)
 
         # Get 0.5 second windows with 0.25 second overlap
-        windows = buffer.get_sliding_windows(
-            window_duration_seconds=0.5, overlap_seconds=0.25
-        )
+        windows = buffer.get_sliding_windows(window_duration_seconds=0.5, overlap_seconds=0.25)
 
         # Should have multiple windows
         assert len(windows) > 0
@@ -173,9 +171,7 @@ class TestAudioBuffer:
         audio = np.arange(32000, dtype=np.float32)
         buffer.append(audio)
 
-        windows = buffer.get_sliding_windows(
-            window_duration_seconds=0.5, overlap_seconds=0.0
-        )
+        windows = buffer.get_sliding_windows(window_duration_seconds=0.5, overlap_seconds=0.0)
 
         # With 2 seconds of audio and 0.5 second windows, should have 4 windows
         assert len(windows) == 4
@@ -196,9 +192,7 @@ class TestAudioBuffer:
         assert len(windows) == 0
 
         # Overlap >= window duration
-        windows = buffer.get_sliding_windows(
-            window_duration_seconds=0.5, overlap_seconds=0.6
-        )
+        windows = buffer.get_sliding_windows(window_duration_seconds=0.5, overlap_seconds=0.6)
         assert len(windows) == 0
 
     # Clear Tests

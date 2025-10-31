@@ -26,6 +26,7 @@ from typing import Any, Callable, Dict, Optional
 
 logger = logging.getLogger("echonote.transcription.task_queue")
 
+
 class TaskStatus(Enum):
     """Task status enumeration."""
 
@@ -57,6 +58,7 @@ class TaskStatus(Enum):
             return display_names.get(self, "Unknown")
 
         return i18n_manager.t(f"constants.task_status.{self.value}")
+
 
 class TaskQueue:
     """

@@ -32,7 +32,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from ui.base_widgets import create_hbox, create_button, connect_button_with_callback
+from ui.base_widgets import connect_button_with_callback, create_button, create_hbox
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.dialogs.ffmpeg_install")

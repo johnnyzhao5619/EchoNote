@@ -33,10 +33,7 @@ def mock_db():
 def timeline_manager(mock_calendar_manager, mock_db):
     """Create TimelineManager instance."""
     return TimelineManager(
-        calendar_manager=mock_calendar_manager,
-        db_connection=mock_db,
-        i18n=None,
-        translate=None
+        calendar_manager=mock_calendar_manager, db_connection=mock_db, i18n=None, translate=None
     )
 
 
@@ -52,9 +49,7 @@ class TestTimelineManagerInitialization:
         """Test initialization with translate callback."""
         translate_fn = Mock(return_value="Translated")
         manager = TimelineManager(
-            calendar_manager=mock_calendar_manager,
-            db_connection=mock_db,
-            translate=translate_fn
+            calendar_manager=mock_calendar_manager, db_connection=mock_db, translate=translate_fn
         )
         assert manager._translate_callback == translate_fn
 
@@ -62,13 +57,15 @@ class TestTimelineManagerInitialization:
         """Test that providing both i18n and translate raises error."""
         i18n = Mock()
         translate_fn = Mock()
-        
-        with pytest.raises(ValueError, match="Provide either an i18n manager or a translation callback"):
+
+        with pytest.raises(
+            ValueError, match="Provide either an i18n manager or a translation callback"
+        ):
             TimelineManager(
                 calendar_manager=mock_calendar_manager,
                 db_connection=mock_db,
                 i18n=i18n,
-                translate=translate_fn
+                translate=translate_fn,
             )
 
 
@@ -84,9 +81,9 @@ class TestTimelineManagerGetEvents:
         mock_event.start_time = "2025-11-01T10:00:00"
         mock_event.end_time = "2025-11-01T11:00:00"
         mock_calendar_manager.get_events.return_value = [mock_event]
-        
+
         result = timeline_manager.get_timeline_events(center_time, past_days=7, future_days=7)
-        
+
         # Returns a dict with past_events and future_events
         assert isinstance(result, dict)
         assert "past_events" in result or "future_events" in result
@@ -95,13 +92,9 @@ class TestTimelineManagerGetEvents:
         """Test getting events with custom window."""
         center_time = datetime(2025, 11, 1, 12, 0, 0)
         mock_calendar_manager.get_events.return_value = []
-        
-        result = timeline_manager.get_timeline_events(
-            center_time,
-            past_days=14,
-            future_days=14
-        )
-        
+
+        result = timeline_manager.get_timeline_events(center_time, past_days=14, future_days=14)
+
         assert isinstance(result, dict)
 
 
@@ -112,23 +105,20 @@ class TestTimelineManagerSearch:
         """Test basic event search."""
         with patch.object(timeline_manager.calendar_manager, "get_events", return_value=[]):
             results = timeline_manager.search_events("test query")
-            
+
             assert isinstance(results, list)
 
     def test_search_events_empty_query(self, timeline_manager):
         """Test search with empty query."""
         results = timeline_manager.search_events("")
-        
+
         assert results == []
 
     def test_search_events_with_filters(self, timeline_manager):
         """Test search with filters."""
         with patch.object(timeline_manager.calendar_manager, "get_events", return_value=[]):
-            results = timeline_manager.search_events(
-                "test",
-                filters={"event_type": "Meeting"}
-            )
-            
+            results = timeline_manager.search_events("test", filters={"event_type": "Meeting"})
+
             assert isinstance(results, list)
 
 
@@ -138,25 +128,27 @@ class TestTimelineManagerArtifacts:
     def test_get_event_artifacts_basic(self, timeline_manager):
         """Test getting event artifacts."""
         event_id = "event_123"
-        
+
         with patch("data.database.models.EventAttachment.get_by_event_id", return_value=[]):
             artifacts = timeline_manager.get_event_artifacts(event_id)
-            
+
             assert isinstance(artifacts, dict)
             assert "attachments" in artifacts
 
     def test_get_event_artifacts_with_attachments(self, timeline_manager):
         """Test getting artifacts with attachments."""
         event_id = "event_123"
-        
+
         mock_attachment = Mock()
         mock_attachment.attachment_type = "recording"
         mock_attachment.file_path = "/path/to/recording.wav"
         mock_attachment.file_size = 1000
-        
-        with patch("data.database.models.EventAttachment.get_by_event_id", return_value=[mock_attachment]):
+
+        with patch(
+            "data.database.models.EventAttachment.get_by_event_id", return_value=[mock_attachment]
+        ):
             artifacts = timeline_manager.get_event_artifacts(event_id)
-            
+
             # Check that artifacts dict is returned
             assert isinstance(artifacts, dict)
             assert "attachments" in artifacts
@@ -178,11 +170,9 @@ class TestTimelineManagerUtilities:
         """Test translation with callback."""
         translate_fn = Mock(return_value="Translated Text")
         manager = TimelineManager(
-            calendar_manager=mock_calendar_manager,
-            db_connection=mock_db,
-            translate=translate_fn
+            calendar_manager=mock_calendar_manager, db_connection=mock_db, translate=translate_fn
         )
-        
+
         result = manager._translate("key", "default")
         assert result == "Translated Text"
 
@@ -195,10 +185,8 @@ class TestTimelineManagerUtilities:
         """Test translation handles exceptions."""
         translate_fn = Mock(side_effect=Exception("Translation error"))
         manager = TimelineManager(
-            calendar_manager=mock_calendar_manager,
-            db_connection=mock_db,
-            translate=translate_fn
+            calendar_manager=mock_calendar_manager, db_connection=mock_db, translate=translate_fn
         )
-        
+
         result = manager._translate("key", "default")
         assert result == "default"

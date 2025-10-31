@@ -20,21 +20,20 @@
 """
 
 import logging
-from typing import Any, Dict, Optional, Callable
+from typing import Any, Callable, Dict, Optional
 
 from ui.qt_imports import (
-    QWidget,
-    QVBoxLayout,
+    QApplication,
     QHBoxLayout,
     QLabel,
-    QPushButton,
     QMessageBox,
-    QApplication,
-    QTimer,
-    Signal,
     QObject,
+    QPushButton,
+    QTimer,
+    QVBoxLayout,
+    QWidget,
+    Signal,
 )
-
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger(__name__)

@@ -26,6 +26,7 @@ from ui.qt_imports import QMessageBox, QWidget
 
 logger = logging.getLogger(__name__)
 
+
 def handle_ui_error(
     parent: QWidget,
     operation: Callable,
@@ -55,6 +56,7 @@ def handle_ui_error(
         logger.error(f"{log_context} failed: {e}")
         QMessageBox.critical(parent, error_title, str(e))
         return False
+
 
 def safe_operation(operation: Callable, default_value=None, log_context: str = "Operation"):
     """

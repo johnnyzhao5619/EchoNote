@@ -24,6 +24,14 @@ from typing import Optional
 
 from PySide6.QtCore import QTimer
 
+from ui.base_widgets import (
+    BaseWidget,
+    ErrorHandlerMixin,
+    I18nMixin,
+    ThemeMixin,
+    connect_button_with_callback,
+    create_hbox,
+)
 from ui.qt_imports import (
     QApplication,
     QDialog,
@@ -35,14 +43,6 @@ from ui.qt_imports import (
     QWidget,
 )
 from utils.i18n import I18nQtManager
-from ui.base_widgets import (
-    BaseWidget,
-    I18nMixin,
-    ThemeMixin,
-    ErrorHandlerMixin,
-    connect_button_with_callback,
-    create_hbox,
-)
 
 logger = logging.getLogger("echonote.ui.error_dialog")
 

@@ -30,13 +30,16 @@ from .registry import ModelInfo
 
 logger = logging.getLogger(__name__)
 
+
 class DownloadCancelled(Exception):
     """表示下载过程被主动取消。"""
+
 
 @dataclass
 class _RemoteFile:
     path: str
     size: int
+
 
 class ModelDownloader(QObject):
     """负责从 Hugging Face 下载模型文件。"""

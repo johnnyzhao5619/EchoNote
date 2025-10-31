@@ -37,7 +37,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ui.base_widgets import BaseWidget, create_hbox, create_vbox, create_button
+from ui.base_widgets import BaseWidget, create_button, create_hbox, create_vbox
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.settings")

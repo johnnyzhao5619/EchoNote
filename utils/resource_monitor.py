@@ -63,12 +63,12 @@ class ResourceMonitor(QObject):
 
         # Import constants
         from config.constants import (
-            LOW_MEMORY_THRESHOLD_MB,
             HIGH_CPU_THRESHOLD_PERCENT,
-            MAX_MEMORY_THRESHOLD_MB,
-            MIN_MEMORY_THRESHOLD_MB,
+            LOW_MEMORY_THRESHOLD_MB,
             MAX_CPU_THRESHOLD_PERCENT,
+            MAX_MEMORY_THRESHOLD_MB,
             MIN_CPU_THRESHOLD_PERCENT,
+            MIN_MEMORY_THRESHOLD_MB,
         )
 
         self.low_memory_threshold_mb = self._resolve_threshold(

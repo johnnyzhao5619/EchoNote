@@ -49,6 +49,7 @@ def mock_transcription_manager():
 def mock_realtime_recorder():
     """Create a mock RealtimeRecorder for testing."""
     from unittest.mock import PropertyMock
+
     recorder = MagicMock()
     recorder.start_recording = Mock()
     recorder.stop_recording = Mock()
@@ -63,10 +64,12 @@ def mock_realtime_recorder():
 def mock_audio_capture():
     """Create a mock AudioCapture for testing."""
     capture = MagicMock()
-    capture.list_devices = Mock(return_value=[
-        {"index": 0, "name": "Default Device", "channels": 2},
-        {"index": 1, "name": "Test Device", "channels": 1}
-    ])
+    capture.list_devices = Mock(
+        return_value=[
+            {"index": 0, "name": "Default Device", "channels": 2},
+            {"index": 1, "name": "Test Device", "channels": 1},
+        ]
+    )
     capture.get_default_device = Mock(return_value=0)
     return capture
 
@@ -80,10 +83,9 @@ def mock_settings_manager():
     manager.save = Mock()
     manager.get_all = Mock(return_value={})
     manager.get_all_settings = Mock(return_value={})
-    manager.get_realtime_preferences = Mock(return_value={
-        "recording_format": "wav",
-        "auto_save": True
-    })
+    manager.get_realtime_preferences = Mock(
+        return_value={"recording_format": "wav", "auto_save": True}
+    )
     manager.setting_changed = Mock()
     manager.setting_changed.connect = Mock()
     return manager

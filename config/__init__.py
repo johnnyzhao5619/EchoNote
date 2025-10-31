@@ -19,15 +19,15 @@ Configuration package for EchoNote application.
 Provides configuration management and version information.
 """
 
-from .app_config import ConfigManager, get_app_dir
 from .__version__ import (
     __version__,
+    get_display_version,
     get_version,
     get_version_info,
-    get_display_version,
-    is_development_version,
     get_version_tuple,
+    is_development_version,
 )
+from .app_config import ConfigManager, get_app_dir
 
 __all__ = [
     "ConfigManager",

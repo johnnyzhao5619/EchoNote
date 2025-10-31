@@ -37,7 +37,6 @@ from ui.qt_imports import (
     Qt,
     QWidget,
 )
-
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.main_window")

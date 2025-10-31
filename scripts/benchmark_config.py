@@ -9,6 +9,7 @@ from typing import Dict
 
 import psutil
 
+
 class BenchmarkConfig:
     """Centralized benchmark configuration."""
 

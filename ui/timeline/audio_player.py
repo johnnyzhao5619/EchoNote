@@ -38,10 +38,10 @@ from PySide6.QtWidgets import (
 
 from ui.base_widgets import (
     BaseWidget,
-    create_vbox,
-    create_hbox,
-    create_button,
     connect_button_with_callback,
+    create_button,
+    create_hbox,
+    create_vbox,
 )
 from utils.i18n import I18nQtManager
 

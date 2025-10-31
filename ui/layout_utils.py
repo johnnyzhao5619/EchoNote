@@ -23,6 +23,7 @@ code duplication across the UI layer.
 from ui.constants import DEFAULT_LAYOUT_SPACING, LABEL_MIN_WIDTH
 from ui.qt_imports import QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
+
 def create_horizontal_layout(spacing: int = None, margins: tuple = (0, 0, 0, 0)) -> QHBoxLayout:
     """Create a horizontal layout with standard settings."""
     if spacing is None:
@@ -33,6 +34,7 @@ def create_horizontal_layout(spacing: int = None, margins: tuple = (0, 0, 0, 0))
     layout.setContentsMargins(*margins)
     return layout
 
+
 def create_vertical_layout(spacing: int = None, margins: tuple = (0, 0, 0, 0)) -> QVBoxLayout:
     """Create a vertical layout with standard settings."""
     if spacing is None:
@@ -42,6 +44,7 @@ def create_vertical_layout(spacing: int = None, margins: tuple = (0, 0, 0, 0)) -
     layout.setSpacing(spacing)
     layout.setContentsMargins(*margins)
     return layout
+
 
 def create_label_control_row(
     label_text: str, control_widget: QWidget, label_width: int = None, spacing: int = None

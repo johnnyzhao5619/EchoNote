@@ -7,7 +7,7 @@ and multi-provider management.
 """
 
 from datetime import datetime, timedelta
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -27,13 +27,15 @@ class MockDatabaseConnection:
     def execute(self, query, params=None, commit=False):
         """Mock execute method."""
         self.execute_calls.append({"query": query, "params": params, "commit": commit})
-        
+
         # Handle SELECT queries
         if "SELECT" in query.upper():
             if "calendar_event_links" in query:
                 if "WHERE event_id" in query:
                     event_id = params[0] if params else None
-                    return [link for link in self.links.values() if link.get("event_id") == event_id]
+                    return [
+                        link for link in self.links.values() if link.get("event_id") == event_id
+                    ]
                 elif "WHERE provider" in query:
                     provider = params[0] if params else None
                     return [
@@ -49,13 +51,13 @@ class MockDatabaseConnection:
                         for event in self.events.values()
                         if event.get("source") == source
                     ]
-        
+
         # Handle DELETE queries
         elif "DELETE" in query.upper():
             if "calendar_event_links" in query and params:
                 event_id = params[0]
                 self.links = {k: v for k, v in self.links.items() if v.get("event_id") != event_id}
-        
+
         return []
 
 
@@ -170,10 +172,10 @@ class TestCalendarManagerCreateEvent:
                 mock_event.id = "event_123"
                 mock_event.title = event_data["title"]
                 mock_init.return_value = None
-                
+
                 with patch("core.calendar.manager.CalendarEvent", return_value=mock_event):
                     event_id = calendar_manager.create_event(event_data)
-                    
+
                     assert event_id is not None
 
     def test_create_event_missing_required_fields(self, calendar_manager):
@@ -211,7 +213,7 @@ class TestCalendarManagerCreateEvent:
                 mock_event = Mock()
                 mock_event.id = "event_123"
                 mock_event_class.return_value = mock_event
-                
+
                 event_id = calendar_manager.create_event(event_data)
                 assert event_id == "event_123"
 
@@ -229,11 +231,11 @@ class TestCalendarManagerCreateEvent:
                 mock_event.id = "event_123"
                 mock_event.title = "Synced Event"
                 mock_event_class.return_value = mock_event
-                
+
                 with patch.object(calendar_manager, "_push_to_external", return_value="ext_123"):
                     with patch.object(calendar_manager, "_upsert_event_link"):
                         event_id = calendar_manager.create_event(event_data, sync_to=["google"])
-                        
+
                         assert event_id == "event_123"
 
 
@@ -258,7 +260,7 @@ class TestCalendarManagerUpdateEvent:
             with patch.object(CalendarEvent, "save"):
                 with patch.object(CalendarEventLink, "list_for_event", return_value=[]):
                     calendar_manager.update_event(event_id, event_data)
-                    
+
                     assert mock_event.title == "Updated Title"
                     assert mock_event.description == "Updated description"
 
@@ -295,7 +297,7 @@ class TestCalendarManagerUpdateEvent:
             with patch.object(CalendarEvent, "save"):
                 with patch.object(CalendarEventLink, "list_for_event", return_value=[]):
                     calendar_manager.update_event("event_123", event_data)
-                    
+
                     # Times are normalized to UTC, so just check they were updated
                     assert mock_event.start_time != "2025-11-01T10:00:00"
                     assert mock_event.end_time != "2025-11-01T11:00:00"
@@ -343,11 +345,13 @@ class TestCalendarManagerDeleteEvent:
 
         with patch.object(CalendarEvent, "get_by_id", return_value=mock_event):
             with patch.object(CalendarEventLink, "list_for_event", return_value=[]):
-                with patch.object(EventAttachment, "get_by_event_id", return_value=[mock_attachment]):
+                with patch.object(
+                    EventAttachment, "get_by_event_id", return_value=[mock_attachment]
+                ):
                     with patch.object(CalendarEvent, "delete"):
                         with patch.object(mock_attachment, "delete"):
                             calendar_manager.delete_event("event_123")
-                            
+
                             assert "/path/to/file.txt" in mock_file_manager.deleted_files
 
 
@@ -389,9 +393,13 @@ class TestCalendarManagerGetEvents:
         mock_event2 = Mock(id="event_2", event_type="Task", title="Code Review", description="")
         mock_event3 = Mock(id="event_3", event_type="Meeting", title="Planning", description="")
 
-        with patch.object(CalendarEvent, "get_by_time_range", return_value=[mock_event1, mock_event2, mock_event3]):
+        with patch.object(
+            CalendarEvent, "get_by_time_range", return_value=[mock_event1, mock_event2, mock_event3]
+        ):
             # Filter by event_type
-            events = calendar_manager.get_events(start_date, end_date, filters={"event_type": "Meeting"})
+            events = calendar_manager.get_events(
+                start_date, end_date, filters={"event_type": "Meeting"}
+            )
             assert len(events) == 2
 
     def test_get_events_with_keyword_filter(self, calendar_manager):
@@ -403,9 +411,13 @@ class TestCalendarManagerGetEvents:
         mock_event2 = Mock(id="event_2", title="Code Review", description="Review PR")
         mock_event3 = Mock(id="event_3", title="Planning Meeting", description="Sprint planning")
 
-        with patch.object(CalendarEvent, "get_by_time_range", return_value=[mock_event1, mock_event2, mock_event3]):
+        with patch.object(
+            CalendarEvent, "get_by_time_range", return_value=[mock_event1, mock_event2, mock_event3]
+        ):
             # Filter by keyword
-            events = calendar_manager.get_events(start_date, end_date, filters={"keyword": "meeting"})
+            events = calendar_manager.get_events(
+                start_date, end_date, filters={"keyword": "meeting"}
+            )
             assert len(events) == 2
 
 

@@ -25,6 +25,7 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+
 class AudioCapture:
     """High-level wrapper for microphone capture using PyAudio."""
 

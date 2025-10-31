@@ -36,6 +36,7 @@ from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.timeline.auto_task_scheduler")
 
+
 class AutoTaskScheduler:
     """
     Automatic task scheduler for calendar events.
@@ -191,9 +192,9 @@ class AutoTaskScheduler:
         """Persist reminder minutes and refresh dependent time windows."""
         self.reminder_minutes = minutes
         from config.constants import (
+            MIN_FUTURE_WINDOW_MINUTES,
             MIN_REMINDER_WINDOW_MINUTES,
             REMINDER_FUTURE_WINDOW_OFFSET_MINUTES,
-            MIN_FUTURE_WINDOW_MINUTES,
         )
 
         self._past_window_minutes = max(minutes, MIN_REMINDER_WINDOW_MINUTES)

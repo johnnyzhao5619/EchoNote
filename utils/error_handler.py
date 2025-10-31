@@ -27,6 +27,7 @@ from engines.speech.base import AUDIO_VIDEO_FORMATS
 
 logger = logging.getLogger(__name__)
 
+
 class ErrorCategory(Enum):
     """错误类别"""
 
@@ -65,6 +66,7 @@ class ErrorCategory(Enum):
 
         return i18n_manager.t(f"constants.error_category.{self.value}")
 
+
 # 自定义异常类
 class EchoNoteError(Exception):
     """EchoNote 基础异常类"""
@@ -72,6 +74,7 @@ class EchoNoteError(Exception):
     def __init__(self, message: str, category: ErrorCategory = ErrorCategory.UNKNOWN):
         super().__init__(message)
         self.category = category
+
 
 class UnsupportedFormatError(EchoNoteError):
     """不支持的文件格式错误"""
@@ -84,6 +87,7 @@ class UnsupportedFormatError(EchoNoteError):
             msg = f"Unsupported file format: {file_format}"
         super().__init__(msg, ErrorCategory.FILE_FORMAT)
 
+
 class NetworkError(EchoNoteError):
     """网络连接错误"""
 
@@ -95,6 +99,7 @@ class NetworkError(EchoNoteError):
                 message = "Network connection failed"
         super().__init__(message, ErrorCategory.NETWORK)
 
+
 class AuthenticationError(EchoNoteError):
     """认证错误"""
 
@@ -105,6 +110,7 @@ class AuthenticationError(EchoNoteError):
             else:
                 message = "Authentication failed"
         super().__init__(message, ErrorCategory.AUTHENTICATION)
+
 
 class APILimitError(EchoNoteError):
     """API 速率限制错误"""
@@ -118,6 +124,7 @@ class APILimitError(EchoNoteError):
         super().__init__(message, ErrorCategory.API_LIMIT)
         self.retry_after = retry_after
 
+
 class PermissionError(EchoNoteError):
     """权限错误"""
 
@@ -128,6 +135,7 @@ class PermissionError(EchoNoteError):
             else:
                 message = "Insufficient permissions"
         super().__init__(message, ErrorCategory.PERMISSION)
+
 
 class ResourceError(EchoNoteError):
     """资源错误（磁盘空间、内存等）"""
@@ -140,6 +148,7 @@ class ResourceError(EchoNoteError):
                 message = "Insufficient system resources"
         super().__init__(message, ErrorCategory.RESOURCE)
 
+
 class ValidationError(EchoNoteError):
     """输入验证错误"""
 
@@ -150,6 +159,7 @@ class ValidationError(EchoNoteError):
             message = "Input validation failed"
         super().__init__(message, ErrorCategory.VALIDATION)
         self.field = field
+
 
 class ErrorHandler:
     """统一错误处理器"""

@@ -33,6 +33,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+
 class FirstRunSetup:
     """Handles first-run initialization of the application."""
 
@@ -351,6 +352,7 @@ class FirstRunSetup:
         except Exception as e:
             logger.error(f"Error initializing database: {e}")
             raise
+
 
 class FirstRunWizard:
     """

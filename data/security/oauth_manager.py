@@ -30,6 +30,7 @@ from data.security.encryption import SecurityManager
 
 logger = logging.getLogger("echonote.security.oauth")
 
+
 class OAuthManager:
     """
     Manages OAuth tokens with encrypted storage and automatic refresh.

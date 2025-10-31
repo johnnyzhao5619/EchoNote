@@ -34,6 +34,7 @@ from utils.gpu_detector import GPUDetector
 
 logger = logging.getLogger(__name__)
 
+
 class ModelManager(QObject):
     """管理可用模型及其生命周期。"""
 

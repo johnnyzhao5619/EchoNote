@@ -43,7 +43,7 @@ from PySide6.QtWidgets import (
 
 from core.transcription.format_converter import FormatConverter
 from data.database.models import TranscriptionTask
-from ui.base_widgets import create_hbox, connect_button_with_callback
+from ui.base_widgets import connect_button_with_callback, create_hbox
 from ui.batch_transcribe.file_operations import FileExporter, FileLoadWorker
 from ui.batch_transcribe.search_widget import SearchWidget
 from ui.batch_transcribe.theme_manager import TranscriptViewerThemeManager

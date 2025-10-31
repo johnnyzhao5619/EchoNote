@@ -36,7 +36,7 @@ def to_local_naive(value: Union[datetime, str]) -> datetime:
     """Convert datetime/ISO string to local-time naive datetime."""
     if isinstance(value, str):
         text = value.strip()
-        from config.constants import UTC_TIMEZONE_SUFFIX, UTC_TIMEZONE_OFFSET
+        from config.constants import UTC_TIMEZONE_OFFSET, UTC_TIMEZONE_SUFFIX
 
         if text.endswith(UTC_TIMEZONE_SUFFIX):
             text = text[:-1] + UTC_TIMEZONE_OFFSET
@@ -137,7 +137,7 @@ class TimelineManager:
                     except ValueError:
                         pass
                     else:
-                        from config.constants import TIMEZONE_SUFFIX_START, TIMEZONE_SUFFIX_END
+                        from config.constants import TIMEZONE_SUFFIX_END, TIMEZONE_SUFFIX_START
 
                         suffix = TIMEZONE_SUFFIX_START if is_start else TIMEZONE_SUFFIX_END
                         return f"{text}{suffix}"
@@ -155,15 +155,15 @@ class TimelineManager:
             )
 
         from config.constants import (
-            TIMELINE_MIN_YEAR,
-            TIMELINE_MIN_MONTH,
-            TIMELINE_MIN_DAY,
-            TIMELINE_MAX_YEAR,
-            TIMELINE_MAX_MONTH,
             TIMELINE_MAX_DAY,
             TIMELINE_MAX_HOUR,
             TIMELINE_MAX_MINUTE,
+            TIMELINE_MAX_MONTH,
             TIMELINE_MAX_SECOND,
+            TIMELINE_MAX_YEAR,
+            TIMELINE_MIN_DAY,
+            TIMELINE_MIN_MONTH,
+            TIMELINE_MIN_YEAR,
         )
 
         start_dt = (
@@ -819,7 +819,7 @@ class TimelineManager:
         # Check description
         if event.description and query_lower in event.description.lower():
             # Find the position and extract context
-            from config.constants import SEARCH_CONTEXT_CHARS_BEFORE, SEARCH_CONTEXT_CHARS_AFTER
+            from config.constants import SEARCH_CONTEXT_CHARS_AFTER, SEARCH_CONTEXT_CHARS_BEFORE
 
             pos = event.description.lower().find(query_lower)
             start = max(0, pos - SEARCH_CONTEXT_CHARS_BEFORE)

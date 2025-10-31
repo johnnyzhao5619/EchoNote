@@ -30,8 +30,8 @@ from PySide6.QtWidgets import (
     QMessageBox,
 )
 
+from ui.base_widgets import create_button, create_hbox
 from ui.settings.base_page import BaseSettingsPage
-from ui.base_widgets import create_hbox, create_button
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.settings.calendar")

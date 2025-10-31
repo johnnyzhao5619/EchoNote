@@ -24,6 +24,7 @@ import logging
 import re
 from typing import List, Optional
 
+from ui.base_widgets import BaseWidget, create_button
 from ui.qt_imports import (
     QCheckBox,
     QColor,
@@ -42,8 +43,6 @@ from ui.signal_helpers import (
     connect_button_with_callback,
     connect_text_changed,
 )
-
-from ui.base_widgets import BaseWidget, create_button
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.search_widget")

@@ -20,6 +20,7 @@ import inspect
 import logging
 from typing import Any
 
+
 def close_lazy_loaded_engine(name: str, loader: Any, logger: logging.Logger) -> None:
     """关闭惰性加载的引擎实例。"""
     if not loader or not getattr(loader, "is_initialized", lambda: False)():

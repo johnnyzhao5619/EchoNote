@@ -28,6 +28,7 @@ from typing import Optional
 
 logger = logging.getLogger("echonote.database")
 
+
 class DatabaseConnection:
     """
     Manages SQLite database connections with encryption support.

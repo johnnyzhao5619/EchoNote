@@ -42,7 +42,7 @@ from config.constants import (
     GAIN_SLIDER_TICK_INTERVAL,
     STANDARD_LABEL_WIDTH,
 )
-from ui.base_widgets import create_hbox, create_vbox, create_button
+from ui.base_widgets import create_button, create_hbox, create_vbox
 from ui.settings.base_page import BaseSettingsPage
 from utils.i18n import I18nQtManager
 

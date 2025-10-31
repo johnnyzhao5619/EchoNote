@@ -4,17 +4,18 @@ Tests for audio format conversion functionality.
 """
 
 import io
-import pytest
-import numpy as np
-import soundfile as sf
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
+
+import numpy as np
+import pytest
+import soundfile as sf
 
 from engines.speech.base import (
-    convert_audio_to_wav_bytes,
-    ensure_audio_sample_rate,
     AUDIO_VIDEO_FORMATS,
     AUDIO_VIDEO_SUFFIXES,
+    convert_audio_to_wav_bytes,
+    ensure_audio_sample_rate,
 )
 
 
@@ -53,7 +54,7 @@ class TestEnsureAudioSampleRate:
         """Test when source and target rates are the same."""
         audio = np.array([0.1, 0.2, 0.3], dtype=np.float32)
         result, rate = ensure_audio_sample_rate(audio, 16000, 16000)
-        
+
         assert rate == 16000
         np.testing.assert_array_almost_equal(result, audio)
 
@@ -61,7 +62,7 @@ class TestEnsureAudioSampleRate:
         """Test upsampling audio."""
         audio = np.array([0.0, 0.5, 1.0], dtype=np.float32)
         result, rate = ensure_audio_sample_rate(audio, 8000, 16000)
-        
+
         assert rate == 16000
         assert len(result) > len(audio)
 
@@ -69,7 +70,7 @@ class TestEnsureAudioSampleRate:
         """Test downsampling audio."""
         audio = np.linspace(0, 1, 1000, dtype=np.float32)
         result, rate = ensure_audio_sample_rate(audio, 48000, 16000)
-        
+
         assert rate == 16000
         assert len(result) < len(audio)
 
@@ -77,7 +78,7 @@ class TestEnsureAudioSampleRate:
         """Test with None target rate (preserve source)."""
         audio = np.array([0.1, 0.2, 0.3], dtype=np.float32)
         result, rate = ensure_audio_sample_rate(audio, 16000, None)
-        
+
         assert rate == 16000
         np.testing.assert_array_almost_equal(result, audio)
 
@@ -85,7 +86,7 @@ class TestEnsureAudioSampleRate:
         """Test with empty audio array."""
         audio = np.array([], dtype=np.float32)
         result, rate = ensure_audio_sample_rate(audio, 16000, 16000)
-        
+
         assert len(result) == 0
         assert rate == 16000
 
@@ -93,7 +94,7 @@ class TestEnsureAudioSampleRate:
         """Test with zero source rate."""
         audio = np.array([0.1, 0.2], dtype=np.float32)
         result, rate = ensure_audio_sample_rate(audio, 0, 16000)
-        
+
         # Should use target rate as source
         assert rate == 16000
 
@@ -110,14 +111,14 @@ class TestConvertAudioToWavBytes:
         samples = int(sample_rate * duration)
         audio_data = np.sin(2 * np.pi * 440 * np.linspace(0, duration, samples))
         audio_data = audio_data.astype(np.float32)
-        
+
         sf.write(str(file_path), audio_data, sample_rate)
         return str(file_path)
 
     def test_convert_wav_file(self, temp_wav_file):
         """Test converting a WAV file."""
         wav_bytes, output_rate, source_rate, fmt = convert_audio_to_wav_bytes(temp_wav_file)
-        
+
         assert isinstance(wav_bytes, bytes)
         assert len(wav_bytes) > 0
         assert output_rate == 16000
@@ -129,7 +130,7 @@ class TestConvertAudioToWavBytes:
         wav_bytes, output_rate, source_rate, fmt = convert_audio_to_wav_bytes(
             temp_wav_file, target_rate=8000
         )
-        
+
         assert isinstance(wav_bytes, bytes)
         assert output_rate == 8000
         assert source_rate == 16000
@@ -142,11 +143,11 @@ class TestConvertAudioToWavBytes:
     def test_wav_bytes_are_valid(self, temp_wav_file):
         """Test that converted WAV bytes are valid."""
         wav_bytes, output_rate, _, _ = convert_audio_to_wav_bytes(temp_wav_file)
-        
+
         # Try to read the WAV bytes back
         buffer = io.BytesIO(wav_bytes)
         data, rate = sf.read(buffer)
-        
+
         assert rate == output_rate
         assert len(data) > 0
 
@@ -156,20 +157,20 @@ class TestConvertAudioToWavBytes:
         sample_rate = 16000
         duration = 0.5
         samples = int(sample_rate * duration)
-        
+
         # Create stereo audio (2 channels)
         left_channel = np.sin(2 * np.pi * 440 * np.linspace(0, duration, samples))
         right_channel = np.sin(2 * np.pi * 880 * np.linspace(0, duration, samples))
         stereo_audio = np.column_stack([left_channel, right_channel]).astype(np.float32)
-        
+
         sf.write(str(file_path), stereo_audio, sample_rate)
-        
+
         wav_bytes, output_rate, source_rate, fmt = convert_audio_to_wav_bytes(str(file_path))
-        
+
         # Read back and verify it's mono
         buffer = io.BytesIO(wav_bytes)
         data, rate = sf.read(buffer)
-        
+
         assert data.ndim == 1  # Mono audio
         assert rate == sample_rate
 
@@ -206,17 +207,17 @@ class TestFormatDetection:
         samples = int(sample_rate * duration)
         audio_data = np.sin(2 * np.pi * 440 * np.linspace(0, duration, samples))
         audio_data = audio_data.astype(np.float32)
-        
+
         # WAV file
         wav_path = tmp_path / "test.wav"
         sf.write(str(wav_path), audio_data, sample_rate)
         files["wav"] = str(wav_path)
-        
+
         # FLAC file
         flac_path = tmp_path / "test.flac"
         sf.write(str(flac_path), audio_data, sample_rate, format="FLAC")
         files["flac"] = str(flac_path)
-        
+
         return files
 
     def test_detect_wav_format(self, temp_audio_files):

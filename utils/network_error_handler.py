@@ -30,6 +30,7 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
+
 def check_network_connectivity(host: str = "8.8.8.8", port: int = 53, timeout: float = 3.0) -> bool:
     """
     检查网络连接是否可用
@@ -56,6 +57,7 @@ def check_network_connectivity(host: str = "8.8.8.8", port: int = 53, timeout: f
                 sock.close()
             except OSError:
                 logger.debug("Failed to close socket cleanly", exc_info=True)
+
 
 def get_network_error_message(error: Exception) -> tuple[str, str]:
     """
@@ -149,6 +151,7 @@ def get_network_error_message(error: Exception) -> tuple[str, str]:
         suggestion = "请检查网络连接，或使用本地引擎（faster-whisper）"
 
     return message, suggestion
+
 
 def retry_on_network_error(
     max_retries: int = 3,
@@ -255,6 +258,7 @@ def retry_on_network_error(
         return wrapper
 
     return decorator
+
 
 def async_retry_on_network_error(
     max_retries: int = 3,

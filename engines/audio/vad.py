@@ -26,6 +26,7 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+
 class VADDetector:
     """语音活动检测器"""
 

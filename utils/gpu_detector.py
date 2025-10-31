@@ -25,6 +25,7 @@ from typing import Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
 
+
 class GPUDetector:
     """Detects available GPU and compute devices."""
 
