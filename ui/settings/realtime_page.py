@@ -29,14 +29,19 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QFileDialog,
-    QHBoxLayout,
     QLabel,
     QLineEdit,
-    QPushButton,
     QSlider,
-    QVBoxLayout,
 )
 
+from config.constants import (
+    GAIN_SLIDER_DEFAULT,
+    GAIN_SLIDER_DIVISOR,
+    GAIN_SLIDER_MAX,
+    GAIN_SLIDER_MIN,
+    GAIN_SLIDER_TICK_INTERVAL,
+    STANDARD_LABEL_WIDTH,
+)
 from ui.base_widgets import create_hbox, create_vbox, create_button
 from ui.settings.base_page import BaseSettingsPage
 from utils.i18n import I18nQtManager
@@ -79,7 +84,7 @@ class RealtimeSettingsPage(BaseSettingsPage):
         # Default input source
         source_layout = create_hbox()
         self.source_label = QLabel(self.i18n.t("settings.realtime.input_source"))
-        self.source_label.setMinimumWidth(200)
+        self.source_label.setMinimumWidth(STANDARD_LABEL_WIDTH)
         self.source_combo = QComboBox()
         self.source_combo.addItems(
             [
@@ -100,11 +105,12 @@ class RealtimeSettingsPage(BaseSettingsPage):
 
         gain_slider_layout = create_hbox()
         self.gain_slider = QSlider(Qt.Orientation.Horizontal)
-        self.gain_slider.setMinimum(10)  # 0.1 * 100
-        self.gain_slider.setMaximum(200)  # 2.0 * 100
-        self.gain_slider.setValue(100)  # 1.0 * 100
+        # Gain slider range: 0.1x to 2.0x (multiplied by 100 for integer slider)
+        self.gain_slider.setMinimum(GAIN_SLIDER_MIN)
+        self.gain_slider.setMaximum(GAIN_SLIDER_MAX)
+        self.gain_slider.setValue(GAIN_SLIDER_DEFAULT)
         self.gain_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
-        self.gain_slider.setTickInterval(10)
+        self.gain_slider.setTickInterval(GAIN_SLIDER_TICK_INTERVAL)
         self.gain_slider.valueChanged.connect(self._on_gain_changed)
 
         self.gain_value_label = QLabel("1.0x")
@@ -130,7 +136,7 @@ class RealtimeSettingsPage(BaseSettingsPage):
         # Recording format
         format_layout = create_hbox()
         self.format_label = QLabel(self.i18n.t("settings.realtime.recording_format"))
-        self.format_label.setMinimumWidth(200)
+        self.format_label.setMinimumWidth(STANDARD_LABEL_WIDTH)
         self.format_combo = QComboBox()
         self.format_combo.addItems(["wav", "mp3"])
         if not self._mp3_supported:
@@ -157,7 +163,7 @@ class RealtimeSettingsPage(BaseSettingsPage):
         # Recording save path
         path_layout = create_hbox()
         self.path_label = QLabel(self.i18n.t("settings.realtime.recording_path"))
-        self.path_label.setMinimumWidth(200)
+        self.path_label.setMinimumWidth(STANDARD_LABEL_WIDTH)
         self.path_edit = QLineEdit()
         self.path_edit.textChanged.connect(self._emit_changed)
         self.browse_button = create_button(self.i18n.t("settings.realtime.browse"))
@@ -182,10 +188,13 @@ class RealtimeSettingsPage(BaseSettingsPage):
         # Translation engine
         translation_layout = create_hbox()
         self.translation_label = QLabel(self.i18n.t("settings.realtime.translation_engine"))
-        self.translation_label.setMinimumWidth(200)
+        self.translation_label.setMinimumWidth(STANDARD_LABEL_WIDTH)
         self.translation_combo = QComboBox()
         self.translation_combo.addItems(
-            [self.i18n.t("settings.realtime.no_translation"), "Google Translate"]
+            [
+                self.i18n.t("settings.realtime.no_translation"),
+                self.i18n.t("settings.realtime.google_translate"),
+            ]
         )
         self.translation_combo.currentTextChanged.connect(self._emit_changed)
         translation_layout.addWidget(self.translation_label)
@@ -203,7 +212,7 @@ class RealtimeSettingsPage(BaseSettingsPage):
         Args:
             value: Slider value (10-200)
         """
-        gain = value / 100.0
+        gain = value / GAIN_SLIDER_DIVISOR
         self.gain_value_label.setText(f"{gain:.1f}x")
         self._emit_changed()
 
@@ -236,7 +245,7 @@ class RealtimeSettingsPage(BaseSettingsPage):
             # Gain level
             gain = self.settings_manager.get_setting("realtime.default_gain")
             if gain:
-                self.gain_slider.setValue(int(gain * 100))
+                self.gain_slider.setValue(int(gain * GAIN_SLIDER_DIVISOR))
 
             # Recording format
             recording_format = self.settings_manager.get_setting("realtime.recording_format")
@@ -277,7 +286,7 @@ class RealtimeSettingsPage(BaseSettingsPage):
             self.settings_manager.set_setting("realtime.default_input_source", source_value)
 
             # Gain level
-            gain = self.gain_slider.value() / 100.0
+            gain = self.gain_slider.value() / GAIN_SLIDER_DIVISOR
             self.settings_manager.set_setting("realtime.default_gain", gain)
 
             # Recording format
@@ -359,6 +368,33 @@ class RealtimeSettingsPage(BaseSettingsPage):
                 self.format_combo.setToolTip(self.i18n.t("settings.realtime.mp3_requires_ffmpeg"))
             else:
                 self.format_combo.setToolTip(self.i18n.t("settings.realtime.mp3_enabled_ffmpeg"))
+
+        # Update combo box options
+        if hasattr(self, "source_combo"):
+            current_index = self.source_combo.currentIndex()
+            self.source_combo.blockSignals(True)
+            self.source_combo.clear()
+            self.source_combo.addItems(
+                [
+                    self.i18n.t("settings.realtime.default_device"),
+                    self.i18n.t("settings.realtime.system_audio"),
+                ]
+            )
+            self.source_combo.setCurrentIndex(current_index)
+            self.source_combo.blockSignals(False)
+
+        if hasattr(self, "translation_combo"):
+            current_index = self.translation_combo.currentIndex()
+            self.translation_combo.blockSignals(True)
+            self.translation_combo.clear()
+            self.translation_combo.addItems(
+                [
+                    self.i18n.t("settings.realtime.no_translation"),
+                    self.i18n.t("settings.realtime.google_translate"),
+                ]
+            )
+            self.translation_combo.setCurrentIndex(current_index)
+            self.translation_combo.blockSignals(False)
 
     def _detect_mp3_support(self) -> bool:
         try:

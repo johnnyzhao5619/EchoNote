@@ -172,6 +172,7 @@ FILE_SIZE_THRESHOLD = 1024.0
 # User Feedback
 DEFAULT_RECENT_OPERATIONS_COUNT = 10
 
+
 # Default Paths (platform-aware) - Deprecated, use get_i18n_default_recordings_path instead
 def get_default_recordings_path() -> str:
     """
@@ -183,11 +184,13 @@ def get_default_recordings_path() -> str:
 
     return str(Path.home() / "Documents" / "EchoNote" / "Recordings")
 
+
 DEFAULT_RECORDINGS_PATH = get_default_recordings_path()
 
 # ============================================================================
 # Internationalized User-Visible Constants
 # ============================================================================
+
 
 def get_i18n_file_size_units(i18n_manager=None) -> list[str]:
     """
@@ -209,6 +212,7 @@ def get_i18n_file_size_units(i18n_manager=None) -> list[str]:
         i18n_manager.t("constants.file_size.gigabytes"),
         i18n_manager.t("constants.file_size.terabytes"),
     ]
+
 
 def get_i18n_startup_progress_labels(i18n_manager=None) -> dict[str, str]:
     """
@@ -251,6 +255,7 @@ def get_i18n_startup_progress_labels(i18n_manager=None) -> dict[str, str]:
         "final": i18n_manager.t("constants.startup.final"),
     }
 
+
 def get_i18n_default_recordings_path(i18n_manager=None) -> str:
     """
     Get internationalized default recordings path.
@@ -271,6 +276,23 @@ def get_i18n_default_recordings_path(i18n_manager=None) -> str:
     recordings_folder = i18n_manager.t("constants.folders.recordings")
 
     return str(Path.home() / documents_folder / "EchoNote" / recordings_folder)
+
+
+# ============================================================================
+# UI Layout Constants
+# ============================================================================
+
+# Standard widget dimensions
+STANDARD_LABEL_WIDTH = 200  # Standard width for form labels
+STANDARD_BUTTON_HEIGHT = 32  # Standard height for buttons
+STANDARD_SPACING = 10  # Standard spacing between UI elements
+
+# Gain slider constants (for realtime settings)
+GAIN_SLIDER_MIN = 10  # 0.1 * 100 (minimum gain multiplier)
+GAIN_SLIDER_MAX = 200  # 2.0 * 100 (maximum gain multiplier)
+GAIN_SLIDER_DEFAULT = 100  # 1.0 * 100 (default gain multiplier)
+GAIN_SLIDER_TICK_INTERVAL = 10  # Tick every 0.1x
+GAIN_SLIDER_DIVISOR = 100.0  # Convert slider value to float
 
 # ============================================================================
 # Accessibility Constants

@@ -21,6 +21,7 @@ task lifecycle from creation to completion.
 """
 
 import asyncio
+import concurrent.futures
 import json
 import logging
 import os
@@ -39,8 +40,12 @@ from ui.common.notification import get_notification_manager
 
 logger = logging.getLogger("echonote.transcription.manager")
 
+
 class TaskNotFoundError(Exception):
     """Raised when a transcription task cannot be found."""
+
+    pass
+
 
 class TranscriptionManager:
     """

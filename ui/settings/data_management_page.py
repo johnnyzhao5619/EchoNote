@@ -30,7 +30,7 @@ from PySide6.QtCore import Qt, QThread, Signal
     QVBoxLayout,
 )
 
-from ui.settings.base_page import BasePage
+from ui.settings.base_page import BaseSettingsPage
 from utils.data_cleanup import DataCleanup
 
 logger = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ class CleanupWorker(QThread):
             logger.error(f"Cleanup worker error: {e}")
             self.error.emit(str(e))
 
-class DataManagementPage(BasePage):
+class DataManagementPage(BaseSettingsPage):
     """
     Data Management settings page.
 
@@ -62,12 +62,13 @@ class DataManagementPage(BasePage):
     - Selective data cleanup
     """
 
-    def __init__(self, settings_manager, parent=None):
+    def __init__(self, settings_manager, i18n, parent=None):
         """
         Initialize data management page.
 
         Args:
             settings_manager: SettingsManager instance
+            i18n: Internationalization manager
             parent: Parent widget
         """
         super().__init__(settings_manager, i18n)
@@ -81,9 +82,9 @@ class DataManagementPage(BasePage):
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         # Page title
-        title = QLabel(self.i18n.t("data_management.title"))
-        title.setProperty("role", "calendar-header")
-        layout.addWidget(title)
+        self.title_label = QLabel(self.i18n.t("data_management.title"))
+        self.title_label.setProperty("role", "calendar-header")
+        layout.addWidget(self.title_label)
 
         # Storage summary group
         storage_group = self._create_storage_summary_group()
@@ -100,7 +101,7 @@ class DataManagementPage(BasePage):
 
     def _create_storage_summary_group(self) -> QGroupBox:
         """Create storage summary group."""
-        group = QGroupBox(self.i18n.t("settings.storage_summary"))
+        self.storage_group = QGroupBox(self.i18n.t("settings.storage_summary"))
         layout = create_vbox()
 
         # Summary labels
@@ -121,20 +122,20 @@ class DataManagementPage(BasePage):
         layout.addWidget(self.total_label)
 
         # Refresh button
-        refresh_btn = create_button("Refresh")
-        connect_button_with_callback(refresh_btn, self._refresh_storage_summary)
-        layout.addWidget(refresh_btn)
+        self.refresh_btn = create_button(self.i18n.t("common.refresh"))
+        connect_button_with_callback(self.refresh_btn, self._refresh_storage_summary)
+        layout.addWidget(self.refresh_btn)
 
-        group.setLayout(layout)
+        self.storage_group.setLayout(layout)
 
         # Initial refresh
         self._refresh_storage_summary()
 
-        return group
+        return self.storage_group
 
     def _create_cleanup_group(self) -> QGroupBox:
         """Create data cleanup group."""
-        group = QGroupBox(self.i18n.t("settings.data_cleanup"))
+        self.cleanup_group = QGroupBox(self.i18n.t("settings.data_cleanup"))
         layout = create_vbox()
 
         # Warning label
@@ -147,18 +148,18 @@ class DataManagementPage(BasePage):
         layout.addWidget(warning)
 
         # Clear all data button
-        clear_all_btn = create_button(self.i18n.t("data_management.clear_all"))
-        clear_all_btn.setProperty("role", "data-delete-all")
-        connect_button_with_callback(clear_all_btn, self._confirm_clear_all_data)
-        layout.addWidget(clear_all_btn)
+        self.clear_all_btn = create_button(self.i18n.t("data_management.clear_all"))
+        self.clear_all_btn.setProperty("role", "data-delete-all")
+        connect_button_with_callback(self.clear_all_btn, self._confirm_clear_all_data)
+        layout.addWidget(self.clear_all_btn)
 
         # Description
-        description = QLabel(self.i18n.t("data_management.clear_all_description"))
-        description.setProperty("role", "data-description")
-        layout.addWidget(description)
+        self.description_label = QLabel(self.i18n.t("data_management.clear_all_description"))
+        self.description_label.setProperty("role", "data-description")
+        layout.addWidget(self.description_label)
 
-        group.setLayout(layout)
-        return group
+        self.cleanup_group.setLayout(layout)
+        return self.cleanup_group
 
     def _refresh_storage_summary(self):
         """Refresh storage summary display."""
@@ -174,21 +175,21 @@ class DataManagementPage(BasePage):
             total_size = DataCleanup.format_size(summary["total_size"])
 
             # Update labels
+            db_status = self.i18n.t("data_management.storage_status.exists") if summary["database_exists"] else self.i18n.t("data_management.storage_status.not_found")
             self.database_label.setText(
-                f"Database: {db_size}"
-                + (" (exists)" if summary["database_exists"] else " (not found)")
+                f"{self.i18n.t('data_management.storage_labels.database_prefix')}: {db_size} ({db_status})"
             )
             self.config_label.setText(
-                f"Configuration: {config_size} " f"({len(summary['config_files'])} files)"
+                f"{self.i18n.t('data_management.storage_labels.configuration_prefix')}: {config_size} ({len(summary['config_files'])} {self.i18n.t('data_management.storage_labels.files')})"
             )
             self.recordings_label.setText(
-                f"Recordings: {recordings_size} " f"({summary['recordings_count']} files)"
+                f"{self.i18n.t('data_management.storage_labels.recordings_prefix')}: {recordings_size} ({summary['recordings_count']} {self.i18n.t('data_management.storage_labels.files')})"
             )
             self.transcripts_label.setText(
-                f"Transcripts: {transcripts_size} " f"({summary['transcripts_count']} files)"
+                f"{self.i18n.t('data_management.storage_labels.transcripts_prefix')}: {transcripts_size} ({summary['transcripts_count']} {self.i18n.t('data_management.storage_labels.files')})"
             )
-            self.logs_label.setText(f"Logs: {logs_size} " f"({summary['logs_count']} files)")
-            self.total_label.setText(f"Total: {total_size}")
+            self.logs_label.setText(f"{self.i18n.t('data_management.storage_labels.logs_prefix')}: {logs_size} ({summary['logs_count']} {self.i18n.t('data_management.storage_labels.files')})")
+            self.total_label.setText(f"{self.i18n.t('data_management.storage_labels.total_prefix')}: {total_size}")
 
             logger.debug("Storage summary refreshed")
 
@@ -323,3 +324,46 @@ class DataManagementPage(BasePage):
 
     def save_settings(self):
         """Save settings (not applicable for this page)."""
+
+    def validate_settings(self):
+        """Validate settings (not applicable for this page)."""
+        return True, ""
+
+    def update_translations(self):
+        """Update UI text after language change."""
+        # Update title
+        if hasattr(self, "title_label"):
+            self.title_label.setText(self.i18n.t("data_management.title"))
+
+        # Update storage summary labels
+        if hasattr(self, "database_label"):
+            self.database_label.setText(self.i18n.t("data_management.storage_labels.database"))
+        if hasattr(self, "config_label"):
+            self.config_label.setText(self.i18n.t("data_management.storage_labels.configuration"))
+        if hasattr(self, "recordings_label"):
+            self.recordings_label.setText(self.i18n.t("data_management.storage_labels.recordings"))
+        if hasattr(self, "transcripts_label"):
+            self.transcripts_label.setText(self.i18n.t("data_management.storage_labels.transcripts"))
+        if hasattr(self, "logs_label"):
+            self.logs_label.setText(self.i18n.t("data_management.storage_labels.logs"))
+        if hasattr(self, "total_label"):
+            self.total_label.setText(self.i18n.t("data_management.storage_labels.total"))
+
+        # Update buttons
+        if hasattr(self, "refresh_btn"):
+            self.refresh_btn.setText(self.i18n.t("common.refresh"))
+        if hasattr(self, "clear_all_btn"):
+            self.clear_all_btn.setText(self.i18n.t("data_management.clear_all"))
+
+        # Update group titles
+        if hasattr(self, "storage_group"):
+            self.storage_group.setTitle(self.i18n.t("settings.storage_summary"))
+        if hasattr(self, "cleanup_group"):
+            self.cleanup_group.setTitle(self.i18n.t("data_management.title"))
+
+        # Update description
+        if hasattr(self, "description_label"):
+            self.description_label.setText(self.i18n.t("data_management.clear_all_description"))
+
+        # Refresh storage summary to update the text
+        self._refresh_storage_summary()

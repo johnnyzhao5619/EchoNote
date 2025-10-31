@@ -72,11 +72,16 @@ class LanguageSettingsPage(BaseSettingsPage):
 
         self.language_combo.currentIndexChanged.connect(self._on_language_changed)
 
-        from ui.layout_utils import create_label_control_row
+        from ui.layout_utils import create_horizontal_layout
 
-        language_layout = create_label_control_row(
-            self.i18n.t("settings.language.select"), self.language_combo
-        )
+        language_layout = create_horizontal_layout()
+
+        self.language_label = QLabel(self.i18n.t("settings.language.select"))
+        self.language_label.setMinimumWidth(120)
+        language_layout.addWidget(self.language_label)
+        language_layout.addWidget(self.language_combo)
+        language_layout.addStretch()
+
         self.content_layout.addLayout(language_layout)
 
         self.add_spacing(10)

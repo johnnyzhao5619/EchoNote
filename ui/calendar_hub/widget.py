@@ -1132,16 +1132,16 @@ class CalendarHubWidget(BaseWidget):
                 delta = now - most_recent
 
                 if delta.total_seconds() < 60:
-                    time_ago = "just now"
+                    time_ago = self.i18n.t("calendar_hub.widget.time_ago_just_now")
                 elif delta.total_seconds() < 3600:
                     minutes = int(delta.total_seconds() / 60)
-                    time_ago = f"{minutes}m ago"
+                    time_ago = self.i18n.t("calendar_hub.widget.time_ago_minutes", minutes=minutes)
                 elif delta.total_seconds() < 86400:
                     hours = int(delta.total_seconds() / 3600)
-                    time_ago = f"{hours}h ago"
+                    time_ago = self.i18n.t("calendar_hub.widget.time_ago_hours", hours=hours)
                 else:
                     days = int(delta.total_seconds() / 86400)
-                    time_ago = f"{days}d ago"
+                    time_ago = self.i18n.t("calendar_hub.widget.time_ago_days", days=days)
 
                 self.sync_status_label.setText(f"Last sync: {time_ago}")
                 self.sync_status_label.setProperty("state", None)  # Reset to default

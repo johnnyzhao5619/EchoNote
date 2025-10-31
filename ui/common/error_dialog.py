@@ -187,7 +187,11 @@ class ErrorDialog(QDialog):
             else:
                 text = self.i18n.t("common.show_details")
         else:
-            text = "Hide Details" if showing else "Show Details"
+            text = (
+                self.i18n.t("common.hide_details")
+                if showing
+                else self.i18n.t("common.show_details")
+            )
 
         self.details_button.setText(text)
 

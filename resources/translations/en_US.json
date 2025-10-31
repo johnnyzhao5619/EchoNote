@@ -57,7 +57,18 @@
       "recordings": "Recordings: Calculating...",
       "transcripts": "Transcripts: Calculating...",
       "logs": "Logs: Calculating...",
-      "total": "Total: Calculating..."
+      "total": "Total: Calculating...",
+      "database_prefix": "Database",
+      "configuration_prefix": "Configuration",
+      "recordings_prefix": "Recordings",
+      "transcripts_prefix": "Transcripts",
+      "logs_prefix": "Logs",
+      "total_prefix": "Total",
+      "files": "files"
+    },
+    "storage_status": {
+      "exists": "exists",
+      "not_found": "not found"
     },
     "clear_all_description": "This will delete:\n• Database (all tasks, events, and settings)\n• Configuration files\n• All recordings\n• All transcripts\n• Log files",
     "confirm_delete_details": "This will permanently delete approximately {size} of data.\n\nThis operation cannot be undone!\n\nThe application will need to be restarted after cleanup.",
@@ -228,10 +239,28 @@
       "appointment": "Appointment"
     },
     "event_dialog": {
+      "edit_event_title": "Edit Event",
+      "title_label": "Title *:",
+      "type_label": "Type *:",
+      "start_time_label": "Start Time *:",
+      "end_time_label": "End Time *:",
+      "location_label": "Location:",
+      "attendees_label": "Attendees:",
+      "description_label": "Description:",
+      "reminder_label": "Reminder:",
       "title_placeholder": "Enter event title",
       "location_placeholder": "Enter location",
       "attendees_placeholder": "Enter emails separated by commas",
       "description_placeholder": "Enter description",
+      "reminder_none": "No reminder",
+      "reminder_5min": "5 minutes before",
+      "reminder_10min": "10 minutes before",
+      "reminder_15min": "15 minutes before",
+      "reminder_30min": "30 minutes before",
+      "reminder_1hour": "1 hour before",
+      "reminder_1day": "1 day before",
+      "sync_options": "Sync Options",
+      "sync_to_provider": "Sync to {provider} ({email})",
       "validation_error": "Validation Error",
       "title_required": "Title is required.",
       "end_after_start": "End time must be after start time.",
@@ -243,7 +272,16 @@
       "waiting_authorization": "Waiting for authorization...",
       "authorization_failed": "Authorization failed: state mismatch",
       "authorization_successful": "Authorization successful!",
-      "authorization_error": "Authorization Error"
+      "authorization_error": "Authorization Error",
+      "auth_success_title": "Authorization Successful",
+      "auth_success_heading": "Authorization Successful!",
+      "auth_success_content": "<p>You can close this window and return to EchoNote.</p>",
+      "auth_failed_title": "Authorization Failed",
+      "auth_failed_heading": "Authorization Failed",
+      "auth_failed_content": "<p>Error: {error}</p><p>You can close this window and try again.</p>",
+      "unknown_error": "Unknown error",
+      "connect_title": "Connect {provider} Calendar",
+      "instructions_html": "<p>To connect your {provider} calendar:</p><ol><li>Click the \"Start Authorization\" button below</li><li>Your browser will open to {provider}'s authorization page</li><li>Sign in to your {provider} account if needed</li><li>Grant EchoNote permission to access your calendar</li><li>You will be redirected back to EchoNote automatically</li></ol><p><strong>Note:</strong> EchoNote will only access your calendar data. We never store your password.</p>"
     },
     "widget": {
       "add_calendar_account": "Add Calendar Account",
@@ -255,7 +293,11 @@
       "previous": "Previous",
       "next": "Next",
       "sync_now_tooltip": "Sync calendar data immediately",
-      "sync_now": "Sync Now"
+      "sync_now": "Sync Now",
+      "time_ago_just_now": "just now",
+      "time_ago_minutes": "{minutes}m ago",
+      "time_ago_hours": "{hours}h ago",
+      "time_ago_days": "{days}d ago"
     },
     "calendar_view": {
       "no_events": "No events for this day"
@@ -496,6 +538,7 @@
       "will_automatically_use": "Will automatically use: {device_name} ({compute_type})",
       "gpu_acceleration": "NVIDIA GPU acceleration. Requires CUDA-compatible GPU.",
       "cpu_mode": "CPU mode. No GPU acceleration.",
+      "unknown_provider": "Unknown provider",
       "show_password": "Show/Hide Password",
       "error": {
         "empty_path": "Save path cannot be empty",
@@ -520,6 +563,7 @@
       "translation": "Translation Settings",
       "translation_engine": "Translation Engine",
       "no_translation": "No Translation",
+      "google_translate": "Google Translate",
       "error": {
         "empty_path": "Save path cannot be empty",
         "invalid_path": "Invalid path: {error}"

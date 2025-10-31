@@ -270,23 +270,23 @@ class RealtimeRecordWidget(BaseWidget):
         self.tab_widget = QTabWidget()
         self.tab_widget.setObjectName("main_tabs")
 
-        # 标签1: 录制控制
+        # Recording control tab
         recording_tab = self._create_recording_tab()
         self.tab_widget.addTab(
             recording_tab, "🎙 " + self.i18n.t("realtime_record.recording_control")
         )
 
-        # 标签2: 转录结果
+        # Transcription results tab
         transcription_tab = self._create_transcription_tab()
         self.tab_widget.addTab(
             transcription_tab, "📝 " + self.i18n.t("realtime_record.transcription")
         )
 
-        # 标签3: 翻译结果
+        # Translation results tab
         translation_tab = self._create_translation_tab()
         self.tab_widget.addTab(translation_tab, "🌐 " + self.i18n.t("realtime_record.translation"))
 
-        # 标签4: 时间标记
+        # Time markers tab
         markers_tab = self._create_markers_tab()
         self.tab_widget.addTab(markers_tab, "📌 " + self.i18n.t("realtime_record.markers"))
 
@@ -301,7 +301,7 @@ class RealtimeRecordWidget(BaseWidget):
         self._update_audio_availability()
 
     def _create_recording_tab(self) -> QWidget:
-        """创建录制控制标签页"""
+        """Create recording control tab."""
         tab = QWidget()
         tab.setObjectName("recording_tab")
         layout = QVBoxLayout(tab)
@@ -370,7 +370,7 @@ class RealtimeRecordWidget(BaseWidget):
         return tab
 
     def _create_markers_tab(self) -> QWidget:
-        """创建时间标记标签页"""
+        """Create time markers tab."""
         tab = QWidget()
         tab.setObjectName("markers_tab")
         layout = QVBoxLayout(tab)
@@ -1076,40 +1076,59 @@ class RealtimeRecordWidget(BaseWidget):
                 translation_tooltip = self.i18n.t("realtime_record.translation_disabled_tooltip")
             self.target_lang_combo.setToolTip(translation_tooltip)
 
-        # 控制组
-        control_group = self.findChild(QGroupBox, "control_group")
-        if control_group:
-            control_group.setTitle(self.i18n.t("realtime_record.recording_control"))
-
-        record_button = self.findChild(QPushButton, "record_button")
-        if record_button:
+        # 更新按钮文本
+        if hasattr(self, "record_button"):
             if self.recorder.is_recording:
-                record_button.setText(self.i18n.t("realtime_record.stop_recording"))
+                self.record_button.setText(self.i18n.t("realtime_record.stop_recording"))
             else:
-                record_button.setText(self.i18n.t("realtime_record.start_recording"))
+                self.record_button.setText(self.i18n.t("realtime_record.start_recording"))
 
-        add_marker_button = self.findChild(QPushButton, "add_marker_button")
-        if add_marker_button:
-            add_marker_button.setText(self.i18n.t("realtime_record.add_marker"))
+        if hasattr(self, "add_marker_button"):
+            self.add_marker_button.setText(self.i18n.t("realtime_record.add_marker"))
 
-        duration_label = self.findChild(QLabel, "duration_label")
-        if duration_label:
-            duration_label.setText(self.i18n.t("realtime_record.recording_duration") + ":")
+        if hasattr(self, "save_recording_button"):
+            self.save_recording_button.setText(self.i18n.t("realtime_record.save_recording"))
 
-        # 转录组
-        transcription_group = self.findChild(QGroupBox, "transcription_group")
-        if transcription_group:
-            transcription_group.setTitle(self.i18n.t("realtime_record.transcription_text"))
+        # 更新导出按钮
+        if hasattr(self, "export_transcription_button"):
+            self.export_transcription_button.setText(
+                "📥 " + self.i18n.t("realtime_record.export_transcription")
+            )
 
-        # 翻译组
-        translation_group = self.findChild(QGroupBox, "translation_group")
-        if translation_group:
-            translation_group.setTitle(self.i18n.t("realtime_record.translation_text"))
+        if hasattr(self, "export_translation_button"):
+            self.export_translation_button.setText(
+                "📥 " + self.i18n.t("realtime_record.export_translation")
+            )
 
-        markers_group = self.findChild(QGroupBox, "markers_group")
-        if markers_group:
-            markers_group.setTitle(self.i18n.t("realtime_record.markers"))
+        # 更新工具栏中的复制按钮和字数统计
+        copy_buttons = self.findChildren(QPushButton)
+        for btn in copy_buttons:
+            if "📋" in btn.text():
+                btn.setText("📋 " + self.i18n.t("common.copy"))
 
+        # 更新字数统计标签
+        if hasattr(self, "transcription_word_count"):
+            current_count = self.transcription_word_count.text().split()[0]
+            self.transcription_word_count.setText(current_count + " " + self.i18n.t("common.words"))
+
+        if hasattr(self, "translation_word_count"):
+            current_count = self.translation_word_count.text().split()[0]
+            self.translation_word_count.setText(current_count + " " + self.i18n.t("common.words"))
+
+        # 更新清除标记按钮 - 查找包含"clear"或"清除"文本的按钮
+        clear_buttons = self.findChildren(QPushButton)
+        for btn in clear_buttons:
+            btn_text = btn.text().lower()
+            if "clear" in btn_text or "清除" in btn_text:
+                btn.setText(self.i18n.t("realtime_record.clear_markers"))
+
+        # 更新表单标签
+        self._update_form_labels()
+
+        # 更新语言下拉框
+        self._update_language_combos()
+
+        # 更新占位符文本
         if hasattr(self, "markers_list") and hasattr(self.markers_list, "setPlaceholderText"):
             self.markers_list.setPlaceholderText(self.i18n.t("realtime_record.markers_placeholder"))
             self._refresh_markers_list()
@@ -1120,18 +1139,16 @@ class RealtimeRecordWidget(BaseWidget):
                 self.i18n.t("realtime_record.translation_not_available")
             )
 
-        # 导出按钮
-        export_transcription_button = self.findChild(QPushButton, "export_transcription_button")
-        if export_transcription_button:
-            export_transcription_button.setText(self.i18n.t("realtime_record.export_transcription"))
+        # 更新标签页标题
+        if hasattr(self, "tab_widget"):
+            self.tab_widget.setTabText(0, "🎙 " + self.i18n.t("realtime_record.recording_control"))
+            self.tab_widget.setTabText(1, "📝 " + self.i18n.t("realtime_record.transcription"))
+            self.tab_widget.setTabText(2, "🌐 " + self.i18n.t("realtime_record.translation"))
+            self.tab_widget.setTabText(3, "📌 " + self.i18n.t("realtime_record.markers"))
 
-        export_translation_button = self.findChild(QPushButton, "export_translation_button")
-        if export_translation_button:
-            export_translation_button.setText(self.i18n.t("realtime_record.export_translation"))
-
-        save_recording_button = self.findChild(QPushButton, "save_recording_button")
-        if save_recording_button:
-            save_recording_button.setText(self.i18n.t("realtime_record.save_recording"))
+        # 更新页面标题
+        if hasattr(self, "title_label"):
+            self.title_label.setText(self.i18n.t("realtime_record.title"))
 
         # 更新音频可用性提示
         self._update_audio_availability()

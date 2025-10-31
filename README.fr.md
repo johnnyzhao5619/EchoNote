@@ -310,7 +310,7 @@ Nous accueillons les contributions ! Veuillez consulter notre [Guide de contribu
 
 ## 📊 Statut du projet
 
-- **Version** : v1.1.1 (Dernière version de maintenance)
+- **Version** : v1.2.0 (Dernière version de maintenance)
 - **Couverture de tests** : 607 tests, 100% de réussite
 - **Qualité du code** : Excellente (conforme PEP 8, annotations de type complètes)
 - **Documentation** : Complète et restructurée

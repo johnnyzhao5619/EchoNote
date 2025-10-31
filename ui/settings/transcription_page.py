@@ -539,7 +539,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
                     )
                 else:
                     is_valid = False
-                    message = "Unknown provider"
+                    message = self.i18n.t("settings.transcription.unknown_provider")
 
                 # Show result
                 if is_valid:

@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional,
 from data.database.models import AutoTaskConfig, CalendarEvent, EventAttachment
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
-    pass  # Type checking imports would go here if needed
+    from utils.i18n import I18nQtManager as I18nManager
 
 from config.constants import DEFAULT_TRANSCRIPT_CANDIDATE_WINDOW_DAYS, MAX_TRANSCRIPT_CANDIDATES
 

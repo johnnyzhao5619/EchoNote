@@ -386,7 +386,8 @@ class TranscriptViewerDialog(QDialog):
     def _init_ui(self):
         """Initialize the user interface."""
         # Window properties
-        self.setWindowTitle(f"Transcript Viewer - {self.task_data['file_name']}")
+        title = self.i18n.t("viewer.title", filename=self.task_data["file_name"])
+        self.setWindowTitle(title)
         self.setMinimumSize(QSize(800, 600))
         self.resize(QSize(1000, 800))
 

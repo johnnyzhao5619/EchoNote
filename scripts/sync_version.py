@@ -18,218 +18,268 @@
 Version synchronization script for EchoNote.
 
 This script ensures all version references across the project are consistent
-with the version defined in config/__version__.py.
+with the canonical version defined in config/__version__.py.
 """
 
-import json
+import argparse
 import re
 import sys
 from pathlib import Path
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
-# Add project root to path
+# Add project root to path for imports
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from config import get_version, get_display_version
+from config.__version__ import __version__, VERSION_INFO
 
 
-def update_pyproject_toml(version: str) -> bool:
-    """Update version in pyproject.toml."""
-    file_path = project_root / "pyproject.toml"
-    if not file_path.exists():
-        print(f"Warning: {file_path} not found")
-        return False
+class VersionSyncer:
+    """Synchronizes version numbers across all project files."""
 
-    content = file_path.read_text(encoding="utf-8")
+    def __init__(self, project_root: Path):
+        """
+        Initialize the version syncer.
 
-    # Update version line
-    pattern = r'^version\s*=\s*"[^"]*"'
-    replacement = f'version = "{version}"'
+        Args:
+            project_root: Path to the project root directory
+        """
+        self.project_root = project_root
+        self.version = __version__
+        self.version_info = VERSION_INFO
 
-    new_content = re.sub(pattern, replacement, content, flags=re.MULTILINE)
+        # Files that need version synchronization
+        self.version_files = {
+            "pyproject.toml": self._update_pyproject_toml,
+            "EchoNote.spec": self._update_spec_file,
+            "README.md": self._update_readme,
+            "README.zh-CN.md": self._update_readme,
+            "README.fr.md": self._update_readme,
+            "docs/INSTALLATION.md": self._update_docs,
+            "docs/DEVELOPER_GUIDE.md": self._update_docs,
+        }
 
-    if new_content != content:
-        file_path.write_text(new_content, encoding="utf-8")
-        print(f"Updated version in {file_path}")
-        return True
+    def sync_all_versions(self, dry_run: bool = False) -> bool:
+        """
+        Synchronize version across all project files.
 
-    print(f"Version already up to date in {file_path}")
-    return False
+        Args:
+            dry_run: If True, only show what would be changed without making changes
 
+        Returns:
+            True if all synchronizations were successful, False otherwise
+        """
+        print(f"Synchronizing version to {self.version}")
+        print(f"Version info: {self.version_info}")
+        print()
 
-def update_default_config_json(version: str) -> bool:
-    """Update version in config/default_config.json."""
-    file_path = project_root / "config" / "default_config.json"
-    if not file_path.exists():
-        print(f"Warning: {file_path} not found")
-        return False
+        success = True
+        changes_made = []
 
-    try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            config = json.load(f)
+        for file_path, update_func in self.version_files.items():
+            full_path = self.project_root / file_path
 
-        old_version = config.get("version")
-        if old_version != version:
-            config["version"] = version
+            if not full_path.exists():
+                print(f"⚠️  File not found: {file_path}")
+                continue
 
-            with open(file_path, "w", encoding="utf-8") as f:
-                json.dump(config, f, indent=2, ensure_ascii=False)
+            try:
+                changed = update_func(full_path, dry_run)
+                if changed:
+                    changes_made.append(file_path)
+                    status = "📝 Would update" if dry_run else "✅ Updated"
+                    print(f"{status}: {file_path}")
+                else:
+                    print(f"✓ Already up to date: {file_path}")
 
-            print(f"Updated version in {file_path}: {old_version} -> {version}")
-            return True
+            except Exception as e:
+                print(f"❌ Error updating {file_path}: {e}")
+                success = False
 
-        print(f"Version already up to date in {file_path}")
-        return False
+        print()
+        if dry_run:
+            print(f"Dry run complete. {len(changes_made)} files would be updated.")
+        else:
+            print(f"Version sync complete. {len(changes_made)} files updated.")
 
-    except (json.JSONDecodeError, KeyError) as e:
-        print(f"Error updating {file_path}: {e}")
-        return False
+        return success
 
+    def _update_pyproject_toml(self, file_path: Path, dry_run: bool) -> bool:
+        """Update version in pyproject.toml."""
+        content = file_path.read_text(encoding="utf-8")
 
-def update_readme_md(version: str, display_version: str) -> bool:
-    """Update version references in README.md."""
-    file_path = project_root / "README.md"
-    if not file_path.exists():
-        print(f"Warning: {file_path} not found")
-        return False
+        # Update version line
+        pattern = r'^version\s*=\s*"[^"]*"'
+        replacement = f'version = "{self.version}"'
 
-    content = file_path.read_text(encoding="utf-8")
-    original_content = content
+        new_content, count = re.subn(pattern, replacement, content, flags=re.MULTILINE)
 
-    # Update version patterns
-    patterns = [
-        # Version in project status
-        (r"- \*\*Version\*\*: v[\d.]+", f"- **Version**: {display_version}"),
-        # Version in announcement
-        (r"> 📢 v[\d.]+ 维护版本发布", f"> 📢 {display_version} 维护版本发布"),
-        # Version in status lines
-        (r"\(v[\d.]+\)", f"({display_version})"),
-    ]
+        if count > 0 and not dry_run:
+            file_path.write_text(new_content, encoding="utf-8")
 
-    for pattern, replacement in patterns:
-        content = re.sub(pattern, replacement, content)
+        return count > 0
 
-    if content != original_content:
-        file_path.write_text(content, encoding="utf-8")
-        print(f"Updated version references in {file_path}")
-        return True
+    def _update_spec_file(self, file_path: Path, dry_run: bool) -> bool:
+        """Update version references in PyInstaller spec file."""
+        content = file_path.read_text(encoding="utf-8")
+        original_content = content
 
-    print(f"Version references already up to date in {file_path}")
-    return False
+        # Update any version references in the spec file
+        # This is more complex as spec files can have various formats
+        # For now, we'll look for common patterns
 
+        # Look for version strings in comments or metadata
+        patterns = [
+            (r"# Version: [^\n]*", f"# Version: {self.version}"),
+            (r'version=[\'"][^\'"]*[\'"]', f'version="{self.version}"'),
+        ]
 
-def update_third_party_licenses(version: str) -> bool:
-    """Update EchoNote version in THIRD_PARTY_LICENSES.md."""
-    file_path = project_root / "THIRD_PARTY_LICENSES.md"
-    if not file_path.exists():
-        print(f"Warning: {file_path} not found")
-        return False
+        for pattern, replacement in patterns:
+            content = re.sub(pattern, replacement, content)
 
-    content = file_path.read_text(encoding="utf-8")
+        changed = content != original_content
 
-    # Update EchoNote version at the end of the file
-    pattern = r"\*\*EchoNote Version\*\*: [\d.]+"
-    replacement = f"**EchoNote Version**: {version}"
+        if changed and not dry_run:
+            file_path.write_text(content, encoding="utf-8")
 
-    new_content = re.sub(pattern, replacement, content)
+        return changed
 
-    if new_content != content:
-        file_path.write_text(new_content, encoding="utf-8")
-        print(f"Updated EchoNote version in {file_path}")
-        return True
+    def _update_readme(self, file_path: Path, dry_run: bool) -> bool:
+        """Update version references in README files."""
+        content = file_path.read_text(encoding="utf-8")
+        original_content = content
 
-    print(f"EchoNote version already up to date in {file_path}")
-    return False
+        # Update version badges and references
+        patterns = [
+            # Version badges
+            (r"version-v[0-9]+\.[0-9]+\.[0-9]+", f"version-v{self.version}"),
+            (r"Version [0-9]+\.[0-9]+\.[0-9]+", f"Version {self.version}"),
+            (r"v[0-9]+\.[0-9]+\.[0-9]+", f"v{self.version}"),
+            # Download links
+            (r"releases/tag/v[0-9]+\.[0-9]+\.[0-9]+", f"releases/tag/v{self.version}"),
+        ]
 
+        for pattern, replacement in patterns:
+            content = re.sub(pattern, replacement, content)
 
-def check_version_consistency() -> List[Tuple[str, str, str]]:
-    """Check version consistency across files."""
-    inconsistencies = []
-    canonical_version = get_version()
+        changed = content != original_content
 
-    # Check pyproject.toml
-    pyproject_path = project_root / "pyproject.toml"
-    if pyproject_path.exists():
-        content = pyproject_path.read_text(encoding="utf-8")
-        match = re.search(r'^version\s*=\s*"([^"]*)"', content, re.MULTILINE)
-        if match:
-            found_version = match.group(1)
-            if found_version != canonical_version:
-                inconsistencies.append(("pyproject.toml", found_version, canonical_version))
+        if changed and not dry_run:
+            file_path.write_text(content, encoding="utf-8")
 
-    # Check default_config.json
-    config_path = project_root / "config" / "default_config.json"
-    if config_path.exists():
-        try:
-            with open(config_path, "r", encoding="utf-8") as f:
-                config = json.load(f)
-            found_version = config.get("version", "")
-            if found_version != canonical_version:
-                inconsistencies.append(
-                    ("config/default_config.json", found_version, canonical_version)
-                )
-        except (json.JSONDecodeError, KeyError):
-            pass
+        return changed
 
-    return inconsistencies
+    def _update_docs(self, file_path: Path, dry_run: bool) -> bool:
+        """Update version references in documentation files."""
+        content = file_path.read_text(encoding="utf-8")
+        original_content = content
+
+        # Update version references in documentation
+        patterns = [
+            (r"Version [0-9]+\.[0-9]+\.[0-9]+", f"Version {self.version}"),
+            (r"v[0-9]+\.[0-9]+\.[0-9]+", f"v{self.version}"),
+            (r"EchoNote [0-9]+\.[0-9]+\.[0-9]+", f"EchoNote {self.version}"),
+        ]
+
+        for pattern, replacement in patterns:
+            content = re.sub(pattern, replacement, content)
+
+        changed = content != original_content
+
+        if changed and not dry_run:
+            file_path.write_text(content, encoding="utf-8")
+
+        return changed
+
+    def verify_version_consistency(self) -> Tuple[bool, List[str]]:
+        """
+        Verify that all version references are consistent.
+
+        Returns:
+            Tuple of (is_consistent, list_of_inconsistencies)
+        """
+        inconsistencies = []
+
+        for file_path, _ in self.version_files.items():
+            full_path = self.project_root / file_path
+
+            if not full_path.exists():
+                continue
+
+            try:
+                content = full_path.read_text(encoding="utf-8")
+
+                # Look for version patterns that don't match current version
+                # Be more specific to avoid matching Python versions, etc.
+                if file_path == "pyproject.toml":
+                    version_patterns = [r'^version\s*=\s*"([^"]*)"']
+                else:
+                    version_patterns = [
+                        r"Version ([0-9]+\.[0-9]+\.[0-9]+)",
+                        r"v([0-9]+\.[0-9]+\.[0-9]+)",
+                        r"EchoNote ([0-9]+\.[0-9]+\.[0-9]+)",
+                    ]
+
+                for pattern in version_patterns:
+                    if file_path == "pyproject.toml":
+                        matches = re.findall(pattern, content, re.MULTILINE)
+                    else:
+                        matches = re.findall(pattern, content, re.IGNORECASE)
+                    for match in matches:
+                        if match != self.version:
+                            inconsistencies.append(
+                                f"{file_path}: found version {match}, expected {self.version}"
+                            )
+
+            except Exception as e:
+                inconsistencies.append(f"{file_path}: error reading file - {e}")
+
+        return len(inconsistencies) == 0, inconsistencies
 
 
 def main():
-    """Main function to synchronize versions."""
-    print("EchoNote Version Synchronization")
-    print("=" * 40)
+    """Main entry point for the version sync script."""
+    parser = argparse.ArgumentParser(
+        description="Synchronize version numbers across all EchoNote project files"
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Show what would be changed without making changes"
+    )
+    parser.add_argument(
+        "--verify", action="store_true", help="Verify version consistency without making changes"
+    )
+    parser.add_argument("--verbose", action="store_true", help="Show detailed output")
 
-    # Get canonical version
-    version = get_version()
-    display_version = get_display_version()
+    args = parser.parse_args()
 
-    print(f"Canonical version: {version}")
-    print(f"Display version: {display_version}")
-    print()
+    # Initialize syncer
+    syncer = VersionSyncer(project_root)
 
-    # Check for inconsistencies first
-    inconsistencies = check_version_consistency()
-    if inconsistencies:
-        print("Found version inconsistencies:")
-        for file_path, found, expected in inconsistencies:
-            print(f"  {file_path}: {found} (expected: {expected})")
-        print()
+    if args.verify:
+        print("Verifying version consistency...")
+        is_consistent, inconsistencies = syncer.verify_version_consistency()
 
-    # Update all files
-    updated_files = []
-
-    if update_pyproject_toml(version):
-        updated_files.append("pyproject.toml")
-
-    if update_default_config_json(version):
-        updated_files.append("config/default_config.json")
-
-    if update_readme_md(version, display_version):
-        updated_files.append("README.md")
-
-    if update_third_party_licenses(version):
-        updated_files.append("THIRD_PARTY_LICENSES.md")
-
-    print()
-    if updated_files:
-        print(f"Updated {len(updated_files)} files:")
-        for file_path in updated_files:
-            print(f"  ✓ {file_path}")
-        print("\nVersion synchronization completed successfully!")
+        if is_consistent:
+            print("✅ All version references are consistent!")
+            return 0
+        else:
+            print("❌ Version inconsistencies found:")
+            for inconsistency in inconsistencies:
+                print(f"  - {inconsistency}")
+            return 1
     else:
-        print("All files are already up to date.")
+        # Sync versions
+        success = syncer.sync_all_versions(dry_run=args.dry_run)
 
-    # Final consistency check
-    final_inconsistencies = check_version_consistency()
-    if final_inconsistencies:
-        print("\nWarning: Some inconsistencies remain:")
-        for file_path, found, expected in final_inconsistencies:
-            print(f"  {file_path}: {found} (expected: {expected})")
-        sys.exit(1)
-    else:
-        print("\n✓ All version references are now consistent.")
+        if success:
+            if not args.dry_run:
+                print("\n🎉 Version synchronization completed successfully!")
+                print(f"All files now reference version {syncer.version}")
+            return 0
+        else:
+            print("\n❌ Version synchronization failed!")
+            return 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

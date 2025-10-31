@@ -76,11 +76,16 @@ class AppearanceSettingsPage(BaseSettingsPage):
         )
         self.theme_combo.currentIndexChanged.connect(self._on_theme_changed)
 
-        from ui.layout_utils import create_label_control_row
+        from ui.layout_utils import create_horizontal_layout
 
-        theme_layout = create_label_control_row(
-            self.i18n.t("settings.appearance.theme_select"), self.theme_combo
-        )
+        theme_layout = create_horizontal_layout()
+
+        self.theme_label = QLabel(self.i18n.t("settings.appearance.theme_select"))
+        self.theme_label.setMinimumWidth(120)
+        theme_layout.addWidget(self.theme_label)
+        theme_layout.addWidget(self.theme_combo)
+        theme_layout.addStretch()
+
         self.content_layout.addLayout(theme_layout)
 
         self.add_spacing(10)

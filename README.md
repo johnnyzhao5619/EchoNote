@@ -130,7 +130,7 @@ These language-specific READMEs include:
 
 ## 📊 Project Status
 
-- **Version**: v1.1.1 (Latest maintenance release)
+- **Version**: v1.2.0 (Latest maintenance release)
 - **Test Coverage**: 607 tests, 100% pass rate
 - **Code Quality**: Excellent (PEP 8 compliant, type-annotated)
 - **Documentation**: Complete and restructured

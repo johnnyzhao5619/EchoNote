@@ -57,7 +57,18 @@
       "recordings": "录音：计算中...",
       "transcripts": "转录：计算中...",
       "logs": "日志：计算中...",
-      "total": "总计：计算中..."
+      "total": "总计：计算中...",
+      "database_prefix": "数据库",
+      "configuration_prefix": "配置",
+      "recordings_prefix": "录音",
+      "transcripts_prefix": "转录",
+      "logs_prefix": "日志",
+      "total_prefix": "总计",
+      "files": "个文件"
+    },
+    "storage_status": {
+      "exists": "存在",
+      "not_found": "未找到"
     },
     "clear_all_description": "这将删除：\n• 数据库（所有任务、事件和设置）\n• 配置文件\n• 所有录音\n• 所有转录\n• 日志文件",
     "confirm_delete_details": "这将永久删除大约 {size} 的数据。\n\n此操作无法撤销！\n\n清理后需要重启应用程序。",
@@ -228,10 +239,28 @@
       "appointment": "约会"
     },
     "event_dialog": {
+      "edit_event_title": "编辑事件",
+      "title_label": "标题 *：",
+      "type_label": "类型 *：",
+      "start_time_label": "开始时间 *：",
+      "end_time_label": "结束时间 *：",
+      "location_label": "地点：",
+      "attendees_label": "参与者：",
+      "description_label": "描述：",
+      "reminder_label": "提醒：",
       "title_placeholder": "输入事件标题",
       "location_placeholder": "输入地点",
       "attendees_placeholder": "输入邮箱，用逗号分隔",
       "description_placeholder": "输入描述",
+      "reminder_none": "无提醒",
+      "reminder_5min": "提前5分钟",
+      "reminder_10min": "提前10分钟",
+      "reminder_15min": "提前15分钟",
+      "reminder_30min": "提前30分钟",
+      "reminder_1hour": "提前1小时",
+      "reminder_1day": "提前1天",
+      "sync_options": "同步选项",
+      "sync_to_provider": "同步到 {provider} ({email})",
       "validation_error": "验证错误",
       "title_required": "标题为必填项。",
       "end_after_start": "结束时间必须晚于开始时间。",
@@ -243,7 +272,16 @@
       "waiting_authorization": "等待授权中...",
       "authorization_failed": "授权失败：状态不匹配",
       "authorization_successful": "授权成功！",
-      "authorization_error": "授权错误"
+      "authorization_error": "授权错误",
+      "auth_success_title": "授权成功",
+      "auth_success_heading": "授权成功！",
+      "auth_success_content": "<p>您可以关闭此窗口并返回 EchoNote。</p>",
+      "auth_failed_title": "授权失败",
+      "auth_failed_heading": "授权失败",
+      "auth_failed_content": "<p>错误：{error}</p><p>您可以关闭此窗口并重试。</p>",
+      "unknown_error": "未知错误",
+      "connect_title": "连接 {provider} 日历",
+      "instructions_html": "<p>连接您的 {provider} 日历：</p><ol><li>点击下方的\"开始授权\"按钮</li><li>浏览器将打开 {provider} 的授权页面</li><li>如需要，请登录您的 {provider} 账户</li><li>授权 EchoNote 访问您的日历</li><li>您将自动重定向回 EchoNote</li></ol><p><strong>注意：</strong>EchoNote 只会访问您的日历数据。我们绝不会存储您的密码。</p>"
     },
     "widget": {
       "add_calendar_account": "添加日历账户",
@@ -255,7 +293,11 @@
       "previous": "上一个",
       "next": "下一个",
       "sync_now_tooltip": "立即同步日历数据",
-      "sync_now": "立即同步"
+      "sync_now": "立即同步",
+      "time_ago_just_now": "刚刚",
+      "time_ago_minutes": "{minutes}分钟前",
+      "time_ago_hours": "{hours}小时前",
+      "time_ago_days": "{days}天前"
     },
     "calendar_view": {
       "no_events": "今天没有事件"
@@ -500,7 +542,8 @@
       },
       "show_password": "显示密码",
       "gpu_acceleration": "GPU加速",
-      "cpu_mode": "CPU模式"
+      "cpu_mode": "CPU模式",
+      "unknown_provider": "未知提供商"
     },
     "realtime": {
       "title": "实时录制设置",
@@ -520,6 +563,7 @@
       "translation": "翻译设置",
       "translation_engine": "翻译引擎",
       "no_translation": "不翻译",
+      "google_translate": "Google 翻译",
       "error": {
         "empty_path": "保存路径不能为空",
         "invalid_path": "无效的路径: {error}"

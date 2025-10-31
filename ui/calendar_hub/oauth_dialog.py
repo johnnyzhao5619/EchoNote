@@ -54,6 +54,7 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
     """HTTP request handler for OAuth callback."""
 
     callback_received = None  # Will be set to a callback function
+    i18n = None  # Will be set to I18nQtManager instance
 
     def do_GET(self):
         """Handle GET request (OAuth callback)."""
@@ -79,19 +80,18 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
 
         if code:
             response_body = html_template.format(
-                title="Authorization Successful",
-                heading="Authorization Successful!",
-                content="<p>You can close this window and return to EchoNote.</p>",
+                title=self.i18n.t("calendar_hub.oauth_dialog.auth_success_title"),
+                heading=self.i18n.t("calendar_hub.oauth_dialog.auth_success_heading"),
+                content=self.i18n.t("calendar_hub.oauth_dialog.auth_success_content"),
             )
             self.send_response(200)
         else:
-            error_message = str(error or "Unknown error")
+            error_message = str(error or self.i18n.t("calendar_hub.oauth_dialog.unknown_error"))
             response_body = html_template.format(
-                title="Authorization Failed",
-                heading="Authorization Failed",
-                content=(
-                    f"<p>Error: {escape(error_message)}</p>"
-                    "<p>You can close this window and try again.</p>"
+                title=self.i18n.t("calendar_hub.oauth_dialog.auth_failed_title"),
+                heading=self.i18n.t("calendar_hub.oauth_dialog.auth_failed_heading"),
+                content=self.i18n.t(
+                    "calendar_hub.oauth_dialog.auth_failed_content", error=escape(error_message)
                 ),
             )
             self.send_response(400)
@@ -194,7 +194,10 @@ class OAuthDialog(QDialog):
         layout = QVBoxLayout(self)
 
         # Title
-        title_label = QLabel(f"<h2>Connect {self.provider.capitalize()} Calendar</h2>")
+        title_text = self.i18n.t(
+            "calendar_hub.oauth_dialog.connect_title", provider=self.provider.capitalize()
+        )
+        title_label = QLabel(f"<h2>{title_text}</h2>")
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title_label)
 
@@ -229,18 +232,9 @@ class OAuthDialog(QDialog):
         instructions.setReadOnly(True)
         instructions.setMaximumHeight(150)
 
-        text = f"""
-        <p>To connect your {self.provider.capitalize()} calendar:</p>
-        <ol>
-            <li>Click the "Start Authorization" button below</li>
-            <li>Your browser will open to {self.provider.capitalize()}'s authorization page</li>
-            <li>Sign in to your {self.provider.capitalize()} account if needed</li>
-            <li>Grant EchoNote permission to access your calendar</li>
-            <li>You will be redirected back to EchoNote automatically</li>
-        </ol>
-        <p><strong>Note:</strong> EchoNote will only access your calendar data.
-        We never store your password.</p>
-        """
+        text = self.i18n.t(
+            "calendar_hub.oauth_dialog.instructions_html", provider=self.provider.capitalize()
+        )
 
         instructions.setHtml(text)
 
@@ -297,6 +291,7 @@ class OAuthDialog(QDialog):
         try:
             # Set callback handler
             OAuthCallbackHandler.callback_received = self._on_callback_received
+            OAuthCallbackHandler.i18n = self.i18n
 
             # Create server
             self.callback_server = HTTPServer(
@@ -625,7 +620,11 @@ class OAuthResultDialog(QDialog):
     def setup_ui(self):
         """Set up the dialog UI."""
         # Set dialog properties
-        title = "Authorization Successful" if self.success else "Authorization Failed"
+        title = (
+            self.i18n.t("calendar_hub.oauth_dialog.auth_success_title")
+            if self.success
+            else self.i18n.t("calendar_hub.oauth_dialog.auth_failed_title")
+        )
         self.setWindowTitle(title)
         self.setMinimumWidth(400)
 

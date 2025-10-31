@@ -51,7 +51,18 @@
       "recordings": "Enregistrements : Calcul en cours...",
       "transcripts": "Transcriptions : Calcul en cours...",
       "logs": "Journaux : Calcul en cours...",
-      "total": "Total : Calcul en cours..."
+      "total": "Total : Calcul en cours...",
+      "database_prefix": "Base de données",
+      "configuration_prefix": "Configuration",
+      "recordings_prefix": "Enregistrements",
+      "transcripts_prefix": "Transcriptions",
+      "logs_prefix": "Journaux",
+      "total_prefix": "Total",
+      "files": "fichiers"
+    },
+    "storage_status": {
+      "exists": "existe",
+      "not_found": "introuvable"
     },
     "clear_all_description": "Ceci supprimera :\n• Base de données (toutes les tâches, événements et paramètres)\n• Fichiers de configuration\n• Tous les enregistrements\n• Toutes les transcriptions\n• Fichiers journaux",
     "confirm_delete_details": "Ceci supprimera définitivement environ {size} de données.\n\nCette opération ne peut pas être annulée !\n\nL'application devra être redémarrée après le nettoyage.",
@@ -220,10 +231,28 @@
       "appointment": "Rendez-vous"
     },
     "event_dialog": {
+      "edit_event_title": "Modifier l'Événement",
+      "title_label": "Titre * :",
+      "type_label": "Type * :",
+      "start_time_label": "Heure de Début * :",
+      "end_time_label": "Heure de Fin * :",
+      "location_label": "Lieu :",
+      "attendees_label": "Participants :",
+      "description_label": "Description :",
+      "reminder_label": "Rappel :",
       "title_placeholder": "Saisir le titre de l'événement",
       "location_placeholder": "Saisir le lieu",
       "attendees_placeholder": "Saisir les emails séparés par des virgules",
       "description_placeholder": "Saisir la description",
+      "reminder_none": "Aucun rappel",
+      "reminder_5min": "5 minutes avant",
+      "reminder_10min": "10 minutes avant",
+      "reminder_15min": "15 minutes avant",
+      "reminder_30min": "30 minutes avant",
+      "reminder_1hour": "1 heure avant",
+      "reminder_1day": "1 jour avant",
+      "sync_options": "Options de Synchronisation",
+      "sync_to_provider": "Synchroniser avec {provider} ({email})",
       "validation_error": "Erreur de Validation",
       "title_required": "Le titre est requis.",
       "end_after_start": "L'heure de fin doit être après l'heure de début.",
@@ -235,7 +264,16 @@
       "waiting_authorization": "En attente d'autorisation...",
       "authorization_failed": "Échec de l'autorisation : état non concordant",
       "authorization_successful": "Autorisation réussie !",
-      "authorization_error": "Erreur d'Autorisation"
+      "authorization_error": "Erreur d'Autorisation",
+      "auth_success_title": "Autorisation Réussie",
+      "auth_success_heading": "Autorisation Réussie !",
+      "auth_success_content": "<p>Vous pouvez fermer cette fenêtre et retourner à EchoNote.</p>",
+      "auth_failed_title": "Échec de l'Autorisation",
+      "auth_failed_heading": "Échec de l'Autorisation",
+      "auth_failed_content": "<p>Erreur : {error}</p><p>Vous pouvez fermer cette fenêtre et réessayer.</p>",
+      "unknown_error": "Erreur inconnue",
+      "connect_title": "Connecter le Calendrier {provider}",
+      "instructions_html": "<p>Pour connecter votre calendrier {provider} :</p><ol><li>Cliquez sur le bouton \"Commencer l'Autorisation\" ci-dessous</li><li>Votre navigateur s'ouvrira sur la page d'autorisation de {provider}</li><li>Connectez-vous à votre compte {provider} si nécessaire</li><li>Accordez à EchoNote la permission d'accéder à votre calendrier</li><li>Vous serez automatiquement redirigé vers EchoNote</li></ol><p><strong>Note :</strong> EchoNote n'accédera qu'à vos données de calendrier. Nous ne stockons jamais votre mot de passe.</p>"
     },
     "widget": {
       "add_calendar_account": "Ajouter un Compte de Calendrier",
@@ -247,7 +285,11 @@
       "previous": "Précédent",
       "next": "Suivant",
       "sync_now": "Synchroniser Maintenant",
-      "sync_now_tooltip": "Synchroniser manuellement tous les calendriers connectés"
+      "sync_now_tooltip": "Synchroniser manuellement tous les calendriers connectés",
+      "time_ago_just_now": "à l'instant",
+      "time_ago_minutes": "il y a {minutes}min",
+      "time_ago_hours": "il y a {hours}h",
+      "time_ago_days": "il y a {days}j"
     },
     "calendar_view": {
       "no_events": "Aucun événement pour ce jour"
@@ -490,6 +532,7 @@
       "will_automatically_use": "Utilisera automatiquement : {device_name} ({compute_type})",
       "gpu_acceleration": "Accélération GPU NVIDIA. Nécessite un GPU compatible CUDA.",
       "cpu_mode": "Mode CPU. Pas d'accélération GPU.",
+      "unknown_provider": "Fournisseur inconnu",
       "error": {
         "empty_path": "Le chemin de sauvegarde ne peut pas être vide",
         "invalid_path": "Chemin invalide : {error}"
@@ -514,6 +557,7 @@
       "translation": "Paramètres de Traduction",
       "translation_engine": "Moteur de Traduction",
       "no_translation": "Pas de Traduction",
+      "google_translate": "Google Traduction",
       "error": {
         "empty_path": "Le chemin de sauvegarde ne peut pas être vide",
         "invalid_path": "Chemin invalide : {error}"

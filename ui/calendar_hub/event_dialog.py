@@ -96,7 +96,11 @@ class EventDialog(QDialog):
     def setup_ui(self):
         """Set up the dialog UI."""
         # Set dialog properties
-        title = "Edit Event" if self.is_edit_mode else self.i18n.t("calendar_hub.create_event")
+        title = (
+            self.i18n.t("calendar_hub.event_dialog.edit_event_title")
+            if self.is_edit_mode
+            else self.i18n.t("calendar_hub.create_event")
+        )
         self.setWindowTitle(title)
         self.setMinimumWidth(500)
 
@@ -130,7 +134,7 @@ class EventDialog(QDialog):
         self.title_input.setPlaceholderText(
             self.i18n.t("calendar_hub.event_dialog.title_placeholder")
         )
-        form.addRow("Title *:", self.title_input)
+        form.addRow(self.i18n.t("calendar_hub.event_dialog.title_label"), self.title_input)
 
         # Event type
         self.type_combo = QComboBox()
@@ -141,14 +145,16 @@ class EventDialog(QDialog):
                 self.i18n.t("calendar_hub.event_types.appointment"),
             ]
         )
-        form.addRow("Type *:", self.type_combo)
+        form.addRow(self.i18n.t("calendar_hub.event_dialog.type_label"), self.type_combo)
 
         # Start time (required)
         self.start_time_input = QDateTimeEdit()
         self.start_time_input.setCalendarPopup(True)
         self.start_time_input.setDateTime(QDateTime.currentDateTime())
         self.start_time_input.setDisplayFormat("yyyy-MM-dd HH:mm")
-        form.addRow("Start Time *:", self.start_time_input)
+        form.addRow(
+            self.i18n.t("calendar_hub.event_dialog.start_time_label"), self.start_time_input
+        )
 
         # End time (required)
         self.end_time_input = QDateTimeEdit()
@@ -157,21 +163,21 @@ class EventDialog(QDialog):
         default_end = QDateTime.currentDateTime().addSecs(3600)
         self.end_time_input.setDateTime(default_end)
         self.end_time_input.setDisplayFormat("yyyy-MM-dd HH:mm")
-        form.addRow("End Time *:", self.end_time_input)
+        form.addRow(self.i18n.t("calendar_hub.event_dialog.end_time_label"), self.end_time_input)
 
         # Location (optional)
         self.location_input = QLineEdit()
         self.location_input.setPlaceholderText(
             self.i18n.t("calendar_hub.event_dialog.location_placeholder")
         )
-        form.addRow("Location:", self.location_input)
+        form.addRow(self.i18n.t("calendar_hub.event_dialog.location_label"), self.location_input)
 
         # Attendees (optional)
         self.attendees_input = QLineEdit()
         self.attendees_input.setPlaceholderText(
             self.i18n.t("calendar_hub.event_dialog.attendees_placeholder")
         )
-        form.addRow("Attendees:", self.attendees_input)
+        form.addRow(self.i18n.t("calendar_hub.event_dialog.attendees_label"), self.attendees_input)
 
         # Description (optional)
         self.description_input = QTextEdit()
@@ -179,22 +185,24 @@ class EventDialog(QDialog):
             self.i18n.t("calendar_hub.event_dialog.description_placeholder")
         )
         self.description_input.setMaximumHeight(100)
-        form.addRow("Description:", self.description_input)
+        form.addRow(
+            self.i18n.t("calendar_hub.event_dialog.description_label"), self.description_input
+        )
 
         # Reminder (optional)
         self.reminder_combo = QComboBox()
         self.reminder_combo.addItems(
             [
-                "No reminder",
-                "5 minutes before",
-                "10 minutes before",
-                "15 minutes before",
-                "30 minutes before",
-                "1 hour before",
-                "1 day before",
+                self.i18n.t("calendar_hub.event_dialog.reminder_none"),
+                self.i18n.t("calendar_hub.event_dialog.reminder_5min"),
+                self.i18n.t("calendar_hub.event_dialog.reminder_10min"),
+                self.i18n.t("calendar_hub.event_dialog.reminder_15min"),
+                self.i18n.t("calendar_hub.event_dialog.reminder_30min"),
+                self.i18n.t("calendar_hub.event_dialog.reminder_1hour"),
+                self.i18n.t("calendar_hub.event_dialog.reminder_1day"),
             ]
         )
-        form.addRow("Reminder:", self.reminder_combo)
+        form.addRow(self.i18n.t("calendar_hub.event_dialog.reminder_label"), self.reminder_combo)
 
         return form
 
@@ -205,14 +213,19 @@ class EventDialog(QDialog):
         Returns:
             Sync options group box
         """
-        group = QGroupBox(self.i18n.t("calendar_hub.sync_external_calendars"))
+        group = QGroupBox(self.i18n.t("calendar_hub.event_dialog.sync_options"))
         layout = QVBoxLayout(group)
 
         # Create checkbox for each connected account
         self.sync_checkboxes: Dict[str, QCheckBox] = {}
 
         for provider, email in self.connected_accounts.items():
-            checkbox = QCheckBox(f"Sync to {provider.capitalize()} ({email})")
+            checkbox_text = self.i18n.t(
+                "calendar_hub.event_dialog.sync_to_provider",
+                provider=provider.capitalize(),
+                email=email,
+            )
+            checkbox = QCheckBox(checkbox_text)
             layout.addWidget(checkbox)
             self.sync_checkboxes[provider] = checkbox
 
@@ -409,3 +422,20 @@ class EventDialog(QDialog):
             Event data dictionary or None if cancelled
         """
         return self.result_data
+
+    def show_warning(self, title: str, message: str):
+        """
+        Show warning message dialog.
+
+        Args:
+            title: Dialog title
+            message: Warning message
+        """
+        from PySide6.QtWidgets import QMessageBox
+
+        msg_box = QMessageBox(self)
+        msg_box.setIcon(QMessageBox.Icon.Warning)
+        msg_box.setWindowTitle(title)
+        msg_box.setText(message)
+        msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+        msg_box.exec()
