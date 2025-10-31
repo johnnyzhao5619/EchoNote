@@ -22,6 +22,7 @@ Provides UI for managing user data, including cleanup functionality.
 import logging
 
 from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtWidgets import (
     QGroupBox,
     QLabel,
     QMessageBox,
@@ -30,10 +31,12 @@ from PySide6.QtCore import Qt, QThread, Signal
     QVBoxLayout,
 )
 
+from ui.base_widgets import connect_button_with_callback, create_button, create_vbox
 from ui.settings.base_page import BaseSettingsPage
 from utils.data_cleanup import DataCleanup
 
 logger = logging.getLogger(__name__)
+
 
 class CleanupWorker(QThread):
     """Worker thread for data cleanup operations."""
@@ -41,7 +44,8 @@ class CleanupWorker(QThread):
     finished = Signal(dict)  # Emits cleanup results
     error = Signal(str)  # Emits error message
 
-    def __init__(self, cleanup_manager: DataCleanup):        self.cleanup_manager = cleanup_manager
+    def __init__(self, cleanup_manager: DataCleanup):
+        self.cleanup_manager = cleanup_manager
 
     def run(self):
         """Execute cleanup operation."""
@@ -51,6 +55,7 @@ class CleanupWorker(QThread):
         except Exception as e:
             logger.error(f"Cleanup worker error: {e}")
             self.error.emit(str(e))
+
 
 class DataManagementPage(BaseSettingsPage):
     """
@@ -175,7 +180,11 @@ class DataManagementPage(BaseSettingsPage):
             total_size = DataCleanup.format_size(summary["total_size"])
 
             # Update labels
-            db_status = self.i18n.t("data_management.storage_status.exists") if summary["database_exists"] else self.i18n.t("data_management.storage_status.not_found")
+            db_status = (
+                self.i18n.t("data_management.storage_status.exists")
+                if summary["database_exists"]
+                else self.i18n.t("data_management.storage_status.not_found")
+            )
             self.database_label.setText(
                 f"{self.i18n.t('data_management.storage_labels.database_prefix')}: {db_size} ({db_status})"
             )
@@ -188,14 +197,19 @@ class DataManagementPage(BaseSettingsPage):
             self.transcripts_label.setText(
                 f"{self.i18n.t('data_management.storage_labels.transcripts_prefix')}: {transcripts_size} ({summary['transcripts_count']} {self.i18n.t('data_management.storage_labels.files')})"
             )
-            self.logs_label.setText(f"{self.i18n.t('data_management.storage_labels.logs_prefix')}: {logs_size} ({summary['logs_count']} {self.i18n.t('data_management.storage_labels.files')})")
-            self.total_label.setText(f"{self.i18n.t('data_management.storage_labels.total_prefix')}: {total_size}")
+            self.logs_label.setText(
+                f"{self.i18n.t('data_management.storage_labels.logs_prefix')}: {logs_size} ({summary['logs_count']} {self.i18n.t('data_management.storage_labels.files')})"
+            )
+            self.total_label.setText(
+                f"{self.i18n.t('data_management.storage_labels.total_prefix')}: {total_size}"
+            )
 
             logger.debug("Storage summary refreshed")
 
         except Exception as e:
             logger.error(f"Failed to refresh storage summary: {e}")
-            self.show_error(self.i18n.t("common.error"), f"Failed to calculate storage summary:\n{str(e)}"
+            self.show_error(
+                self.i18n.t("common.error"), f"Failed to calculate storage summary:\n{str(e)}"
             )
 
     def _confirm_clear_all_data(self):
@@ -314,7 +328,9 @@ class DataManagementPage(BaseSettingsPage):
         """Handle cleanup error."""
         progress.close()
 
-        self.show_error(self.i18n.t("dialogs.settings.data_management.cleanup_failed"), f"An error occurred during cleanup:\n\n{error}",
+        self.show_error(
+            self.i18n.t("dialogs.settings.data_management.cleanup_failed"),
+            f"An error occurred during cleanup:\n\n{error}",
         )
 
         logger.error(f"Data cleanup failed: {error}")
@@ -343,7 +359,9 @@ class DataManagementPage(BaseSettingsPage):
         if hasattr(self, "recordings_label"):
             self.recordings_label.setText(self.i18n.t("data_management.storage_labels.recordings"))
         if hasattr(self, "transcripts_label"):
-            self.transcripts_label.setText(self.i18n.t("data_management.storage_labels.transcripts"))
+            self.transcripts_label.setText(
+                self.i18n.t("data_management.storage_labels.transcripts")
+            )
         if hasattr(self, "logs_label"):
             self.logs_label.setText(self.i18n.t("data_management.storage_labels.logs"))
         if hasattr(self, "total_label"):
