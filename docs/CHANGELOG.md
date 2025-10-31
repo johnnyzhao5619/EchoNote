@@ -2,6 +2,39 @@
 
 ## Unreleased
 
+### Added
+
+- **Version Management System**: Centralized version management with single source of truth
+
+  - `config/__version__.py` - Canonical version definition
+  - `scripts/sync_version.py` - Automated version synchronization across all files
+  - `scripts/bump_version.py` - Semantic version bumping with validation
+  - `docs/VERSION_MANAGEMENT.md` - Comprehensive version management guide
+
+- **Multilingual Documentation**: Comprehensive language-specific documentation system
+  - `README.zh-CN.md` - Complete Chinese documentation with local context
+  - `README.fr.md` - Complete French documentation with cultural adaptations
+  - `docs/MULTILINGUAL_DOCUMENTATION.md` - Best practices guide for multilingual docs
+  - Language-specific setup instructions, troubleshooting, and examples
+
+### Changed
+
+- **README Structure**: Reorganized main README.md following multilingual best practices
+
+  - Simplified main README with focus on English content
+  - Clear references to language-specific documentation
+  - Improved navigation and user experience
+
+- **Splash Screen**: Enhanced version display logic with consistent formatting
+- **Configuration System**: Version now automatically injected from code, not config files
+- **Main Application**: Improved version loading for startup splash screen
+
+### Fixed
+
+- **Version Consistency**: Eliminated version number discrepancies across project files
+- **Startup Display**: Splash screen now always shows current application version
+- **Documentation Maintenance**: Reduced content duplication and improved maintainability
+
 ## v1.1.1 - 2025-10-31
 
 ### Changed

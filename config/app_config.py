@@ -27,13 +27,18 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Dict
 
+from .__version__ import get_version
+
 APP_DIR_NAME = ".echonote"
+
 
 def get_app_dir() -> Path:
     """Return the root directory for EchoNote user data."""
     return Path.home() / APP_DIR_NAME
 
+
 logger = logging.getLogger(__name__)
+
 
 class ConfigManager:
     """Manages application configuration with validation and persistence."""
@@ -62,6 +67,9 @@ class ConfigManager:
                     user_config = json.load(f)
 
             self._config = self._deep_merge(self._default_config, user_config)
+
+            # Ensure version is always current from code, not config file
+            self._config["version"] = get_version()
 
             # Validate the loaded configuration
             self._validate_config()

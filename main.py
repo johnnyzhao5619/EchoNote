@@ -28,6 +28,7 @@ from utils.first_run_setup import FirstRunSetup
 from utils.logger import setup_logging
 from utils.resource_cleanup import close_lazy_loaded_engine
 
+
 def main():
     """Application entry point."""
     global _logger
@@ -77,7 +78,11 @@ def main():
         # Load configuration early to display accurate version on splash screen
         logger.info("Loading configuration...")
         config = ConfigManager()
-        app_version = config.get("version", "") or ""
+
+        # Get version directly from version module for consistency
+        from config import get_display_version
+
+        app_version = get_display_version()
 
         # Show splash screen
         from ui.common.splash_screen import SplashScreen
@@ -105,7 +110,7 @@ def main():
         splash.show_progress("Loading configuration...", STARTUP_PROGRESS_STEPS["configuration"])
         app.processEvents()
 
-        logger.info("Configuration loaded successfully (version: %s)", app_version or "unknown")
+        logger.info("Configuration loaded successfully (version: %s)", app_version)
         timer.checkpoint("config_loaded")
 
         # Early FFmpeg check - detect system and log status
@@ -462,6 +467,7 @@ def main():
 
         traceback.print_exc()
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

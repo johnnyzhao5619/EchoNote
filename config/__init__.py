@@ -13,4 +13,29 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Configuration management."""
+"""
+Configuration package for EchoNote application.
+
+Provides configuration management and version information.
+"""
+
+from .app_config import ConfigManager, get_app_dir
+from .__version__ import (
+    __version__,
+    get_version,
+    get_version_info,
+    get_display_version,
+    is_development_version,
+    get_version_tuple,
+)
+
+__all__ = [
+    "ConfigManager",
+    "get_app_dir",
+    "__version__",
+    "get_version",
+    "get_version_info",
+    "get_display_version",
+    "is_development_version",
+    "get_version_tuple",
+]

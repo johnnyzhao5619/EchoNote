@@ -65,7 +65,15 @@ class SplashScreen(QSplashScreen):
 
     @staticmethod
     def _format_version(version: str | None) -> str:
-        """Return formatted version label for display."""
+        """
+        Return formatted version label for display.
+
+        Args:
+            version: Version string to format
+
+        Returns:
+            Formatted version string with 'v' prefix, or empty string if invalid
+        """
         if not version:
             return ""
 
@@ -73,9 +81,11 @@ class SplashScreen(QSplashScreen):
         if not normalized:
             return ""
 
+        # If already has 'v' prefix, return as-is
         if normalized.lower().startswith("v"):
             return normalized
 
+        # Add 'v' prefix for display
         return f"v{normalized}"
 
     @property

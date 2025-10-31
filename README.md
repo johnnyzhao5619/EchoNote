@@ -1,319 +1,158 @@
-<h1 align="left">EchoNote</h1>
+<h1 align="center">EchoNote</h1>
 
-<p align="left">
+<p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-2563EB.svg" alt="Apache 2.0 License badge"></a>
   <img src="https://img.shields.io/badge/Python-3.10%2B-4B5563.svg" alt="Python 3.10+ badge">
   <img src="https://img.shields.io/badge/Desktop-Local%20First-0EA5E9.svg" alt="Desktop local-first badge">
 </p>
 
-> 📢 v1.1.1 维护版本发布，项目清理和文档重组完成。完整变更可查阅 [CHANGELOG](docs/CHANGELOG.md#v111---2025-10-31)。
+<p align="center">
+  <strong>Local-first desktop application for intelligent voice transcription and calendar management</strong>
+</p>
 
-## 🌐 Language Overview
+<p align="center">
+  <a href="#english">English</a> •
+  <a href="README.zh-CN.md">中文</a> •
+  <a href="README.fr.md">Français</a>
+</p>
 
-- [English](#english)
-- [中文](#中文)
-- [Français](#français)
+> **📖 Language-specific READMEs**: For detailed documentation in your preferred language, see [README.zh-CN.md](README.zh-CN.md) (Chinese) or [README.fr.md](README.fr.md) (French).
 
-## 📚 Global Index
+---
 
-- [System Architecture Overview](#system-architecture-overview)
-- [Core Capabilities Matrix](#core-capabilities-matrix)
-- [Documentation Library](#documentation-library)
-- [Developer Toolchain](#developer-toolchain)
-- [License](#license)
+## English
 
-### System Architecture Overview
+### 🚀 Quick Start
+
+**EchoNote** is a privacy-first desktop application that provides intelligent voice transcription and calendar management with local processing capabilities.
+
+#### Installation & Setup
+
+```bash
+# 1. Create virtual environment
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+
+# 2. Install dependencies
+pip install -r requirements.txt
+
+# 3. Launch application
+python main.py
+```
+
+#### First Launch Setup
+
+1. **Storage Configuration**: Choose paths for recordings and transcripts
+2. **Model Download**: Download a Faster-Whisper model (recommend `base` for most users)
+3. **FFmpeg Check**: Verify FFmpeg installation for media format support
+4. **Optional**: Configure calendar sync (Google/Outlook OAuth)
+
+### 🎯 Key Features
+
+- **🎙️ Batch & Real-time Transcription**: Process audio/video files or capture live recordings
+- **📅 Calendar Integration**: Sync with Google Calendar and Outlook, manage local events
+- **⏰ Timeline Intelligence**: Correlate events with recordings, automated task scheduling
+- **🔒 Privacy-First**: Encrypted local storage, no cloud dependency required
+- **🌍 Multi-language**: Built-in internationalization (English, Chinese, French)
+- **🎨 Accessibility**: Keyboard navigation, screen reader support, multiple themes
+
+### 📋 System Requirements
+
+- **Python**: 3.10 or newer
+- **Operating System**: macOS, Linux, Windows
+- **Optional Dependencies**:
+  - PyAudio (microphone capture)
+  - FFmpeg (media format support)
+  - CUDA GPU (Faster-Whisper acceleration)
+
+### 🏗️ Architecture Overview
 
 ```
 EchoNote/
-├── main.py                # PySide6 bootstrap, dependency wiring, runtime orchestration
-├── config/                # Default configuration and runtime config manager
-├── core/                  # Feature domains: calendar, realtime, timeline, transcription, settings
-├── engines/               # Integrations: audio capture, speech, translation, calendar sync
-├── data/                  # Database schema/models, encrypted storage, file lifecycle helpers
-├── ui/                    # Desktop UI components, dialogs, feature modules
-├── utils/                 # Logging, diagnostics, i18n, startup & resource utilities
-└── tests/                 # Unit, integration, and scenario harnesses
+├── main.py                # Application entry point
+├── config/                # Configuration management & version control
+├── core/                  # Business logic domains
+├── engines/               # External service integrations
+├── data/                  # Database, security, storage
+├── ui/                    # PySide6 desktop interface
+├── utils/                 # Cross-cutting utilities
+└── tests/                 # Test suites
 ```
 
-### Core Capabilities Matrix
+### 📚 Documentation
 
-| Domain                         | Purpose                                                  | Key Modules                                                                                   |
-| ------------------------------ | -------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| Batch & realtime transcription | Task queueing, model orchestration, export formats       | `core/transcription`, `engines/speech/`, `ui/batch_transcribe`, `ui/realtime_record`          |
-| Calendar orchestration         | Local persistence, Google/Outlook sync, OAuth lifecycle  | `core/calendar`, `engines/calendar_sync`, `data/security/oauth_manager.py`, `ui/calendar_hub` |
-| Timeline intelligence          | Event correlation, automation rules, reminders           | `core/timeline`, `ui/timeline`                                                                |
-| Settings & preferences         | Config surfaces, model downloads, appearance             | `core/settings`, `ui/settings`, `core/models`                                                 |
-| Platform services              | Logging, error handling, startup health, resource safety | `utils/`, `data/security`, `engines/audio`                                                    |
+| Audience         | Resource           | Location                                                   |
+| ---------------- | ------------------ | ---------------------------------------------------------- |
+| **New Users**    | Quick start guide  | [`docs/quick-start/README.md`](docs/quick-start/README.md) |
+| **End Users**    | User manual        | [`docs/user-guide/README.md`](docs/user-guide/README.md)   |
+| **Developers**   | API reference      | [`docs/DEVELOPER_GUIDE.md`](docs/DEVELOPER_GUIDE.md)       |
+| **Contributors** | Coding standards   | [`docs/CODE_STANDARDS.md`](docs/CODE_STANDARDS.md)         |
+| **Maintainers**  | Version management | [`docs/VERSION_MANAGEMENT.md`](docs/VERSION_MANAGEMENT.md) |
 
-### Documentation Library
+### 🧪 Development & Testing
 
-| Audience           | Focus                                  | Location                                                  |
-| ------------------ | -------------------------------------- | --------------------------------------------------------- |
-| New users          | Guided onboarding & workflows          | `docs/quick-start/README.md`, `docs/user-guide/README.md` |
-| Product overview   | Value proposition & personas           | `docs/project-overview/README.md`                         |
-| API & architecture | Core services, data flow diagrams      | `docs/DEVELOPER_GUIDE.md`, `docs/API_REFERENCE.md`        |
-| Accessibility & UX | Accessibility checklist, UI rationale  | `docs/ACCESSIBILITY.md`, `ui/*/README.md`                 |
-| Contribution       | Coding standards, contribution process | `docs/CODE_STANDARDS.md`, `docs/CONTRIBUTING.md`          |
-| Cloud engines      | External speech engine requirements    | `engines/speech/CLOUD_ENGINES_IMPLEMENTATION.md`          |
-| Project status     | Current status, metrics, and roadmap   | `docs/PROJECT_STATUS.md`                                  |
+```bash
+# Install development dependencies
+pip install -r requirements-dev.txt
 
-### Developer Toolchain
+# Run tests
+pytest tests/unit                    # Unit tests
+pytest tests/integration             # Integration tests
+pytest tests/e2e_performance_test.py # Performance tests
 
-- Python 3.10+
-- Optional accelerants: PyAudio (capture), FFmpeg (media), CUDA GPU (Faster-Whisper)
-- Environment setup (`python -m venv .venv && source .venv/bin/activate`)
-- Install dependencies with `pip install -r requirements.txt` (includes `requests>=2.31.0` for model downloads—download the wheel ahead of time when preparing offline machines)
-- Launch the desktop client via `python main.py`
-- Extended tooling: `pip install -r requirements-dev.txt`
-- Testing guardrails:
-  - Unit tests – `pytest tests/unit`
-  - Integration tests – `pytest tests/integration`
-  - Performance/E2E harness – `pytest tests/e2e_performance_test.py`
+# Code quality checks
+python scripts/sync_version.py       # Version consistency
+pre-commit run --all-files          # Code formatting & linting
+```
 
-### License
+### 📄 License
 
-Released under the [Apache 2.0 License](LICENSE).
-
-> ✅ **PySide6 许可证合规**：UI 层使用 PySide6 (LGPL v3)，与 Apache 2.0 完全兼容。PySide6 通过动态链接使用，允许商业分发而无需额外许可证。详细的第三方许可证信息请参见 [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)。
+Released under the [Apache 2.0 License](LICENSE). PySide6 (LGPL v3) is used for the UI layer and is fully compatible through dynamic linking.
 
 ---
 
-### English
+## 🌍 Other Languages
 
-#### Project Snapshot
+For comprehensive documentation in other languages:
 
-- **Framework**: PySide6 entry point in `main.py`
-- **Core Domains**: batch/real-time transcription, calendar sync, task automation, settings management
-- **Operating Principles**: privacy-first, encrypted persistence, proactive resource checks
-- **Project Status**: Production-ready with clean, maintainable structure (v1.1.1)
+- **中文 (Chinese)**: See [README.zh-CN.md](README.zh-CN.md) for detailed Chinese documentation
+- **Français (French)**: See [README.fr.md](README.fr.md) for detailed French documentation
 
-#### Quick Start Checklist
+These language-specific READMEs include:
 
-1. Create and activate a virtual environment.
-2. `pip install -r requirements.txt` (installs `requests>=2.31.0` to power model downloads; fetch the wheel beforehand if the target host is offline)
-3. Run `python main.py`
-4. On first launch complete the guided setup (storage paths, FFmpeg check, model download recommendation).
-
-#### Model Management
-
-EchoNote uses Faster-Whisper models for speech recognition:
-
-1. **Download a model**: Settings > Model Management (recommend `base` model for most users)
-2. **Select the model**: Settings > Transcription > Default Model
-3. **Troubleshooting**: See `docs/TROUBLESHOOTING.md`
-
-#### Feature Highlights
-
-1. **Batch Transcription** – `core/transcription` coordinates Faster-Whisper engines, resumable queues, and export formatting.
-2. **Real-time Recording** – `core/realtime` plus `engines/audio` provide capture, gain control, voice activity detection, inline markers, and optional translation.
-3. **Calendar Hub** – `core/calendar` stores local events while `engines/calendar_sync` integrates Google and Outlook accounts.
-4. **Timeline Automation** – `core/timeline` links events with recordings, maintains auto-task rules, and exposes history queries.
-5. **Secure Storage** – `data/database`, `data/security`, and `data/storage` deliver encrypted SQLite, token vaults, and file lifecycle helpers.
-6. **System Health** – `utils/` centralises logging, diagnostics, resource monitoring, and FFmpeg checks.
-
-#### Environment Requirements
-
-- Python 3.10 or newer
-- Optional: PyAudio (microphone capture), FFmpeg (media formats), CUDA GPU (acceleration)
-- First launch writes encrypted SQLite data, logs, and settings to `~/.echonote`
-
-#### Configuration Notes
-
-- Defaults live in `config/default_config.json`; user overrides persist to `~/.echonote/app_config.json`.
-- Recordings and transcripts are stored under `~/Documents/EchoNote/` by default.
-- Provide OAuth credentials in the settings UI before enabling Google or Outlook sync.
-
-#### Operational Index
-
-- **Runtime orchestration**: `main.py`, `utils/startup_optimizer.py`
-- **Audio services**: `engines/audio/`, `core/realtime/`
-- **Transcription pipeline**: `core/transcription/`, `core/models/`
-- **Calendar sync**: `core/calendar/`, `engines/calendar_sync/`
-- **UI modules**: `ui/main_window.py`, `ui/sidebar.py`, feature widgets under `ui/*`
-- **Security**: `data/security/`, `utils/error_handler.py`
-- **Testing suites**: `tests/core/test_model_manager.py`, placeholders under `tests/unit`, `tests/integration`
-
-#### Quality & Testing
-
-- `pytest tests/unit` – core logic and utilities
-- `pytest tests/integration` – database, engines, and schedulers (requires local dependencies)
-- Optional E2E and performance baselines reside in `tests/`
-
-#### Documentation References
-
-- User handbook: `docs/user-guide/README.md`
-- Quick start: `docs/quick-start/README.md`
-- Project overview: `docs/project-overview/README.md`
-- Developer resources: `docs/DEVELOPER_GUIDE.md`, `docs/API_REFERENCE.md`
-- Project status: `docs/PROJECT_STATUS.md` - Current metrics, roadmap, and maintenance history
+- Complete setup instructions
+- Detailed feature descriptions
+- Troubleshooting guides
+- Configuration examples
+- Development workflows
 
 ---
 
-### 中文
-
-#### 项目速览
-
-- **框架**：PySide6 桌面应用，入口位于 `main.py`
-- **核心领域**：批量/实时转录、日历同步、自动任务、设置管理
-- **运行原则**：隐私优先、加密持久化、主动的资源诊断
-- **项目状态**：生产就绪，结构清晰易维护 (v1.1.1)
-
-#### 快速启动清单
-
-1. 创建并激活虚拟环境
-2. `pip install -r requirements.txt`（安装 `requests>=2.31.0` 以支持模型下载；离线环境请提前下载 wheel 文件）
-3. 运行 `python main.py`
-4. 首次启动时完成引导设置（存储路径、FFmpeg 检查、模型下载推荐）
-
-#### 模型管理
-
-EchoNote 使用 Faster-Whisper 模型进行语音识别。使用转录功能前：
-
-1. **下载模型**：
-
-   - 打开 设置 > 模型管理
-   - 根据需求选择模型：
-     - `tiny`: 最快，准确度较低（~75MB）
-     - `base`: 速度和准确度平衡（~142MB）- **推荐大多数用户使用**
-     - `small`: 较慢，准确度高（~462MB）
-     - `medium/large`: 最慢，准确度最高（1.5-3GB）
-   - 点击"下载"并等待完成
-
-2. **选择模型**：
-
-   - 打开 设置 > 转录
-   - 从"默认模型"下拉菜单中选择已下载的模型
-   - 点击"保存"
-
-3. **故障排查**：
-   - 如果看到"模型未下载"错误，请确保至少下载了一个模型
-   - 应用程序会自动使用任何可用的已下载模型作为备选
-   - 详细的故障排查请参见 `docs/TROUBLESHOOTING.md`
-
-#### 快速启动清单（续）
-
-1. 创建并激活虚拟环境。
-2. 执行 `pip install -r requirements.txt` 安装依赖（其中包含 `requests>=2.31.0`，用于模型下载；离线环境需提前准备相应的 wheel 包）。
-3. 运行 `python main.py` 启动桌面客户端。
-4. 首次启动按向导完成存储路径、FFmpeg 检测、模型下载建议等设置。
-
-#### 核心特性
-
-1. **批量转录** —— `core/transcription` 调度 Faster-Whisper 引擎、支持任务重试与多格式导出。
-2. **实时录制** —— `core/realtime` 与 `engines/audio` 提供音频捕获、增益控制、语音活动检测与可选翻译。
-3. **日历中心** —— `core/calendar` 管理本地事件，`engines/calendar_sync` 负责 Google/Outlook 账户对接。
-4. **时间线自动化** —— `core/timeline` 关联事件与录音，维护自动任务规则并提供历史检索。
-5. **安全存储** —— `data/database`、`data/security`、`data/storage` 提供加密 SQLite、令牌保管与文件生命周期管理。
-6. **系统健康** —— `utils/` 集中处理日志、诊断、资源监控与 FFmpeg 检测。
-
-#### 环境要求
-
-- Python 3.10 及以上
-- 可选依赖：PyAudio（麦克风采集）、FFmpeg（媒体格式）、CUDA GPU（加速）
-- 首次启动会在 `~/.echonote` 下写入加密数据库、日志与配置
-
-#### 配置索引
-
-- 默认配置：`config/default_config.json`
-- 用户配置：`~/.echonote/app_config.json`
-- 录音/转录目录：`~/Documents/EchoNote/`
-- OAuth 管理：`data/security/oauth_manager.py`
-
-#### 模块索引
-
-- **运行调度**：`main.py`、`utils/startup_optimizer.py`
-- **音频链路**：`engines/audio/`、`core/realtime/`
-- **转录与模型**：`core/transcription/`、`core/models/`
-- **日历同步**：`core/calendar/`、`engines/calendar_sync/`
-- **桌面界面**：`ui/main_window.py`、`ui/sidebar.py` 及功能子模块
-- **安全机制**：`data/security/`、`utils/error_handler.py`
-- **测试样例**：`tests/core/test_model_manager.py`、`tests/` 下的占位目录
-
-#### 质量与测试
-
-- `pytest tests/unit` —— 核心逻辑与工具单元测试
-- `pytest tests/integration` —— 数据库、引擎与调度器集成测试（需本地依赖）
-- 其他端到端与性能场景位于 `tests/`
-
-#### 文档索引
-
-- 使用手册：`docs/user-guide/README.md`
-- 快速入门：`docs/quick-start/README.md`
-- 项目说明：`docs/project-overview/README.md`
-- 开发者参考：`docs/DEVELOPER_GUIDE.md`、`docs/API_REFERENCE.md`
-- 项目状态：`docs/PROJECT_STATUS.md` - 当前指标、路线图和维护历史
-
----
-
-### Français
-
-#### Aperçu du projet
-
-- **Cadre** : application PySide6 dont le point d’entrée est `main.py`
-- **Domaines clés** : transcription batch/temps réel, synchronisation calendrier, automatisation des tâches, gestion des paramètres
-- **Principes opérationnels** : confidentialité par défaut, persistance chiffrée, surveillance proactive des ressources
-- **Statut du projet** : Prêt pour la production avec une structure claire et maintenable (v1.1.1)
-
-#### Démarrage rapide
-
-1. Créez et activez un environnement virtuel.
-2. Installez les dépendances avec `pip install -r requirements.txt` (inclut `requests>=2.31.0` pour les téléchargements de modèles ; pré-téléchargez la roue si la cible est hors ligne).
-3. Lancez `python main.py` pour ouvrir le client.
-4. Suivez l’assistant initial (chemins de stockage, vérification FFmpeg, recommandation de modèle).
-
-#### Fonctionnalités principales
-
-1. **Transcription par lots** – `core/transcription` orchestre les moteurs Faster-Whisper, gère les files avec reprise et l’export multi-formats.
-2. **Enregistrement en temps réel** – `core/realtime` et `engines/audio` gèrent la capture, le gain, la détection d’activité vocale et la traduction optionnelle.
-3. **Hub calendrier** – `core/calendar` stocke les événements locaux et `engines/calendar_sync` connecte les comptes Google et Outlook.
-4. **Automatisation de la timeline** – `core/timeline` relie événements et enregistrements, maintient les règles automatiques et expose les requêtes historiques.
-5. **Stockage sécurisé** – `data/database`, `data/security` et `data/storage` fournissent SQLite chiffré, coffre à jetons et gestion du cycle de vie des fichiers.
-6. **Santé du système** – `utils/` centralise journalisation, diagnostics, surveillance des ressources et contrôles FFmpeg.
-
-#### Prérequis
-
-- Python 3.10 ou supérieur
-- Optionnel : PyAudio (capture micro), FFmpeg (formats média), GPU CUDA (accélération)
-- Le premier lancement crée la base SQLite chiffrée, les journaux et la configuration dans `~/.echonote`
-
-#### Index de configuration
-
-- Configuration par défaut : `config/default_config.json`
-- Surcharges utilisateur : `~/.echonote/app_config.json`
-- Stockage des enregistrements : `~/Documents/EchoNote/`
-- Gestion OAuth : `data/security/oauth_manager.py`
-
-#### Index fonctionnel
-
-- **Orchestration runtime** : `main.py`, `utils/startup_optimizer.py`
-- **Chaîne audio** : `engines/audio/`, `core/realtime/`
-- **Pipeline de transcription** : `core/transcription/`, `core/models/`
-- **Synchronisation calendrier** : `core/calendar/`, `engines/calendar_sync/`
-- **Interface utilisateur** : `ui/main_window.py`, `ui/sidebar.py`, modules `ui/*`
-- **Sécurité & résilience** : `data/security/`, `utils/error_handler.py`
-- **Tests** : `tests/core/test_model_manager.py`, suites `tests/`
-
-#### Qualité & tests
-
-- `pytest tests/unit` – logique cœur et utilitaires
-- `pytest tests/integration` – base de données, moteurs et ordonnanceurs (dépendances locales requises)
-- Scénarios E2E et performance supplémentaires dans `tests/`
-
-#### Documentation
-
-- Guide utilisateur : `docs/user-guide/README.md`
-- Démarrage rapide : `docs/quick-start/README.md`
-- Présentation du projet : `docs/project-overview/README.md`
-- Ressources développeur : `docs/DEVELOPER_GUIDE.md`, `docs/API_REFERENCE.md`
-- Statut du projet : `docs/PROJECT_STATUS.md` - Métriques actuelles, feuille de route et historique de maintenance
-
-## Project Status
+## 📊 Project Status
 
 - **Version**: v1.1.1 (Latest maintenance release)
 - **Test Coverage**: 607 tests, 100% pass rate
 - **Code Quality**: Excellent (PEP 8 compliant, type-annotated)
-- **Documentation**: Complete and restructured (user guides, API reference, developer docs)
-- **Project Structure**: Clean and maintainable (88% reduction in temporary files)
-- **Maintenance**: Comprehensive cleanup completed (60 files removed, 8 core scripts retained)
+- **Documentation**: Complete and restructured
 - **License**: Apache 2.0 (fully compliant)
+
+## 🤝 Contributing
+
+We welcome contributions! Please see our [Contributing Guide](docs/CONTRIBUTING.md) for details on:
+
+- Code standards and style guide
+- Development workflow
+- Testing requirements
+- Documentation guidelines
+
+## 📞 Support
+
+- **Documentation**: [`docs/`](docs/) directory
+- **Issues**: [GitHub Issues](https://github.com/your-org/echonote/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/your-org/echonote/discussions)
+
+---
+
+<p align="center">
+  Made with ❤️ by the EchoNote team
+</p>

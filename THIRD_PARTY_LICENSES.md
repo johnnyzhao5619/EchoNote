@@ -317,7 +317,7 @@ This document should be updated whenever:
 - License terms change for any dependency
 
 **Last Updated**: October 30, 2025  
-**EchoNote Version**: 1.1.0
+**EchoNote Version**: 1.1.1
 
 ---
 
