@@ -132,8 +132,8 @@ class TranscriptViewerDialog(QDialog):
         # Apply initial translations
         self.update_language()
 
-        # Restore window state
-        self._restore_window_state()
+        # Restore window state using WindowStateManager
+        self.window_state_manager.restore_window_state()
 
         logger.info(f"Transcript viewer opened for task {task_id}")
 
@@ -1145,7 +1145,8 @@ class TranscriptViewerDialog(QDialog):
                 # If no timestamps, create simple markdown
                 logger.warning(
                     self.i18n.t(
-                        "logging.batch_transcribe_viewer.no_timestamps_found_creating_basic_markdown"
+                        "logging.batch_transcribe_viewer."
+                        "no_timestamps_found_creating_basic_markdown"
                     )
                 )
                 md_content = self._create_basic_markdown(content)
@@ -1434,33 +1435,6 @@ class TranscriptViewerDialog(QDialog):
             logger.warning(f"Could not detect system theme: {e}")
             return "light"
 
-    def _save_window_state(self):
-        """Save window geometry and state to settings."""
-        try:
-            # Save window geometry (position and size)
-            self.settings.setValue("window/geometry", self.saveGeometry())
-
-            # Note: QDialog doesn't have saveState() like QMainWindow
-            # Window state (maximized, etc.) is handled by geometry
-
-            logger.debug("Window state saved")
-        except Exception as e:
-            logger.error(f"Error saving window state: {e}")
-
-    def _restore_window_state(self):
-        """Restore window geometry and state from settings."""
-        try:
-            # Restore geometry
-            geometry = self.settings.value("window/geometry")
-            if geometry:
-                self.restoreGeometry(geometry)
-                logger.debug("Window geometry restored")
-
-            # Note: QDialog doesn't have restoreState() like QMainWindow
-            # Window state (maximized, etc.) is handled by geometry
-        except Exception as e:
-            logger.error(f"Error restoring window state: {e}")
-
     def closeEvent(self, event):
         """
         Handle window close event with cleanup.
@@ -1473,8 +1447,8 @@ class TranscriptViewerDialog(QDialog):
             self.load_worker.cancel()
             self.load_worker.wait()
 
-        # Save window state before closing
-        self._save_window_state()
+        # Save window state before closing using WindowStateManager
+        self.window_state_manager.save_window_state()
 
         if self.is_modified:
             # Show unsaved changes dialog
@@ -1492,14 +1466,17 @@ class TranscriptViewerDialog(QDialog):
                 self.save_changes()
                 self._cleanup_resources()
                 event.accept()
+                super().closeEvent(event)
             elif reply == QMessageBox.StandardButton.Discard:
                 self._cleanup_resources()
                 event.accept()
+                super().closeEvent(event)
             else:
                 event.ignore()
         else:
             self._cleanup_resources()
             event.accept()
+            super().closeEvent(event)
 
     def _cleanup_resources(self):
         """

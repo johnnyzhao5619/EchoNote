@@ -41,6 +41,7 @@ from ui.base_widgets import (
     ThemeMixin,
     ErrorHandlerMixin,
     connect_button_with_callback,
+    create_hbox,
 )
 
 logger = logging.getLogger("echonote.ui.error_dialog")

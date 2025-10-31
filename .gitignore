@@ -223,16 +223,43 @@ test_transcripts/
 *.old
 migration_backup_*/
 
-# Editor files
-# OS files
-# Code quality reports
+# Temporary analysis and reports (prevent future clutter)
 reports/
-# Validation reports
+test_reports/
+*_report.json
+*_report.md
+*_analysis.json
+PROJECT_CLEANUP_*.md
+PROJECT_MAINTENANCE_*.md
+DOCUMENTATION_*.md
 VALIDATION_REPORT.md
 CODE_QUALITY_IMPROVEMENT_REPORT.md
-# Temporary improvement files
-scripts/quick_fixes.py
-scripts/minimal_fixes.py
-scripts/fix_basewidget_issues.py
-scripts/final_cleanup.py
-scripts/
+
+# Development and maintenance artifacts
+IMPROVEMENT_PLAN_*.md
+PROJECT_REVIEW_*.md
+RELEASE_NOTES_*.md
+REVIEW_SUMMARY.md
+*_SUMMARY.md
+*_STATUS_REPORT.md
+IMPLEMENTATION_SUMMARY.md
+TASK_REVIEW.md
+
+# Performance and analysis outputs
+performance_results/
+analysis_output/
+benchmark_results/
+
+# IDE and editor artifacts
+.vscode/settings.json
+.idea/workspace.xml
+*.sublime-workspace
+*.sublime-project
+
+# OS-specific temporary files
+.DS_Store?
+.Spotlight-V100?
+.Trashes?
+Icon?
+Thumbs.db?
+Desktop.ini?

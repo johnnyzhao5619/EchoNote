@@ -24,6 +24,7 @@ from typing import Dict, List
 
 logger = logging.getLogger("echonote.transcription.format_converter")
 
+
 class FormatConverter:
     """
     Converts internal transcription format to various output formats.
@@ -61,7 +62,7 @@ class FormatConverter:
 
         # Validate data
         if not internal_format or "segments" not in internal_format:
-            raise ValueError(self.i18n.t("core.invalid_format_error"))
+            raise ValueError("Invalid format: missing 'segments' key")
 
         segments = internal_format["segments"]
         if not segments:
@@ -87,7 +88,8 @@ class FormatConverter:
         """
         lines = []
         for segment in segments:
-            text = segment.get("text", "").strip()
+            text = segment.get("text") or ""
+            text = text.strip()
             if text:
                 lines.append(text)
 
@@ -118,7 +120,8 @@ class FormatConverter:
 
         subtitle_index = 1
         for segment in segments:
-            text = segment.get("text", "").strip()
+            text = segment.get("text") or ""
+            text = text.strip()
             if not text:
                 continue
 
@@ -158,7 +161,8 @@ class FormatConverter:
         lines = ["# Transcription\n"]
 
         for segment in segments:
-            text = segment.get("text", "").strip()
+            text = segment.get("text") or ""
+            text = text.strip()
             if not text:
                 continue
 

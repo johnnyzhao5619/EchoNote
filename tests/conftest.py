@@ -3,10 +3,12 @@
 Pytest configuration for EchoNote PySide6 migration tests.
 """
 
+import asyncio
 import sys
 
 import pytest
 from PySide6.QtWidgets import QApplication
+
 
 @pytest.fixture(scope="session")
 def qapp():
@@ -15,3 +17,11 @@ def qapp():
     if app is None:
         app = QApplication(sys.argv)
     yield app
+
+
+@pytest.fixture
+def event_loop():
+    """Create an event loop for async tests."""
+    loop = asyncio.new_event_loop()
+    yield loop
+    loop.close()
