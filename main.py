@@ -72,6 +72,14 @@ def main():
         app.setOrganizationName("EchoNote")
         app.setOrganizationDomain("echonote.app")
 
+        # Set application icon
+        from PySide6.QtGui import QIcon
+        import os
+
+        icon_path = os.path.join("resources", "icons", "echonote.png")
+        if os.path.exists(icon_path):
+            app.setWindowIcon(QIcon(icon_path))
+
         logger.info("PySide6 application initialized")
         timer.checkpoint("qt_initialized")
 
@@ -162,7 +170,7 @@ def main():
         logger.info("Initializing internationalization...")
         from utils.i18n import I18nQtManager
 
-        language = config.get("ui.language", "zh_CN")
+        language = config.get("ui.language", "en_US")
         i18n = I18nQtManager(default_language=language)
         logger.info(f"Internationalization initialized (language: {language})")
         timer.checkpoint("i18n_initialized")

@@ -1,26 +1,19 @@
-<h1 align="center">EchoNote</h1>
+<div align="center">
+  <img src="resources/icons/echonote.png" alt="EchoNote Logo" width="120" height="120">
+  <h1>EchoNote</h1>
+  <p><em>Intelligent Voice Transcription & Calendar Management</em></p>
+</div>
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-2563EB.svg" alt="Apache 2.0 License badge"></a>
   <img src="https://img.shields.io/badge/Python-3.10%2B-4B5563.svg" alt="Python 3.10+ badge">
   <img src="https://img.shields.io/badge/Desktop-Local%20First-0EA5E9.svg" alt="Desktop local-first badge">
+  <img src="https://img.shields.io/badge/Privacy-First-10B981.svg" alt="Privacy-first badge">
 </p>
 
 <p align="center">
-  <strong>Local-first desktop application for intelligent voice transcription and calendar management</strong>
+  <strong>🎙️ Transcribe • 📅 Organize • 🔒 Secure • 🌍 Multilingual</strong>
 </p>
-
-<p align="center">
-  <a href="#english">English</a> •
-  <a href="README.zh-CN.md">中文</a> •
-  <a href="README.fr.md">Français</a>
-</p>
-
-> **📖 Language-specific READMEs**: For detailed documentation in your preferred language, see [README.zh-CN.md](README.zh-CN.md) (Chinese) or [README.fr.md](README.fr.md) (French).
-
----
-
-## English
 
 ### 🚀 Quick Start
 
@@ -108,23 +101,6 @@ pre-commit run --all-files          # Code formatting & linting
 ### 📄 License
 
 Released under the [Apache 2.0 License](LICENSE). PySide6 (LGPL v3) is used for the UI layer and is fully compatible through dynamic linking.
-
----
-
-## 🌍 Other Languages
-
-For comprehensive documentation in other languages:
-
-- **中文 (Chinese)**: See [README.zh-CN.md](README.zh-CN.md) for detailed Chinese documentation
-- **Français (French)**: See [README.fr.md](README.fr.md) for detailed French documentation
-
-These language-specific READMEs include:
-
-- Complete setup instructions
-- Detailed feature descriptions
-- Troubleshooting guides
-- Configuration examples
-- Development workflows
 
 ---
 

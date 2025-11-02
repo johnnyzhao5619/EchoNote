@@ -102,6 +102,14 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(self.i18n.t("app.title"))
         self.setMinimumSize(1024, 768)
 
+        # Set application icon
+        from PySide6.QtGui import QIcon
+        import os
+
+        icon_path = os.path.join("resources", "icons", "echonote.png")
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
+
         # Create central widget
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
