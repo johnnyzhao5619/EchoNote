@@ -156,7 +156,7 @@ class AutoTaskScheduler:
         if i18n_manager is not None:
             return i18n_manager
 
-        default_language = "zh_CN"
+        default_language = "en_US"
         if self.settings_manager and hasattr(self.settings_manager, "get_language"):
             try:
                 language = self.settings_manager.get_language()

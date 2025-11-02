@@ -63,14 +63,14 @@ class AudioPlayer(BaseWidget):
     # Signals
     playback_error = Signal(str)  # error_message
 
-    # Constants - 避免硬编码
-    DEFAULT_VOLUME = 70  # 默认音量 (0-100)
-    TRANSCRIPT_AREA_HEIGHT = 220  # 转录区域固定高度
-    CONTROLS_WIDTH = 400  # 控制栏总宽度
-    SIDE_CONTROL_WIDTH = 148  # 左右侧控制区域宽度
-    CENTER_CONTROL_WIDTH = 104  # 中间播放按钮区域宽度
-    PLAY_BUTTON_SIZE = 56  # 播放按钮尺寸
-    CONTROL_BUTTON_SIZE = 40  # 控制按钮尺寸
+    # Constants - avoid hardcoding
+    DEFAULT_VOLUME = 70  # Default volume (0-100)
+    TRANSCRIPT_AREA_HEIGHT = 220  # Fixed height for transcript area
+    CONTROLS_WIDTH = 400  # Total width of control bar
+    SIDE_CONTROL_WIDTH = 148  # Width of left/right control areas
+    CENTER_CONTROL_WIDTH = 104  # Width of center play button area
+    PLAY_BUTTON_SIZE = 56  # Play button size
+    CONTROL_BUTTON_SIZE = 40  # Control button size
     VOLUME_SLIDER_WIDTH = 100  # 音量滑块宽度
 
     # Layout constants - 布局常量

@@ -244,7 +244,7 @@ class ConfigManager:
             raise ValueError(f"ui.theme must be one of {valid_themes}")
 
         # Validate language value
-        valid_languages = ["zh_CN", "en_US", "fr_FR"]
+        valid_languages = ["en_US"]
         if ui_config["language"] not in valid_languages:
             raise ValueError(f"ui.language must be one of {valid_languages}")
 

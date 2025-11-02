@@ -53,8 +53,6 @@ class VersionSyncer:
             "pyproject.toml": self._update_pyproject_toml,
             "EchoNote.spec": self._update_spec_file,
             "README.md": self._update_readme,
-            "README.zh-CN.md": self._update_readme,
-            "README.fr.md": self._update_readme,
             "docs/INSTALLATION.md": self._update_docs,
             "docs/DEVELOPER_GUIDE.md": self._update_docs,
         }

@@ -14,9 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-语音活动检测 (Voice Activity Detection)
+Voice Activity Detection (VAD)
 
-集成 silero-vad 和 webrtcvad 实现语音段落检测
+Integrates silero-vad and webrtcvad for speech segment detection
 """
 
 import logging
@@ -28,18 +28,18 @@ logger = logging.getLogger(__name__)
 
 
 class VADDetector:
-    """语音活动检测器"""
+    """Voice Activity Detector"""
 
     def __init__(
         self, threshold: float = 0.5, silence_duration_ms: int = 2000, method: str = "silero"
     ):
         """
-        初始化 VAD 检测器
+        Initialize VAD detector
 
         Args:
-            threshold: 语音检测阈值（0.0-1.0），用于 VAD 灵敏度控制
-            silence_duration_ms: 静音阈值（毫秒），超过此时长的静音视为语音段落结束
-            method: VAD 方法 ('silero' 或 'webrtc')
+            threshold: Speech detection threshold (0.0-1.0), used for VAD sensitivity control
+            silence_duration_ms: Silence threshold (milliseconds), silence exceeding this duration is considered end of speech segment
+            method: VAD method ('silero' or 'webrtc')
         """
         self.threshold = threshold
         self.silence_duration_ms = silence_duration_ms
@@ -48,7 +48,7 @@ class VADDetector:
         self._initialize_model()
 
     def _initialize_model(self):
-        """初始化 VAD 模型"""
+        """Initialize VAD model"""
         if self.method == "silero":
             self._initialize_silero()
         elif self.method == "webrtc":
@@ -57,7 +57,7 @@ class VADDetector:
             raise ValueError(f"Unsupported VAD method: {self.method}")
 
     def _initialize_silero(self):
-        """初始化 Silero VAD 模型"""
+        """Initialize Silero VAD model"""
         try:
             import torch
 
@@ -76,12 +76,12 @@ class VADDetector:
             raise
 
     def _initialize_webrtc(self):
-        """初始化 WebRTC VAD"""
+        """Initialize WebRTC VAD"""
         try:
             import webrtcvad
 
             logger.info("Initializing WebRTC VAD...")
-            # 创建 VAD 实例，aggressiveness 级别 0-3（3 最激进）
+            # Create VAD instance, aggressiveness level 0-3 (3 most aggressive)
             self.model = webrtcvad.Vad(2)
             logger.info("WebRTC VAD initialized successfully")
 
@@ -92,16 +92,16 @@ class VADDetector:
 
     def detect_speech(self, audio: np.ndarray, sample_rate: int = 16000) -> List[Dict]:
         """
-        检测音频中的语音段落
+        Detect speech segments in audio
 
         Args:
-            audio: 音频数据（numpy array）
-            sample_rate: 采样率（Hz）
+            audio: Audio data (numpy array)
+            sample_rate: Sample rate (Hz)
 
         Returns:
-            List[Dict]: 语音时间戳列表
+            List[Dict]: Speech timestamp list
                 [
-                    {'start': float, 'end': float},  # 时间单位：秒
+                    {'start': float, 'end': float},  # Time unit: seconds
                     ...
                 ]
         """
@@ -113,15 +113,15 @@ class VADDetector:
             return []
 
     def _detect_speech_silero(self, audio: np.ndarray, sample_rate: int) -> List[Dict]:
-        """使用 Silero VAD 检测语音"""
+        """Detect speech using Silero VAD"""
         try:
             import torch
 
-            # 转换为 torch tensor
+            # Convert to torch tensor
             audio_tensor = torch.from_numpy(audio).float()
 
-            # 获取语音时间戳
-            # 注意：不使用 return_seconds=True，因为某些版本的 silero-vad 可能有 bug
+            # Get speech timestamps
+            # Note: Don't use return_seconds=True as some versions of silero-vad may have bugs
             speech_timestamps = self.get_speech_timestamps(
                 audio_tensor,
                 self.model,
@@ -130,10 +130,10 @@ class VADDetector:
                 min_silence_duration_ms=self.silence_duration_ms,
             )
 
-            # 转换为标准格式（从样本数转换为秒）
+            # Convert to standard format (from sample count to seconds)
             result = []
             for ts in speech_timestamps:
-                # silero-vad 返回的时间戳是样本数，需要转换为秒
+                # silero-vad returns timestamps as sample counts, need to convert to seconds
                 start_sec = (
                     ts["start"] / sample_rate
                     if isinstance(ts["start"], (int, float))
@@ -148,36 +148,36 @@ class VADDetector:
             return result
 
         except NameError as e:
-            # 捕获 silero-vad 内部的 NameError（如 'current_time' 未定义）
+            # Catch internal NameError from silero-vad (e.g., 'current_time' undefined)
             logger.error(
                 f"Silero VAD internal error: {e}. This may be a version compatibility issue."
             )
             logger.info("Falling back to processing all audio without VAD")
-            # 返回整个音频段作为语音
+            # Return entire audio segment as speech
             duration = len(audio) / sample_rate
             return [{"start": 0.0, "end": duration}]
 
         except Exception as e:
             logger.error(f"Silero VAD detection failed: {e}")
-            # 返回整个音频段作为语音
+            # Return entire audio segment as speech
             duration = len(audio) / sample_rate
             return [{"start": 0.0, "end": duration}]
 
     def _detect_speech_webrtc(self, audio: np.ndarray, sample_rate: int) -> List[Dict]:
-        """使用 WebRTC VAD 检测语音"""
+        """Detect speech using WebRTC VAD"""
         try:
-            # WebRTC VAD 只支持 8kHz, 16kHz, 32kHz, 48kHz
+            # WebRTC VAD only supports 8kHz, 16kHz, 32kHz, 48kHz
             if sample_rate not in [8000, 16000, 32000, 48000]:
                 logger.warning(
                     f"WebRTC VAD requires sample rate of 8k/16k/32k/48k, got {sample_rate}"
                 )
                 return []
 
-            # 转换为 16-bit PCM
+            # Convert to 16-bit PCM
             audio_int16 = (audio * 32767).astype(np.int16)
             audio_bytes = audio_int16.tobytes()
 
-            # WebRTC VAD 需要固定大小的帧（10ms, 20ms, 或 30ms）
+            # WebRTC VAD requires fixed-size frames (10ms, 20ms, or 30ms)
             frame_duration_ms = 30
             frame_size = int(sample_rate * frame_duration_ms / 1000)
             frame_bytes = frame_size * 2  # 16-bit = 2 bytes per sample

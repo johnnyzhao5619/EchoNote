@@ -1,6 +1,6 @@
 # EchoNote Code Standards
 
-**Version**: 1.0.0  
+**Version**: 1.2.0  
 **Last Updated**: October 2025
 
 ---
@@ -884,4 +884,4 @@ If you have questions about code standards:
 ---
 
 **Last Updated**: October 2025  
-**Version**: 1.0.0
+**Version**: 1.2.0

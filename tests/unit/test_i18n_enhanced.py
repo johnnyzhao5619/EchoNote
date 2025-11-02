@@ -68,7 +68,7 @@ class TestI18nEnhanced:
             }
 
             # Write translation files
-            with open(translations_dir / "zh_CN.json", "w", encoding="utf-8") as f:
+            with open(translations_dir / "en_US.json", "w", encoding="utf-8") as f:
                 json.dump(zh_translations, f, ensure_ascii=False, indent=2)
 
             with open(translations_dir / "en_US.json", "w", encoding="utf-8") as f:
@@ -79,7 +79,7 @@ class TestI18nEnhanced:
     @pytest.fixture
     def i18n_manager(self, temp_translations_dir):
         """Create I18nManager instance with test data."""
-        return I18nManager(str(temp_translations_dir), "zh_CN")
+        return I18nManager(str(temp_translations_dir), "en_US")
 
     def test_simple_translation(self, i18n_manager):
         """Test basic translation functionality."""

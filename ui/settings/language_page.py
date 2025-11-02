@@ -66,9 +66,7 @@ class LanguageSettingsPage(BaseSettingsPage):
         self.language_combo = QComboBox()
 
         # Add language options
-        self.language_combo.addItem(self.i18n.t("settings.language.chinese"), "zh_CN")
         self.language_combo.addItem(self.i18n.t("settings.language.english"), "en_US")
-        self.language_combo.addItem(self.i18n.t("settings.language.french"), "fr_FR")
 
         self.language_combo.currentIndexChanged.connect(self._on_language_changed)
 
@@ -170,9 +168,7 @@ class LanguageSettingsPage(BaseSettingsPage):
             self.language_combo.blockSignals(True)
             self.language_combo.clear()
 
-            self.language_combo.addItem(self.i18n.t("settings.language.chinese"), "zh_CN")
             self.language_combo.addItem(self.i18n.t("settings.language.english"), "en_US")
-            self.language_combo.addItem(self.i18n.t("settings.language.french"), "fr_FR")
 
             # Restore selection
             for i in range(self.language_combo.count()):

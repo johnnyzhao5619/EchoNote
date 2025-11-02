@@ -140,7 +140,7 @@ QPushButton[secondary="true"]:focus {
    Calendar Hub Specific Buttons
    ======================================== */
 
-/* View switching buttons (月/周/日) */
+/* View switching buttons (Month/Week/Day) */
 QPushButton#view_button {
     background-color: #000000;
     color: #FFFFFF;
@@ -170,7 +170,7 @@ QPushButton#view_button:focus {
     outline: 3px solid #00FFFF;
 }
 
-/* Primary action button (创建事件) */
+/* Primary action button (Create Event) */
 QPushButton#primary_button {
     background-color: #FFFF00;
     color: #000000;
@@ -1264,12 +1264,12 @@ QLabel[role="user-feedback"][state="error"] {
    Audio Player Styles - High Contrast Theme
    ======================================== */
 
-/* 播放器主容器 */
+/* Player main container */
 QWidget#audio_player {
     background-color: #000000;
 }
 
-/* 播放器标题 */
+/* Player title */
 QLabel#player_title {
     color: #FFFFFF;
     font-size: 18px;
@@ -1279,7 +1279,7 @@ QLabel#player_title {
     margin: 0px;
 }
 
-/* 播放器副标题 */
+/* Player subtitle */
 QLabel#player_subtitle {
     color: #FFFF00;
     font-size: 14px;
@@ -1289,24 +1289,24 @@ QLabel#player_subtitle {
     margin: 0px;
 }
 
-/* 播放器控制栏容器 */
+/* Player control bar container */
 QWidget#player_control_bar {
     background-color: transparent;
 }
 
-/* 播放器控制容器 - 确保所有内部容器背景透明 */
+/* Player control container - ensure all internal containers have transparent background */
 QWidget#player_controls_container,
 QWidget#player_control_container,
 QWidget#player_spacer {
     background-color: transparent;
 }
 
-/* 播放器内所有QWidget容器都透明 - 覆盖全局QWidget样式 */
+/* All QWidget containers in player are transparent - override global QWidget style */
 QWidget#audio_player QWidget {
     background-color: transparent;
 }
 
-/* 播放器时间显示 */
+/* Player time display */
 QLabel#player_time {
     color: #FFFF00;
     font-size: 14px;
@@ -1314,7 +1314,7 @@ QLabel#player_time {
     font-weight: bold;
 }
 
-/* 播放器进度条 */
+/* Player progress bar */
 QSlider#player_progress {
     min-height: 28px;
 }
@@ -1358,7 +1358,7 @@ QSlider#player_progress:disabled::handle:horizontal {
     border: 3px solid #666666;
 }
 
-/* 播放器音量滑块 */
+/* Player volume slider */
 QSlider#player_volume {
     min-height: 24px;
     max-height: 40px;
@@ -1395,7 +1395,7 @@ QSlider#player_volume::sub-page:horizontal {
     border-radius: 2px;
 }
 
-/* 播放按钮 - 大号圆形按钮 */
+/* Play button - large circular button */
 QPushButton#player_play_button {
     background-color: #000000;
     color: #FFFF00;
@@ -1428,7 +1428,7 @@ QPushButton#player_play_button:disabled {
     border: 4px solid #666666;
 }
 
-/* 播放器控制按钮 - 小号圆形按钮 */
+/* Player control buttons - small circular buttons */
 QPushButton#player_control_button {
     background-color: #000000;
     color: #FFFFFF;

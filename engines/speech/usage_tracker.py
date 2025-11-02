@@ -14,9 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-API 使用量跟踪器
+API Usage Tracker
 
-跟踪云服务语音识别 API 的使用量和费用
+Tracks usage and costs of cloud speech recognition APIs
 """
 
 import logging
@@ -29,15 +29,15 @@ logger = logging.getLogger(__name__)
 
 
 class UsageTracker:
-    """API 使用量跟踪器"""
+    """API Usage Tracker"""
 
-    # API 定价（每分钟，单位：美元）
+    # API pricing (per minute, in USD)
     PRICING = {
         "openai": Decimal("0.006"),  # $0.006 per minute
-        "google": Decimal("0.006"),  # $0.006 per minute (前 60 分钟免费)
+        "google": Decimal("0.006"),  # $0.006 per minute (first 60 minutes free)
         "azure": Decimal(
             "0.0167"
-        ),  # Azure Speech 标准版（定价参考：Azure 官方定价页 $1.00/小时≈$0.0167/分钟）
+        ),  # Azure Speech Standard (pricing reference: Azure official pricing $1.00/hour ≈ $0.0167/minute)
     }
 
     def __init__(self, db_connection):

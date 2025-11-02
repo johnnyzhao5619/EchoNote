@@ -435,12 +435,10 @@ class FirstRunWizard:
                     layout.addWidget(lang_label)
 
                     self.language_combo = QComboBox()
-                    self.language_combo.addItem("中文（简体）", "zh_CN")
                     self.language_combo.addItem("English", "en_US")
-                    self.language_combo.addItem("Français", "fr_FR")
 
                     # Set current language
-                    current_lang = config_manager.get("ui.language", "zh_CN")
+                    current_lang = config_manager.get("ui.language", "en_US")
                     index = self.language_combo.findData(current_lang)
                     if index >= 0:
                         self.language_combo.setCurrentIndex(index)

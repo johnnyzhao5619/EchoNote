@@ -333,7 +333,7 @@ class SettingsManager(QObject):
                 return False
 
         elif setting_name == "language":
-            valid_languages = ["zh_CN", "en_US", "fr_FR"]
+            valid_languages = ["en_US"]
             if value not in valid_languages:
                 logger.error(f"Invalid language: {value}. " f"Must be one of {valid_languages}")
                 return False

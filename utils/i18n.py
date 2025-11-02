@@ -59,13 +59,13 @@ LANGUAGE_OPTION_KEYS = [
 class I18nManager:
     """Basic translation manager without Qt dependencies with enhanced dynamic string support."""
 
-    def __init__(self, translations_dir: str = None, default_language: str = "zh_CN"):
+    def __init__(self, translations_dir: str = None, default_language: str = "en_US"):
         """
         Initialize the translation manager.
 
         Args:
             translations_dir: Directory containing translation files
-            default_language: Default language code (zh_CN, en_US, fr_FR)
+            default_language: Default language code (en_US)
         """
         if translations_dir is None:
             translations_dir = Path(__file__).parent.parent / "resources" / "translations"
@@ -84,7 +84,7 @@ class I18nManager:
         Load translations for the specified language.
 
         Args:
-            language: Language code (zh_CN, en_US, fr_FR)
+            language: Language code (en_US)
         """
         translation_file = self.translations_dir / f"{language}.json"
 
@@ -388,7 +388,7 @@ class I18nManager:
         Change the current language and clear caches.
 
         Args:
-            language: New language code (zh_CN, en_US, fr_FR)
+            language: New language code (en_US)
         """
         if language == self.current_language:
             return
@@ -470,7 +470,7 @@ if QT_AVAILABLE:
 
         language_changed = Signal(str)
 
-        def __init__(self, translations_dir: str = None, default_language: str = "zh_CN"):
+        def __init__(self, translations_dir: str = None, default_language: str = "en_US"):
             """
             Initialize the Qt-enabled translation manager.
 
@@ -486,7 +486,7 @@ if QT_AVAILABLE:
             Change the current language, clear caches, and emit signal.
 
             Args:
-                language: New language code (zh_CN, en_US, fr_FR)
+                language: New language code (en_US)
             """
             if language == self.current_language:
                 return

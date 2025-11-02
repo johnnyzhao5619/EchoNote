@@ -102,7 +102,7 @@ class TranscriptionStatusDemo:
         """Demonstrate multilingual support with dynamic strings."""
         print(f"\n=== Multilingual Support Demo ===")
 
-        languages = ["zh_CN", "en_US", "fr_FR"]
+        languages = ["en_US"]
 
         for lang in languages:
             self.i18n.change_language(lang)
@@ -144,10 +144,10 @@ def main():
 
     # Demonstrate various features
     demo.show_file_processing_status(processed=15, successful=12, failed=3)
-    demo.show_task_status("语音转录", is_completed=True)
-    demo.show_task_status("文件导出", is_completed=False)
+    demo.show_task_status("Voice Transcription", is_completed=True)
+    demo.show_task_status("File Export", is_completed=False)
     demo.show_error_handling(has_error=False)
-    demo.show_error_handling(has_error=True, error_message="文件权限不足")
+    demo.show_error_handling(has_error=True, error_message="Insufficient file permissions")
     demo.demonstrate_parameter_validation()
     demo.demonstrate_multilingual_support()
     demo.show_performance_stats()

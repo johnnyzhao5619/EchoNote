@@ -223,7 +223,7 @@ Stop recording and save files.
   - `markers_path` (str, optional): JSON export of markers when markers exist and
     saving succeeds.
 - `event_id` (str, optional): Created calendar event ID when
-    `create_calendar_event` succeeds. Absent when no database connection is configured.
+  `create_calendar_event` succeeds. Absent when no database connection is configured.
 
 **Note:** When multiple recordings finish within the same second, EchoNote automatically appends a counter or millisecond suffix to every exported filename (audio, transcript, translation, and markers) to avoid collisions.
 
@@ -1080,7 +1080,7 @@ Configuration is stored in JSON format. Key paths use dot notation.
 #### UI
 
 - `ui.theme`: Theme ('light', 'dark', 'system')
-- `ui.language`: Language ('zh_CN', 'en_US', 'fr_FR')
+- `ui.language`: Language ('en_US')
 
 ---
 

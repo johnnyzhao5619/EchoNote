@@ -14,9 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-API 密钥验证工具
+API Key Validation Tool
 
-用于验证云服务 API 密钥的有效性
+Used to validate the validity of cloud service API keys
 """
 
 import logging
@@ -28,19 +28,19 @@ logger = logging.getLogger(__name__)
 
 
 class APIKeyValidator:
-    """API 密钥验证器"""
+    """API Key Validator"""
 
     @staticmethod
     async def validate_openai_key(api_key: str, timeout: int = 10) -> Tuple[bool, str]:
         """
-        验证 OpenAI API 密钥
+        Validate OpenAI API key
 
         Args:
-            api_key: OpenAI API 密钥
-            timeout: 超时时间（秒）
+            api_key: OpenAI API key
+            timeout: Timeout in seconds
 
         Returns:
-            Tuple[bool, str]: (是否有效, 错误消息)
+            Tuple[bool, str]: (is_valid, error_message)
         """
         if not api_key or not api_key.strip():
             return False, "API key cannot be empty"
@@ -78,43 +78,43 @@ class APIKeyValidator:
     @staticmethod
     async def validate_google_key(api_key: str, timeout: int = 10) -> Tuple[bool, str]:
         """
-        验证 Google Cloud Speech-to-Text API 密钥
+        Validate Google Cloud Speech-to-Text API key
 
         Args:
-            api_key: Google API 密钥
-            timeout: 超时时间（秒）
+            api_key: Google API key
+            timeout: Timeout in seconds
 
         Returns:
-            Tuple[bool, str]: (是否有效, 错误消息)
+            Tuple[bool, str]: (is_valid, error_message)
         """
         if not api_key or not api_key.strip():
             return False, "API key cannot be empty"
 
         try:
-            # 使用简单的 API 调用测试密钥
-            # 注意：这需要一个有效的音频数据，这里使用最小的测试请求
+            # Use simple API call to test key
+            # Note: This requires valid audio data, using minimal test request here
             async with httpx.AsyncClient(timeout=timeout) as client:
-                # 测试 API 端点可访问性
+                # Test API endpoint accessibility
                 test_url = f"https://speech.googleapis.com/v1/speech:recognize?key={api_key}"
 
-                # 发送一个最小的测试请求
+                # Send a minimal test request
                 test_data = {
                     "config": {
                         "encoding": "LINEAR16",
                         "sampleRateHertz": 16000,
                         "languageCode": "en-US",
                     },
-                    "audio": {"content": ""},  # 空内容会返回错误，但可以验证密钥
+                    "audio": {"content": ""},  # Empty content returns error but validates key
                 }
 
                 response = await client.post(test_url, json=test_data)
 
-                # 即使请求失败，如果不是认证错误，说明密钥有效
+                # Even if request fails, if not auth error, key is valid
                 if response.status_code == 200:
                     logger.info("Google API key validation successful")
                     return True, "API key is valid"
                 elif response.status_code == 400:
-                    # 400 错误通常表示请求格式问题，但密钥有效
+                    # 400 error usually indicates request format issue, but key is valid
                     logger.info("Google API key appears valid (400 response)")
                     return True, "API key is valid"
                 elif response.status_code == 401 or response.status_code == 403:
@@ -140,15 +140,15 @@ class APIKeyValidator:
     @staticmethod
     async def validate_azure_key(api_key: str, region: str, timeout: int = 10) -> Tuple[bool, str]:
         """
-        验证 Azure Speech Service API 密钥
+        Validate Azure Speech Service API key
 
         Args:
-            api_key: Azure API 密钥
-            region: Azure 区域（如 eastus）
-            timeout: 超时时间（秒）
+            api_key: Azure API key
+            region: Azure region (e.g., eastus)
+            timeout: Timeout in seconds
 
         Returns:
-            Tuple[bool, str]: (是否有效, 错误消息)
+            Tuple[bool, str]: (is_valid, error_message)
         """
         if not api_key or not api_key.strip():
             return False, "API key cannot be empty"
@@ -157,7 +157,7 @@ class APIKeyValidator:
             return False, "Region cannot be empty"
 
         try:
-            # 使用 token 端点验证密钥
+            # Use token endpoint to validate key
             async with httpx.AsyncClient(timeout=timeout) as client:
                 token_url = f"https://{region}.api.cognitive.microsoft.com/sts/v1.0/issueToken"
 

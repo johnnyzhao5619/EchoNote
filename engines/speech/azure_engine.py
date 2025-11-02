@@ -14,9 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-Azure Speech API 语音识别引擎
+Azure Speech API Speech Recognition Engine
 
-使用 Microsoft Azure Cognitive Services Speech API 进行云端语音识别
+Uses Microsoft Azure Cognitive Services Speech API for cloud-based speech recognition
 """
 
 import logging
@@ -38,19 +38,19 @@ logger = logging.getLogger(__name__)
 
 
 class AzureEngine(SpeechEngine):
-    """Azure Speech API 引擎"""
+    """Azure Speech API Engine"""
 
     def __init__(
         self, subscription_key: str, region: str, timeout: int = None, max_retries: int = 3
     ):
         """
-        初始化 Azure 引擎
+        Initialize Azure engine
 
         Args:
-            subscription_key: Azure 订阅密钥
-            region: Azure 区域（如 'eastus', 'westeurope'）
-            timeout: 请求超时时间（秒），默认使用 DEFAULT_HTTP_TIMEOUT_SECONDS
-            max_retries: 最大重试次数
+            subscription_key: Azure subscription key
+            region: Azure region (e.g., 'eastus', 'westeurope')
+            timeout: Request timeout in seconds, defaults to DEFAULT_HTTP_TIMEOUT_SECONDS
+            max_retries: Maximum retry attempts
         """
         if timeout is None:
             from config.constants import DEFAULT_HTTP_TIMEOUT_SECONDS
@@ -72,7 +72,7 @@ class AzureEngine(SpeechEngine):
         logger.info(f"Azure Speech engine initialized (region: {region})")
 
     def get_name(self) -> str:
-        """获取引擎名称"""
+        """Get engine name"""
         return "azure-speech"
 
     def get_supported_languages(self) -> List[str]:

@@ -485,7 +485,7 @@
       "current": "Current Language",
       "select": "Select Language",
       "description": "Change interface language",
-      "chinese": "中文（简体）",
+      "chinese": "Chinese (Simplified)",
       "english": "English",
       "french": "Français",
       "change_info": "Language changes will be applied immediately to the entire application",
@@ -706,9 +706,7 @@
       "system": "Follow System"
     },
     "languages": {
-      "zh_CN": "中文（简体）",
-      "en_US": "English",
-      "fr_FR": "Français"
+      "en_US": "English"
     }
   },
   "errors": {

@@ -5,7 +5,7 @@ All notable changes to EchoNote will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.2.0] - 2025-01-31
+## [1.2.0] - 2025-11-01
 
 ### Added
 
@@ -54,10 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `scripts/sync_version.py` - Automated version synchronization across all files
   - `scripts/bump_version.py` - Semantic version bumping with validation
   - `docs/VERSION_MANAGEMENT.md` - Comprehensive version management guide
-- **Multilingual Documentation**: Comprehensive language-specific documentation system
-  - `README.zh-CN.md` - Complete Chinese documentation with local context
-  - `README.fr.md` - Complete French documentation with cultural adaptations
-  - `docs/MULTILINGUAL_DOCUMENTATION.md` - Best practices guide for multilingual docs
+- **Unified English Documentation**: Streamlined documentation system with comprehensive English-only content
 - **Project Status**: New unified project status document (`docs/PROJECT_STATUS.md`)
 - **CI/CD Documentation**: Added comprehensive CI/CD guide (`docs/CI_CD_GUIDE.md`)
 - **Performance Tests**: Added comprehensive performance test suite
@@ -141,18 +138,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- 调整 `TimelineManager.get_timeline_events` 的分页策略：历史事件继续遵循 `page/page_size`，但第一页始终返回完整的未来事件列表，并新增 `future_total_count` 字段，便于前端与调度器依赖未来事件数据时保持兼容
-- 优化时间线搜索结果的自动任务加载逻辑，通过批量查询减少数据库往返次数
-- 数据库连接初始化时改为对 SQLCipher 密钥使用参数绑定，并在必要时回退到安全的引用方案，避免字符串拼接导致的注入风险
-- 修复转录任务在用户取消后仍继续生成结果文件并标记完成的问题：任务队列现在向任务处理函数传递 `cancel_event`，管理器会在检测到取消时立刻终止处理、保持数据库状态为 `cancelled`，同时不会产生新的导出文件或成功通知
-- 实时录制模块在创建日历事件与错误提示时接入国际化资源，根据当前语言返回标题、描述与警告信息，并同步更新中英法本地化文本
-- 实时录制在停止时会等待翻译协程完整退出：若后台翻译超时，将发送显式终止信号并清理队列，确保导出的翻译文件与累积内容一致
-- 时间线音频播放器新增媒体状态管理：在加载本地文件时执行严格路径校验，并在媒体不可播放或出错时自动禁用播放控件、反馈本地化错误提示，避免用户触发无效操作
+- Adjusted `TimelineManager.get_timeline_events` pagination strategy: historical events continue to follow `page/page_size`, but the first page always returns the complete future events list with a new `future_total_count` field for frontend and scheduler compatibility
+- Optimized timeline search result auto-task loading logic by using batch queries to reduce database round trips
+- Database connection initialization now uses parameter binding for SQLCipher keys with secure fallback to prevent injection risks from string concatenation
+- Fixed transcription tasks continuing to generate result files and mark completion after user cancellation: task queue now passes `cancel_event` to processing functions, manager terminates processing immediately upon cancellation detection, maintains database state as `cancelled`, and prevents new export files or success notifications
+- Real-time recording module integrated internationalization resources for calendar event creation and error prompts, returning titles, descriptions, and warning messages based on current language with synchronized localization text updates
+- Real-time recording now waits for translation coroutines to fully exit when stopping: if background translation times out, explicit termination signals are sent and queues are cleaned to ensure exported translation files match accumulated content
+- Timeline audio player added media state management: performs strict path validation when loading local files, automatically disables playback controls and provides localized error feedback when media is unplayable or errors occur, preventing invalid user operations
 
 ### Fixed
 
-- 修复短录音在停止后因未满足最小时长而缺失转录与翻译的问题，停止录制时会自动补偿处理缓冲区中的剩余音频
-- 修正转录任务队列在任务被取消时错误地终止 worker 的问题：现在取消请求只会结束当前任务，worker 会继续处理后续排队项
+- Fixed short recordings missing transcription and translation after stopping due to not meeting minimum duration requirements: stopping recording now automatically compensates by processing remaining audio in the buffer
+- Fixed transcription task queue incorrectly terminating workers when tasks are cancelled: cancellation requests now only end the current task, workers continue processing subsequent queued items
 
 ---
 

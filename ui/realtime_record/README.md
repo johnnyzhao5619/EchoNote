@@ -198,8 +198,6 @@ The widget supports multiple languages through the i18n system:
 ```python
 # Change language
 i18n.change_language('en_US')  # English
-i18n.change_language('zh_CN')  # Chinese
-i18n.change_language('fr_FR')  # French
 ```
 
 Translation keys used:

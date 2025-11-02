@@ -14,9 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-用户反馈机制
+User Feedback Mechanism
 
-提供操作成功确认、状态更新和操作日志功能。
+Provides operation success confirmation, status updates, and operation logging functionality.
 """
 
 import json
@@ -36,17 +36,17 @@ SECONDS_PER_MINUTE = 60
 
 class OperationLogger:
     """
-    操作日志记录器
+    Operation Logger
 
-    记录用户操作历史到日志文件。
+    Records user operation history to log files.
     """
 
     def __init__(self, log_file: Optional[Path] = None):
         """
-        初始化操作日志记录器
+        Initialize operation logger
 
         Args:
-            log_file: 日志文件路径，默认为 ~/.echonote/operation.log
+            log_file: Log file path, defaults to ~/.echonote/operation.log
         """
         if log_file is None:
             log_dir = get_app_dir()
@@ -58,7 +58,7 @@ class OperationLogger:
 
     def log_operation(self, operation: str, status: str, details: Optional[Dict[str, Any]] = None):
         """
-        记录操作
+        Log operation
 
         Args:
             operation: 操作名称

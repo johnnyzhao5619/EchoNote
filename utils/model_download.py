@@ -13,7 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""模型下载线程工具。"""
+"""Model download thread utilities."""
 
 import asyncio
 import logging
@@ -29,7 +29,7 @@ def run_model_download(
     on_error: Optional[Callable[[Exception], None]] = None,
     error_message: Optional[str] = None,
 ) -> bool:
-    """使用独立事件循环执行模型下载任务。"""
+    """Execute model download task using independent event loop."""
 
     loop = asyncio.new_event_loop()
     try:
@@ -38,7 +38,7 @@ def run_model_download(
         if on_success:
             on_success()
         return True
-    except Exception as exc:  # noqa: BLE001 - 需要捕获所有异常以记录日志
+    except Exception as exc:  # noqa: BLE001 - need to catch all exceptions for logging
         try:
             loop.stop()
         except RuntimeError:

@@ -63,7 +63,6 @@ Topic-specific documentation:
 
 1. [Quick Start](quick-start/README.md) - Get started quickly
 2. [User Guide](user-guide/README.md) - Learn all features
-3. [Troubleshooting](TROUBLESHOOTING.md) - Solve problems
 
 ### For Developers
 

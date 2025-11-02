@@ -96,7 +96,7 @@ self.add_page('settings', settings_widget)
 ### 6. Language Settings
 
 - **Path**: `ui.language`
-- **Values**: zh_CN/en_US/fr_FR
+- **Values**: en_US
 
 ## API Reference
 

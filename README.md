@@ -76,8 +76,6 @@ EchoNote/
 
 | Audience         | Resource           | Location                                                   |
 | ---------------- | ------------------ | ---------------------------------------------------------- |
-| **New Users**    | Quick start guide  | [`docs/quick-start/README.md`](docs/quick-start/README.md) |
-| **End Users**    | User manual        | [`docs/user-guide/README.md`](docs/user-guide/README.md)   |
 | **Developers**   | API reference      | [`docs/DEVELOPER_GUIDE.md`](docs/DEVELOPER_GUIDE.md)       |
 | **Contributors** | Coding standards   | [`docs/CODE_STANDARDS.md`](docs/CODE_STANDARDS.md)         |
 | **Maintainers**  | Version management | [`docs/VERSION_MANAGEMENT.md`](docs/VERSION_MANAGEMENT.md) |

@@ -14,10 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-Faster-Whisper 语音识别引擎实现
+Faster-Whisper Speech Recognition Engine Implementation
 
-基于 faster-whisper 库的本地语音识别引擎
-参考: https://github.com/SYSTRAN/faster-whisper
+Local speech recognition engine based on the faster-whisper library
+Reference: https://github.com/SYSTRAN/faster-whisper
 """
 
 import logging

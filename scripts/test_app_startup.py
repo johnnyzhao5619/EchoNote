@@ -16,9 +16,9 @@
 # limitations under the License.
 
 """
-应用程序启动测试
+Application Startup Test
 
-测试EchoNote应用程序是否能够完全启动到主窗口显示阶段
+Tests whether the EchoNote application can fully start up to the main window display stage
 """
 
 import logging
@@ -31,20 +31,20 @@ logger = logging.getLogger(__name__)
 
 
 def test_app_startup():
-    """测试应用程序启动"""
+    """Test application startup"""
     logger.info("Testing application startup...")
 
     project_root = Path(__file__).parent.parent
     sys.path.insert(0, str(project_root))
 
     try:
-        # 测试主模块导入
+        # Test main module import
         logger.info("Testing main module import...")
         import main
 
         logger.info("✅ Main module imported successfully")
 
-        # 测试关键组件导入
+        # Test key component imports
         logger.info("Testing key component imports...")
 
         from config.app_config import ConfigManager
@@ -57,20 +57,20 @@ def test_app_startup():
 
         logger.info("✅ All key components imported successfully")
 
-        # 测试配置管理器
+        # Test configuration manager
         logger.info("Testing configuration manager...")
         config = ConfigManager()
         app_version = config.get("version", "unknown")
         logger.info(f"✅ Configuration loaded (version: {app_version})")
 
-        # 测试国际化管理器
+        # Test internationalization manager
         logger.info("Testing i18n manager...")
-        language = config.get("ui.language", "zh_CN")
+        language = config.get("ui.language", "en_US")
         i18n = I18nQtManager(default_language=language)
         test_translation = i18n.t("common.ok")
         logger.info(f"✅ I18n manager working (translation: {test_translation})")
 
-        # 测试资源监控器
+        # Test resource monitor
         logger.info("Testing resource monitor...")
         resource_monitor = get_resource_monitor()
         logger.info("✅ Resource monitor initialized successfully")
@@ -87,20 +87,20 @@ def test_app_startup():
 
 
 def main():
-    """主函数"""
-    print("🚀 开始应用程序启动测试...")
+    """Main function"""
+    print("🚀 Starting application startup test...")
     print("=" * 60)
 
     success = test_app_startup()
 
     print("\n" + "=" * 60)
     if success:
-        print("✅ 应用程序启动测试成功！")
-        print("EchoNote应用程序已准备好正常运行。")
+        print("✅ Application startup test successful!")
+        print("EchoNote application is ready for normal operation.")
         return 0
     else:
-        print("❌ 应用程序启动测试失败！")
-        print("需要修复启动问题才能正常运行应用程序。")
+        print("❌ Application startup test failed!")
+        print("Startup issues need to be fixed before the application can run normally.")
         return 1
 
 

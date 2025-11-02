@@ -67,7 +67,7 @@
   },
   "ui": {
     "theme": "light",
-    "language": "zh_CN"
+    "language": "en_US"
   },
   "security": {
     "encryption_algorithm": "AES-256-GCM"

@@ -231,7 +231,7 @@ def validate_language_code(code: str) -> Tuple[bool, str]:
     Validate language code.
 
     Args:
-        code: Language code to validate (e.g., zh_CN, en_US, fr_FR)
+        code: Language code to validate (e.g., en_US)
 
     Returns:
         Tuple of (is_valid, error_message)
@@ -243,7 +243,7 @@ def validate_language_code(code: str) -> Tuple[bool, str]:
         return False, "Language code cannot be empty"
 
     # Valid language codes for EchoNote
-    valid_codes = ["zh_CN", "en_US", "fr_FR"]
+    valid_codes = ["en_US"]
 
     if code not in valid_codes:
         return (False, f"Invalid language code. Must be one of: {', '.join(valid_codes)}")
