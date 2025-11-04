@@ -1,0 +1,51 @@
+{
+  "hero": {
+    "title": "EchoNote",
+    "description": "A modern, open-source note-taking application with powerful features for organizing and managing your thoughts",
+    "viewOnGitHub": "View on GitHub",
+    "subtitle": "Open Source • Free • Cross-Platform",
+    "getStarted": "Get Started",
+    "learnMore": "Learn More"
+  },
+  "header": {
+    "github": "View on GitHub",
+    "toggleMenu": "Toggle menu"
+  },
+  "nav": {
+    "home": "Home",
+    "about": "About"
+  },
+  "features": {
+    "title": "Key Features",
+    "subtitle": "Discover the powerful capabilities of EchoNote that make note-taking more efficient",
+    "callToAction": "Want to learn more about the technical details?",
+    "exploreMore": "View Project Stats"
+  },
+  "github": {
+    "title": "Project Statistics",
+    "subtitle": "View real-time data and community activity for EchoNote on GitHub",
+    "stars": "Stars",
+    "forks": "Forks",
+    "issues": "Issues",
+    "repository": "Repository Info",
+    "latestRelease": "Latest Release",
+    "released": "Released on",
+    "viewRelease": "View Release",
+    "noReleases": "No releases yet",
+    "openSource": "Open Source",
+    "viewOnGitHub": "View on GitHub",
+    "loading": "Loading...",
+    "error": "Failed to load"
+  },
+  "footer": {
+    "copyright": "Copyright",
+    "links": "Links",
+    "sourceCode": "Source Code",
+    "documentation": "Documentation",
+    "releases": "Releases",
+    "legal": "Legal",
+    "license": "License:",
+    "builtWith": "Built with:",
+    "starOnGitHub": "Star on GitHub"
+  }
+}

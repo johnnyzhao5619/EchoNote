@@ -1,0 +1,51 @@
+{
+  "hero": {
+    "title": "EchoNote",
+    "description": "Une application de prise de notes moderne et open-source avec des fonctionnalités puissantes pour organiser et gérer vos idées",
+    "viewOnGitHub": "Voir sur GitHub",
+    "subtitle": "Open Source • Gratuit • Multi-plateforme",
+    "getStarted": "Commencer",
+    "learnMore": "En savoir plus"
+  },
+  "header": {
+    "github": "Voir sur GitHub",
+    "toggleMenu": "Basculer le menu"
+  },
+  "nav": {
+    "home": "Accueil",
+    "about": "À propos"
+  },
+  "features": {
+    "title": "Fonctionnalités clés",
+    "subtitle": "Découvrez les capacités puissantes d'EchoNote qui rendent la prise de notes plus efficace",
+    "callToAction": "Vous voulez en savoir plus sur les détails techniques ?",
+    "exploreMore": "Voir les statistiques du projet"
+  },
+  "github": {
+    "title": "Statistiques du projet",
+    "subtitle": "Consultez les données en temps réel et l'activité de la communauté pour EchoNote sur GitHub",
+    "stars": "Étoiles",
+    "forks": "Forks",
+    "issues": "Issues",
+    "repository": "Informations du dépôt",
+    "latestRelease": "Dernière version",
+    "released": "Publié le",
+    "viewRelease": "Voir la version",
+    "noReleases": "Aucune version encore",
+    "openSource": "Open Source",
+    "viewOnGitHub": "Voir sur GitHub",
+    "loading": "Chargement...",
+    "error": "Échec du chargement"
+  },
+  "footer": {
+    "copyright": "Droits d'auteur",
+    "links": "Liens",
+    "sourceCode": "Code source",
+    "documentation": "Documentation",
+    "releases": "Versions",
+    "legal": "Légal",
+    "license": "Licence :",
+    "builtWith": "Construit avec :",
+    "starOnGitHub": "Étoiler sur GitHub"
+  }
+}

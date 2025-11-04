@@ -1,0 +1,51 @@
+{
+  "hero": {
+    "title": "EchoNote",
+    "description": "現代化的開源筆記應用程式，具有強大的功能來組織和管理您的想法",
+    "viewOnGitHub": "查看 GitHub",
+    "subtitle": "開源 • 免費 • 跨平台",
+    "getStarted": "開始使用",
+    "learnMore": "了解更多"
+  },
+  "header": {
+    "github": "查看 GitHub",
+    "toggleMenu": "切換選單"
+  },
+  "nav": {
+    "home": "首頁",
+    "about": "關於"
+  },
+  "features": {
+    "title": "主要特性",
+    "subtitle": "探索 EchoNote 的強大功能，讓您的筆記體驗更加高效",
+    "callToAction": "想了解更多技術細節？",
+    "exploreMore": "查看專案統計"
+  },
+  "github": {
+    "title": "專案統計",
+    "subtitle": "查看 EchoNote 在 GitHub 上的即時資料和社群活躍度",
+    "stars": "Stars",
+    "forks": "Forks",
+    "issues": "Issues",
+    "repository": "儲存庫資訊",
+    "latestRelease": "最新版本",
+    "released": "發布於",
+    "viewRelease": "查看版本",
+    "noReleases": "暫無發布版本",
+    "openSource": "開源",
+    "viewOnGitHub": "在 GitHub 上查看",
+    "loading": "載入中...",
+    "error": "載入失敗"
+  },
+  "footer": {
+    "copyright": "版權所有",
+    "links": "相關連結",
+    "sourceCode": "原始碼",
+    "documentation": "文件",
+    "releases": "發布版本",
+    "legal": "法律資訊",
+    "license": "授權條款:",
+    "builtWith": "建構技術:",
+    "starOnGitHub": "在 GitHub 上按讚"
+  }
+}
