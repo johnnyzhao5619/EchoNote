@@ -1,0 +1,1118 @@
+{
+  "app": {
+    "name": "EchoNote",
+    "title": "EchoNote",
+    "tagline": "Intelligent Voice Transcription and Calendar Management",
+    "exit_confirmation_title": "Confirm Exit",
+    "exit_confirmation_message": "There are tasks in progress. Are you sure you want to exit?\n\nUnfinished tasks will be stopped.",
+    "exit_confirmation_message_with_count": "There are {count} task(s) in progress. Are you sure you want to exit?\n\nUnfinished tasks will be stopped."
+  },
+  "common": {
+    "ok": "OK",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "close": "Close",
+    "yes": "Yes",
+    "no": "No",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "warning": "Warning",
+    "info": "Information",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "show_details": "Show Details",
+    "hide_details": "Hide Details",
+    "refresh": "Refresh",
+    "words": "words",
+    "file_count": "{count} file",
+    "file_count_plural": "{count} files",
+    "task_status": "Task {name} is {status|completed|in progress}",
+    "conditional_message": "{has_error|Error occurred: {error}|Operation successful}",
+    "complex_status": "Processed {processed} files, {success} successful, {failed} failed"
+  },
+  "search": {
+    "placeholder": "Search...",
+    "previous": "Previous",
+    "next": "Next",
+    "close": "Close"
+  },
+  "data_management": {
+    "title": "Data Management",
+    "clear_all": "Clear All Data",
+    "confirm_cleanup": "Confirm Data Cleanup",
+    "confirm_delete": "Are you sure you want to delete ALL user data?",
+    "final_confirmation": "Final Confirmation",
+    "last_chance": "This is your last chance to cancel!",
+    "cleanup_progress": "Cleanup in Progress",
+    "cleanup_complete": "Cleanup Complete",
+    "cleanup_success": "All user data has been deleted successfully.",
+    "cleanup_errors": "Cleanup Completed with Errors",
+    "cleanup_partial": "Data cleanup completed, but some items could not be deleted.",
+    "storage_labels": {
+      "database": "Database: Calculating...",
+      "configuration": "Configuration: Calculating...",
+      "recordings": "Recordings: Calculating...",
+      "transcripts": "Transcripts: Calculating...",
+      "logs": "Logs: Calculating...",
+      "total": "Total: Calculating...",
+      "database_prefix": "Database",
+      "configuration_prefix": "Configuration",
+      "recordings_prefix": "Recordings",
+      "transcripts_prefix": "Transcripts",
+      "logs_prefix": "Logs",
+      "total_prefix": "Total",
+      "files": "files"
+    },
+    "storage_status": {
+      "exists": "exists",
+      "not_found": "not found"
+    },
+    "clear_all_description": "This will delete:\n• Database (all tasks, events, and settings)\n• Configuration files\n• All recordings\n• All transcripts\n• Log files",
+    "confirm_delete_details": "This will permanently delete approximately {size} of data.\n\nThis operation cannot be undone!\n\nThe application will need to be restarted after cleanup.",
+    "final_confirmation_details": "Type 'DELETE' in the confirmation dialog to proceed.\n\nAre you absolutely sure you want to delete all data?",
+    "cleanup_progress_message": "Deleting all user data...",
+    "cleanup_success_details": "Deleted {count} items.\n\nPlease restart the application.",
+    "more_errors": "... and {count} more errors",
+    "cleanup_partial_details": "Deleted: {deleted} items\nFailed: {failed} items"
+  },
+  "sidebar": {
+    "batch_transcribe": "Batch Transcribe",
+    "realtime_record": "Real-time Record",
+    "calendar_hub": "Calendar Hub",
+    "timeline": "Timeline",
+    "settings": "Settings"
+  },
+  "batch_transcribe": {
+    "title": "Batch Audio Transcription",
+    "import_file": "Import File",
+    "import_folder": "Import Folder",
+    "clear_queue": "Clear Queue",
+    "confirm_clear_queue": "Are you sure you want to clear all tasks?",
+    "engine": "Engine",
+    "model": "Model",
+    "task_queue": "Task Queue",
+    "tasks_count": "{count} tasks",
+    "confirm_delete_task": "Are you sure you want to delete this task?",
+    "no_models_available": "Please download a model first",
+    "no_models_message": "You haven't downloaded any models yet. Please download a model to start transcription.",
+    "go_to_download": "Go to Download Models",
+    "status": {
+      "pending": "Pending",
+      "processing": "Processing",
+      "completed": "Completed",
+      "failed": "Failed",
+      "cancelled": "Cancelled"
+    },
+    "actions": {
+      "start": "Start",
+      "pause": "Pause",
+      "resume": "Resume",
+      "cancel": "Cancel",
+      "retry": "Retry",
+      "view": "View",
+      "export": "Export"
+    },
+    "info": {
+      "size": "Size: {size}",
+      "duration": "Duration: {duration}",
+      "language": "Language: {language}",
+      "unknown": "Unknown",
+      "error": "Error: {error}"
+    },
+    "export_success": "Exported to: {path}",
+    "feedback": {
+      "paused": "Batch transcription paused.",
+      "resumed": "Batch transcription resumed."
+    },
+    "notifications": {
+      "success": {
+        "title": "{app_name}",
+        "message": "Transcription complete: {filename}"
+      },
+      "failure": {
+        "title": "{app_name}",
+        "message": "Transcription failed: {filename}\\n{error}"
+      }
+    }
+  },
+  "realtime_record": {
+    "title": "Real-time Recording",
+    "audio_input": "Audio Input Device",
+    "language_settings": "Language & Model",
+    "recording_control": "Recording Control",
+    "gain": "Audio Gain",
+    "model": "Recognition Model",
+    "source_language": "Source Language",
+    "target_language": "Target Language",
+    "enable_translation": "Enable Real-time Translation",
+    "default_duration": "00:00:00",
+    "available_languages": {
+      "zh": "Chinese (Simplified)",
+      "en": "English",
+      "fr": "French",
+      "ja": "Japanese",
+      "ko": "Korean"
+    },
+    "start_recording": "Start Recording",
+    "stop_recording": "Stop Recording",
+    "recording_duration": "Recording Duration",
+    "transcription_text": "Transcription Text",
+    "translation_text": "Translation Text",
+    "export_transcription": "Export Transcription",
+    "export_translation": "Export Translation",
+    "save_recording": "Save Recording File",
+    "no_input_devices": "No input devices found",
+    "no_models_available": "Please download a model first",
+    "no_models_message": "No models available. Please download at least one model to use real-time recording.",
+    "go_to_download": "Go to Download Models",
+    "no_model_selected": "Please select a model",
+    "model_not_downloaded": "Selected model is not downloaded",
+    "translation_disabled_tooltip": "Translation not available. Configure a Google Translate API key in Settings > Transcription.",
+    "translation_not_available": "Translation not available. Please configure Google Translate API key in Settings > Transcription.",
+    "audio_unavailable_short": "Microphone capture not available",
+    "audio_unavailable_message": "Real-time recording requires PyAudio. Install it with: {command}",
+    "audio_unavailable_tooltip": "Install PyAudio (pip install pyaudio) to enable real-time recording.",
+    "add_marker": "Add Marker",
+    "markers": "Time Markers",
+    "markers_placeholder": "Add time markers during recording",
+    "marker_unavailable": "Recording not started, cannot add marker",
+    "marker_failed": "Failed to add marker",
+    "marker_item": "#{number} {timestamp}",
+    "marker_item_with_label": "#{number} {timestamp} - {label}",
+    "async_loop_unavailable": "Async event loop not initialized",
+    "start_failed": "Failed to start recording: {error}",
+    "stop_failed": "Failed to stop recording: {error}",
+    "export_transcription_title": "Export Transcription",
+    "export_translation_title": "Export Translation",
+    "export_file_filter": "Text Files (*.txt);;Markdown Files (*.md);;All Files (*)",
+    "export_failed": "Export failed: {error}",
+    "feedback": {
+      "error_prefix": "Error",
+      "success_prefix": "Success",
+      "success_detail": "Recording completed, duration: {duration}",
+      "success_detail_with_path": "Recording completed, duration: {duration}, saved to: {path}"
+    },
+    "calendar_event": {
+      "title": "Recording session - {timestamp}",
+      "description": "Recording duration: {duration} seconds",
+      "db_missing": "Cannot create calendar event because no database connection is configured. Configure the database to enable calendar integrations.",
+      "creation_failed": "Failed to create calendar event: {error}"
+    },
+    "audio_settings": "Audio Settings",
+    "clear_markers": "Clear Markers",
+    "audio_unavailable": "Audio Unavailable",
+    "audio_device_unknown": "Unknown Audio Device",
+    "audio_error": "Audio Error",
+    "model_error": "Model Error",
+    "marker_added": "Marker added",
+    "recording_started": "Recording started",
+    "recording_stopped": "Recording stopped",
+    "status_ready": "Ready",
+    "status_recording": "Recording...",
+    "export_success": "Export successful",
+    "transcription": "Transcription",
+    "translation": "Translation"
+  },
+  "calendar_hub": {
+    "title": "Calendar Hub",
+    "view_month": "Month",
+    "view_week": "Week",
+    "view_day": "Day",
+    "today": "Today",
+    "connected_accounts": "Connected",
+    "add_account": "Add Account",
+    "create_event": "Create Event",
+    "sync_now": "Sync Now",
+    "sync_now_tooltip": "Manually sync all connected calendars",
+    "providers": {
+      "google": "Google",
+      "outlook": "Outlook"
+    },
+    "account_with_email": "{provider} ({email})",
+    "account_without_email": "{provider} account",
+    "event_types": {
+      "event": "Event",
+      "task": "Task",
+      "appointment": "Appointment"
+    },
+    "event_dialog": {
+      "edit_event_title": "Edit Event",
+      "title_label": "Title *:",
+      "type_label": "Type *:",
+      "start_time_label": "Start Time *:",
+      "end_time_label": "End Time *:",
+      "location_label": "Location:",
+      "attendees_label": "Attendees:",
+      "description_label": "Description:",
+      "reminder_label": "Reminder:",
+      "title_placeholder": "Enter event title",
+      "location_placeholder": "Enter location",
+      "attendees_placeholder": "Enter emails separated by commas",
+      "description_placeholder": "Enter description",
+      "reminder_none": "No reminder",
+      "reminder_5min": "5 minutes before",
+      "reminder_10min": "10 minutes before",
+      "reminder_15min": "15 minutes before",
+      "reminder_30min": "30 minutes before",
+      "reminder_1hour": "1 hour before",
+      "reminder_1day": "1 day before",
+      "sync_options": "Sync Options",
+      "sync_to_provider": "Sync to {provider} ({email})",
+      "validation_error": "Validation Error",
+      "title_required": "Title is required.",
+      "end_after_start": "End time must be after start time.",
+      "invalid_email": "Invalid email format: {email}"
+    },
+    "oauth_dialog": {
+      "ready_to_authorize": "Ready to authorize",
+      "start_authorization": "Start Authorization",
+      "waiting_authorization": "Waiting for authorization...",
+      "authorization_failed": "Authorization failed: state mismatch",
+      "authorization_successful": "Authorization successful!",
+      "authorization_error": "Authorization Error",
+      "auth_success_title": "Authorization Successful",
+      "auth_success_heading": "Authorization Successful!",
+      "auth_success_content": "<p>You can close this window and return to EchoNote.</p>",
+      "auth_failed_title": "Authorization Failed",
+      "auth_failed_heading": "Authorization Failed",
+      "auth_failed_content": "<p>Error: {error}</p><p>You can close this window and try again.</p>",
+      "unknown_error": "Unknown error",
+      "connect_title": "Connect {provider} Calendar",
+      "instructions_html": "<p>To connect your {provider} calendar:</p><ol><li>Click the \"Start Authorization\" button below</li><li>Your browser will open to {provider}'s authorization page</li><li>Sign in to your {provider} account if needed</li><li>Grant EchoNote permission to access your calendar</li><li>You will be redirected back to EchoNote automatically</li></ol><p><strong>Note:</strong> EchoNote will only access your calendar data. We never store your password.</p>"
+    },
+    "widget": {
+      "add_calendar_account": "Add Calendar Account",
+      "connect_google": "Connect Google Calendar",
+      "connect_outlook": "Connect Outlook Calendar",
+      "syncing": "Syncing...",
+      "sync_error": "Sync Error",
+      "never_synced": "Never synced",
+      "previous": "Previous",
+      "next": "Next",
+      "sync_now_tooltip": "Sync calendar data immediately",
+      "sync_now": "Sync Now",
+      "time_ago_just_now": "just now",
+      "time_ago_minutes": "{minutes}m ago",
+      "time_ago_hours": "{hours}h ago",
+      "time_ago_days": "{days}d ago"
+    },
+    "calendar_view": {
+      "no_events": "No events for this day"
+    }
+  },
+  "timeline": {
+    "title": "Intelligent Timeline",
+    "search_placeholder": "Search events...",
+    "search": "Search",
+    "filter_all": "All",
+    "filter_event": "Event",
+    "filter_task": "Task",
+    "filter_appointment": "Appointment",
+    "filter_date_range_label": "Date Range:",
+    "filter_date_range_separator": "to",
+    "source_all": "All Sources",
+    "source_local": "Local",
+    "source_google": "Google",
+    "source_outlook": "Outlook",
+    "current_time": "Current Time",
+    "enable_transcription": "Enable Real-time Transcription",
+    "enable_recording": "Enable Meeting Recording",
+    "enable_translation": "Enable Translation",
+    "auto_task_save_failed_title": "Failed to save auto-task settings",
+    "auto_task_save_failed_message": "We couldn't save your automatic task preferences. Previous values have been restored.\nError: {error}",
+    "translation_target_label": "Target Language:",
+    "play_recording": "Play Recording",
+    "view_transcript": "View Transcript",
+    "view_translation": "View Translation",
+    "translation_viewer_title": "Translation Viewer",
+    "no_artifacts": "No artifacts",
+    "audio_player_title": "Audio Player",
+    "audio_player_unavailable_title": "Audio playback unavailable",
+    "audio_player_unavailable_message": "Qt Multimedia components are not available, so recordings cannot be played. Timeline items remain accessible.",
+    "audio_player_open_failed_title": "Failed to open recording",
+    "audio_player_open_failed_message": "The audio player could not be opened: {error}. Please verify the recording file and review the application log for more details.",
+    "audio_player": {
+      "initial_time": "00:00",
+      "play_button_label": "▶",
+      "pause_button_label": "⏸",
+      "play_tooltip": "Play",
+      "pause_tooltip": "Pause",
+      "progress_tooltip": "Seek within the recording",
+      "volume_tooltip": "Adjust volume",
+      "volume_icon": "🔊",
+      "load_failed": "Failed to load audio file: {error}",
+      "playback_error": "Playback error: {error}",
+      "invalid_media": "Media format is not supported or the file is corrupted",
+      "dialog_error_body": "{message}",
+      "errors": {
+        "service_missing": "Playback unavailable: the Qt multimedia service is missing. Install the Qt Multimedia backend for your platform and restart EchoNote.",
+        "format_error": "Playback failed: the media format is not supported. Re-encode the recording to WAV or MP3, or install the required codecs. Details: {details}"
+      },
+      "loading": "Loading...",
+      "transcript": "Transcript",
+      "no_transcript": "No transcript available",
+      "show_timestamps": "Show Timestamps",
+      "hide_timestamps": "Hide Timestamps"
+    },
+    "snippet": {
+      "title_prefix": "Title",
+      "description_prefix": "Description",
+      "transcript_prefix": "Transcript",
+      "translation_prefix": "Translation",
+      "missing_transcript": "Transcript unavailable (file missing)",
+      "unreadable_transcript": "Transcript unavailable (cannot read transcript)",
+      "generic_transcript": "Transcript unavailable"
+    }
+  },
+  "transcript": {
+    "viewer_title": "Transcript Viewer",
+    "search_placeholder": "Search text...",
+    "search": "Search",
+    "clear_search": "Clear",
+    "previous_match_button": "◀",
+    "previous_match_tooltip": "Previous match",
+    "next_match_button": "▶",
+    "next_match_tooltip": "Next match",
+    "copy_all": "Copy All",
+    "copied": "Copied!",
+    "export": "Export",
+    "export_dialog_title": "Export Transcript",
+    "export_success": "Transcript exported successfully",
+    "load_error": "Failed to load transcript"
+  },
+  "viewer": {
+    "title": "Transcript Viewer - {filename}",
+    "edit": "Edit",
+    "save": "Save",
+    "save_success": "Transcript saved successfully",
+    "save_error": "Failed to save",
+    "save_error_permission": "Cannot save file: Permission denied",
+    "save_error_disk_full": "Cannot save file: Disk full",
+    "save_error_details": "Save failed: {error}",
+    "save_retry": "Retry",
+    "export": "Export",
+    "export_txt": "Export as TXT",
+    "export_srt": "Export as SRT",
+    "export_md": "Export as Markdown",
+    "export_success": "Exported as {format}",
+    "export_error": "Export failed",
+    "export_error_permission": "Cannot export file: Permission denied",
+    "export_error_disk_full": "Cannot export file: Disk full",
+    "export_error_invalid_content": "Cannot export: Invalid transcript content format",
+    "export_error_details": "Export failed: {error}",
+    "export_retry": "Retry",
+    "copy_all": "Copy All",
+    "copied": "Copied to clipboard",
+    "copy_error": "Failed to copy",
+    "select_all": "Select All",
+    "search": "Search",
+    "search_placeholder": "Enter search keywords...",
+    "case_sensitive": "Case Sensitive",
+    "match_count": "Match {current}/{total}",
+    "no_matches": "No matches found",
+    "unsaved_title": "Unsaved Changes",
+    "unsaved_message": "You have unsaved changes. Do you want to save them?",
+    "file_not_found": "Transcript file not found",
+    "file_not_found_details": "Transcript file not found, it may have been deleted or moved",
+    "file_read_error": "Cannot read transcript file",
+    "file_read_error_permission": "Cannot read transcript file: Permission denied",
+    "file_read_error_details": "Cannot read transcript file: {error}",
+    "file_format_error": "Transcript file format error",
+    "file_format_error_details": "Transcript file format error, cannot parse: {error}",
+    "task_not_found": "Task not found",
+    "task_not_found_details": "Task {task_id} not found, it may have been deleted",
+    "metadata": {
+      "file": "File",
+      "duration": "Duration",
+      "language": "Language",
+      "engine": "Engine",
+      "completed": "Completed"
+    },
+    "loading": "Loading...",
+    "loading_title": "Loading Transcript"
+  },
+  "settings": {
+    "title": "Settings",
+    "save": "Save",
+    "cancel": "Cancel",
+    "reset": "Reset to Defaults",
+    "category": {
+      "transcription": "Transcription",
+      "realtime": "Real-time Recording",
+      "calendar": "Calendar",
+      "timeline": "Timeline",
+      "model_management": "Model Management",
+      "appearance": "Appearance",
+      "language": "Language"
+    },
+    "error": {
+      "title": "Error",
+      "load_failed": "Failed to load settings: {error}",
+      "save_failed": "Failed to save settings: {error}",
+      "reset_failed": "Failed to reset settings: {error}"
+    },
+    "success": {
+      "title": "Success",
+      "saved": "Settings saved successfully",
+      "reset": "Settings reset to defaults"
+    },
+    "confirm": {
+      "title": "Confirm",
+      "discard_changes": "You have unsaved changes. Discard them?",
+      "reset_defaults": "Reset all settings to default values?"
+    },
+    "validation": {
+      "title": "Validation Error"
+    },
+    "appearance": {
+      "title": "Appearance Settings",
+      "theme": "Theme",
+      "theme_select": "Select Theme",
+      "theme_description": "Choose the application theme",
+      "light": "Light",
+      "dark": "Dark",
+      "high_contrast": "High Contrast",
+      "system": "System",
+      "preview": "Preview",
+      "preview_text": "This is a theme preview",
+      "theme_info": "Theme changes will be applied immediately to the entire application"
+    },
+    "language": {
+      "title": "Language Settings",
+      "current": "Current Language",
+      "select": "Select Language",
+      "description": "Change interface language",
+      "chinese": "Chinese (Simplified)",
+      "english": "English",
+      "french": "Français",
+      "change_info": "Language changes will be applied immediately to the entire application",
+      "restart_required": "Language changes will take effect after restart"
+    },
+    "transcription": {
+      "title": "Transcription Settings",
+      "general": "General Settings",
+      "output_format": "Default Output Format",
+      "concurrent_tasks": "Concurrent Tasks",
+      "save_path": "Save Location",
+      "browse": "Browse",
+      "select_directory": "Select Directory",
+      "engine": "Speech Recognition Engine",
+      "engine_select": "Select Engine",
+      "whisper_config": "Faster-Whisper Configuration",
+      "model_size": "Model Size",
+      "device": "Device",
+      "compute_type": "Compute Type",
+      "device_info_cpu": "CPU mode. CoreML optimization will be used automatically on Apple Silicon.",
+      "cloud_config": "Cloud Service Configuration",
+      "api_key_note": "Note: API keys will be encrypted and stored securely. Please keep your keys safe.",
+      "test_connection": "Test Connection",
+      "testing": "Testing...",
+      "test_success": "Test Successful",
+      "test_success_message": "{message}",
+      "test_failed": "Test Failed",
+      "test_failed_message": "{message}",
+      "test_error": "Test Error",
+      "test_error_message": "Error: {error}",
+      "empty_api_key": "API key cannot be empty",
+      "empty_region": "Azure region cannot be empty",
+      "monthly_usage": "Monthly Usage",
+      "no_usage_data": "No usage data available",
+      "usage_stats": "{minutes} minutes / ${cost}",
+      "refresh_usage": "Refresh Usage Statistics",
+      "ffmpeg_status": "FFmpeg Status",
+      "ffmpeg_installed": "✓ Installed",
+      "ffmpeg_not_installed": "✗ Not Installed",
+      "ffmpeg_view_guide": "View Installation Guide",
+      "ffmpeg_info": "FFmpeg is used to process video formats (MP4, MKV, etc.). Pure audio formats (WAV, MP3, FLAC) can still be processed without FFmpeg.",
+      "please_download_model": "Please download a model first",
+      "cloud_api_openai": "OpenAI API",
+      "cloud_api_google": "Google Speech-to-Text API",
+      "cloud_api_azure": "Azure Speech Service",
+      "api_key_label": "API Key:",
+      "api_key_placeholder": "sk-...",
+      "azure_region_label": "Region:",
+      "azure_region_placeholder": "e.g., eastus",
+      "will_automatically_use": "Will automatically use: {device_name} ({compute_type})",
+      "gpu_acceleration": "NVIDIA GPU acceleration. Requires CUDA-compatible GPU.",
+      "cpu_mode": "CPU mode. No GPU acceleration.",
+      "unknown_provider": "Unknown provider",
+      "show_password": "Show/Hide Password",
+      "error": {
+        "empty_path": "Save path cannot be empty",
+        "invalid_path": "Invalid path: {error}"
+      }
+    },
+    "realtime": {
+      "title": "Real-time Recording Settings",
+      "audio_input": "Audio Input",
+      "input_source": "Audio Input Source",
+      "default_device": "Default Device",
+      "system_audio": "System Audio",
+      "gain_level": "Gain Level",
+      "recording": "Recording Settings",
+      "recording_format": "Recording Format",
+      "mp3_requires_ffmpeg": "MP3 export requires FFmpeg. Install FFmpeg to enable this option.",
+      "mp3_enabled_ffmpeg": "MP3 export uses FFmpeg for conversion when available.",
+      "recording_path": "Recording Save Location",
+      "browse": "Browse",
+      "select_directory": "Select Directory",
+      "auto_save": "Auto-save Recordings",
+      "translation": "Translation Settings",
+      "translation_engine": "Translation Engine",
+      "no_translation": "No Translation",
+      "google_translate": "Google Translate",
+      "error": {
+        "empty_path": "Save path cannot be empty",
+        "invalid_path": "Invalid path: {error}"
+      }
+    },
+    "calendar": {
+      "title": "Calendar Integration",
+      "connected_accounts": "Connected Accounts",
+      "accounts_description": "Connect your Google or Outlook calendar to sync events",
+      "add_google": "Add Google Account",
+      "add_outlook": "Add Outlook Account",
+      "remove_account": "Remove Account",
+      "add_account": "Add Account",
+      "sync_settings": "Sync Settings",
+      "sync_info": "Calendars will sync automatically. You can view all events in the timeline.",
+      "google_oauth_info": "A browser window will open for Google account authorization. Please follow the prompts to complete the authorization process.",
+      "outlook_oauth_info": "A browser window will open for Outlook account authorization. Please follow the prompts to complete the authorization process.",
+      "confirm_remove_title": "Confirm Removal",
+      "confirm_remove_message": "Are you sure you want to remove account {account}?"
+    },
+    "timeline": {
+      "title": "Timeline Settings",
+      "view_range": "View Range",
+      "past_days": "Past Days",
+      "future_days": "Future Days",
+      "days": "days",
+      "notifications": "Notification Settings",
+      "reminder_time": "Reminder Time",
+      "minutes": "minutes",
+      "auto_start": "Auto-start",
+      "enable_auto_start": "Enable auto-start recording",
+      "auto_start_description": "Automatically start real-time recording and transcription when an event begins"
+    },
+    "model_management": {
+      "title": "Model Management",
+      "description": "Manage local Whisper models, including download, delete, and configuration",
+      "downloaded_models": "Downloaded Models",
+      "available_models": "Available Models",
+      "download_success_title": "Download Successful",
+      "download_success_message": "Model {model} downloaded successfully",
+      "download_error_title": "Download Failed",
+      "download_error_message": "Failed to download model {model}",
+      "retry_title": "Retry Download",
+      "retry_message": "Would you like to retry downloading this model?",
+      "suggestions": "Suggestions",
+      "suggestion_network": "Please check your network connection and ensure you can access Hugging Face.",
+      "suggestion_disk_space": "Insufficient disk space. Please free up some space and try again.",
+      "suggestion_permission": "Insufficient permissions. Please check folder permissions or run as administrator.",
+      "suggestion_general": "Please check your network connection and disk space, or view the log file for details.",
+      "configure": "Configure",
+      "delete": "Delete",
+      "view_details": "View Details",
+      "download": "Download",
+      "downloading": "Downloading...",
+      "cancel_download": "Cancel",
+      "download_recommended": "Download Recommended Model",
+      "size": "Size",
+      "speed": "Speed",
+      "accuracy": "Accuracy",
+      "usage_count": "Used {count} times",
+      "usage_count_label": "Usage Count",
+      "last_used": "Last used",
+      "never_used": "Never used",
+      "multilingual": "Multilingual support",
+      "english_only": "English only",
+      "speed_fastest": "Fastest",
+      "speed_fast": "Fast",
+      "speed_medium": "Medium",
+      "speed_slow": "Slow",
+      "accuracy_low": "Low",
+      "accuracy_medium": "Medium",
+      "accuracy_high": "High",
+      "days_ago": "{days} days ago",
+      "hours_ago": "{hours} hours ago",
+      "minutes_ago": "{minutes} minutes ago",
+      "just_now": "Just now",
+      "recommendation_title": "Based on your device configuration, we recommend the {model} model",
+      "recommendation_reason_low_memory": "Your device has limited memory, this model runs fast with low resource usage",
+      "recommendation_reason_fast": "This model runs fast, suitable for quick transcription",
+      "recommendation_reason_balanced": "This model provides a good balance between speed and accuracy",
+      "recommendation_reason_medium_memory": "Your device has sufficient memory, this model provides better accuracy",
+      "recommendation_reason_high_memory": "Your device has ample memory, this model provides high accuracy",
+      "recommendation_reason_gpu_small": "GPU detected, this model can take full advantage of GPU acceleration",
+      "recommendation_reason_gpu_medium": "GPU detected, this model can leverage GPU acceleration with high accuracy",
+      "recommendation_reason_best_quality": "This model provides the best transcription quality",
+      "cancel_download_title": "Cancel Download",
+      "cancel_download_confirm": "Are you sure you want to cancel downloading {model}?",
+      "delete_confirm_title": "Confirm Delete",
+      "delete_confirm_message": "Are you sure you want to delete model {model}?\n\nDisk space: {size} MB",
+      "delete_warning": "After deletion, transcription tasks using this model will not work until you re-download it.",
+      "delete_success_title": "Delete Successful",
+      "delete_success_message": "Model {model} has been successfully deleted",
+      "delete_error_title": "Delete Failed",
+      "delete_error_message": "Failed to delete model {model}",
+      "delete_suggestion": "Please ensure the model is not in use and check file permissions.",
+      "delete_suggestion_in_use": "The model file is currently in use. Please close all applications using this model and try again.",
+      "delete_suggestion_permission": "Insufficient permissions to delete model files. Please check file permissions or run as administrator.",
+      "delete_suggestion_general": "Please check if the file exists and if you have sufficient permissions. If the problem persists, check the log file.",
+      "details_title": "Model Details",
+      "model_name": "Model Name",
+      "model_version": "Model Version",
+      "supported_languages": "Supported Languages",
+      "model_size": "Model Size",
+      "model_path": "Model Path",
+      "disk_usage": "Actual Disk Usage",
+      "download_date": "Download Date",
+      "show_in_explorer": "Show in File Manager",
+      "close": "Close",
+      "config_title": "{model} Configuration",
+      "config_description": "Configure computation parameters for this model",
+      "compute_device": "Compute Device",
+      "compute_precision": "Compute Precision",
+      "enable_vad": "Enable VAD Filter",
+      "vad_description": "Filter silent segments (batch transcription)",
+      "vad_threshold": "VAD Silence Threshold",
+      "cuda_not_available": "CUDA is not available. Please ensure you have installed PyTorch with CUDA support.",
+      "validation_error": "Validation Error",
+      "validation_error_title": "Model Validation Failed",
+      "validation_error_message": "Model {model} failed validation and may be corrupted.",
+      "validation_suggestion": "Suggestion: Please delete this model and re-download it, or check the log file for details.",
+      "save": "Save",
+      "cancel": "Cancel",
+      "model_in_use": "Model is currently in use and cannot be deleted",
+      "first_run_title": "Welcome to EchoNote",
+      "first_run_welcome": "Welcome to EchoNote! Before we begin, let's download a speech recognition model for you.",
+      "first_run_recommendation": "Based on your device configuration, we recommend the {model_name} model.",
+      "download_now": "Download Now",
+      "download_later": "Download Later",
+      "reason_low_memory": "Your device has limited memory (< 8GB), this model runs fast with low resource usage.",
+      "reason_medium_memory": "Your device has sufficient memory (8-16GB), this model provides good accuracy.",
+      "reason_high_memory": "Your device has ample memory (> 16GB), this model provides high accuracy.",
+      "reason_gpu_available": "GPU detected, can accelerate model execution.",
+      "reason_no_gpu": "No GPU detected, will run on CPU.",
+      "reminder_title": "Reminder",
+      "reminder_message": "You haven't downloaded any speech recognition models yet.\n\nTo use transcription features, please go to Settings > Model Management to download a model."
+    },
+    "theme": {
+      "light": "Light Theme",
+      "dark": "Dark Theme",
+      "system": "Follow System"
+    },
+    "languages": {
+      "en_US": "English"
+    }
+  },
+  "errors": {
+    "file_not_found": "File not found",
+    "invalid_format": "Unsupported format",
+    "network_error": "Network error",
+    "api_error": "API error",
+    "permission_denied": "Permission denied",
+    "unknown_error": "Unknown error"
+  },
+  "notification": {
+    "low_memory": {
+      "title": "Low Memory",
+      "message": "System memory is low ({memory} available). Batch transcription paused."
+    },
+    "resources_recovered": {
+      "title": "Resources Recovered",
+      "message": "System resources recovered. Batch transcription resumed."
+    }
+  },
+  "notifications": {
+    "transcription_complete": "Transcription complete: {filename}",
+    "transcription_failed": "Transcription failed: {filename}",
+    "recording_saved": "Recording saved",
+    "recording_failed": "Recording failed",
+    "event_reminder": "{title} is about to start",
+    "sync_complete": "Calendar sync complete",
+    "sync_failed": "Calendar sync failed"
+  },
+  "auto_task": {
+    "reminder": {
+      "title": "{app_name} - Auto Task Reminder",
+      "message": "{event_title}\n{start_time_label}: {start_time}\n{task_list_label}: {task_list}",
+      "start_time_label": "Start Time",
+      "task_list_label": "Task List"
+    },
+    "tasks": {
+      "transcription": "Live Transcription",
+      "recording": "Meeting Recording",
+      "separator": ", ",
+      "none": "None"
+    },
+    "notifications": {
+      "start_success": {
+        "title": "{app_name} - Auto tasks started",
+        "message": "Automatic recording started for \"{event_title}\"."
+      },
+      "start_error": {
+        "title": "{app_name} - Failed to start auto tasks",
+        "message": "Could not start automatic recording for \"{event_title}\":\\n{error_message}"
+      },
+      "stop_success": {
+        "title": "{app_name} - Auto recording completed",
+        "message": "Recording for \"{event_title}\" finished.\\nDuration: {duration_seconds} seconds"
+      },
+      "stop_error": {
+        "title": "{app_name} - Failed to stop auto recording",
+        "message": "Could not stop recording for \"{event_title}\":\\n{error_message}"
+      },
+      "recorder_busy": {
+        "title": "{app_name} - Unable to start auto tasks",
+        "message": "Could not start automatic recording for \"{event_title}\":\\nRecorder is already in use"
+      }
+    }
+  },
+  "logging": {
+    "main_window": {
+      "initialized": "Main window initialized",
+      "exit_cancelled": "Application exit cancelled by user",
+      "closed": "Main window closed",
+      "cleanup_starting": "Starting application cleanup...",
+      "closing_transcript_viewers": "Closing all transcript viewers...",
+      "stopping_transcription_tasks": "Stopping transcription tasks...",
+      "transcription_manager_timeout": "Transcription manager did not stop within timeout",
+      "stopping_realtime_recorder": "Stopping realtime recorder...",
+      "stopping_resource_monitor": "Stopping resource monitor...",
+      "stopping_auto_task_scheduler": "Stopping auto task scheduler...",
+      "stopping_sync_scheduler": "Stopping sync scheduler...",
+      "saving_settings": "Saving settings...",
+      "closing_database_connection": "Closing database connection...",
+      "cleaning_temp_files": "Cleaning up old temporary files...",
+      "keyboard_shortcuts_configured": "Keyboard shortcuts configured",
+      "api_keys_updated": "API keys updated, reloading cloud engines...",
+      "transcription_engine_reloaded": "Transcription engine reloaded successfully",
+      "realtime_recorder_engine_reloaded": "Realtime recorder engine reloaded successfully",
+      "cloud_engines_reload_completed": "Cloud engines reload completed"
+    },
+    "batch_transcribe": {
+      "starting_task_processing": "Starting transcription task processing...",
+      "processing_started": "Transcription processing started",
+      "widget_initialized": "Batch transcribe widget initialized",
+      "no_speech_engine": "No speech engine available",
+      "no_models_downloaded": "No models downloaded",
+      "navigating_to_model_management": "Navigating to model management page",
+      "cannot_navigate_main_window_not_found": "Cannot navigate: main window not found",
+      "task_queue_cleared": "Task queue cleared",
+      "closed_all_transcript_viewers": "Closed all transcript viewers"
+    },
+    "realtime_record": {
+      "widget_initialized": "RealtimeRecordWidget initialized",
+      "async_loop_started": "Async event loop started",
+      "async_loop_stopping": "Async event loop stopping",
+      "async_loop_stopped": "Async event loop stopped",
+      "no_models_downloaded": "No models downloaded",
+      "download_guide_displayed": "Download guide displayed",
+      "navigated_to_model_management": "Navigated to model management page",
+      "updating_ui_recording_started": "Updating UI for recording started",
+      "updating_ui_recording_stopped": "Updating UI for recording stopped",
+      "recording_started": "Recording started",
+      "no_transcription_text_to_export": "No transcription text to export",
+      "no_translation_text_to_export": "No translation text to export",
+      "save_recording_handled_automatically": "Save recording - handled automatically on stop",
+      "async_loop_thread_timeout": "Async event loop thread did not terminate within timeout"
+    },
+    "settings": {
+      "widget_initialized": "Settings widget initialized",
+      "model_manager_not_available": "model_manager not available, skipping model management page",
+      "saved_successfully": "Settings saved successfully",
+      "reset_to_defaults": "Settings reset to defaults",
+      "transcription_page": {
+        "no_models_downloaded_selector_disabled": "No models downloaded, model selector disabled",
+        "showed_ffmpeg_guide": "Showed FFmpeg installation guide",
+        "no_secrets_manager_skipping_api_key_loading": "No secrets_manager available, skipping API key loading",
+        "no_secrets_manager_skipping_api_key_saving": "No secrets_manager available, skipping API key saving",
+        "api_keys_encrypted_saved": "API keys encrypted and saved successfully",
+        "api_keys_updated_signal_emitted": "API keys updated signal emitted"
+      },
+      "calendar_page": {
+        "add_google_account_clicked": "Add Google account clicked",
+        "add_outlook_account_clicked": "Add Outlook account clicked"
+      },
+      "model_management_page": {
+        "initialized": "Model management page initialized"
+      },
+      "data_management_page": {
+        "cleanup_completed_successfully": "Data cleanup completed successfully"
+      }
+    },
+    "calendar_hub": {
+      "google_user_info_missing_email": "Google user info response missing email field",
+      "outlook_user_info_missing_email": "Outlook user info response missing mail fields"
+    },
+    "timeline": {
+      "widget_initialized": "Timeline widget initialized",
+      "refreshing_without_query_filter": "Refreshing timeline without query filter",
+      "transcript_copied_to_clipboard": "Transcript copied to clipboard",
+      "transcript_viewer_dialog_initialized": "Transcript viewer dialog initialized",
+      "audio_player_dialog_initialized": "Audio player dialog initialized"
+    },
+    "batch_transcribe_viewer": {
+      "file_load_cancelled": "File load cancelled by user",
+      "user_chose_retry_save": "User chose to retry save operation",
+      "user_cancelled_save": "User cancelled save operation",
+      "no_timestamps_found_creating_basic_srt": "No timestamps found, creating basic SRT",
+      "no_timestamps_found_creating_basic_markdown": "No timestamps found, creating basic Markdown",
+      "copied_all_transcript_to_clipboard": "Copied all transcript content to clipboard"
+    },
+    "audio_visualizer": {
+      "initialized": "AudioVisualizer initialized"
+    },
+    "common": {
+      "notification": {
+        "win10toast_not_installed": "win10toast not installed, Windows notifications unavailable",
+        "notify_send_not_found": "notify-send not found, Linux notifications unavailable",
+        "macos_notification_timeout": "macOS notification timed out",
+        "windows_notifications_not_available": "Windows notifications not available",
+        "linux_notifications_not_available": "Linux notifications not available",
+        "linux_notification_timeout": "Linux notification timed out"
+      },
+      "splash_screen": {
+        "closed": "Splash screen closed"
+      }
+    }
+  },
+  "ui_strings": {
+    "batch_transcribe": {
+      "no_engine_configured": "No engine configured",
+      "error_loading_engines": "Error loading engines",
+      "error_loading_models": "Error loading models"
+    },
+    "realtime_record": {
+      "error_loading_devices": "Error loading devices"
+    },
+    "common": {
+      "error_dialog": {
+        "copied": "Copied!"
+      },
+      "progress_bar": {
+        "zero_percent": "0%"
+      }
+    },
+    "timeline": {
+      "audio_player": {
+        "mute_icon": "🔇",
+        "low_volume_icon": "🔉",
+        "high_volume_icon": "🔊",
+        "pause_icon": "⏸",
+        "play_icon": "▶"
+      }
+    },
+    "gpu_detector": {
+      "device_names": {
+        "cpu": "CPU",
+        "cuda": "CUDA (NVIDIA GPU)",
+        "auto": "Auto (Recommended)"
+      }
+    }
+  },
+  "exceptions": {
+    "settings": {
+      "failed_to_save_to_disk": "Failed to save settings to disk"
+    },
+    "realtime_record": {
+      "failed_to_initialize_async_loop": "Failed to initialize async event loop"
+    },
+    "batch_transcribe_viewer": {
+      "output_path_not_set": "Output path is not set",
+      "insufficient_disk_space": "Insufficient disk space",
+      "content_is_empty": "Content is empty",
+      "no_content_to_export": "No content to export"
+    },
+    "calendar_hub": {
+      "expected_authorization_request_payload": "Expected authorization request payload with state and code verifier.",
+      "authorization_request_missing_pkce": "Authorization request is missing required PKCE parameters.",
+      "state_and_code_verifier_required": "State and code_verifier must be provided for OAuth dialog",
+      "invalid_port_in_redirect_uri": "Invalid port specified in redirect URI.",
+      "failed_to_parse_redirect_uri": "Failed to parse redirect URI for callback port.",
+      "invalid_port_in_configured_redirect_uri": "Invalid port specified in configured redirect URI."
+    }
+  },
+  "dialogs": {
+    "settings": {
+      "data_management": {
+        "cleanup_failed": "Cleanup Failed"
+      }
+    },
+    "calendar_hub": {
+      "authorization_failed": "Authorization Failed",
+      "disconnect_account": "Disconnect Account",
+      "no_accounts": "No Accounts",
+      "sync_complete": "Sync Complete",
+      "sync_completed_with_errors": "Sync Completed with Errors"
+    }
+  },
+  "ffmpeg": {
+    "dialog_title": "Install FFmpeg ({platform})",
+    "not_installed_title": "FFmpeg Not Installed ({platform})",
+    "description": "FFmpeg is an open-source multimedia processing tool used to handle audio information from video formats (MP4, MKV, etc.).",
+    "benefits_title": "After installing FFmpeg, you will be able to:",
+    "benefit_video_formats": "Process audio transcription for all video formats",
+    "benefit_duration": "Get accurate audio duration and progress information",
+    "benefit_experience": "Enjoy a better user experience",
+    "installation_instructions": "Installation Instructions:",
+    "note": "Note: If you only need to process pure audio formats (WAV, MP3, FLAC), you can skip this step.",
+    "dont_show_again": "Don't show this again",
+    "install_later": "Install Later",
+    "got_it": "Got It",
+    "ffmpeg_label": "FFmpeg:",
+    "detected_system": "Detected your system: {system}",
+    "purpose": "FFmpeg is used to process audio information from video formats (MP4, MKV, etc.).",
+    "recommended_install": "Recommended installation using {method}:",
+    "macos": {
+      "method_homebrew": "Homebrew",
+      "step1": "1. If you haven't installed Homebrew yet, visit:",
+      "step1_url": "   https://brew.sh",
+      "step2": "2. Run in Terminal:",
+      "step2_cmd": "   brew install ffmpeg"
+    },
+    "linux": {
+      "choose_distro": "Choose the installation command based on your distribution:",
+      "ubuntu_debian": "Ubuntu/Debian:",
+      "ubuntu_cmd1": "   sudo apt-get update",
+      "ubuntu_cmd2": "   sudo apt-get install ffmpeg",
+      "fedora": "Fedora:",
+      "fedora_cmd": "   sudo dnf install ffmpeg",
+      "arch": "Arch Linux:",
+      "arch_cmd": "   sudo pacman -S ffmpeg",
+      "opensuse": "openSUSE:",
+      "opensuse_cmd": "   sudo zypper install ffmpeg"
+    },
+    "windows": {
+      "method1_chocolatey": "Method 1 - Using Chocolatey (Recommended, Easiest):",
+      "choco_step1": "1. Open PowerShell as Administrator",
+      "choco_step2": "2. Install Chocolatey (if not already installed):",
+      "choco_step2_url": "   Visit https://chocolatey.org/install",
+      "choco_step3": "3. Install FFmpeg:",
+      "choco_step3_cmd": "   choco install ffmpeg",
+      "method2_scoop": "Method 2 - Using Scoop (Recommended):",
+      "scoop_step1": "1. Install Scoop: https://scoop.sh",
+      "scoop_step2": "2. Run in PowerShell:",
+      "scoop_step2_cmd": "   scoop install ffmpeg",
+      "method3_manual": "Method 3 - Manual Installation:",
+      "manual_step1": "1. Visit: https://ffmpeg.org/download.html",
+      "manual_step2": "2. Download Windows version (choose gyan.dev or BtbN build)",
+      "manual_step3": "3. Extract to a directory (e.g., C:\\ffmpeg)",
+      "manual_step4": "4. Add the bin directory to system PATH environment variable",
+      "manual_step5": "5. Restart EchoNote"
+    },
+    "generic": {
+      "visit_website": "Please visit https://ffmpeg.org/download.html to download the version suitable for your system.",
+      "ensure_available": "After installation, ensure that ffmpeg and ffprobe commands can be run in the terminal."
+    },
+    "after_install": "After installation, restart EchoNote",
+    "verify_install": "Verify installation:",
+    "verify_cmd": "   ffmpeg -version",
+    "verify_cmd_probe": "   ffprobe -version",
+    "skip_note": "Note: Without FFmpeg, you can still process pure audio formats (WAV, MP3, FLAC)."
+  },
+  "wizard": {
+    "title": "Welcome to EchoNote",
+    "welcome": {
+      "title": "Welcome",
+      "message": "Welcome to EchoNote!\n\nEchoNote is an intelligent voice transcription and calendar management application that helps you efficiently process audio content and manage your schedule.",
+      "features": "Key Features:\n• Batch audio transcription\n• Real-time recording and transcription\n• Calendar integration and sync\n• Intelligent timeline management"
+    },
+    "language": {
+      "title": "Choose Language",
+      "subtitle": "Please select your preferred language",
+      "select": "Interface Language:",
+      "info": "You can change the language at any time in settings."
+    },
+    "theme": {
+      "title": "Choose Theme",
+      "subtitle": "Select your preferred interface theme",
+      "select": "Theme:",
+      "info": "You can change the theme at any time in settings."
+    },
+    "model": {
+      "title": "Download Speech Recognition Model",
+      "subtitle": "Download a model to use transcription features",
+      "recommendation": "Recommended Model: {model}",
+      "download_now": "Download Now",
+      "downloading": "Downloading model, please wait...",
+      "download_complete": "Model download complete!",
+      "download_error": "Download failed: {error}",
+      "skip_info": "You can skip this step and download models later in settings."
+    },
+    "complete": {
+      "title": "Setup Complete",
+      "message": "Congratulations! EchoNote is ready to use.",
+      "next_steps": "Next, you can:\n• Import audio files in Batch Transcription\n• Use Real-time Recording features\n• Connect your calendar accounts\n• Customize more options in Settings"
+    }
+  },
+  "constants": {
+    "file_size": {
+      "bytes": "B",
+      "kilobytes": "KB",
+      "megabytes": "MB",
+      "gigabytes": "GB",
+      "terabytes": "TB"
+    },
+    "startup": {
+      "configuration": "Configuration",
+      "dependencies": "Dependencies",
+      "database": "Database",
+      "i18n": "Internationalization",
+      "managers": "Managers",
+      "speech_engine": "Speech Engine",
+      "transcription": "Transcription",
+      "resource_monitor": "Resource Monitor",
+      "realtime_recorder": "Realtime Recorder",
+      "calendar": "Calendar",
+      "main_window": "Main Window",
+      "final": "Final"
+    },
+    "folders": {
+      "documents": "Documents",
+      "recordings": "Recordings",
+      "transcripts": "Transcripts"
+    },
+    "error_category": {
+      "file_format": "File Format",
+      "network": "Network",
+      "authentication": "Authentication",
+      "api_limit": "API Limit",
+      "permission": "Permission",
+      "resource": "Resource",
+      "validation": "Validation",
+      "unknown": "Unknown"
+    },
+    "task_status": {
+      "pending": "Pending",
+      "processing": "Processing",
+      "completed": "Completed",
+      "failed": "Failed",
+      "cancelled": "Cancelled"
+    },
+    "errors": {
+      "unsupported_format": "Unsupported file format: {format}",
+      "network_connection_failed": "Network connection failed",
+      "authentication_failed": "Authentication failed",
+      "api_rate_limit": "API rate limit exceeded",
+      "insufficient_permissions": "Insufficient permissions",
+      "insufficient_resources": "Insufficient system resources",
+      "validation_failed": "Input validation failed"
+    },
+    "error_actions": {
+      "unsupported_format": "Supported formats: {formats}\nSuggest using FFmpeg to convert to supported format",
+      "network_connection_failed": "Please check network connection and retry, or use local engine (faster-whisper)",
+      "authentication_failed": "Please check if API Key is correct, or reconnect external services",
+      "api_rate_limit": "Please retry later, or consider upgrading API plan",
+      "insufficient_permissions": "Please check file/directory permissions, or run as administrator",
+      "insufficient_resources": "Please free up disk space or memory and retry",
+      "validation_failed": "Please check if input content meets requirements"
+    }
+  },
+  "settings.cleanup_warning": "⚠️ Warning: Data cleanup operations cannot be undone!\nPlease make sure you have backed up any important data.",
+  "calendar_hub.no_accounts_message": "No external calendar accounts connected. Please add an account first."
+}

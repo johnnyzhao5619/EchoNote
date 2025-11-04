@@ -1,0 +1,429 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (c) 2024-2025 EchoNote Contributors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""Google Calendar synchronization adapter."""
+
+import logging
+from datetime import timezone
+from typing import Any, Dict, List, Optional
+
+import httpx
+
+from data.database.models import CalendarEvent
+from engines.calendar_sync.base import (
+    CALENDAR_API_TIMEOUT_SECONDS,
+    OAuthCalendarAdapter,
+    OAuthEndpoints,
+)
+
+logger = logging.getLogger("echonote.calendar_sync.google")
+
+
+class GoogleCalendarAdapter(OAuthCalendarAdapter):
+    """Google Calendar synchronization adapter."""
+
+    # Google OAuth endpoints
+    AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
+    TOKEN_URL = "https://oauth2.googleapis.com/token"
+    REVOKE_URL = "https://oauth2.googleapis.com/revoke"
+    API_BASE_URL = "https://www.googleapis.com/calendar/v3"
+
+    # OAuth scopes
+    SCOPES = [
+        "https://www.googleapis.com/auth/calendar.readonly",
+        "https://www.googleapis.com/auth/calendar.events",
+        "openid",
+        "https://www.googleapis.com/auth/userinfo.email",
+        "https://www.googleapis.com/auth/userinfo.profile",
+    ]
+
+    def __init__(
+        self,
+        client_id: str,
+        client_secret: str,
+        redirect_uri: str = None,
+        http_client_config: Optional[Dict[str, Any]] = None,
+    ):
+        from config.constants import DEFAULT_OAUTH_REDIRECT_PORT
+
+        if redirect_uri is None:
+            redirect_uri = f"http://localhost:{DEFAULT_OAUTH_REDIRECT_PORT}/callback"
+
+        super().__init__(
+            client_id=client_id,
+            client_secret=client_secret,
+            redirect_uri=redirect_uri,
+            scopes=self.SCOPES,
+            endpoints=OAuthEndpoints(
+                auth_url=self.AUTH_URL,
+                token_url=self.TOKEN_URL,
+                api_base_url=self.API_BASE_URL,
+                revoke_url=self.REVOKE_URL,
+            ),
+            logger=logger,
+            http_client_config=http_client_config,
+        )
+        self.logger.info("GoogleCalendarAdapter initialized")
+
+    def build_authorization_params(self, state: str, code_challenge: str) -> Dict[str, Any]:
+        params = super().build_authorization_params(state, code_challenge)
+        params.update(
+            {
+                "access_type": "offline",
+                "prompt": "consent",
+            }
+        )
+        return params
+
+    def fetch_events(
+        self,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        last_sync_token: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Fetch events from Google Calendar.
+
+        Args:
+            start_date: Optional start date in ISO format
+            end_date: Optional end date in ISO format
+            last_sync_token: Optional sync token for incremental sync
+
+        Returns:
+            Dictionary with events and new sync token
+        """
+        try:
+            events = []
+            deleted_events: List[str] = []
+            page_token = None
+            new_sync_token = None
+
+            from config.constants import CALENDAR_API_TIMEOUT_SECONDS, GOOGLE_CALENDAR_MAX_RESULTS
+
+            while True:
+                params = {
+                    "maxResults": GOOGLE_CALENDAR_MAX_RESULTS,
+                    "singleEvents": True,
+                    "orderBy": "startTime",
+                    "showDeleted": True,
+                }
+
+                # Use sync token for incremental sync
+                if last_sync_token:
+                    params["syncToken"] = last_sync_token
+                else:
+                    if start_date:
+                        params["timeMin"] = start_date
+                    if end_date:
+                        params["timeMax"] = end_date
+
+                if page_token:
+                    params["pageToken"] = page_token
+
+                response = self.api_request(
+                    "GET",
+                    f"{self.api_base_url}/calendars/primary/events",
+                    params=params,
+                    timeout=CALENDAR_API_TIMEOUT_SECONDS,
+                )
+                data = response.json()
+
+                # Convert Google events to internal format
+                for item in data.get("items", []):
+                    event = self._convert_google_event(item)
+                    if not event:
+                        continue
+
+                    if event.get("deleted"):
+                        event_id = event.get("id")
+                        if event_id:
+                            deleted_events.append(event_id)
+                        continue
+
+                    events.append(event)
+
+                # Check for pagination
+                page_token = data.get("nextPageToken")
+                if not page_token:
+                    new_sync_token = data.get("nextSyncToken")
+                    break
+
+            self.logger.info("Fetched %s events from Google", len(events))
+
+            return {"events": events, "deleted": deleted_events, "sync_token": new_sync_token}
+
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 410:
+                # Sync token expired, need full sync
+                self.logger.warning("Sync token expired, performing full sync")
+                return self.fetch_events(start_date, end_date, None)
+            self.logger.error("HTTP error fetching events: %s", e)
+            raise
+        except Exception as e:
+            self.logger.error("Failed to fetch events: %s", e)
+            raise
+
+    def push_event(self, event: CalendarEvent) -> str:
+        """
+        Push a local event to Google Calendar.
+
+        Args:
+            event: CalendarEvent instance
+
+        Returns:
+            Google event ID
+        """
+        try:
+            google_event = self._convert_to_google_event(event)
+
+            response = self.api_request(
+                "POST",
+                f"{self.api_base_url}/calendars/primary/events",
+                json=google_event,
+                headers={"Content-Type": "application/json"},
+                timeout=CALENDAR_API_TIMEOUT_SECONDS,
+            )
+            data = response.json()
+            google_id = data["id"]
+
+            self.logger.info("Pushed event to Google: %s", google_id)
+            return google_id
+
+        except Exception as e:
+            self.logger.error("Failed to push event: %s", e)
+            raise
+
+    def update_event(self, event: CalendarEvent, external_id: str) -> None:
+        """Update an existing Google Calendar event."""
+        if not external_id:
+            raise ValueError("Missing external event identifier")
+
+        try:
+            google_event = self._convert_to_google_event(event)
+
+            self.api_request(
+                "PATCH",
+                f"{self.api_base_url}/calendars/primary/events/{external_id}",
+                json=google_event,
+                headers={"Content-Type": "application/json"},
+                timeout=CALENDAR_API_TIMEOUT_SECONDS,
+            )
+
+            self.logger.info("Updated Google event: %s", external_id)
+
+        except Exception as e:
+            self.logger.error("Failed to update event %s: %s", external_id, e)
+            raise
+
+    def delete_event(self, event: CalendarEvent, external_id: str) -> None:
+        """Delete an event from Google Calendar."""
+        if not external_id:
+            raise ValueError("Missing external event identifier")
+
+        try:
+            self.api_request(
+                "DELETE",
+                f"{self.api_base_url}/calendars/primary/events/{external_id}",
+                timeout=CALENDAR_API_TIMEOUT_SECONDS,
+            )
+
+            self.logger.info("Deleted Google event: %s", external_id)
+
+        except httpx.HTTPStatusError as err:
+            if err.response.status_code == 404:
+                self.logger.warning("Google event %s already removed", external_id)
+                return
+            self.logger.error("HTTP error deleting event %s: %s", external_id, err)
+            raise
+        except Exception as e:
+            self.logger.error("Failed to delete event %s: %s", external_id, e)
+            raise
+
+    def _convert_google_event(self, google_event: dict) -> Optional[dict]:
+        """
+        Convert Google Calendar event to internal format.
+
+        Args:
+            google_event: Google event data
+
+        Returns:
+            Internal event format or None if conversion fails
+        """
+        try:
+            # Extract start and end times
+            status_value = google_event.get("status")
+            if isinstance(status_value, str) and status_value.lower() == "cancelled":
+                event_id = google_event.get("id")
+                if event_id:
+                    return {"id": event_id, "deleted": True}
+                return None
+
+            start = google_event.get("start", {})
+            end = google_event.get("end", {})
+
+            start_time = start.get("dateTime") or start.get("date")
+            end_time = end.get("dateTime") or end.get("date")
+
+            if not start_time or not end_time:
+                return None
+
+            # Extract attendees
+            attendees = [
+                att["email"] for att in google_event.get("attendees", []) if "email" in att
+            ]
+
+            # Extract reminder
+            reminder_minutes = None
+            reminder_use_default: Optional[bool] = None
+            reminders = google_event.get("reminders", {})
+            if isinstance(reminders, dict):
+                use_default_flag = reminders.get("useDefault")
+                if use_default_flag is True:
+                    reminder_use_default = True
+                elif use_default_flag is False:
+                    reminder_use_default = False
+
+                overrides = reminders.get("overrides")
+                if overrides:
+                    override = next(
+                        (
+                            item
+                            for item in overrides
+                            if isinstance(item, dict) and "minutes" in item
+                        ),
+                        None,
+                    )
+                    if override is not None:
+                        reminder_minutes = override.get("minutes")
+                        reminder_use_default = False
+                elif use_default_flag is False:
+                    reminder_minutes = None
+
+            return {
+                "id": google_event["id"],
+                "title": google_event.get("summary", "Untitled"),
+                "event_type": "Event",
+                "start_time": start_time,
+                "end_time": end_time,
+                "location": google_event.get("location"),
+                "attendees": attendees,
+                "description": google_event.get("description"),
+                "reminder_minutes": reminder_minutes,
+                "reminder_use_default": reminder_use_default,
+                "recurrence_rule": (
+                    google_event.get("recurrence", [None])[0]
+                    if google_event.get("recurrence")
+                    else None
+                ),
+            }
+
+        except Exception as e:
+            self.logger.error("Failed to convert Google event: %s", e)
+            return None
+
+    def _convert_to_google_event(self, event: CalendarEvent) -> dict:
+        """
+        Convert internal event to Google Calendar format.
+
+        Args:
+            event: CalendarEvent instance
+
+        Returns:
+            Google event format
+        """
+        local_tz = self._get_local_timezone()
+
+        def _is_date_only(value: Any) -> bool:
+            from config.constants import ISO_DATE_ONLY_LENGTH
+
+            return (
+                isinstance(value, str)
+                and "T" not in value
+                and len(value.strip()) == ISO_DATE_ONLY_LENGTH
+            )
+
+        is_all_day = False
+        if hasattr(event, "is_all_day_event"):
+            try:
+                is_all_day = event.is_all_day_event()
+            except Exception:  # pragma: no cover - defensive guard
+                is_all_day = False
+        if not is_all_day:
+            is_all_day = _is_date_only(event.start_time) and _is_date_only(event.end_time)
+
+        start_dt = self._parse_event_datetime(event.start_time, local_tz)
+        end_dt = self._parse_event_datetime(event.end_time, local_tz)
+
+        def _format_google_datetime(dt_value):
+            identifier = self._get_timezone_identifier(dt_value)
+            payload = {"dateTime": dt_value.isoformat()}
+            if identifier:
+                if identifier == "UTC":
+                    payload["dateTime"] = dt_value.astimezone(timezone.utc).isoformat()
+                payload["timeZone"] = identifier
+            return payload
+
+        def _format_google_date(dt_value, original_value):
+            if isinstance(original_value, str):
+                text_value = original_value.strip()
+                if _is_date_only(text_value):
+                    return text_value
+
+            dt_local = dt_value
+            if dt_local.tzinfo and local_tz:
+                dt_local = dt_local.astimezone(local_tz)
+            elif local_tz and dt_local.tzinfo is None:
+                dt_local = dt_local.replace(tzinfo=local_tz)
+            return dt_local.date().isoformat()
+
+        google_event = {
+            "summary": event.title,
+            "start": (
+                {"date": _format_google_date(start_dt, event.start_time)}
+                if is_all_day
+                else _format_google_datetime(start_dt)
+            ),
+            "end": (
+                {"date": _format_google_date(end_dt, event.end_time)}
+                if is_all_day
+                else _format_google_datetime(end_dt)
+            ),
+        }
+
+        if event.location:
+            google_event["location"] = event.location
+
+        if event.description:
+            google_event["description"] = event.description
+
+        if event.attendees:
+            google_event["attendees"] = [{"email": email} for email in event.attendees]
+
+        use_default_reminder = getattr(event, "reminder_use_default", None)
+        overrides: Optional[List[Dict[str, Any]]] = None
+        if event.reminder_minutes is not None:
+            overrides = [{"method": "popup", "minutes": event.reminder_minutes}]
+
+        if use_default_reminder is True:
+            google_event["reminders"] = {"useDefault": True}
+        elif use_default_reminder is False:
+            google_event["reminders"] = {"useDefault": False, "overrides": overrides or []}
+        elif overrides is not None:
+            google_event["reminders"] = {"useDefault": False, "overrides": overrides}
+
+        if event.recurrence_rule:
+            google_event["recurrence"] = [event.recurrence_rule]
+
+        return google_event

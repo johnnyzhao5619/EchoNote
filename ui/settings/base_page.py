@@ -1,0 +1,134 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (c) 2024-2025 EchoNote Contributors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""
+Base class for settings pages.
+
+Provides common functionality for all settings pages.
+"""
+
+import logging
+from typing import Tuple
+
+from PySide6.QtCore import Signal
+from PySide6.QtGui import QFont
+from PySide6.QtWidgets import QLabel, QScrollArea, QVBoxLayout, QWidget
+
+from ui.base_widgets import BaseWidget
+from utils.i18n import I18nQtManager
+
+logger = logging.getLogger("echonote.ui.settings.base")
+
+
+class BaseSettingsPage(BaseWidget):
+    """
+    Base class for settings pages.
+
+    Provides common layout and functionality for all settings pages.
+    """
+
+    # Signal emitted when settings change
+    settings_changed = Signal()
+
+    def __init__(self, settings_manager, i18n: I18nQtManager, parent=None):
+        """
+        Initialize base settings page.
+
+        Args:
+            settings_manager: SettingsManager instance
+            i18n: Internationalization manager
+            parent: Parent widget
+        """
+        super().__init__(i18n, parent)
+
+        self.settings_manager = settings_manager
+        self.i18n = i18n
+
+        # Main layout
+        self.main_layout = QVBoxLayout(self)
+        self.main_layout.setContentsMargins(20, 20, 20, 20)
+        self.main_layout.setSpacing(15)
+
+        # Create scroll area for content
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QScrollArea.Shape.NoFrame)
+
+        # Content widget
+        self.content_widget = QWidget()
+        self.content_layout = QVBoxLayout(self.content_widget)
+        self.content_layout.setSpacing(15)
+
+        scroll_area.setWidget(self.content_widget)
+        self.main_layout.addWidget(scroll_area)
+
+    def add_section_title(self, title: str):
+        """
+        Add a section title to the page.
+
+        Args:
+            title: Section title text
+        """
+        label = QLabel(title)
+        font = QFont()
+        font.setPointSize(12)
+        font.setBold(True)
+        label.setFont(font)
+        self.content_layout.addWidget(label)
+
+    def add_spacing(self, height: int = 10):
+        """
+        Add vertical spacing.
+
+        Args:
+            height: Spacing height in pixels
+        """
+        self.content_layout.addSpacing(height)
+
+    def load_settings(self):
+        """
+        Load settings into the page.
+
+        Should be overridden by subclasses.
+        """
+
+    def save_settings(self):
+        """
+        Save settings from the page.
+
+        Should be overridden by subclasses.
+        """
+
+    def validate_settings(self) -> Tuple[bool, str]:
+        """
+        Validate settings before saving.
+
+        Should be overridden by subclasses if validation is needed.
+
+        Returns:
+            Tuple of (is_valid, error_message)
+        """
+        return True, ""
+
+    def update_translations(self):
+        """
+        Update UI text after language change.
+
+        Should be overridden by subclasses.
+        """
+
+    def _emit_changed(self):
+        """Emit settings changed signal."""
+        self.settings_changed.emit()

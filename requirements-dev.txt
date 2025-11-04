@@ -1,0 +1,38 @@
+# EchoNote Development Dependencies
+
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-asyncio>=0.21.0
+pytest-qt>=4.2.0
+pytest-mock>=3.11.0
+
+# Code Quality
+black>=23.7.0
+pylint>=2.17.0
+flake8>=6.1.0
+mypy>=1.5.0
+isort>=5.12.0
+
+# Pre-commit Hooks
+pre-commit>=3.3.0
+
+# Documentation
+sphinx>=7.1.0
+sphinx-rtd-theme>=1.3.0
+sphinx-autodoc-typehints>=1.24.0
+
+# Development Tools
+ipython>=8.14.0
+ipdb>=0.13.13
+
+# HTTP Client (parity with production)
+requests>=2.31.0
+
+# Build Tools
+pyinstaller>=5.13.0
+py2app>=0.28.0  # macOS only
+
+# Type Stubs
+types-requests>=2.31.0
+PySide6-stubs>=6.5.0

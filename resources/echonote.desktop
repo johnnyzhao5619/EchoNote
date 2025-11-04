@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=EchoNote
+Comment=Intelligent Voice Transcription & Calendar Management
+Exec=echonote
+Icon=echonote
+Terminal=false
+Categories=AudioVideo;Audio;Office;
+Keywords=transcription;voice;audio;calendar;recording;
+StartupNotify=true
+MimeType=audio/wav;audio/mp3;audio/flac;audio/ogg;video/mp4;video/avi;video/mkv;

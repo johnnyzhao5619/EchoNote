@@ -1,0 +1,265 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+ENV/
+env/
+.venv
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# PEP 582
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Kiro AI Assistant
+.kiro/
+
+# EchoNote specific
+# User data directory
+.echonote/
+
+# Downloaded models (large files)
+models/
+!core/models/
+*.bin
+*.pt
+*.pth
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+\#*\#
+
+# Logs
+logs/
+*.log
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Configuration files with secrets
+config/local_config.json
+config/secrets.json
+
+# Build artifacts
+dist/
+build/
+*.dmg
+*.exe
+*.app
+*.AppImage
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# Test files
+test_output/
+test_recordings/
+test_transcripts/
+
+# Backup files
+*.bak
+*.backup
+*.old
+migration_backup_*/
+
+# Temporary analysis and reports (prevent future clutter)
+reports/
+test_reports/
+*_report.json
+*_report.md
+*_analysis.json
+PROJECT_CLEANUP_*.md
+PROJECT_MAINTENANCE_*.md
+DOCUMENTATION_*.md
+VALIDATION_REPORT.md
+CODE_QUALITY_IMPROVEMENT_REPORT.md
+
+# Development and maintenance artifacts
+IMPROVEMENT_PLAN_*.md
+PROJECT_REVIEW_*.md
+RELEASE_NOTES_*.md
+REVIEW_SUMMARY.md
+*_SUMMARY.md
+*_STATUS_REPORT.md
+IMPLEMENTATION_SUMMARY.md
+TASK_REVIEW.md
+
+# Performance and analysis outputs
+performance_results/
+analysis_output/
+benchmark_results/
+
+# IDE and editor artifacts
+.vscode/settings.json
+.idea/workspace.xml
+*.sublime-workspace
+*.sublime-project
+
+# OS-specific temporary files
+.DS_Store?
+.Spotlight-V100?
+.Trashes?
+Icon
+Thumbs.db?
+Desktop.ini?
