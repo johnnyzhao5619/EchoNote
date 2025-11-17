@@ -1,0 +1,218 @@
+{
+  "meta": {
+    "title": "EchoNote | 智能语音转写与日历编排",
+    "description": "EchoNote 是一款隐私优先的开源桌面应用，提供本地语音转写、时间线智能和多日历协作能力。",
+    "version": "v1.2.0",
+    "repo": "https://github.com/your-org/echonote"
+  },
+  "hero": {
+    "eyebrow": "EchoNote v1.2.0",
+    "title": "语音到行动的最快路径",
+    "description": "EchoNote 通过 Faster-Whisper、本地数据库与跨日历同步，将会议语音在数秒内转为准确文本、洞察与任务。所有数据均在设备中处理，满足企业的合规与敏感信息要求。",
+    "actions": [
+      {
+        "label": "获取 EchoNote",
+        "href": "https://github.com/your-org/echonote",
+        "variant": "primary"
+      },
+      {
+        "label": "阅读文档",
+        "href": "https://github.com/your-org/echonote/tree/main/docs",
+        "variant": "secondary"
+      },
+      {
+        "label": "发布版本",
+        "href": "https://github.com/your-org/echonote/releases",
+        "variant": "ghost"
+      }
+    ],
+    "meta": [
+      "桌面端 · PySide6",
+      "多语言界面：English / 中文 / Français",
+      "隐私优先 · 本地计算"
+    ]
+  },
+  "stats": [
+    {
+      "value": "607",
+      "label": "自动化测试",
+      "detail": "涵盖单元、集成与性能三类场景"
+    },
+    {
+      "value": "3",
+      "label": "官方语言",
+      "detail": "English / 中文 / Français"
+    },
+    {
+      "value": "100%",
+      "label": "本地处理",
+      "detail": "语音、转写与日程数据仅保留在设备内"
+    },
+    {
+      "value": "Apache 2.0",
+      "label": "许可协议",
+      "detail": "商用、内部署或二次开发均可"
+    }
+  ],
+  "useCases": [
+    {
+      "title": "会议密集型团队",
+      "description": "为产品、销售与项目团队将多时区会议的录音自动转写，并同步到共享日历。",
+      "highlights": [
+        "批量导入音频文件，统一输出结构化纪要",
+        "时间线智能将重点段落与日程节点关联",
+        "支持 Google Calendar 与 Outlook"
+      ]
+    },
+    {
+      "title": "研究与用户访谈",
+      "description": "将调研访谈实时记录为多语言文本，并在本地加密存储，满足合规要求。",
+      "highlights": [
+        "实时录音转写并保留原音轨",
+        "多语言模型切换，覆盖主流语种",
+        "离线环境下依旧可运行"
+      ]
+    },
+    {
+      "title": "合规与审计",
+      "description": "所有语音资产保存在本地数据库，通过访问控制与日志满足审计需求。",
+      "highlights": [
+        "SQLite + SQLCipher 加密存储（可选）",
+        "事件日志记录每次转写与导出",
+        "版本管理脚本确保可追溯"
+      ]
+    }
+  ],
+  "featureGroups": [
+    {
+      "title": "语音智能",
+      "description": "利用 Faster-Whisper 引擎提供批量与实时转写能力，兼容音频与视频文件。",
+      "items": [
+        {
+          "title": "批量 / 实时",
+          "detail": "同一界面支持长文件导入与实时录制"
+        },
+        {
+          "title": "多语言",
+          "detail": "内置英语、中文、法语界面及模型选择"
+        },
+        {
+          "title": "导出灵活",
+          "detail": "文本、字幕、时间戳与段落摘要一键导出"
+        }
+      ]
+    },
+    {
+      "title": "时间线与日历",
+      "description": "将语音与日程联动，帮助团队自动整理行动项。",
+      "items": [
+        {
+          "title": "Timeline Manager",
+          "detail": "事件与语音片段自动关联"
+        },
+        {
+          "title": "智能提醒",
+          "detail": "根据转写内容建议任务和截止时间"
+        },
+        {
+          "title": "跨日历",
+          "detail": "兼容 Google Calendar 与 Outlook"
+        }
+      ]
+    },
+    {
+      "title": "安全与隐私",
+      "description": "本地优先的设计确保录音、转写与任务全程可控。",
+      "items": [
+        {
+          "title": "本地存储",
+          "detail": "录音目录与数据库路径可配置"
+        },
+        {
+          "title": "加密通道",
+          "detail": "可启用 SQLCipher 与系统级加密"
+        },
+        {
+          "title": "访问控制",
+          "detail": "事件与导出操作全程记录"
+        }
+      ]
+    },
+    {
+      "title": "开发与运维",
+      "description": "保持高质量代码与可观测能力，降低维护成本。",
+      "items": [
+        {
+          "title": "统一脚本",
+          "detail": "scripts/sync_version.py 等工具保持版本一致"
+        },
+        {
+          "title": "测试覆盖",
+          "detail": "607 项自动化测试保障回归"
+        },
+        {
+          "title": "文档体系",
+          "detail": "开发者指南、CI/CD、可访问性等全覆盖"
+        }
+      ]
+    }
+  ],
+  "workflow": {
+    "steps": [
+      {
+        "title": "采集",
+        "description": "选择实时录音或导入音/视频文件，支持 WAV、MP3、MP4 等格式。"
+      },
+      {
+        "title": "转写",
+        "description": "Faster-Whisper 本地推理，结合多语言模型与可调速率设置。"
+      },
+      {
+        "title": "洞察",
+        "description": "时间线智能算法将摘要、重点与任务候选展示在统一视图。"
+      },
+      {
+        "title": "日程",
+        "description": "一键同步到 Google/Outlook 或本地日历，触发提醒与跟进。"
+      }
+    ]
+  },
+  "integrations": [
+    {
+      "name": "Google Calendar",
+      "description": "通过 OAuth 配置，与企业账户日历保持实时同步。",
+      "status": "官方支持"
+    },
+    {
+      "name": "Microsoft Outlook",
+      "description": "兼容 Exchange Online，支持事件创建与更新。",
+      "status": "官方支持"
+    },
+    {
+      "name": "本地事件引擎",
+      "description": "Timeline 与任务调度器使用统一事件模型，方便二次开发。",
+      "status": "核心模块"
+    },
+    {
+      "name": "扩展 API",
+      "description": "通过 scripts 目录与 utils 库快速添加新的转写或导出流程。",
+      "status": "开放扩展"
+    }
+  ],
+  "cta": {
+    "title": "以 1.2.0 版本部署并展示 EchoNote",
+    "description": "克隆仓库后即可本地运行桌面端，同时可直接将 docs/landing 发布到 GitHub Pages 作为团队介绍页。",
+    "actions": [
+      {
+        "label": "部署介绍页指南",
+        "href": "https://github.com/your-org/echonote/tree/main/docs/landing",
+        "variant": "primary"
+      },
+      {
+        "label": "查看 Release Notes",
+        "href": "https://github.com/your-org/echonote/blob/main/RELEASE_NOTES_v1.2.0.md",
+        "variant": "secondary"
+      }
+    ]
+  }
+}
