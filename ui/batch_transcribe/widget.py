@@ -67,6 +67,9 @@ class BatchTranscribeWidget(BaseWidget):
 
     # Signal emitted when a task is added
     task_added = Signal(str)  # task_id
+    # Internal signal for manager events (thread-safe bridge)
+    manager_event = Signal(str, dict)
+
     _CLEAR_QUEUE_MAX_RETRIES = 10
     _CLEAR_QUEUE_RETRY_INTERVAL_MS = 300
 
@@ -111,10 +114,14 @@ class BatchTranscribeWidget(BaseWidget):
         if self.model_manager:
             self.model_manager.models_updated.connect(self._update_model_list)
 
-        # Setup periodic refresh timer
-        self.refresh_timer = QTimer(self)
-        self.refresh_timer.timeout.connect(self._refresh_tasks)
-        self.refresh_timer.start(1000)  # Refresh every second
+        # Connect manager event signal
+        self.manager_event.connect(self._handle_manager_event)
+
+        # Register event listener with manager
+        self.transcription_manager.add_listener(self._on_manager_event_threadsafe)
+
+        # Initial load of tasks
+        self._refresh_tasks()
 
         # Start transcription processing
         logger.info(self.i18n.t("logging.batch_transcribe.starting_task_processing"))
@@ -771,6 +778,7 @@ class BatchTranscribeWidget(BaseWidget):
             # Create and show transcript viewer dialog
             viewer = TranscriptViewerDialog(
                 task_id,
+                self.transcription_manager,
                 db_connection,
                 self.i18n,
                 settings_manager=settings_manager,
@@ -801,9 +809,62 @@ class BatchTranscribeWidget(BaseWidget):
         try:
             if task_id in self.open_viewers:
                 del self.open_viewers[task_id]
-                logger.debug(f"Removed viewer reference for task {task_id}")
+                logger.info(f"Closed viewer for task {task_id}")
         except Exception as e:
             logger.error(f"Error removing viewer reference: {e}")
+
+    def _on_manager_event_threadsafe(self, event_type: str, data: Dict):
+        """
+        Handle manager event from background thread.
+        
+        Emits signal to handle event on main UI thread.
+        
+        Args:
+            event_type: Type of event
+            data: Event data
+        """
+        try:
+            self.manager_event.emit(event_type, data)
+        except Exception as e:
+            logger.error(f"Error emitting manager event: {e}")
+
+    def _handle_manager_event(self, event_type: str, data: Dict):
+        """
+        Handle manager event on main thread.
+        
+        Args:
+            event_type: Type of event
+            data: Event data
+        """
+        try:
+            if event_type == "task_added":
+                task_id = data["id"]
+                if task_id not in self.task_items:
+                    self._add_task_item(data)
+                    self._update_queue_label()
+                    
+            elif event_type == "task_updated":
+                task_id = data["id"]
+                if task_id in self.task_items:
+                    self.task_items[task_id].update_task_data(data)
+                elif task_id not in self.task_items:
+                    # Might happen if we missed the add event or it was filtered
+                    # We can try to fetch the full task data or ignore
+                    pass
+                    
+            elif event_type == "task_deleted":
+                task_id = data["id"]
+                self._remove_task_item(task_id)
+                self._update_queue_label()
+                
+            elif event_type == "processing_paused":
+                self._set_tasks_pause_state(True)
+                
+            elif event_type == "processing_resumed":
+                self._set_tasks_pause_state(False)
+                
+        except Exception as e:
+            logger.error(f"Error handling manager event {event_type}: {e}")
 
     def _on_task_export(self, task_id: str):
         """Handle task export button click."""

@@ -136,7 +136,10 @@ class TranscriptionManager:
         # Progress callbacks (task_id -> callback function)
         self.progress_callbacks: Dict[str, callable] = {}
 
-        # Background thread and event loop for async operations
+        # Global event listeners
+        self.event_listeners: List[Callable[[str, Dict[str, Any]], None]] = []
+
+        # Background thread and event loop for additional async operations
         self._loop = None
         self._thread = None
         self._running = False
@@ -151,6 +154,40 @@ class TranscriptionManager:
         logger.info(
             f"Transcription manager initialized with engine: " f"{speech_engine.get_name()}"
         )
+
+    def add_listener(self, callback: Callable[[str, Dict[str, Any]], None]):
+        """
+        Register a global event listener.
+        
+        Args:
+            callback: Function(event_type: str, data: dict)
+        """
+        if callback not in self.event_listeners:
+            self.event_listeners.append(callback)
+            
+    def remove_listener(self, callback: Callable[[str, Dict[str, Any]], None]):
+        """
+        Unregister a global event listener.
+        
+        Args:
+            callback: Function to remove
+        """
+        if callback in self.event_listeners:
+            self.event_listeners.remove(callback)
+            
+    def _notify_listeners(self, event_type: str, data: Dict[str, Any]):
+        """
+        Notify all listeners of an event.
+        
+        Args:
+            event_type: Type of event (task_added, task_updated, task_deleted)
+            data: Event data
+        """
+        for listener in self.event_listeners:
+            try:
+                listener(event_type, data)
+            except Exception as e:
+                logger.error(f"Error in event listener: {e}")
 
     def _load_persisted_task_engine_options(self) -> None:
         """Load task engine options persisted on disk."""
@@ -305,9 +342,19 @@ class TranscriptionManager:
             self._task_engine_options[task.id] = engine_options
             self._persist_task_engine_options()
 
-        # Add to task queue (schedule in background event loop)
         if not self._queue_or_buffer_task(task.id):
             logger.info(f"Task queue not ready, task {task.id} cached until processing starts")
+
+        # Notify listeners
+        self._notify_listeners(
+            "task_added",
+            {
+                "id": task.id,
+                "file_name": task.file_name,
+                "status": task.status,
+                "created_at": task.created_at,
+            },
+        )
 
         logger.info(f"Added transcription task: {task.id} for file {file_path.name}")
         return task.id
@@ -530,6 +577,8 @@ class TranscriptionManager:
             future = asyncio.run_coroutine_threadsafe(self.task_queue.pause(), self._loop)
             try:
                 future.result(timeout=2.0)
+                # Notify listeners
+                self._notify_listeners("processing_paused", {})
                 logger.info("Paused transcription task processing")
             except Exception as e:
                 logger.error(f"Error pausing task queue: {e}")
@@ -547,6 +596,8 @@ class TranscriptionManager:
             future = asyncio.run_coroutine_threadsafe(self.task_queue.resume(), self._loop)
             try:
                 future.result(timeout=2.0)
+                # Notify listeners
+                self._notify_listeners("processing_resumed", {})
                 logger.info("Resumed transcription task processing")
             except Exception as e:
                 logger.error(f"Error resuming task queue: {e}")
@@ -618,19 +669,20 @@ class TranscriptionManager:
 
         Args:
             task_id: Task identifier
+            cancel_event: Event to check for cancellation
         """
         task: Optional[TranscriptionTask] = None
+
+        def ensure_not_cancelled(stage: str) -> None:
+            if cancel_event.is_set():
+                logger.info(
+                    "Cancellation detected for task %s %s",
+                    task_id,
+                    stage,
+                )
+                raise asyncio.CancelledError()
+
         try:
-
-            def ensure_not_cancelled(stage: str) -> None:
-                if cancel_event.is_set():
-                    logger.info(
-                        "Cancellation detected for task %s %s",
-                        task_id,
-                        stage,
-                    )
-                    raise asyncio.CancelledError()
-
             ensure_not_cancelled("before loading task from database")
 
             # Load task from database
@@ -655,246 +707,174 @@ class TranscriptionManager:
             def progress_callback(progress: float):
                 """Callback for speech engine progress updates."""
                 try:
-                    # Update task progress in database
-                    # Direct SQL update to avoid model overhead in callback
+                    # Update task progress directly in DB to avoid object overhead
                     query = "UPDATE transcription_tasks SET progress = ? WHERE id = ?"
                     self.db.execute(query, (progress, task_id), commit=True)
-                    logger.debug(
-                        f"Task {task_id} progress updated to {progress:.1f}% " f"in database"
-                    )
-
-                    # Notify registered callbacks
+                    
+                    # Notify listeners
                     self._update_progress(task_id, progress, "Transcribing")
                 except Exception as e:
                     logger.error(f"Error updating progress for task {task_id}: {e}", exc_info=True)
 
-            # Call speech engine to transcribe with progress callback
             self._update_progress(task_id, 10.0, "Loading audio file")
 
             # Also update database for 10% progress
             task.progress = 10.0
             task.save(self.db)
-            logger.info(f"Task {task_id} progress set to 10%, starting transcription")
-
-            # Call transcribe_file and log the start
+            
             logger.info(f"Calling speech_engine.transcribe_file for task {task_id}")
             ensure_not_cancelled("before starting transcription")
+
+            # Prepare engine options
             engine_kwargs = dict(self._task_engine_options.get(task_id, {}))
             engine_kwargs["progress_callback"] = progress_callback
+            
+            # Execute transcription
             result = await self.speech_engine.transcribe_file(
                 task.file_path, language=task.language, **engine_kwargs
             )
+            
             ensure_not_cancelled("after completing transcription")
             logger.info(f"Transcription completed for task {task_id}, processing results")
 
-            # Extract audio duration if available
-            if "duration" in result:
-                task.audio_duration = result["duration"]
-
-            # Update progress: saving results
+            # Save results
             ensure_not_cancelled("before saving results")
             self._update_progress(task_id, 90.0, "Saving results")
+            
+            # Use helper to save internal result
+            self._save_internal_result(task_id, result)
 
-            # Save internal format to file system
-            # Note: Storing in file system instead of database to avoid
-            # storing large JSON blobs in the database
-            internal_format_path = self._get_internal_format_path(task_id)
-            internal_format_path_obj = Path(internal_format_path)
-            internal_format_path_obj.parent.mkdir(parents=True, exist_ok=True)
-
-            # Write with secure permissions
-            ensure_not_cancelled("before writing internal transcript")
-            with open(internal_format_path, "w", encoding="utf-8") as f:
-                json.dump(result, f, ensure_ascii=False, indent=2)
-
-            # Set secure file permissions (owner read/write only)
-            import os
-
-            try:
-                os.chmod(internal_format_path, 0o600)
-            except Exception as e:
-                logger.warning(f"Could not set file permissions: {e}")
-
-            # Update task status to completed FIRST
-            # (export_result requires status to be "completed")
+            # Finalize task
             ensure_not_cancelled("before marking task as completed")
-            task.status = "completed"
-            task.completed_at = datetime.now().isoformat()
-            task.progress = 100.0
-            task.save(self.db)
+            self._finalize_task_completion(task, result)
 
-            # Automatically export to default format (TXT)
-            # This ensures output_path is set for the viewer
-            export_succeeded = False
+            # Notify completion
+            self._notify_listeners("task_updated", task.to_dict())
+            self._notify_listeners("task_completed", {"id": task_id})
+
+            # Cleanup engine options
+            if task_id in self._task_engine_options:
+                del self._task_engine_options[task_id]
+                self._persist_task_engine_options()
+
+        except asyncio.CancelledError:
+            logger.info(f"Task {task_id} cancelled")
+            # Update status to cancelled
+            if task:
+                task.status = "cancelled"
+                task.save(self.db)
+                self._notify_listeners("task_updated", task.to_dict())
+                self._notify_listeners("task_cancelled", {"id": task_id})
+            
+            # Use helper to ensure consistent cleanup if needed
+            self._cleanup_after_cancellation(task_id)
+
+        except Exception as e:
+            logger.error(f"Error processing task {task_id}: {e}", exc_info=True)
+            # Update status to failed
+            if task:
+                task.status = "failed"
+                task.error_message = str(e)
+                task.save(self.db)
+                self._notify_listeners("task_updated", task.to_dict())
+                self._notify_listeners("task_failed", {"id": task_id, "error": str(e)})
+
+    def _save_internal_result(self, task_id: str, result: Dict[str, Any]) -> None:
+        """
+        Save transcription result to internal storage with secure permissions.
+        
+        Args:
+            task_id: Task identifier
+            result: Transcription result dictionary
+        """
+        internal_format_path = self._get_internal_format_path(task_id)
+        internal_format_path_obj = Path(internal_format_path)
+        internal_format_path_obj.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(internal_format_path, "w", encoding="utf-8") as f:
+            json.dump(result, f, ensure_ascii=False, indent=2)
+
+        # Set secure file permissions (owner read/write only)
+        try:
+            os.chmod(internal_format_path, 0o600)
+        except Exception as e:
+            logger.warning(f"Could not set file permissions for {internal_format_path}: {e}")
+
+    def _finalize_task_completion(self, task: TranscriptionTask, result: Dict[str, Any]) -> None:
+        """
+        Handle task completion steps: update metadata, status, and trigger export.
+        
+        Args:
+            task: Task object
+            result: Transcription result dictionary
+        """
+        # Extract audio duration if available
+        if "duration" in result:
+            task.audio_duration = result["duration"]
+
+        # Update status
+        task.status = "completed"
+        task.completed_at = datetime.now().isoformat()
+        task.progress = 100.0
+        task.save(self.db)
+
+        # Auto-export logic
+        try:
+            default_format = self._default_output_format
+            if task.output_format:
+                default_format = task.output_format
+
+            # Generate default output path if not set
+            if not task.output_path:
+                source_path = Path(task.file_path)
+                # Use a safe fallback if stem fails
+                stem = source_path.stem if source_path.name else "output"
+                output_filename = f"{stem}.{default_format}"
+                task.output_path = str(source_path.parent / output_filename)
+                task.save(self.db)
+
+            self.export_result(task.id, default_format, task.output_path)
+        except Exception as e:
+            logger.error(f"Failed to auto-export task {task.id}: {e}", exc_info=True)
+            
+            # Fallback export to application-managed directory.
             try:
+                fallback_dir = get_app_dir() / "exports"
+                fallback_dir.mkdir(parents=True, exist_ok=True)
+                # Ensure we have a valid format
                 default_format = self._default_output_format
                 if task.output_format:
                     default_format = task.output_format
-
-                # Generate default output path if not set
-                if not task.output_path:
-                    source_path = Path(task.file_path)
-                    output_filename = f"{source_path.stem}.{default_format}"
-                    if self._default_save_path:
-                        output_dir = Path(self._default_save_path)
-                    else:
-                        output_dir = source_path.parent
-                    output_path = output_dir / output_filename
-                else:
-                    output_path = Path(task.output_path)
-
-                ensure_not_cancelled("before exporting results")
+                    
+                fallback_output = fallback_dir / f"{Path(task.file_path).stem}.{default_format}"
+                
                 self.export_result(
-                    task_id, output_format=default_format, output_path=str(output_path)
+                    task.id,
+                    output_format=default_format,
+                    output_path=str(fallback_output),
                 )
-                logger.info(f"Task {task_id} exported to {output_path}")
-                export_succeeded = True
-            except Exception as export_error:
-                logger.error(f"Failed to export task {task_id}: {export_error}", exc_info=True)
-
-                # Fallback export to application-managed directory.
-                try:
-                    fallback_dir = get_app_dir() / "exports"
-                    fallback_dir.mkdir(parents=True, exist_ok=True)
-                    fallback_output = fallback_dir / f"{Path(task.file_path).stem}.{default_format}"
-                    self.export_result(
-                        task_id,
-                        output_format=default_format,
-                        output_path=str(fallback_output),
-                    )
-                    logger.warning(
-                        "Task %s exported using fallback output path: %s",
-                        task_id,
-                        fallback_output,
-                    )
-                    export_succeeded = True
-                except Exception as fallback_error:
-                    logger.error(
-                        "Fallback export failed for task %s: %s",
-                        task_id,
-                        fallback_error,
-                        exc_info=True,
-                    )
-
-            if not export_succeeded:
-                task.status = "failed"
-                task.error_message = "Failed to export transcription result"
-                task.completed_at = datetime.now().isoformat()
-                task.save(self.db)
-                self._update_progress(task_id, task.progress or 100.0, "Failed: export error")
-                self._send_notification(
-                    "batch_transcribe.notifications.failure",
-                    "error",
-                    message_default="Transcription failed: {filename}\n{error}",
-                    filename=task.file_name,
-                    error="Failed to export transcription result",
+                logger.warning(
+                    "Task %s exported using fallback output path: %s",
+                    task.id,
+                    fallback_output,
                 )
-                return
-
-            # Notify progress: completed
-            self._update_progress(task_id, 100.0, "Completed")
-
-            logger.info(f"Task {task_id} completed successfully")
-
-            # Send completion notification
-            ensure_not_cancelled("before sending completion notification")
-            self._send_notification(
-                "batch_transcribe.notifications.success",
-                "success",
-                message_default="Transcription completed: {filename}",
-                filename=task.file_name,
-            )
-
-        except asyncio.CancelledError:
-            logger.info(f"Task {task_id} cancellation acknowledged, rolling back state")
-
-            refreshed_task: Optional[TranscriptionTask] = None
-            try:
-                refreshed_task = TranscriptionTask.get_by_id(self.db, task_id)
-            except Exception as fetch_error:
+            except Exception as fallback_error:
                 logger.error(
-                    f"Failed to reload task {task_id} during cancellation handling: {fetch_error}",
+                    "Fallback export failed for task %s: %s",
+                    task.id,
+                    fallback_error,
                     exc_info=True,
                 )
+            
+            # We don't fail the task if export fails, but we log it
 
-            task_for_update = refreshed_task or task
-            progress_value = (
-                task_for_update.progress
-                if task_for_update and task_for_update.progress is not None
-                else (task.progress if task and task.progress is not None else 0.0)
-            )
+    def _cleanup_after_cancellation(self, task_id: str) -> None:
+        """Clean up resources after task cancellation."""
+        if task_id in self._task_engine_options:
+            del self._task_engine_options[task_id]
+            self._persist_task_engine_options()
 
-            if task_for_update:
-                task_for_update.status = "cancelled"
-                task_for_update.completed_at = datetime.now().isoformat()
-                task_for_update.error_message = None
-                if task_for_update.progress is None:
-                    task_for_update.progress = progress_value
-                try:
-                    task_for_update.save(self.db)
-                except Exception as save_error:
-                    logger.error(
-                        f"Failed to record cancellation for task {task_id}: {save_error}",
-                        exc_info=True,
-                    )
 
-            self._update_progress(task_id, progress_value, "Cancelled")
-
-            raise
-        except Exception as e:
-            logger.error(f"Task {task_id} failed: {e}", exc_info=True)
-
-            refreshed_task: Optional[TranscriptionTask] = None
-            try:
-                refreshed_task = TranscriptionTask.get_by_id(self.db, task_id)
-            except Exception as fetch_error:
-                logger.error(
-                    f"Failed to reload task {task_id} during error handling: {fetch_error}",
-                    exc_info=True,
-                )
-
-            task_for_update = refreshed_task or task
-            progress_value = (
-                task_for_update.progress
-                if task_for_update and task_for_update.progress is not None
-                else 0.0
-            )
-            file_name = (
-                task_for_update.file_name
-                if task_for_update and task_for_update.file_name
-                else task_id
-            )
-
-            if task_for_update:
-                task_for_update.status = "failed"
-                task_for_update.error_message = str(e)
-                task_for_update.completed_at = datetime.now().isoformat()
-                if task_for_update.progress is None:
-                    task_for_update.progress = progress_value
-                try:
-                    task_for_update.save(self.db)
-                except Exception as save_error:
-                    logger.error(
-                        f"Failed to record failure for task {task_id}: {save_error}", exc_info=True
-                    )
-
-            # Notify progress: failed
-            self._update_progress(task_id, progress_value, f"Failed: {str(e)}")
-
-            # Send failure notification
-            self._send_notification(
-                "batch_transcribe.notifications.failure",
-                "error",
-                message_default="Transcription failed: {filename}\n{error}",
-                filename=file_name,
-                error=str(e),
-            )
-
-            if isinstance(e, TaskNotFoundError):
-                raise
-        finally:
-            if self._task_engine_options.pop(task_id, None) is not None:
-                self._persist_task_engine_options()
 
     def get_task_status(self, task_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -1006,80 +986,7 @@ class TranscriptionManager:
             logger.warning("Task queue not running, cannot retry task")
             return False
 
-    def export_result(self, task_id: str, output_format: str, output_path: str) -> str:
-        """
-        Export transcription result to a file.
 
-        Args:
-            task_id: Task identifier
-            output_format: Output format (txt/srt/md)
-            output_path: Path for output file
-
-        Returns:
-            Path to exported file
-
-        Raises:
-            ValueError: If task not found or not completed
-            FileNotFoundError: If internal format file not found
-        """
-        task = TranscriptionTask.get_by_id(self.db, task_id)
-        if not task:
-            raise ValueError(f"Task {task_id} not found")
-
-        if task.status != "completed":
-            raise ValueError(f"Task {task_id} is not completed (status: {task.status})")
-
-        # Load internal format
-        internal_format_path = self._get_internal_format_path(task_id)
-        if not os.path.exists(internal_format_path):
-            raise FileNotFoundError(f"Internal format file not found for task {task_id}")
-
-        with open(internal_format_path, "r", encoding="utf-8") as f:
-            internal_format = json.load(f)
-
-        # Convert to requested format
-        converted_text = self.format_converter.convert(internal_format, output_format)
-
-        # Write to output file
-        path_obj = Path(output_path).expanduser()
-        try:
-            resolved_output_path = path_obj.resolve()
-        except Exception as exc:
-            logger.error(f"Failed to resolve output path '{path_obj}': {exc}", exc_info=True)
-            raise
-
-        output_dir = resolved_output_path.parent
-        try:
-            output_dir.mkdir(parents=True, exist_ok=True)
-        except Exception as exc:
-            logger.error(f"Failed to create output directory '{output_dir}': {exc}", exc_info=True)
-            raise
-
-        # Set secure directory permissions
-        try:
-            os.chmod(output_dir, 0o700)
-        except Exception as e:
-            logger.warning(f"Could not set directory permissions: {e}")
-
-        with open(resolved_output_path, "w", encoding="utf-8") as f:
-            f.write(converted_text)
-
-        # Set secure file permissions (owner read/write only)
-        try:
-            os.chmod(resolved_output_path, 0o600)
-        except Exception as e:
-            logger.warning(f"Could not set file permissions: {e}")
-
-        # Update task record
-        task.output_path = str(resolved_output_path)
-        task.output_format = output_format
-        task.save(self.db)
-
-        logger.info(
-            f"Exported task {task_id} to {resolved_output_path} " f"in {output_format} format"
-        )
-
-        return str(resolved_output_path)
 
     def get_all_tasks(self, status: Optional[str] = None) -> List[Dict[str, Any]]:
         """
@@ -1153,8 +1060,98 @@ class TranscriptionManager:
         # Delete from database
         task.delete(self.db)
 
+        # Notify listeners
+        self._notify_listeners("task_deleted", {"id": task_id})
+
         logger.info(f"Deleted task {task_id}")
         return True
+
+    def get_task_content(self, task_id: str) -> Dict[str, Any]:
+        """
+        Retrieve the internal structured content of a completed task.
+        
+        Args:
+            task_id: Task identifier
+            
+        Returns:
+            Dictionary containing the task content
+            
+        Raises:
+            TaskNotFoundError: If task or its content file is not found
+            ValueError: If content is invalid
+        """
+        internal_path = self._get_internal_format_path(task_id)
+        if not os.path.exists(internal_path):
+            # Check if task exists in DB to give better error
+            task = TranscriptionTask.get_by_id(self.db, task_id)
+            if not task:
+                raise TaskNotFoundError(f"Task {task_id} not found")
+            raise TaskNotFoundError(f"Content file for task {task_id} not found at {internal_path}")
+            
+        try:
+            with open(internal_path, "r", encoding="utf-8") as f:
+                content = json.load(f)
+                return content
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to decode task content for {task_id}: {e}")
+            raise ValueError(f"Invalid task content format: {e}")
+        except Exception as e:
+            logger.error(f"Error reading task content for {task_id}: {e}")
+            raise
+
+    def export_result(self, task_id: str, output_format: str, output_path: str) -> str:
+        """
+        Export task result to a specific format and path.
+        
+        Args:
+            task_id: Task identifier
+            output_format: Target format (txt, srt, md)
+            output_path: Destination file path
+            
+        Returns:
+            Path to the exported file
+            
+        Raises:
+            TaskNotFoundError: If task content is missing
+            ValueError: If format is unsupported
+            IOError: If writing to file fails
+        """
+        # Validate task state first
+        task = TranscriptionTask.get_by_id(self.db, task_id)
+        if not task:
+            raise TaskNotFoundError(f"Task {task_id} not found")
+
+        if task.status != "completed":
+            raise ValueError(f"Task {task_id} is not completed (status: {task.status})")
+
+        # Get content
+        try:
+            content = self.get_task_content(task_id)
+        except TaskNotFoundError:
+            # Re-raise with context
+            raise TaskNotFoundError(f"Cannot export task {task_id}: content not found")
+            
+        # Convert content
+        try:
+            formatted_content = self.format_converter.convert(content, output_format)
+        except ValueError as e:
+            logger.error(f"Format conversion failed for task {task_id}: {e}")
+            raise
+            
+        # Ensure directory exists
+        path_obj = Path(output_path)
+        path_obj.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Write to file
+        try:
+            with open(output_path, "w", encoding="utf-8") as f:
+                f.write(formatted_content)
+        except Exception as e:
+            logger.error(f"Failed to write exported file to {output_path}: {e}")
+            raise IOError(f"Failed to write export file: {e}")
+            
+        logger.info(f"Exported task {task_id} to {output_format.upper()} at {output_path}")
+        return output_path
 
     def _get_internal_format_path(self, task_id: str) -> str:
         """
@@ -1186,6 +1183,15 @@ class TranscriptionManager:
             except Exception as e:
                 logger.error(f"Error calling progress callback for task {task_id}: {e}")
 
+        # Notify global listeners
+        try:
+            self._notify_listeners(
+                "task_updated", 
+                {"id": task_id, "progress": progress, "status": "processing", "message": message}
+            )
+        except Exception:
+            pass
+            
         logger.debug(f"Task {task_id} progress: {progress:.1f}% - {message}")
 
     def _translate(self, key: str, default: Optional[str] = None, **kwargs) -> str:

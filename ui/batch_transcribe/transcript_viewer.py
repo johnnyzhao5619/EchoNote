@@ -22,7 +22,8 @@ transcription results with full i18n and theme support.
 
 import logging
 import os
-from typing import Optional
+import shutil
+from typing import Optional, Any
 
 from PySide6.QtCore import QSize, Qt, QTimer
 from PySide6.QtGui import QAction, QFont, QKeySequence, QShortcut
@@ -43,7 +44,6 @@ from PySide6.QtWidgets import (
 
 from data.database.models import TranscriptionTask
 from ui.base_widgets import connect_button_with_callback, create_hbox
-from ui.batch_transcribe.file_operations import FileExporter, FileLoadWorker
 from ui.batch_transcribe.search_widget import SearchWidget
 from ui.batch_transcribe.window_state_manager import WindowStateManager
 from utils.i18n import I18nQtManager
@@ -66,6 +66,7 @@ class TranscriptViewerDialog(QDialog):
     def __init__(
         self,
         task_id: str,
+        transcription_manager,
         db_connection,
         i18n: I18nQtManager,
         settings_manager=None,
@@ -76,6 +77,7 @@ class TranscriptViewerDialog(QDialog):
 
         Args:
             task_id: Transcription task ID
+            transcription_manager: Transcription manager instance
             db_connection: Database connection instance
             i18n: Internationalization manager
             settings_manager: Settings manager for theme detection
@@ -87,6 +89,7 @@ class TranscriptViewerDialog(QDialog):
         self.setModal(False)
 
         self.task_id = task_id
+        self.transcription_manager = transcription_manager
         self.db_connection = db_connection
         self.i18n = i18n
         self.settings_manager = settings_manager
@@ -95,10 +98,8 @@ class TranscriptViewerDialog(QDialog):
 
         # Initialize managers
         self.window_state_manager = WindowStateManager(self)
-        self.file_exporter = FileExporter(i18n)
 
         # File loading state
-        self.load_worker = None
         self.progress_dialog = None
         self.transcript_content = ""
 
@@ -116,8 +117,8 @@ class TranscriptViewerDialog(QDialog):
         # Initialize UI first (without content)
         self._init_ui()
 
-        # Start async file loading
-        self._start_async_file_load()
+        # Load content
+        self._load_content()
 
         # Connect signals
         self.i18n.language_changed.connect(self.update_language)
@@ -176,147 +177,20 @@ class TranscriptViewerDialog(QDialog):
             logger.error(f"Database error loading task {self.task_id}: {e}", exc_info=True)
             raise Exception(f"Database error: {str(e)}")
 
-    def _start_async_file_load(self):
-        """Start asynchronous file loading with progress indicator."""
-        output_path = self.task_data.get("output_path")
-
-        # Validate output path
-        if not output_path:
-            error_msg = self.i18n.t("viewer.file_not_found_details")
-            logger.error(f"Task {self.task_id} has no output_path")
-            self._show_error_and_close(error_msg)
-            return
-
-        if not os.path.exists(output_path):
-            error_msg = self.i18n.t("viewer.file_not_found_details")
-            logger.error(f"Transcript file not found: {output_path}")
-            self._show_error_and_close(error_msg)
-            return
-
-        # Check file permissions
-        if not os.access(output_path, os.R_OK):
-            error_msg = self.i18n.t("viewer.file_read_error_permission")
-            logger.error(f"No read permission for file: {output_path}")
-            self._show_error_and_close(error_msg)
-            return
-
+    def _load_content(self):
+        """Load transcript content from internal storage."""
         try:
-            # Check file size to determine if we need progress dialog
-            file_size = os.path.getsize(output_path)
-            show_progress = file_size > 1024 * 1024  # Show for files > 1MB
-
-            if show_progress:
-                # Create progress dialog
-                self.progress_dialog = QProgressDialog(
-                    self.i18n.t("viewer.loading"), self.i18n.t("common.cancel"), 0, 100, self
-                )
-                self.progress_dialog.setWindowTitle(self.i18n.t("viewer.loading_title"))
-                self.progress_dialog.setWindowModality(Qt.WindowModality.WindowModal)
-                self.progress_dialog.setMinimumDuration(0)
-                self.progress_dialog.canceled.connect(self._cancel_file_load)
-
-            # Create and start worker thread
-            self.load_worker = FileLoadWorker(output_path)
-            self.load_worker.finished.connect(self._on_file_loaded)
-            self.load_worker.error.connect(self._on_file_load_error)
-
-            if show_progress:
-                self.load_worker.progress.connect(self.progress_dialog.setValue)
-
-            self.load_worker.start()
-            logger.info(f"Started async loading of {output_path} ({file_size} bytes)")
-
-        except OSError as e:
-            error_msg = self.i18n.t("viewer.file_read_error_details", error=str(e))
-            logger.error(f"OS error accessing file {output_path}: {e}", exc_info=True)
-            self._show_error_and_close(error_msg)
-
-    def _on_file_loaded(self, content: str):
-        """
-        Handle successful file load.
-
-        Args:
-            content: Loaded transcript content
-        """
-        self.transcript_content = content
-
-        # Update text edit with content (optimized for large text)
-        self._set_text_content_optimized(content)
-
-        # Close progress dialog if shown
-        if self.progress_dialog:
-            self.progress_dialog.close()
-            self.progress_dialog = None
-
-        # Clean up worker
-        if self.load_worker:
-            self.load_worker.deleteLater()
-            self.load_worker = None
-
-        logger.info(f"File loaded successfully ({len(content)} characters)")
-
-    def _on_file_load_error(self, error_msg: str):
-        """
-        Handle file load error.
-
-        Args:
-            error_msg: Error message
-        """
-        logger.error(f"File load error: {error_msg}")
-
-        # Close progress dialog if shown
-        if self.progress_dialog:
-            self.progress_dialog.close()
-            self.progress_dialog = None
-
-        # Clean up worker
-        if self.load_worker:
-            self.load_worker.deleteLater()
-            self.load_worker = None
-
-        # Translate error message based on error type
-        translated_msg = self._translate_file_error(error_msg)
-
-        # Show error and close dialog
-        self._show_error_and_close(translated_msg)
-
-    def _translate_file_error(self, error_msg: str) -> str:
-        """
-        Translate file error message to user-friendly localized text.
-
-        Args:
-            error_msg: Raw error message
-
-        Returns:
-            Translated error message
-        """
-        error_lower = error_msg.lower()
-
-        # Check for specific error types
-        if "file not found" in error_lower or "not found" in error_lower:
-            return self.i18n.t("viewer.file_not_found_details")
-        elif "permission denied" in error_lower or "permission" in error_lower:
-            return self.i18n.t("viewer.file_read_error_permission")
-        elif (
-            "invalid file encoding" in error_lower
-            or "unicode" in error_lower
-            or "decode" in error_lower
-        ):
-            return self.i18n.t("viewer.file_format_error_details", error=error_msg)
-        else:
-            # Generic error with details
-            return self.i18n.t("viewer.file_read_error_details", error=error_msg)
-
-    def _cancel_file_load(self):
-        """Cancel ongoing file load operation."""
-        if self.load_worker:
-            self.load_worker.cancel()
-            self.load_worker.wait()
-            self.load_worker.deleteLater()
-            self.load_worker = None
-
-        logger.info(self.i18n.t("logging.batch_transcribe_viewer.file_load_cancelled"))
-        self.close()
+            content_data = self.transcription_manager.get_task_content(self.task_id)
+            
+            # Format content for display (using TXT format logic for now)
+            formatted_text = self.transcription_manager.format_converter.convert(content_data, "txt")
+            
+            self._set_text_content_optimized(formatted_text)
+            self.transcript_content = formatted_text
+            
+        except Exception as e:
+            logger.error(f"Failed to load task content: {e}")
+            self._show_error_and_close(self.i18n.t("viewer.file_read_error_details", error=str(e)))
 
     def _optimize_text_edit(self):
         """
@@ -664,8 +538,6 @@ class TranscriptViewerDialog(QDialog):
                 raise PermissionError(f"No write permission for directory: {output_dir}")
 
             # Check disk space (approximate - at least 1MB free)
-            import shutil
-
             stat = shutil.disk_usage(output_dir)
             if stat.free < 1024 * 1024:  # Less than 1MB free
                 raise OSError(
@@ -792,383 +664,125 @@ class TranscriptViewerDialog(QDialog):
             self.search_widget.hide_search()
         else:
             self.search_widget.show_search()
+    
+    def _text_context_menu_event(self, event):
+        """Handle context menu event for text edit."""
+        menu = self.text_edit.createStandardContextMenu()
+        menu.exec(event.globalPos())
 
     def export_as(self, format: str):
         """
         Export transcript to specified format.
 
         Args:
-            format: Export format ('txt', 'srt', or 'md')
+            format: Target format (txt, srt, md)
         """
-        logger.debug(f"Export as {format} requested")
-
-        try:
-            # Get default filename
-            base_name = os.path.splitext(self.task_data["file_name"])[0]
-            default_filename = f"{base_name}.{format}"
-
-            # Set up file dialog
-            file_dialog = QFileDialog(self)
-            file_dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
-            file_dialog.setDefaultSuffix(format)
-
-            # Set file filter based on format
-            filters = {
-                "txt": self.i18n.t("viewer.export_txt") + " (*.txt)",
-                "srt": self.i18n.t("viewer.export_srt") + " (*.srt)",
-                "md": self.i18n.t("viewer.export_md") + " (*.md)",
-            }
-            file_dialog.setNameFilter(filters.get(format, ""))
-            file_dialog.selectFile(default_filename)
-
-            # Show dialog and get selected file
-            if file_dialog.exec() != QFileDialog.DialogCode.Accepted:
-                logger.debug("Export cancelled by user")
-                return
-
-            save_path = file_dialog.selectedFiles()[0]
-            logger.info(f"Exporting to {save_path} as {format}")
-
-            # Get current content (edited or original)
-            content = self.text_edit.toPlainText()
-
-            # Export based on format (shared implementation in file_operations)
-            exporters = {
-                "txt": self.file_exporter.export_txt,
-                "srt": self.file_exporter.export_srt,
-                "md": self.file_exporter.export_md,
-            }
-            export_func = exporters.get(format)
-            if export_func is None:
-                raise ValueError(f"Unsupported export format: {format}")
-            export_func(save_path, content)
-
-            # Show success notification
-            self.show_info(
-                self.i18n.t("common.success"),
-                self.i18n.t("viewer.export_success", format=format.upper()),
-            )
-
-            logger.info(f"Successfully exported to {save_path}")
-
-        except Exception as e:
-            logger.error(f"Export failed: {e}", exc_info=True)
-            self._show_export_error(format, str(e))
-
-    def _show_export_error(self, format: str, error_msg: str):
-        """
-        Show export error dialog with retry option and user-friendly message.
-
-        Args:
-            format: Export format that failed
-            error_msg: Error message
-        """
-        # Create custom message box with retry option
-        msg_box = QMessageBox(self)
-        msg_box.setIcon(QMessageBox.Icon.Critical)
-        msg_box.setWindowTitle(self.i18n.t("common.error"))
-
-        # Use translated error message if available, otherwise show generic error
-        if error_msg:
-            msg_box.setText(error_msg)
-        else:
-            msg_box.setText(self.i18n.t("viewer.export_error"))
-
-        # Add detailed text for technical details
-        msg_box.setDetailedText(f"Export format: {format.upper()}\nError: {error_msg}")
-
-        # Add buttons
-        retry_button = msg_box.addButton(
-            self.i18n.t("viewer.export_retry"), QMessageBox.ButtonRole.AcceptRole
+        # Generate default export path
+        original_name = self.task_data.get("file_name", "transcript")
+        base_name = os.path.splitext(original_name)[0]
+        
+        # Infer extension from format
+        extension = format.lower()
+        default_name = f"{base_name}.{extension}"
+        
+        # Open file dialog
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            self.i18n.t("viewer.export_title"),
+            default_name,
+            f"{format.upper()} (*.{extension})",
         )
-        msg_box.addButton(self.i18n.t("common.cancel"), QMessageBox.ButtonRole.RejectRole)
-
-        msg_box.setDefaultButton(retry_button)
-        msg_box.exec()
-
-        # Check which button was clicked
-        if msg_box.clickedButton() == retry_button:
-            # User wants to retry
-            logger.info(f"User chose to retry export as {format}")
-            self.export_as(format)
-        else:
-            # User cancelled
-            logger.info(f"User cancelled export as {format}")
-
-    def copy_all(self):
-        """
-        Copy all transcript content to clipboard.
-
-        Copies the complete transcript text including timestamps (if present)
-        to the system clipboard and shows a temporary notification.
-        """
+        
+        if not file_path:
+            return
+            
         try:
-            # Get all text content
-            content = self.text_edit.toPlainText()
-
-            # Copy to clipboard
-            clipboard = QApplication.clipboard()
-            clipboard.setText(content)
-
-            # Show temporary notification
-            self._show_copy_notification()
-
-            logger.info(
-                self.i18n.t("logging.batch_transcribe_viewer.copied_all_transcript_to_clipboard")
+            # Use manager to export (which uses structured data)
+            self.transcription_manager.export_result(self.task_id, format, file_path)
+            
+            self.show_info(
+                self.i18n.t("common.success"), 
+                self.i18n.t("viewer.export_success", path=file_path)
+            )
+            
+        except Exception as e:
+            logger.error(f"Export failed: {e}")
+            self.show_error(
+                self.i18n.t("viewer.export_error"), 
+                str(e)
             )
 
-        except Exception as e:
-            logger.error(f"Failed to copy to clipboard: {e}")
-            self.show_warning(self.i18n.t("common.error"), self.i18n.t("viewer.copy_error"))
+    def show_info(self, title: str, message: str):
+        """Show info message box."""
+        QMessageBox.information(self, title, message)
 
-    def _show_copy_notification(self):
-        """
-        Show temporary notification that content was copied.
-
-        Displays a brief message box that auto-closes after 1.5 seconds.
-        """
-        # Create a simple message box
-        msg_box = QMessageBox(self)
-        msg_box.setIcon(QMessageBox.Icon.Information)
-        msg_box.setWindowTitle(self.i18n.t("common.success"))
-        msg_box.setText(self.i18n.t("viewer.copied"))
-        msg_box.setStandardButtons(QMessageBox.StandardButton.NoButton)
-
-        # Show the message box
-        msg_box.show()
-
-        # Auto-close after 1.5 seconds
-        QTimer.singleShot(1500, msg_box.close)
-
-        logger.debug("Showing copy notification")
-
-    def _text_context_menu_event(self, event):
-        """
-        Handle context menu event for text edit widget.
-
-        Creates a custom context menu with Copy and Select All options.
-
-        Args:
-            event: QContextMenuEvent
-        """
-        # Create context menu
-        context_menu = QMenu(self)
-
-        # Copy action (only enabled if text is selected)
-        copy_action = QAction(self.i18n.t("common.copy"), self)
-        copy_action.setShortcut(QKeySequence.StandardKey.Copy)
-        copy_action.triggered.connect(self.text_edit.copy)
-        copy_action.setEnabled(self.text_edit.textCursor().hasSelection())
-        context_menu.addAction(copy_action)
-
-        # Select All action
-        select_all_action = QAction(self.i18n.t("viewer.select_all"), self)
-        select_all_action.setShortcut(QKeySequence.StandardKey.SelectAll)
-        select_all_action.triggered.connect(self.text_edit.selectAll)
-        context_menu.addAction(select_all_action)
-
-        # Show menu at cursor position
-        context_menu.exec(event.globalPos())
-
-        logger.debug("Context menu shown")
+    def show_error(self, title: str, message: str):
+        """Show error message box."""
+        QMessageBox.critical(self, title, message)
+    
+    def _show_error_and_close(self, message: str):
+        """Show error and close dialog."""
+        self.show_error(self.i18n.t("common.error"), message)
+        self.close()
 
     def update_language(self):
-        """Update UI text with current language translations."""
+        """Update interface language."""
         # Window title
         self.setWindowTitle(self.i18n.t("viewer.title", filename=self.task_data["file_name"]))
-
-        # Metadata labels
-        self.duration_label.setText(
-            self.i18n.t("viewer.metadata.duration") + f": {self.duration_value}"
-        )
-        self.language_label.setText(
-            self.i18n.t("viewer.metadata.language") + f": {self.language_value}"
-        )
-        self.engine_label.setText(self.i18n.t("viewer.metadata.engine") + f": {self.engine_value}")
-        self.completed_label.setText(
-            self.i18n.t("viewer.metadata.completed") + f": {self.completed_value}"
-        )
-
+        
         # Toolbar buttons
-        if self.is_edit_mode:
-            self.edit_button.setText(self.i18n.t("common.save"))
-        else:
-            self.edit_button.setText(self.i18n.t("common.edit"))
-
-        self.export_button.setText(self.i18n.t("viewer.export"))
-        self.copy_button.setText(self.i18n.t("viewer.copy_all"))
-        self.search_button.setText(self.i18n.t("viewer.search"))
-
-        # Update export menu items
+        if self.edit_button:
+            self.edit_button.setText(
+                self.i18n.t("common.save") if self.is_edit_mode else self.i18n.t("common.edit")
+            )
+        if self.copy_button:
+            self.copy_button.setText(self.i18n.t("common.copy_all"))
+        if self.export_button:
+            self.export_button.setText(self.i18n.t("common.export"))
+        if self.search_button:
+            self.search_button.setText(self.i18n.t("common.search"))
+            
+        # Export menu actions
         if hasattr(self, "export_txt_action"):
             self.export_txt_action.setText(self.i18n.t("viewer.export_txt"))
         if hasattr(self, "export_srt_action"):
             self.export_srt_action.setText(self.i18n.t("viewer.export_srt"))
         if hasattr(self, "export_md_action"):
             self.export_md_action.setText(self.i18n.t("viewer.export_md"))
+            
+        # Update metadata labels
+        self._update_metadata_content()
+        self.duration_label.setText(f"{self.i18n.t('viewer.duration')}: {self.duration_value}")
+        self.language_label.setText(f"{self.i18n.t('viewer.language')}: {self.language_value}")
+        self.engine_label.setText(f"{self.i18n.t('viewer.engine')}: {self.engine_value}")
+        self.completed_label.setText(f"{self.i18n.t('viewer.completed')}: {self.completed_value}")
 
-        logger.debug("Language updated")
+    def _on_setting_changed(self, key: str, value: Any):
+        """Handle setting changes."""
+        # For now, we only care about theme changes which might be handled globally 
+        # or by the SearchWidget, but we can add specific handling here if needed.
+        pass
 
-    def _on_setting_changed(self, key: str, value):
-        """
-        Handle setting changes.
+    def copy_all(self):
+        """Copy all text to clipboard."""
+        if self.text_edit:
+            text = self.text_edit.toPlainText()
+            clipboard = QApplication.clipboard()
+            clipboard.setText(text)
+            
+            # Show temporary feedback
+            original_text = self.copy_button.text()
+            self.copy_button.setText(self.i18n.t("common.copied"))
+            self.copy_button.setEnabled(False)
+            
+            QTimer.singleShot(2000, lambda: self._reset_copy_button(original_text))
 
-        Args:
-            key: Setting key that changed
-            value: New value
-        """
-        if key == "ui.theme":
-            # Theme changed, apply new theme
-            self.apply_theme(value)
-            logger.debug(f"Theme setting changed to: {value}")
-
-    def apply_theme(self, theme: str = None):
-        """
-        Apply theme to the viewer.
-
-        This method is called when the application theme changes.
-        Since QSS is applied globally, most styling is automatic.
-        We only need to update dynamic elements like search highlights.
-
-        Args:
-            theme: Theme name ('light', 'dark', or 'system')
-                   If None, detects current theme from settings
-        """
-        try:
-            # Detect current theme if not provided
-            if theme is None and self.settings_manager:
-                theme = self.settings_manager.get_setting("ui.theme")
-                if theme == "system":
-                    theme = self._detect_system_theme()
-
-            # Update search widget highlight colors
-            if hasattr(self, "search_widget") and self.search_widget:
-                self.search_widget.update_highlight_color()
-
-            logger.debug(f"Theme applied to transcript viewer: {theme}")
-
-        except Exception as e:
-            logger.error(f"Error applying theme: {e}")
-
-    def _detect_system_theme(self) -> str:
-        """
-        Detect system theme preference.
-
-        Returns:
-            'light' or 'dark'
-        """
-        try:
-            import platform
-
-            system = platform.system()
-
-            if system == "Darwin":  # macOS
-                import subprocess
-
-                result = subprocess.run(
-                    ["defaults", "read", "-g", "AppleInterfaceStyle"],
-                    capture_output=True,
-                    text=True,
-                )
-                if result.returncode == 0 and "Dark" in result.stdout:
-                    return "dark"
-                return "light"
-
-            elif system == "Windows":  # Windows
-                try:
-                    import winreg
-
-                    registry = winreg.ConnectRegistry(None, winreg.HKEY_CURRENT_USER)
-                    key = winreg.OpenKey(
-                        registry, r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"
-                    )
-                    value, _ = winreg.QueryValueEx(key, "AppsUseLightTheme")
-                    winreg.CloseKey(key)
-                    return "light" if value == 1 else "dark"
-                except Exception:
-                    return "light"
-
-            else:
-                # Default to light for other systems
-                return "light"
-
-        except Exception as e:
-            logger.warning(f"Could not detect system theme: {e}")
-            return "light"
-
-    def closeEvent(self, event):
-        """
-        Handle window close event with cleanup.
-
-        Args:
-            event: QCloseEvent
-        """
-        # Cancel any ongoing file load
-        if self.load_worker and self.load_worker.isRunning():
-            self.load_worker.cancel()
-            self.load_worker.wait()
-
-        # Save window state before closing using WindowStateManager
-        self.window_state_manager.save_window_state()
-
-        if self.is_modified:
-            # Show unsaved changes dialog
-            reply = QMessageBox.question(
-                self,
-                self.i18n.t("viewer.unsaved_title"),
-                self.i18n.t("viewer.unsaved_message"),
-                QMessageBox.StandardButton.Save
-                | QMessageBox.StandardButton.Discard
-                | QMessageBox.StandardButton.Cancel,
-                QMessageBox.StandardButton.Save,
-            )
-
-            if reply == QMessageBox.StandardButton.Save:
-                self.save_changes()
-                self._cleanup_resources()
-                event.accept()
-                super().closeEvent(event)
-            elif reply == QMessageBox.StandardButton.Discard:
-                self._cleanup_resources()
-                event.accept()
-                super().closeEvent(event)
-            else:
-                event.ignore()
-        else:
-            self._cleanup_resources()
-            event.accept()
-            super().closeEvent(event)
-
-    def _cleanup_resources(self):
-        """
-        Clean up resources before closing.
-
-        Frees memory by clearing text content and undo stacks.
-        """
-        try:
-            # Clear text content to free memory (only if text_edit exists)
-            if self.text_edit is not None:
-                self.text_edit.clear()
-
-                # Clear undo/redo stacks
-                self.text_edit.document().clearUndoRedoStacks()
-
-            # Clear search widget cache
-            if hasattr(self, "search_widget"):
-                self.search_widget.clear_highlights()
-
-            logger.debug("Resources cleaned up")
-        except Exception as e:
-            logger.error(f"Error during cleanup: {e}")
-
-    def _show_error_and_close(self, message: str):
-        """
-        Show error message and close dialog.
-
-        Args:
-            message: Error message to display
-        """
-        QMessageBox.critical(
-            self.parent() if self.parent() else None, self.i18n.t("common.error"), message
-        )
-        self.close()
+    def _reset_copy_button(self, text: str):
+        """Reset copy button text."""
+        if self.copy_button:
+            try:
+                self.copy_button.setText(text)
+                self.copy_button.setEnabled(True)
+            except RuntimeError:
+                # Widget might be deleted
+                pass

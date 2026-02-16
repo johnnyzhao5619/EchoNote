@@ -61,12 +61,9 @@ class FormatConverter:
             )
 
         # Validate data
-        if not internal_format or "segments" not in internal_format:
-            raise ValueError("Invalid format: missing 'segments' key")
+        self._validate_internal_format(internal_format)
 
-        segments = internal_format["segments"]
-        if not segments:
-            raise ValueError("Empty segments list")
+        segments = internal_format.get("segments", [])
 
         # Convert based on format
         if output_format == "txt":
@@ -75,6 +72,29 @@ class FormatConverter:
             return self._to_srt(segments)
         elif output_format == "md":
             return self._to_md(segments)
+        
+        return ""
+
+    def _validate_internal_format(self, internal_format: dict) -> None:
+        """
+        Validate the internal format dictionary.
+        
+        Args:
+            internal_format: Dictionary to validate
+            
+        Raises:
+            ValueError: If validation fails
+        """
+        if not internal_format:
+            raise ValueError("Input data is empty")
+            
+        if not isinstance(internal_format, dict):
+            raise ValueError("Input must be a dictionary")
+            
+        if "segments" not in internal_format:
+            # We allow empty segments list, but key must exist or at least be implied
+            # But strict validation is safer
+            logger.warning("Input missing 'segments' key, assuming empty")
 
     def _to_txt(self, segments: List[Dict]) -> str:
         """
@@ -101,15 +121,6 @@ class FormatConverter:
         """
         Convert to SRT subtitle format.
 
-        Format:
-        1
-        00:00:00,000 --> 00:00:02,500
-        Hello world
-
-        2
-        00:00:02,500 --> 00:00:05,000
-        This is a test
-
         Args:
             segments: List of segment dicts
 
@@ -128,6 +139,10 @@ class FormatConverter:
             start_time = segment.get("start", 0.0)
             end_time = segment.get("end", 0.0)
 
+            # Ensure valid timestamps
+            if end_time < start_time:
+                end_time = start_time
+
             # Format timestamps
             start_ts = self._format_timestamp_srt(start_time)
             end_ts = self._format_timestamp_srt(end_time)
@@ -144,13 +159,6 @@ class FormatConverter:
     def _to_md(self, segments: List[Dict]) -> str:
         """
         Convert to Markdown format with timestamp markers.
-
-        Format:
-        ## Transcription
-
-        **[00:00:00]** Hello world
-
-        **[00:00:02]** This is a test
 
         Args:
             segments: List of segment dicts
@@ -180,38 +188,40 @@ class FormatConverter:
     def _format_timestamp_srt(self, seconds: float) -> str:
         """
         Format timestamp for SRT format (HH:MM:SS,mmm).
-
+        
         Args:
             seconds: Time in seconds
-
+            
         Returns:
             Formatted timestamp string
         """
-        from config.constants import MILLISECONDS_PER_SECOND, SECONDS_PER_HOUR, SECONDS_PER_MINUTE
+        # Handle invalid input
+        if seconds < 0:
+            seconds = 0.0
+            
+        hours = int(seconds // 3600)
+        minutes = int((seconds % 3600) // 60)
+        secs = int(seconds % 60)
+        milliseconds = int((seconds % 1) * 1000)
 
-        hours = int(seconds // SECONDS_PER_HOUR)
-        minutes = int((seconds % SECONDS_PER_HOUR) // SECONDS_PER_MINUTE)
-        secs = int(seconds % SECONDS_PER_MINUTE)
-        milliseconds = int((seconds % 1) * MILLISECONDS_PER_SECOND)
-
-        from config.constants import SRT_TIMESTAMP_FORMAT
-
-        return SRT_TIMESTAMP_FORMAT.format(hours, minutes, secs, milliseconds)
+        return f"{hours:02d}:{minutes:02d}:{secs:02d},{milliseconds:03d}"
 
     def _format_timestamp_md(self, seconds: float) -> str:
         """
         Format timestamp for Markdown format (HH:MM:SS).
-
+        
         Args:
             seconds: Time in seconds
-
+            
         Returns:
             Formatted timestamp string
         """
-        from config.constants import MARKDOWN_TIMESTAMP_FORMAT, SECONDS_PER_HOUR, SECONDS_PER_MINUTE
+        # Handle invalid input
+        if seconds < 0:
+            seconds = 0.0
+            
+        hours = int(seconds // 3600)
+        minutes = int((seconds % 3600) // 60)
+        secs = int(seconds % 60)
 
-        hours = int(seconds // SECONDS_PER_HOUR)
-        minutes = int((seconds % SECONDS_PER_HOUR) // SECONDS_PER_MINUTE)
-        secs = int(seconds % SECONDS_PER_MINUTE)
-
-        return MARKDOWN_TIMESTAMP_FORMAT.format(hours, minutes, secs)
+        return f"{hours:02d}:{minutes:02d}:{secs:02d}"

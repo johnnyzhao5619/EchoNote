@@ -423,7 +423,7 @@ class TestTranscriptionManager:
 
     def test_export_result_task_not_found(self, manager):
         """Test exporting result for nonexistent task."""
-        with pytest.raises(ValueError, match="not found"):
+        with pytest.raises(TaskNotFoundError):
             manager.export_result("nonexistent-id", "txt", "/tmp/output.txt")
 
     def test_export_result_task_not_completed(self, manager, temp_audio_file):

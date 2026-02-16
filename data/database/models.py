@@ -82,6 +82,26 @@ class TranscriptionTask:
             completed_at=row["completed_at"],
         )
 
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert task to dictionary."""
+        return {
+            "id": self.id,
+            "file_path": self.file_path,
+            "file_name": self.file_name,
+            "file_size": self.file_size,
+            "audio_duration": self.audio_duration,
+            "status": self.status,
+            "progress": self.progress,
+            "language": self.language,
+            "engine": self.engine,
+            "output_format": self.output_format,
+            "output_path": self.output_path,
+            "error_message": self.error_message,
+            "created_at": self.created_at,
+            "started_at": self.started_at,
+            "completed_at": self.completed_at,
+        }
+
     def save(self, db_connection):
         """Save or update task in database."""
         query = """

@@ -75,10 +75,10 @@ class TestBatchTranscribeWidget:
         assert isinstance(widget.open_viewers, dict)
         assert len(widget.open_viewers) == 0
 
-    def test_refresh_timer_started(self, widget):
-        """Test refresh timer is started."""
-        assert hasattr(widget, "refresh_timer")
-        assert widget.refresh_timer.isActive()
+    def test_manager_listener_registered(self, widget, mock_transcription_manager):
+        """Test manager event listener is registered."""
+        # Verify add_listener was called with the thread-safe handler
+        mock_transcription_manager.add_listener.assert_called_with(widget._on_manager_event_threadsafe)
 
     def test_transcription_manager_started(self, widget, mock_transcription_manager):
         """Test transcription manager processing is started."""
@@ -196,6 +196,73 @@ class TestBatchTranscribeWidget:
         mock_transcription_manager.export_result.assert_called_once_with(
             "task-1", "srt", "/tmp/sample_export.srt"
         )
+    
+    @patch("ui.batch_transcribe.transcript_viewer.TranscriptViewerDialog")
+    def test_view_task_opens_dialog(self, mock_dialog_class, widget, mock_transcription_manager):
+        """View task should open TranscriptViewerDialog with manager."""
+        mock_transcription_manager.db = MagicMock()
+        
+        # Test the method
+        widget._on_task_view("task-1")
+        
+        # Verify dialog created with correct args: task_id, manager, db, i18n...
+        mock_dialog_class.assert_called_once()
+        args, _ = mock_dialog_class.call_args
+        assert args[0] == "task-1"
+        assert args[1] == mock_transcription_manager
+        
+        # Verify show was called
+        mock_dialog_class.return_value.show.assert_called_once()
+    
+    def test_handle_task_added_event(self, widget):
+        """Test handling task_added event."""
+        task_data = {"id": "new-task", "status": "pending", "file_name": "test.mp3"}
+        
+        # Simulate event
+        widget._handle_manager_event("task_added", task_data)
+        
+        # Verify task item added
+        assert "new-task" in widget.task_items
+        assert widget.task_list.count() == 1
+        
+    def test_handle_task_updated_event(self, widget):
+        """Test handling task_updated event."""
+        # Add initial task
+        task_data = {"id": "task-1", "status": "pending", "file_name": "test.mp3"}
+        widget._add_task_item(task_data)
+        
+        # Simulate update event
+        update_data = {"id": "task-1", "status": "processing", "progress": 50.0}
+        
+        # Mock item update method
+        with patch.object(widget.task_items["task-1"], "update_task_data") as mock_update:
+            widget._handle_manager_event("task_updated", update_data)
+            mock_update.assert_called_once_with(update_data)
+            
+    def test_handle_task_deleted_event(self, widget):
+        """Test handling task_deleted event."""
+        # Add initial task
+        task_data = {"id": "task-1", "status": "pending", "file_name": "test.mp3"}
+        widget._add_task_item(task_data)
+        
+        # Simulate delete event
+        widget._handle_manager_event("task_deleted", {"id": "task-1"})
+        
+        # Verify task removed
+        assert "task-1" not in widget.task_items
+        assert widget.task_list.count() == 0
+        
+    def test_handle_pause_resume_events(self, widget):
+        """Test handling pause and resume events."""
+        # Simulate pause
+        with patch.object(widget, "_set_tasks_pause_state") as mock_set_pause:
+            widget._handle_manager_event("processing_paused", {})
+            mock_set_pause.assert_called_with(True)
+            
+        # Simulate resume
+        with patch.object(widget, "_set_tasks_pause_state") as mock_set_pause:
+            widget._handle_manager_event("processing_resumed", {})
+            mock_set_pause.assert_called_with(False)
 
 
 class TestBatchTranscribeWidgetWithoutModelManager:
