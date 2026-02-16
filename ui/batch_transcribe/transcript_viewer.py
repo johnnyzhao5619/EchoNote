@@ -41,12 +41,10 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from core.transcription.format_converter import FormatConverter
 from data.database.models import TranscriptionTask
 from ui.base_widgets import connect_button_with_callback, create_hbox
 from ui.batch_transcribe.file_operations import FileExporter, FileLoadWorker
 from ui.batch_transcribe.search_widget import SearchWidget
-from ui.batch_transcribe.theme_manager import TranscriptViewerThemeManager
 from ui.batch_transcribe.window_state_manager import WindowStateManager
 from utils.i18n import I18nQtManager
 
@@ -97,7 +95,6 @@ class TranscriptViewerDialog(QDialog):
 
         # Initialize managers
         self.window_state_manager = WindowStateManager(self)
-        self.theme_manager = TranscriptViewerThemeManager(self, settings_manager)
         self.file_exporter = FileExporter(i18n)
 
         # File loading state
@@ -835,13 +832,16 @@ class TranscriptViewerDialog(QDialog):
             # Get current content (edited or original)
             content = self.text_edit.toPlainText()
 
-            # Export based on format
-            if format == "txt":
-                self._export_txt(save_path, content)
-            elif format == "srt":
-                self._export_srt(save_path, content)
-            elif format == "md":
-                self._export_md(save_path, content)
+            # Export based on format (shared implementation in file_operations)
+            exporters = {
+                "txt": self.file_exporter.export_txt,
+                "srt": self.file_exporter.export_srt,
+                "md": self.file_exporter.export_md,
+            }
+            export_func = exporters.get(format)
+            if export_func is None:
+                raise ValueError(f"Unsupported export format: {format}")
+            export_func(save_path, content)
 
             # Show success notification
             self.show_info(
@@ -854,346 +854,6 @@ class TranscriptViewerDialog(QDialog):
         except Exception as e:
             logger.error(f"Export failed: {e}", exc_info=True)
             self._show_export_error(format, str(e))
-
-    def _export_txt(self, save_path: str, content: str):
-        """
-        Export as plain text (remove timestamps if present).
-
-        Args:
-            save_path: Path to save the file
-            content: Text content to export
-
-        Raises:
-            PermissionError: If file cannot be written due to permissions
-            OSError: If disk is full or other OS error
-            IOError: If file cannot be written
-        """
-        try:
-            # Validate content
-            if not content or not content.strip():
-                raise ValueError(self.i18n.t("exceptions.batch_transcribe_viewer.content_is_empty"))
-
-            # Check directory exists
-            save_dir = os.path.dirname(save_path)
-            if save_dir and not os.path.exists(save_dir):
-                raise FileNotFoundError(f"Directory does not exist: {save_dir}")
-
-            # Check write permission
-            if os.path.exists(save_path) and not os.access(save_path, os.W_OK):
-                raise PermissionError(f"No write permission for file: {save_path}")
-
-            # Check directory write permission if file doesn't exist
-            if not os.path.exists(save_path):
-                check_dir = save_dir if save_dir else "."
-                if not os.access(check_dir, os.W_OK):
-                    raise PermissionError(f"No write permission for directory: {check_dir}")
-
-            # Check disk space
-            import shutil
-
-            stat = shutil.disk_usage(save_dir if save_dir else ".")
-            if stat.free < 1024 * 1024:  # Less than 1MB free
-                raise OSError(
-                    self.i18n.t("exceptions.batch_transcribe_viewer.insufficient_disk_space")
-                )
-
-            # Remove timestamp markers like [00:00:15] if present
-            import re
-
-            lines = content.split("\n")
-            clean_lines = []
-
-            for line in lines:
-                # Remove timestamp pattern [HH:MM:SS] or [MM:SS]
-                clean_line = re.sub(r"\[\d{1,2}:\d{2}(?::\d{2})?\]\s*", "", line)
-                if clean_line.strip():
-                    clean_lines.append(clean_line.strip())
-
-            # Write to file
-            with open(save_path, "w", encoding="utf-8") as f:
-                f.write("\n".join(clean_lines))
-
-            logger.debug(f"Exported {len(clean_lines)} lines as TXT")
-
-        except PermissionError as e:
-            logger.error(f"Permission error writing TXT file: {e}", exc_info=True)
-            raise PermissionError(self.i18n.t("viewer.export_error_permission"))
-        except OSError as e:
-            logger.error(f"OS error writing TXT file: {e}", exc_info=True)
-            if "disk" in str(e).lower() or "space" in str(e).lower():
-                raise OSError(self.i18n.t("viewer.export_error_disk_full"))
-            else:
-                raise OSError(self.i18n.t("viewer.export_error_details", error=str(e)))
-        except ValueError as e:
-            logger.error(f"Invalid content for TXT export: {e}")
-            raise ValueError(self.i18n.t("viewer.export_error_invalid_content"))
-        except Exception as e:
-            logger.error(f"Unexpected error in TXT export: {e}", exc_info=True)
-            raise Exception(self.i18n.t("viewer.export_error_details", error=str(e)))
-
-    def _export_srt(self, save_path: str, content: str):
-        """
-        Export as SRT subtitle format.
-
-        Args:
-            save_path: Path to save the file
-            content: Text content to export
-
-        Raises:
-            PermissionError: If file cannot be written due to permissions
-            OSError: If disk is full or other OS error
-            ValueError: If content cannot be parsed
-            IOError: If file cannot be written
-        """
-        try:
-            # Validate content
-            if not content or not content.strip():
-                raise ValueError(self.i18n.t("exceptions.batch_transcribe_viewer.content_is_empty"))
-
-            # Check directory exists
-            save_dir = os.path.dirname(save_path)
-            if save_dir and not os.path.exists(save_dir):
-                raise FileNotFoundError(f"Directory does not exist: {save_dir}")
-
-            # Check write permission
-            if os.path.exists(save_path) and not os.access(save_path, os.W_OK):
-                raise PermissionError(f"No write permission for file: {save_path}")
-
-            # Check directory write permission if file doesn't exist
-            if not os.path.exists(save_path):
-                check_dir = save_dir if save_dir else "."
-                if not os.access(check_dir, os.W_OK):
-                    raise PermissionError(f"No write permission for directory: {check_dir}")
-
-            # Check disk space
-            import shutil
-
-            stat = shutil.disk_usage(save_dir if save_dir else ".")
-            if stat.free < 1024 * 1024:  # Less than 1MB free
-                raise OSError("Insufficient disk space")
-
-            # Parse content to extract segments with timestamps
-            segments = self._parse_transcript_content(content)
-
-            if not segments:
-                # If no timestamps found, create simple segments
-                logger.warning(
-                    self.i18n.t(
-                        "logging.batch_transcribe_viewer.no_timestamps_found_creating_basic_srt"
-                    )
-                )
-                segments = self._create_basic_segments(content)
-
-            if not segments:
-                raise ValueError("No content to export")
-
-            # Use FormatConverter to generate SRT
-            converter = FormatConverter()
-            srt_content = converter._to_srt(segments)
-
-            # Write to file
-            with open(save_path, "w", encoding="utf-8") as f:
-                f.write(srt_content)
-
-            logger.debug(f"Exported {len(segments)} segments as SRT")
-
-        except PermissionError as e:
-            logger.error(f"Permission error writing SRT file: {e}", exc_info=True)
-            raise PermissionError(self.i18n.t("viewer.export_error_permission"))
-        except OSError as e:
-            logger.error(f"OS error writing SRT file: {e}", exc_info=True)
-            if "disk" in str(e).lower() or "space" in str(e).lower():
-                raise OSError(self.i18n.t("viewer.export_error_disk_full"))
-            else:
-                raise OSError(self.i18n.t("viewer.export_error_details", error=str(e)))
-        except ValueError as e:
-            logger.error(f"Invalid content for SRT export: {e}")
-            raise ValueError(self.i18n.t("viewer.export_error_invalid_content"))
-        except Exception as e:
-            logger.error(f"Unexpected error in SRT export: {e}", exc_info=True)
-            raise Exception(self.i18n.t("viewer.export_error_details", error=str(e)))
-
-    def _parse_transcript_content(self, content: str):
-        """
-        Parse transcript content to extract segments with timestamps.
-
-        Args:
-            content: Transcript text content
-
-        Returns:
-            List of segment dicts with 'start', 'end', 'text' keys
-        """
-        import re
-
-        segments = []
-        lines = content.split("\n")
-
-        # Pattern to match timestamps like [00:00:15] or [00:15]
-        timestamp_pattern = r"\[(\d{1,2}):(\d{2})(?::(\d{2}))?\]"
-
-        for i, line in enumerate(lines):
-            line = line.strip()
-            if not line:
-                continue
-
-            # Try to find timestamp at start of line
-            match = re.match(timestamp_pattern + r"\s*(.*)", line)
-            if match:
-                # Extract timestamp components
-                hours = 0
-                minutes = int(match.group(1))
-                seconds = int(match.group(2))
-
-                # Check if there's a third group (seconds in HH:MM:SS format)
-                if match.group(3):
-                    hours = minutes
-                    minutes = seconds
-                    seconds = int(match.group(3))
-
-                start_time = hours * 3600 + minutes * 60 + seconds
-                text = match.group(4) if match.group(4) else match.group(3)
-
-                # Estimate end time (start of next segment or +5 seconds)
-                end_time = start_time + 5
-
-                # Look ahead for next timestamp to set accurate end time
-                for next_line in lines[i + 1 :]:
-                    next_match = re.match(timestamp_pattern, next_line)
-                    if next_match:
-                        next_hours = 0
-                        next_minutes = int(next_match.group(1))
-                        next_seconds = int(next_match.group(2))
-                        if next_match.group(3):
-                            next_hours = next_minutes
-                            next_minutes = next_seconds
-                            next_seconds = int(next_match.group(3))
-                        end_time = next_hours * 3600 + next_minutes * 60 + next_seconds
-                        break
-
-                segments.append(
-                    {"start": start_time, "end": end_time, "text": text.strip() if text else line}
-                )
-
-        return segments
-
-    def _create_basic_segments(self, content: str):
-        """
-        Create basic segments without timestamps (5-second intervals).
-
-        Args:
-            content: Text content
-
-        Returns:
-            List of segment dicts
-        """
-        lines = [line.strip() for line in content.split("\n") if line.strip()]
-        segments = []
-
-        for i, line in enumerate(lines):
-            segments.append({"start": i * 5.0, "end": (i + 1) * 5.0, "text": line})
-
-        return segments
-
-    def _export_md(self, save_path: str, content: str):
-        """
-        Export as Markdown format.
-
-        Args:
-            save_path: Path to save the file
-            content: Text content to export
-
-        Raises:
-            PermissionError: If file cannot be written due to permissions
-            OSError: If disk is full or other OS error
-            ValueError: If content is empty
-            IOError: If file cannot be written
-        """
-        try:
-            # Validate content
-            if not content or not content.strip():
-                raise ValueError(self.i18n.t("exceptions.batch_transcribe_viewer.content_is_empty"))
-
-            # Check directory exists
-            save_dir = os.path.dirname(save_path)
-            if save_dir and not os.path.exists(save_dir):
-                raise FileNotFoundError(f"Directory does not exist: {save_dir}")
-
-            # Check write permission
-            if os.path.exists(save_path) and not os.access(save_path, os.W_OK):
-                raise PermissionError(f"No write permission for file: {save_path}")
-
-            # Check directory write permission if file doesn't exist
-            if not os.path.exists(save_path):
-                check_dir = save_dir if save_dir else "."
-                if not os.access(check_dir, os.W_OK):
-                    raise PermissionError(f"No write permission for directory: {check_dir}")
-
-            # Check disk space
-            import shutil
-
-            stat = shutil.disk_usage(save_dir if save_dir else ".")
-            if stat.free < 1024 * 1024:  # Less than 1MB free
-                raise OSError("Insufficient disk space")
-
-            # Parse content to extract segments with timestamps
-            segments = self._parse_transcript_content(content)
-
-            if segments:
-                # Use FormatConverter to generate Markdown
-                converter = FormatConverter()
-                md_content = converter._to_md(segments)
-            else:
-                # If no timestamps, create simple markdown
-                logger.warning(
-                    self.i18n.t(
-                        "logging.batch_transcribe_viewer."
-                        "no_timestamps_found_creating_basic_markdown"
-                    )
-                )
-                md_content = self._create_basic_markdown(content)
-
-            if not md_content or md_content.strip() == "# Transcription":
-                raise ValueError("No content to export")
-
-            # Write to file
-            with open(save_path, "w", encoding="utf-8") as f:
-                f.write(md_content)
-
-            logger.debug(f"Exported as Markdown to {save_path}")
-
-        except PermissionError as e:
-            logger.error(f"Permission error writing Markdown file: {e}", exc_info=True)
-            raise PermissionError(self.i18n.t("viewer.export_error_permission"))
-        except OSError as e:
-            logger.error(f"OS error writing Markdown file: {e}", exc_info=True)
-            if "disk" in str(e).lower() or "space" in str(e).lower():
-                raise OSError(self.i18n.t("viewer.export_error_disk_full"))
-            else:
-                raise OSError(self.i18n.t("viewer.export_error_details", error=str(e)))
-        except ValueError as e:
-            logger.error(f"Invalid content for Markdown export: {e}")
-            raise ValueError(self.i18n.t("viewer.export_error_invalid_content"))
-        except Exception as e:
-            logger.error(f"Unexpected error in Markdown export: {e}", exc_info=True)
-            raise Exception(self.i18n.t("viewer.export_error_details", error=str(e)))
-
-    def _create_basic_markdown(self, content: str):
-        """
-        Create basic Markdown without timestamps.
-
-        Args:
-            content: Text content
-
-        Returns:
-            Markdown formatted string
-        """
-        lines = [line.strip() for line in content.split("\n") if line.strip()]
-
-        md_lines = ["# Transcription\n"]
-        for line in lines:
-            md_lines.append(f"{line}\n")
-
-        return "\n".join(md_lines)
 
     def _show_export_error(self, format: str, error_msg: str):
         """

@@ -228,7 +228,12 @@ def main():
         logger.info("Setting up speech engine (lazy loading)...")
         from utils.app_initializer import EngineProxy, initialize_speech_engine
 
-        speech_engine_loader = initialize_speech_engine(config, model_manager)
+        speech_engine_loader = initialize_speech_engine(
+            config,
+            model_manager,
+            managers.get("secrets_manager"),
+            db,
+        )
         managers["speech_engine_loader"] = speech_engine_loader
         managers["speech_engine"] = EngineProxy(speech_engine_loader)
 

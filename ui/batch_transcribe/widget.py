@@ -20,6 +20,7 @@ Provides UI for importing audio files and managing transcription tasks.
 """
 
 import logging
+from pathlib import Path
 from typing import TYPE_CHECKING, Dict, Optional
 
 from core.transcription.manager import TranscriptionManager
@@ -66,6 +67,8 @@ class BatchTranscribeWidget(BaseWidget):
 
     # Signal emitted when a task is added
     task_added = Signal(str)  # task_id
+    _CLEAR_QUEUE_MAX_RETRIES = 10
+    _CLEAR_QUEUE_RETRY_INTERVAL_MS = 300
 
     def __init__(
         self,
@@ -96,6 +99,7 @@ class BatchTranscribeWidget(BaseWidget):
 
         # Download guide widget reference
         self.download_guide_widget: Optional[QWidget] = None
+        self._clear_queue_in_progress = False
 
         # Setup UI
         self.setup_ui()
@@ -379,13 +383,7 @@ class BatchTranscribeWidget(BaseWidget):
             elif hasattr(self, "engine_label"):
                 self.engine_label.setText(self.i18n.t("batch_transcribe.engine") + ":")
 
-            # Update queue label
-            task_count = self.task_list.count()
-            self.queue_label.setText(
-                self.i18n.t("batch_transcribe.task_queue")
-                + " "
-                + self.i18n.t("batch_transcribe.tasks_count", count=task_count)
-            )
+            self._update_queue_label()
 
             # Update download guide if visible
             if self.download_guide_widget and self.download_guide_widget.isVisible():
@@ -399,6 +397,15 @@ class BatchTranscribeWidget(BaseWidget):
 
         except Exception as e:
             logger.error(f"Error updating translations: {e}")
+
+    def _update_queue_label(self):
+        """Update queue label with current task count."""
+        task_count = self.task_list.count()
+        self.queue_label.setText(
+            self.i18n.t("batch_transcribe.task_queue")
+            + " "
+            + self.i18n.t("batch_transcribe.tasks_count", count=task_count)
+        )
 
     def _on_import_file(self):
         """Handle import file button click."""
@@ -436,12 +443,10 @@ class BatchTranscribeWidget(BaseWidget):
             if not folder_path:
                 return
 
-            # Add tasks from folder
-            try:
-                task_ids = self.transcription_manager.add_tasks_from_folder(folder_path)
-                logger.info(f"Added {len(task_ids)} tasks from folder")
-            except Exception as e:
-                self._show_error(self.i18n.t("errors.unknown_error"), str(e))
+            # Add tasks from folder with the same options used by single-file import
+            options = self._build_task_options()
+            task_ids = self.transcription_manager.add_tasks_from_folder(folder_path, options)
+            logger.info(f"Added {len(task_ids)} tasks from folder")
 
             logger.info(f"Importing from folder: {folder_path}")
 
@@ -452,6 +457,10 @@ class BatchTranscribeWidget(BaseWidget):
     def _on_clear_queue(self):
         """Handle clear queue button click."""
         try:
+            if self._clear_queue_in_progress:
+                logger.info("Clear queue already in progress, ignoring duplicate request")
+                return
+
             # Confirm with user
             reply = QMessageBox.question(
                 self,
@@ -462,16 +471,66 @@ class BatchTranscribeWidget(BaseWidget):
             )
 
             if reply == QMessageBox.StandardButton.Yes:
-                # Delete all tasks
-                for task_id in list(self.task_items.keys()):
-                    self.transcription_manager.delete_task(task_id)
-                    self._remove_task_item(task_id)
+                self._clear_queue_in_progress = True
+                self.clear_queue_btn.setEnabled(False)
 
-                logger.info(self.i18n.t("logging.batch_transcribe.task_queue_cleared"))
+                # Stop all running/pending tasks first to avoid race conditions
+                self.transcription_manager.stop_all_tasks()
+
+                self._clear_queue_with_retry(attempt=1)
 
         except Exception as e:
             logger.error(f"Error clearing queue: {e}")
+            self._clear_queue_in_progress = False
+            self.clear_queue_btn.setEnabled(True)
             self._show_error(self.i18n.t("errors.unknown_error"), str(e))
+
+    def _clear_queue_with_retry(self, attempt: int):
+        """Delete queue tasks with short retries to handle in-flight cancellation."""
+        deleted_task_ids = set()
+        remaining_processing_ids = []
+
+        for task_data in self.transcription_manager.get_all_tasks():
+            task_id = task_data["id"]
+            if self.transcription_manager.delete_task(task_id):
+                deleted_task_ids.add(task_id)
+            elif task_data.get("status") == "processing":
+                remaining_processing_ids.append(task_id)
+
+        for task_id in list(deleted_task_ids):
+            self._remove_task_item(task_id)
+
+        if remaining_processing_ids and attempt < self._CLEAR_QUEUE_MAX_RETRIES:
+            logger.info(
+                "Clear queue retry %d/%d for %d processing task(s)",
+                attempt,
+                self._CLEAR_QUEUE_MAX_RETRIES,
+                len(remaining_processing_ids),
+            )
+            QTimer.singleShot(
+                self._CLEAR_QUEUE_RETRY_INTERVAL_MS,
+                lambda: self._clear_queue_with_retry(attempt + 1),
+            )
+            return
+
+        if remaining_processing_ids:
+            logger.warning(
+                "Clear queue partial completion, %d task(s) still processing after retries: %s",
+                len(remaining_processing_ids),
+                ", ".join(remaining_processing_ids),
+            )
+            self._notify_user(
+                self.i18n.t(
+                    "batch_transcribe.feedback.clear_queue_partial",
+                    count=len(remaining_processing_ids),
+                )
+            )
+
+        self.transcription_manager.start_processing()
+        self._clear_queue_in_progress = False
+        self.clear_queue_btn.setEnabled(True)
+        self._update_queue_label()
+        logger.info(self.i18n.t("logging.batch_transcribe.task_queue_cleared"))
 
     def _add_task(self, file_path: str):
         """
@@ -481,35 +540,7 @@ class BatchTranscribeWidget(BaseWidget):
             file_path: Path to audio/video file
         """
         try:
-            # Prepare task options
-            options = {}
-
-            # If model_manager is available, get selected model info
-            if self.model_manager and hasattr(self, "model_combo"):
-                selected_model = self.model_combo.currentText()
-
-                # Check if a valid model is selected
-                if selected_model and selected_model != self.i18n.t(
-                    "batch_transcribe.no_models_available"
-                ):
-
-                    # Get model info
-                    model_info = self.model_manager.get_model(selected_model)
-
-                    if model_info and model_info.is_downloaded:
-                        # Add model path to options
-                        options["model_name"] = selected_model
-                        options["model_path"] = model_info.local_path
-
-                        logger.debug(f"Using model {selected_model} " f"at {model_info.local_path}")
-                    else:
-                        # Model not available
-                        self._show_error(
-                            self.i18n.t("errors.unknown_error"),
-                            f"Model {selected_model} is not available. "
-                            f"Please download it first.",
-                        )
-                        return
+            options = self._build_task_options()
 
             # Add task to transcription manager
             task_id = self.transcription_manager.add_task(file_path, options)
@@ -518,6 +549,29 @@ class BatchTranscribeWidget(BaseWidget):
         except Exception as e:
             logger.error(f"Error adding task: {e}")
             self._show_error(self.i18n.t("errors.unknown_error"), str(e))
+
+    def _build_task_options(self) -> Dict[str, str]:
+        """Build task options from current UI selection."""
+        options: Dict[str, str] = {}
+
+        if self.model_manager and hasattr(self, "model_combo"):
+            selected_model = self.model_combo.currentText()
+
+            if selected_model and selected_model != self.i18n.t("batch_transcribe.no_models_available"):
+                model_info = self.model_manager.get_model(selected_model)
+
+                if not model_info or not model_info.is_downloaded:
+                    raise ValueError(
+                        self.i18n.t(
+                            "batch_transcribe.model_not_available", model=selected_model
+                        )
+                    )
+
+                options["model_name"] = selected_model
+                options["model_path"] = model_info.local_path
+                logger.debug(f"Using model {selected_model} at {model_info.local_path}")
+
+        return options
 
     def _refresh_tasks(self):
         """Refresh task list from transcription manager."""
@@ -539,23 +593,18 @@ class BatchTranscribeWidget(BaseWidget):
 
                 if task_id in self.task_items:
                     # Update existing task item
-                    full_task_data = self.transcription_manager.get_task_status(task_id)
-                    if full_task_data:
-                        # Log progress for debugging
-                        if full_task_data.get("status") == "processing":
-                            logger.debug(
-                                f"Updating task {task_id}: "
-                                f"progress={full_task_data.get('progress', 0):.1f}%"
-                            )
-                        self.task_items[task_id].update_task_data(full_task_data)
+                    if task_data.get("status") == "processing":
+                        logger.debug(
+                            f"Updating task {task_id}: "
+                            f"progress={task_data.get('progress', 0):.1f}%"
+                        )
+                    self.task_items[task_id].update_task_data(task_data)
                 else:
                     # Add new task item
-                    full_task_data = self.transcription_manager.get_task_status(task_id)
-                    if full_task_data:
-                        self._add_task_item(full_task_data)
+                    self._add_task_item(task_data)
 
-            # Update queue label and sync pause state for task buttons
-            self.update_translations()
+            # Keep periodic refresh lightweight: only update dynamic queue count.
+            self._update_queue_label()
             self._set_tasks_pause_state(self.transcription_manager.is_paused())
 
         except Exception as e:
@@ -679,9 +728,16 @@ class BatchTranscribeWidget(BaseWidget):
             )
 
             if reply == QMessageBox.StandardButton.Yes:
-                self.transcription_manager.delete_task(task_id)
-                self._remove_task_item(task_id)
-                logger.info(f"Deleted task {task_id}")
+                deleted = self.transcription_manager.delete_task(task_id)
+                if deleted:
+                    self._remove_task_item(task_id)
+                    logger.info(f"Deleted task {task_id}")
+                else:
+                    logger.warning(f"Failed to delete task {task_id}")
+                    self._show_error(
+                        self.i18n.t("common.warning"),
+                        self.i18n.t("batch_transcribe.delete_processing_not_allowed"),
+                    )
 
         except Exception as e:
             logger.error(f"Error deleting task: {e}")
@@ -759,7 +815,7 @@ class BatchTranscribeWidget(BaseWidget):
 
             # Open save dialog
             default_name = task_data["file_name"].rsplit(".", 1)[0]
-            file_filter = "Text Files (*.txt);;" "SRT Subtitles (*.srt);;" "Markdown (*.md)"
+            file_filter = self.i18n.t("batch_transcribe.export_file_filter")
             file_path, selected_filter = QFileDialog.getSaveFileName(
                 self,
                 self.i18n.t("batch_transcribe.actions.export"),
@@ -770,13 +826,19 @@ class BatchTranscribeWidget(BaseWidget):
             if not file_path:
                 return
 
-            # Determine format from filter or extension
-            if ".srt" in file_path or "SRT" in selected_filter:
+            # Determine format from extension first, then selected filter pattern.
+            file_extension = Path(file_path).suffix.lower()
+            if file_extension in {".txt", ".srt", ".md"}:
+                output_format = file_extension.lstrip(".")
+            elif "*.srt" in selected_filter:
                 output_format = "srt"
-            elif ".md" in file_path or "Markdown" in selected_filter:
+                file_path = f"{file_path}.srt"
+            elif "*.md" in selected_filter:
                 output_format = "md"
+                file_path = f"{file_path}.md"
             else:
                 output_format = "txt"
+                file_path = f"{file_path}.txt"
 
             # Export
             self.transcription_manager.export_result(task_id, output_format, file_path)

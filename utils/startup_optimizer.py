@@ -124,6 +124,17 @@ class LazyLoader:
         """Check if component is initialized."""
         return self._initialized
 
+    def reload(self) -> Any:
+        """
+        Force re-initialization and return the fresh instance.
+
+        Returns:
+            Re-initialized component instance
+        """
+        self._instance = None
+        self._initialized = False
+        return self.get()
+
 
 class StartupTimer:
     """

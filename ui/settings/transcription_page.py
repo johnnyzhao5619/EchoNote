@@ -849,9 +849,34 @@ class TranscriptionSettingsPage(BaseSettingsPage):
             )
 
             # Engine settings
+            selected_engine = self.engine_combo.currentText()
             self.settings_manager.set_setting(
-                "transcription.default_engine", self.engine_combo.currentText()
+                "transcription.default_engine", selected_engine
             )
+
+            if "transcription_manager" in self.managers:
+                try:
+                    reloaded = self.managers["transcription_manager"].reload_engine()
+                    if reloaded:
+                        logger.info(f"Reloaded transcription engine after selecting {selected_engine}")
+                    else:
+                        self.show_warning(
+                            self.i18n.t("settings.transcription.engine_reload_warning_title"),
+                            self.i18n.t(
+                                "settings.transcription.engine_reload_warning_message",
+                                engine=selected_engine,
+                            ),
+                        )
+                except Exception as e:
+                    logger.error(f"Failed to reload transcription engine: {e}")
+                    self.show_warning(
+                        self.i18n.t("settings.transcription.engine_reload_warning_title"),
+                        self.i18n.t(
+                            "settings.transcription.engine_reload_failed_message",
+                            engine=selected_engine,
+                            error=str(e),
+                        ),
+                    )
 
             # Faster-Whisper settings
             self.settings_manager.set_setting(

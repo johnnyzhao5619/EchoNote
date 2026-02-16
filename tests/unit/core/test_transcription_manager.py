@@ -94,9 +94,9 @@ class MockSpeechEngine:
         """Get engine name."""
         return "mock-engine"
 
-    async def transcribe_file(self, file_path, language=None, progress_callback=None):
+    async def transcribe_file(self, file_path, language=None, progress_callback=None, **kwargs):
         """Mock transcribe_file method."""
-        self.transcribe_calls.append((file_path, language))
+        self.transcribe_calls.append((file_path, language, kwargs))
 
         # Simulate progress callbacks
         if progress_callback:
@@ -206,6 +206,61 @@ class TestTranscriptionManager:
         task_data = manager.db.tasks[task_id]
         assert task_data["language"] == "en"
         assert task_data["output_format"] == "srt"
+
+    def test_add_task_stores_engine_runtime_options(self, manager, temp_audio_file):
+        """Engine-specific options should be preserved for runtime execution."""
+        task_id = manager.add_task(
+            str(temp_audio_file),
+            {"model_name": "base", "model_path": "/tmp/model.bin", "language": "en"},
+        )
+
+        assert task_id in manager._task_engine_options
+        assert manager._task_engine_options[task_id]["model_name"] == "base"
+        assert manager._task_engine_options[task_id]["model_path"] == "/tmp/model.bin"
+
+    @pytest.mark.asyncio
+    async def test_process_task_forwards_engine_runtime_options(self, manager, temp_audio_file, temp_dir):
+        """Runtime options should be forwarded to speech engine invocation."""
+        task_id = manager.add_task(
+            str(temp_audio_file),
+            {"model_name": "base", "model_path": "/tmp/model.bin"},
+        )
+
+        internal_path = temp_dir / f"{task_id}.json"
+
+        with (
+            patch.object(manager, "_get_internal_format_path", return_value=str(internal_path)),
+            patch.object(manager, "export_result", return_value=str(temp_dir / "out.txt")),
+            patch.object(manager, "_send_notification"),
+        ):
+            await manager._process_task_async(task_id, cancel_event=asyncio.Event())
+
+        _, _, forwarded_kwargs = manager.speech_engine.transcribe_calls[-1]
+        assert forwarded_kwargs["model_name"] == "base"
+        assert forwarded_kwargs["model_path"] == "/tmp/model.bin"
+        assert task_id not in manager._task_engine_options
+
+    @pytest.mark.asyncio
+    async def test_process_task_uses_fallback_export_on_primary_failure(
+        self, manager, temp_audio_file, temp_dir
+    ):
+        """When primary export fails, manager should attempt fallback export path."""
+        task_id = manager.add_task(str(temp_audio_file))
+        internal_path = temp_dir / f"{task_id}.json"
+
+        with (
+            patch.object(manager, "_get_internal_format_path", return_value=str(internal_path)),
+            patch.object(
+                manager,
+                "export_result",
+                side_effect=[Exception("primary export failed"), str(temp_dir / "fallback.txt")],
+            ) as mock_export,
+            patch.object(manager, "_send_notification"),
+        ):
+            await manager._process_task_async(task_id, cancel_event=asyncio.Event())
+
+        assert mock_export.call_count == 2
+        assert manager.db.tasks[task_id]["status"] == "completed"
 
     def test_add_task_file_not_found(self, manager):
         """Test adding a task with non-existent file."""
@@ -327,6 +382,16 @@ class TestTranscriptionManager:
         result = manager.delete_task("nonexistent-id")
 
         assert result is False
+
+    def test_delete_processing_task_returns_false(self, manager, temp_audio_file):
+        """Processing tasks should not be deleted directly."""
+        task_id = manager.add_task(str(temp_audio_file))
+        manager.db.tasks[task_id]["status"] = "processing"
+
+        result = manager.delete_task(task_id)
+
+        assert result is False
+        assert task_id in manager.db.tasks
 
     # Export Tests
     def test_export_result_txt(self, manager, temp_audio_file, temp_dir):
@@ -451,8 +516,27 @@ class TestTranscriptionManager:
 
     def test_reload_engine(self, manager):
         """Test reloading speech engine."""
-        # Should not raise an error
-        manager.reload_engine()
+        # Mock engine does not expose lazy loader; reload should be skipped.
+        assert manager.reload_engine() is False
+
+    def test_reload_engine_with_loader(self, mock_db, temp_dir):
+        """Reload should return True when lazy loader is available."""
+
+        class _Loader:
+            def __init__(self):
+                self.reload_calls = 0
+
+            def reload(self):
+                self.reload_calls += 1
+                return Mock(get_name=lambda: "reloaded-engine")
+
+        engine = Mock()
+        engine.get_name.return_value = "wrapper-engine"
+        engine._loader = _Loader()
+
+        manager = TranscriptionManager(mock_db, engine, {"transcription": {"save_path": str(temp_dir)}})
+        assert manager.reload_engine() is True
+        assert engine._loader.reload_calls == 1
 
     def test_manager_with_i18n(self, mock_db, mock_engine):
         """Test manager with i18n support."""

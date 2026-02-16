@@ -96,6 +96,8 @@
     "task_queue": "Task Queue",
     "tasks_count": "{count} tasks",
     "confirm_delete_task": "Are you sure you want to delete this task?",
+    "delete_processing_not_allowed": "Cannot delete a task while it is processing.",
+    "model_not_available": "Model {model} is not available. Please download it first.",
     "no_models_available": "Please download a model first",
     "no_models_message": "You haven't downloaded any models yet. Please download a model to start transcription.",
     "go_to_download": "Go to Download Models",
@@ -123,9 +125,11 @@
       "error": "Error: {error}"
     },
     "export_success": "Exported to: {path}",
+    "export_file_filter": "Text Files (*.txt);;SRT Subtitles (*.srt);;Markdown Files (*.md)",
     "feedback": {
       "paused": "Batch transcription paused.",
-      "resumed": "Batch transcription resumed."
+      "resumed": "Batch transcription resumed.",
+      "clear_queue_partial": "{count} task(s) are still stopping. Please clear again in a moment."
     },
     "notifications": {
       "success": {
@@ -474,7 +478,6 @@
       "theme_description": "Choose the application theme",
       "light": "Light",
       "dark": "Dark",
-      "high_contrast": "High Contrast",
       "system": "System",
       "preview": "Preview",
       "preview_text": "This is a theme preview",
@@ -540,6 +543,9 @@
       "cpu_mode": "CPU mode. No GPU acceleration.",
       "unknown_provider": "Unknown provider",
       "show_password": "Show/Hide Password",
+      "engine_reload_warning_title": "Engine Reload Notice",
+      "engine_reload_warning_message": "Settings were saved, but engine '{engine}' was not reloaded immediately. Changes will apply on next transcription.",
+      "engine_reload_failed_message": "Settings were saved, but reloading engine '{engine}' failed: {error}",
       "error": {
         "empty_path": "Save path cannot be empty",
         "invalid_path": "Invalid path: {error}"

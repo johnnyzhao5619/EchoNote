@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QFileDialog
+from PySide6.QtWidgets import QFileDialog, QMessageBox
 
 from ui.batch_transcribe.widget import BatchTranscribeWidget
 
@@ -111,6 +111,19 @@ class TestBatchTranscribeWidget:
         # Verify dialog was opened
         mock_dialog.assert_called_once()
 
+    @patch("ui.batch_transcribe.widget.QFileDialog.getExistingDirectory")
+    def test_import_folder_uses_built_options(self, mock_dialog, widget, mock_transcription_manager):
+        """Folder import should pass the same task options used by single-file import."""
+        mock_dialog.return_value = "/test/folder"
+        mock_transcription_manager.add_tasks_from_folder.return_value = ["task-1"]
+
+        with patch.object(widget, "_build_task_options", return_value={"model_name": "base"}):
+            widget._on_import_folder()
+
+        mock_transcription_manager.add_tasks_from_folder.assert_called_once_with(
+            "/test/folder", {"model_name": "base"}
+        )
+
     def test_update_translations(self, widget):
         """Test update translations method."""
         # Should not raise exception
@@ -120,6 +133,69 @@ class TestBatchTranscribeWidget:
         """Test language change signal is connected."""
         # Verify the connection was made
         mock_i18n.language_changed.connect.assert_called()
+
+    @patch("ui.batch_transcribe.widget.QMessageBox.question")
+    def test_clear_queue_restarts_processing(self, mock_question, widget, mock_transcription_manager):
+        """Clearing queue should restart processing after cleanup."""
+        mock_question.return_value = QMessageBox.StandardButton.Yes
+        mock_transcription_manager.get_all_tasks.return_value = [{"id": "task-1", "status": "pending"}]
+        mock_transcription_manager.delete_task.return_value = True
+
+        with patch.object(widget, "_remove_task_item"):
+            widget._on_clear_queue()
+
+        mock_transcription_manager.stop_all_tasks.assert_called_once()
+        mock_transcription_manager.start_processing.assert_called()
+
+    @patch("ui.batch_transcribe.widget.QTimer.singleShot")
+    @patch("ui.batch_transcribe.widget.QMessageBox.question")
+    def test_clear_queue_retries_processing_tasks(
+        self, mock_question, mock_single_shot, widget, mock_transcription_manager
+    ):
+        """Clearing queue should retry deletion for in-flight processing tasks."""
+        mock_question.return_value = QMessageBox.StandardButton.Yes
+        mock_transcription_manager.get_all_tasks.side_effect = [
+            [{"id": "task-1", "status": "processing"}],
+            [{"id": "task-1", "status": "cancelled"}],
+        ]
+        mock_transcription_manager.delete_task.side_effect = [False, True]
+        mock_single_shot.side_effect = lambda _ms, callback: callback()
+
+        with patch.object(widget, "_remove_task_item") as mock_remove:
+            widget._on_clear_queue()
+
+        assert mock_transcription_manager.delete_task.call_count == 2
+        mock_remove.assert_called_once_with("task-1")
+        mock_transcription_manager.start_processing.assert_called_once()
+
+    @patch("ui.batch_transcribe.widget.QMessageBox.question")
+    def test_delete_task_failure_keeps_ui_item(self, mock_question, widget, mock_transcription_manager):
+        """Failed deletion should not remove the task item from UI list."""
+        mock_question.return_value = QMessageBox.StandardButton.Yes
+        mock_transcription_manager.delete_task.return_value = False
+
+        with (
+            patch.object(widget, "_remove_task_item") as mock_remove,
+            patch.object(widget, "_show_error"),
+        ):
+            widget._on_task_delete("task-1")
+
+        mock_remove.assert_not_called()
+
+    @patch("ui.batch_transcribe.widget.QFileDialog.getSaveFileName")
+    def test_export_infers_format_from_filter_pattern(
+        self, mock_save_dialog, widget, mock_transcription_manager
+    ):
+        """Export should infer format from filter pattern and append extension when missing."""
+        mock_transcription_manager.get_task_status.return_value = {"file_name": "sample.wav"}
+        mock_save_dialog.return_value = ("/tmp/sample_export", "Sous-titres SRT (*.srt)")
+
+        with patch.object(widget, "show_info"):
+            widget._on_task_export("task-1")
+
+        mock_transcription_manager.export_result.assert_called_once_with(
+            "task-1", "srt", "/tmp/sample_export.srt"
+        )
 
 
 class TestBatchTranscribeWidgetWithoutModelManager:

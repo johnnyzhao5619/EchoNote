@@ -144,10 +144,48 @@ class TranscriptionManager:
         # Queue scheduling buffer for tasks added before loop starts
         self._queue_buffer_lock = threading.Lock()
         self._pending_queue_entries: Dict[str, Tuple[Callable, tuple, dict]] = {}
+        self._task_engine_options: Dict[str, Dict[str, Any]] = {}
+        self._task_engine_options_path = get_app_dir() / "task_engine_options.json"
+        self._load_persisted_task_engine_options()
 
         logger.info(
             f"Transcription manager initialized with engine: " f"{speech_engine.get_name()}"
         )
+
+    def _load_persisted_task_engine_options(self) -> None:
+        """Load task engine options persisted on disk."""
+        try:
+            if not self._task_engine_options_path.exists():
+                return
+            with open(self._task_engine_options_path, "r", encoding="utf-8") as handle:
+                raw_data = json.load(handle)
+            if isinstance(raw_data, dict):
+                self._task_engine_options = {
+                    str(task_id): value
+                    for task_id, value in raw_data.items()
+                    if isinstance(value, dict)
+                }
+        except Exception as exc:
+            logger.warning("Failed to load persisted task engine options: %s", exc, exc_info=True)
+            self._task_engine_options = {}
+
+    def _persist_task_engine_options(self) -> None:
+        """Persist task engine options to disk for restart recovery."""
+        try:
+            self._task_engine_options_path.parent.mkdir(parents=True, exist_ok=True)
+            if not self._task_engine_options:
+                if self._task_engine_options_path.exists():
+                    self._task_engine_options_path.unlink()
+                return
+
+            with open(self._task_engine_options_path, "w", encoding="utf-8") as handle:
+                json.dump(self._task_engine_options, handle, ensure_ascii=False, indent=2)
+            try:
+                os.chmod(self._task_engine_options_path, 0o600)
+            except Exception:
+                pass
+        except Exception as exc:
+            logger.warning("Failed to persist task engine options: %s", exc, exc_info=True)
 
     def _store_task_for_later(self, task_id: str, task_func, *args, **kwargs) -> None:
         """Cache tasks until the background event loop is ready."""
@@ -223,6 +261,15 @@ class TranscriptionManager:
             ValueError: If file format is not supported
         """
         options = options or {}
+        engine_option_keys = {
+            "model_name",
+            "model_path",
+            "beam_size",
+            "vad_filter",
+            "vad_min_silence_duration_ms",
+            "prompt",
+            "temperature",
+        }
 
         # Validate file exists
         file_path = Path(file_path).expanduser().resolve()
@@ -250,6 +297,13 @@ class TranscriptionManager:
 
         # Save to database
         task.save(self.db)
+
+        # Store engine-only options in memory for runtime execution.
+        # These options are not persisted in DB schema.
+        engine_options = {key: options[key] for key in engine_option_keys if key in options}
+        if engine_options:
+            self._task_engine_options[task.id] = engine_options
+            self._persist_task_engine_options()
 
         # Add to task queue (schedule in background event loop)
         if not self._queue_or_buffer_task(task.id):
@@ -310,6 +364,13 @@ class TranscriptionManager:
             rows = []
 
         if rows:
+            active_task_ids = {row["id"] for row in rows}
+            stale_option_ids = set(self._task_engine_options.keys()) - active_task_ids
+            if stale_option_ids:
+                for stale_id in stale_option_ids:
+                    self._task_engine_options.pop(stale_id, None)
+                self._persist_task_engine_options()
+
             processing_ids = [row["id"] for row in rows if row["status"] == "processing"]
 
             if processing_ids:
@@ -618,8 +679,10 @@ class TranscriptionManager:
             # Call transcribe_file and log the start
             logger.info(f"Calling speech_engine.transcribe_file for task {task_id}")
             ensure_not_cancelled("before starting transcription")
+            engine_kwargs = dict(self._task_engine_options.get(task_id, {}))
+            engine_kwargs["progress_callback"] = progress_callback
             result = await self.speech_engine.transcribe_file(
-                task.file_path, language=task.language, progress_callback=progress_callback
+                task.file_path, language=task.language, **engine_kwargs
             )
             ensure_not_cancelled("after completing transcription")
             logger.info(f"Transcription completed for task {task_id}, processing results")
@@ -662,6 +725,7 @@ class TranscriptionManager:
 
             # Automatically export to default format (TXT)
             # This ensures output_path is set for the viewer
+            export_succeeded = False
             try:
                 default_format = self._default_output_format
                 if task.output_format:
@@ -684,9 +748,48 @@ class TranscriptionManager:
                     task_id, output_format=default_format, output_path=str(output_path)
                 )
                 logger.info(f"Task {task_id} exported to {output_path}")
+                export_succeeded = True
             except Exception as export_error:
                 logger.error(f"Failed to export task {task_id}: {export_error}", exc_info=True)
-                # Continue anyway - the internal format is saved
+
+                # Fallback export to application-managed directory.
+                try:
+                    fallback_dir = get_app_dir() / "exports"
+                    fallback_dir.mkdir(parents=True, exist_ok=True)
+                    fallback_output = fallback_dir / f"{Path(task.file_path).stem}.{default_format}"
+                    self.export_result(
+                        task_id,
+                        output_format=default_format,
+                        output_path=str(fallback_output),
+                    )
+                    logger.warning(
+                        "Task %s exported using fallback output path: %s",
+                        task_id,
+                        fallback_output,
+                    )
+                    export_succeeded = True
+                except Exception as fallback_error:
+                    logger.error(
+                        "Fallback export failed for task %s: %s",
+                        task_id,
+                        fallback_error,
+                        exc_info=True,
+                    )
+
+            if not export_succeeded:
+                task.status = "failed"
+                task.error_message = "Failed to export transcription result"
+                task.completed_at = datetime.now().isoformat()
+                task.save(self.db)
+                self._update_progress(task_id, task.progress or 100.0, "Failed: export error")
+                self._send_notification(
+                    "batch_transcribe.notifications.failure",
+                    "error",
+                    message_default="Transcription failed: {filename}\n{error}",
+                    filename=task.file_name,
+                    error="Failed to export transcription result",
+                )
+                return
 
             # Notify progress: completed
             self._update_progress(task_id, 100.0, "Completed")
@@ -789,6 +892,9 @@ class TranscriptionManager:
 
             if isinstance(e, TaskNotFoundError):
                 raise
+        finally:
+            if self._task_engine_options.pop(task_id, None) is not None:
+                self._persist_task_engine_options()
 
     def get_task_status(self, task_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -990,9 +1096,19 @@ class TranscriptionManager:
             {
                 "id": task.id,
                 "file_name": task.file_name,
+                "file_path": task.file_path,
+                "file_size": task.file_size,
+                "audio_duration": task.audio_duration,
                 "status": task.status,
                 "progress": task.progress,
+                "language": task.language,
+                "engine": task.engine,
+                "output_format": task.output_format,
+                "output_path": task.output_path,
+                "error_message": task.error_message,
                 "created_at": task.created_at,
+                "started_at": task.started_at,
+                "completed_at": task.completed_at,
             }
             for task in tasks
         ]
@@ -1010,6 +1126,24 @@ class TranscriptionManager:
         task = TranscriptionTask.get_by_id(self.db, task_id)
         if not task:
             return False
+
+        # Remove buffered entry if task was queued before event loop startup.
+        with self._queue_buffer_lock:
+            self._pending_queue_entries.pop(task_id, None)
+        if self._task_engine_options.pop(task_id, None) is not None:
+            self._persist_task_engine_options()
+
+        if task.status == "processing":
+            # Processing tasks must be cancelled first; deleting here can race
+            # with in-flight worker callbacks and produce inconsistent states.
+            logger.warning(
+                "Refusing to delete processing task %s directly; cancel it first",
+                task_id,
+            )
+            return False
+
+        # Best-effort cleanup for in-memory queue bookkeeping.
+        self.task_queue.tasks.pop(task_id, None)
 
         # Delete internal format file
         internal_format_path = self._get_internal_format_path(task_id)
@@ -1229,33 +1363,34 @@ class TranscriptionManager:
 
         logger.info(f"max_concurrent updated to {max_concurrent}")
 
-    def reload_engine(self):
+    def reload_engine(self) -> bool:
         """
         Reload the speech engine with updated configuration.
 
         This method is called when API keys or engine settings are updated.
         It will reinitialize the engine with new credentials.
+
+        Returns:
+            True if reload completed, False if skipped.
         """
         logger.info("Reloading speech engine with updated configuration...")
 
         try:
-            # Get current engine type
-            engine_name = self.speech_engine.get_name()
-            logger.info(f"Current engine: {engine_name}")
+            loader = getattr(self.speech_engine, "_loader", None)
+            if loader is None:
+                logger.warning("Speech engine does not expose lazy loader; reload skipped")
+                return False
 
-            # For cloud engines, we need to reinitialize with new API keys
-            # For local engines (faster-whisper), no reload needed
-            if engine_name in ["openai-whisper", "google-speech", "azure-speech"]:
-                logger.info(f"Cloud engine detected: {engine_name}")
-                logger.info("Note: Engine will use new API keys on next transcription")
-                # Cloud engines typically load API keys on each request
-                # So we don't need to reinitialize the engine itself
-                # Just log that new keys will be used
+            # Eagerly initialize once so runtime errors surface immediately.
+            if hasattr(loader, "reload") and callable(loader.reload):
+                engine = loader.reload()
             else:
-                logger.info(f"Local engine detected: {engine_name}, no reload needed")
-
-            logger.info("Speech engine reload completed")
-
+                # Backward-compatible fallback for custom loaders.
+                loader._instance = None
+                loader._initialized = False
+                engine = loader.get()
+            logger.info("Speech engine reloaded successfully: %s", engine.get_name())
+            return True
         except Exception as e:
-            logger.error(f"Error reloading speech engine: {e}")
+            logger.error(f"Error reloading speech engine: {e}", exc_info=True)
             raise

@@ -130,16 +130,17 @@ def initialize_database(config, security_manager):
     return db
 
 
-def initialize_speech_engine(config, model_manager):
+def initialize_speech_engine(config, model_manager, secrets_manager=None, db_connection=None):
     """Initialize speech engine with lazy loading."""
-    from engines.speech.faster_whisper_engine import FasterWhisperEngine
     from utils.startup_optimizer import LazyLoader
 
     model_size = config.get("transcription.faster_whisper.model_size", "base")
     device = config.get("transcription.faster_whisper.device", "auto")
     compute_type = config.get("transcription.faster_whisper.compute_type", "int8")
 
-    def create_speech_engine():
+    def create_faster_whisper_engine():
+        from engines.speech.faster_whisper_engine import FasterWhisperEngine
+
         logger.info(f"Loading speech engine (model: {model_size}, device: {device})...")
         engine = FasterWhisperEngine(
             model_size=model_size,
@@ -148,7 +149,6 @@ def initialize_speech_engine(config, model_manager):
             model_manager=model_manager,
         )
 
-        # Check if model is available
         if not engine.is_model_available():
             logger.warning(
                 f"Speech engine initialized but model '{model_size}' is not available. "
@@ -159,8 +159,44 @@ def initialize_speech_engine(config, model_manager):
 
         return engine
 
+    def create_speech_engine():
+        default_engine = config.get("transcription.default_engine", "faster-whisper")
+        engine_name = (default_engine or "faster-whisper").strip().lower()
+
+        if engine_name == "openai":
+            api_key = secrets_manager.get_api_key("openai") if secrets_manager else None
+            if api_key:
+                from engines.speech.openai_engine import OpenAIEngine
+
+                logger.info("Loading OpenAI speech engine from configuration")
+                return OpenAIEngine(api_key=api_key, db_connection=db_connection)
+            logger.warning("OpenAI engine selected but API key is missing; falling back to faster-whisper")
+
+        elif engine_name == "google":
+            api_key = secrets_manager.get_api_key("google") if secrets_manager else None
+            if api_key:
+                from engines.speech.google_engine import GoogleEngine
+
+                logger.info("Loading Google speech engine from configuration")
+                return GoogleEngine(api_key=api_key)
+            logger.warning("Google engine selected but API key is missing; falling back to faster-whisper")
+
+        elif engine_name == "azure":
+            api_key = secrets_manager.get_api_key("azure") if secrets_manager else None
+            region = secrets_manager.get_secret("azure_region") if secrets_manager else None
+            if api_key and region:
+                from engines.speech.azure_engine import AzureEngine
+
+                logger.info("Loading Azure speech engine from configuration")
+                return AzureEngine(subscription_key=api_key, region=region)
+            logger.warning(
+                "Azure engine selected but API key or region is missing; falling back to faster-whisper"
+            )
+
+        return create_faster_whisper_engine()
+
     speech_engine_loader = LazyLoader("speech_engine", create_speech_engine)
-    logger.info("Speech engine configured (will load on first use)")
+    logger.info("Speech engine configured (lazy load enabled)")
 
     return speech_engine_loader
 

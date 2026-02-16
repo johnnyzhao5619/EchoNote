@@ -21,6 +21,8 @@ Extracted from transcript_viewer.py to reduce class size and improve separation 
 
 import logging
 import os
+import re
+import shutil
 from typing import List, Tuple
 
 from PySide6.QtCore import QThread, Signal
@@ -124,7 +126,11 @@ class TranscriptParser:
         segments = []
         lines = content.strip().split("\n")
 
-        for line in lines:
+        simple_timestamp_pattern = re.compile(
+            r"^\[(?:(\d{1,2}):)?(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?\]\s*(.*)$"
+        )
+
+        for i, line in enumerate(lines):
             line = line.strip()
             if not line:
                 continue
@@ -141,6 +147,43 @@ class TranscriptParser:
                         continue
                 except ValueError:
                     pass
+
+            # Parse simple timestamp format: [MM:SS] Text or [HH:MM:SS(.mmm)] Text
+            simple_match = simple_timestamp_pattern.match(line)
+            if simple_match:
+                hours = int(simple_match.group(1) or 0)
+                minutes = int(simple_match.group(2) or 0)
+                seconds = int(simple_match.group(3) or 0)
+                milliseconds = int((simple_match.group(4) or "0").ljust(3, "0"))
+                text_part = simple_match.group(5).strip()
+
+                start_total = hours * SECONDS_PER_HOUR + minutes * SECONDS_PER_MINUTE + seconds
+                start_time = f"{hours:02d}:{minutes:02d}:{seconds:02d}.{milliseconds:03d}"
+
+                # Default end time is +5s, then try to align to next timestamp line.
+                end_total = start_total + DEFAULT_SEGMENT_DURATION
+                for next_line in lines[i + 1 :]:
+                    next_line = next_line.strip()
+                    next_match = simple_timestamp_pattern.match(next_line)
+                    if not next_match:
+                        continue
+                    next_hours = int(next_match.group(1) or 0)
+                    next_minutes = int(next_match.group(2) or 0)
+                    next_seconds = int(next_match.group(3) or 0)
+                    end_total = (
+                        next_hours * SECONDS_PER_HOUR
+                        + next_minutes * SECONDS_PER_MINUTE
+                        + next_seconds
+                    )
+                    break
+
+                end_hours = end_total // SECONDS_PER_HOUR
+                end_minutes = (end_total % SECONDS_PER_HOUR) // SECONDS_PER_MINUTE
+                end_seconds = end_total % SECONDS_PER_MINUTE
+                end_time = f"{end_hours:02d}:{end_minutes:02d}:{end_seconds:02d}.000"
+
+                segments.append((start_time, end_time, text_part))
+                continue
 
             # If no timestamp found, create basic segment
             segments.append(("", "", line))
@@ -178,6 +221,27 @@ class FileExporter:
         """Initialize file exporter with i18n support."""
         self.i18n = i18n
 
+    def _validate_export_target(self, save_path: str, content: str):
+        """Validate export input and destination before writing files."""
+        if not content or not content.strip():
+            raise ValueError(self.i18n.t("exceptions.batch_transcribe_viewer.content_is_empty"))
+
+        save_dir = os.path.dirname(save_path)
+        if save_dir and not os.path.exists(save_dir):
+            raise FileNotFoundError(f"Directory does not exist: {save_dir}")
+
+        if os.path.exists(save_path) and not os.access(save_path, os.W_OK):
+            raise PermissionError(f"No write permission for file: {save_path}")
+
+        if not os.path.exists(save_path):
+            check_dir = save_dir if save_dir else "."
+            if not os.access(check_dir, os.W_OK):
+                raise PermissionError(f"No write permission for directory: {check_dir}")
+
+        stat = shutil.disk_usage(save_dir if save_dir else ".")
+        if stat.free < SMALL_FILE_THRESHOLD:
+            raise OSError(self.i18n.t("exceptions.batch_transcribe_viewer.insufficient_disk_space"))
+
     def export_txt(self, save_path: str, content: str):
         """
         Export as plain text (remove timestamps if present).
@@ -187,6 +251,8 @@ class FileExporter:
             content: Content to export
         """
         try:
+            self._validate_export_target(save_path, content)
+
             # Remove timestamp markers if present
             lines = content.split("\n")
             clean_lines = []
@@ -212,6 +278,17 @@ class FileExporter:
             with open(save_path, "w", encoding="utf-8") as f:
                 f.write(clean_content)
 
+        except PermissionError as e:
+            logger.error(f"Permission error exporting TXT to {save_path}: {e}", exc_info=True)
+            raise PermissionError(self.i18n.t("viewer.export_error_permission"))
+        except OSError as e:
+            logger.error(f"OS error exporting TXT to {save_path}: {e}", exc_info=True)
+            if "disk" in str(e).lower() or "space" in str(e).lower():
+                raise OSError(self.i18n.t("viewer.export_error_disk_full"))
+            raise OSError(self.i18n.t("viewer.export_error_details", error=str(e)))
+        except ValueError as e:
+            logger.error(f"Invalid content for TXT export: {e}")
+            raise ValueError(self.i18n.t("viewer.export_error_invalid_content"))
         except Exception as e:
             logger.error(f"Error exporting TXT to {save_path}: {e}")
             raise Exception(self.i18n.t("viewer.export_error_details", error=str(e)))
@@ -225,6 +302,7 @@ class FileExporter:
             content: Content to export
         """
         try:
+            self._validate_export_target(save_path, content)
             segments = TranscriptParser.parse_transcript_content(content)
 
             # If no timestamps found, create basic segments
@@ -252,6 +330,17 @@ class FileExporter:
             with open(save_path, "w", encoding="utf-8") as f:
                 f.write("\n".join(srt_lines))
 
+        except PermissionError as e:
+            logger.error(f"Permission error exporting SRT to {save_path}: {e}", exc_info=True)
+            raise PermissionError(self.i18n.t("viewer.export_error_permission"))
+        except OSError as e:
+            logger.error(f"OS error exporting SRT to {save_path}: {e}", exc_info=True)
+            if "disk" in str(e).lower() or "space" in str(e).lower():
+                raise OSError(self.i18n.t("viewer.export_error_disk_full"))
+            raise OSError(self.i18n.t("viewer.export_error_details", error=str(e)))
+        except ValueError as e:
+            logger.error(f"Invalid content for SRT export: {e}")
+            raise ValueError(self.i18n.t("viewer.export_error_invalid_content"))
         except Exception as e:
             logger.error(f"Error exporting SRT to {save_path}: {e}")
             raise Exception(self.i18n.t("viewer.export_error_details", error=str(e)))
@@ -265,6 +354,7 @@ class FileExporter:
             content: Content to export
         """
         try:
+            self._validate_export_target(save_path, content)
             segments = TranscriptParser.parse_transcript_content(content)
 
             md_lines = [
@@ -310,6 +400,17 @@ class FileExporter:
             with open(save_path, "w", encoding="utf-8") as f:
                 f.write("\n".join(md_lines))
 
+        except PermissionError as e:
+            logger.error(f"Permission error exporting Markdown to {save_path}: {e}", exc_info=True)
+            raise PermissionError(self.i18n.t("viewer.export_error_permission"))
+        except OSError as e:
+            logger.error(f"OS error exporting Markdown to {save_path}: {e}", exc_info=True)
+            if "disk" in str(e).lower() or "space" in str(e).lower():
+                raise OSError(self.i18n.t("viewer.export_error_disk_full"))
+            raise OSError(self.i18n.t("viewer.export_error_details", error=str(e)))
+        except ValueError as e:
+            logger.error(f"Invalid content for Markdown export: {e}")
+            raise ValueError(self.i18n.t("viewer.export_error_invalid_content"))
         except Exception as e:
             logger.error(f"Error exporting Markdown to {save_path}: {e}")
             raise Exception(self.i18n.t("viewer.export_error_details", error=str(e)))
