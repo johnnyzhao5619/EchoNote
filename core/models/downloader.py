@@ -46,6 +46,7 @@ class ModelDownloader(QObject):
 
     download_progress = Signal(str, int, float)
     download_completed = Signal(str)
+    download_cancelled = Signal(str)
     download_failed = Signal(str, str)
 
     def __init__(self, models_dir: Path, parent: Optional[QObject] = None) -> None:
@@ -60,6 +61,11 @@ class ModelDownloader(QObject):
 
         with self._lock:
             return model_name in self._active_flags
+
+    def has_active_downloads(self) -> bool:
+        """当前是否存在任意模型下载任务。"""
+        with self._lock:
+            return bool(self._active_flags)
 
     async def download(self, model: ModelInfo) -> Path:
         """下载指定模型，返回本地路径。"""
@@ -84,7 +90,7 @@ class ModelDownloader(QObject):
         except DownloadCancelled:
             message = "Download cancelled by user"
             logger.info(f"{model.name}: {message}")
-            self.download_failed.emit(model.name, message)
+            self.download_cancelled.emit(model.name)
             raise
         except Exception as exc:  # pragma: no cover - 记录异常信息
             logger.error(f"Download failed for {model.name}: {exc}", exc_info=True)

@@ -55,9 +55,22 @@ def check_ffmpeg_availability(config, i18n, main_window):
 def check_model_availability(config, model_manager, i18n, main_window):
     """Check model availability and show recommendation dialog if needed."""
     logger.info("Checking if model recommendation is needed...")
+    default_engine = str(
+        config.get("transcription.default_engine", "faster-whisper")
+    ).strip().lower()
+    if default_engine != "faster-whisper":
+        logger.info(
+            "Default speech engine is '%s'; skipping local model recommendation",
+            default_engine,
+        )
+        return
+
     from utils.first_run_setup import FirstRunSetup
 
     downloaded_models = model_manager.get_downloaded_models()
+    if hasattr(model_manager, "has_active_downloads") and model_manager.has_active_downloads():
+        logger.info("Model download is in progress; skipping recommendation dialog")
+        return
 
     # Only show dialog if NO models are downloaded at all
     if not downloaded_models:

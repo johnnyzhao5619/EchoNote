@@ -21,28 +21,24 @@ translating audio in real time.
 
 import asyncio
 import contextlib
-import json
 import logging
-import os
-import shutil
-import subprocess
 import threading
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any, AsyncIterator, Callable, Dict, List, Optional
 
 import numpy as np
-import soundfile as sf
 
 from core.realtime.audio_buffer import AudioBuffer
+from core.realtime.config import RealtimeConfig
+from core.realtime.archiver import SessionArchiver
+from core.realtime.integration import CalendarIntegration
 
 logger = logging.getLogger(__name__)
 
 
 class RealtimeRecorder:
     """Manage the end-to-end lifecycle of real-time recording sessions."""
-
-    TRANSLATION_TASK_TIMEOUT = 5.0
-    TRANSLATION_TASK_SHUTDOWN_TIMEOUT = 2.0
 
     def __init__(
         self,
@@ -52,12 +48,13 @@ class RealtimeRecorder:
         db_connection,
         file_manager,
         i18n=None,
+        config: Optional[RealtimeConfig] = None,
     ):
         """Initialize the real-time recorder.
 
         Args:
             audio_capture: ``AudioCapture`` instance used to acquire audio
-                frames. May be ``None`` when audio input is unavailable.
+                frames.
             speech_engine: ``SpeechEngine`` instance used for transcription.
             translation_engine: Optional ``TranslationEngine`` instance used
                 for post-transcription translation.
@@ -67,21 +64,27 @@ class RealtimeRecorder:
                 artifacts.
             i18n: Optional internationalization helper that provides localized
                 user-facing messages.
+            config: Optional configuration object.
         """
         self.audio_capture = audio_capture
         self.speech_engine = speech_engine
         self.translation_engine = translation_engine
         self.db = db_connection
-        self.file_manager = file_manager
+        # file_manager is used by session_archiver
         self.i18n = i18n
+        self.config = config or RealtimeConfig()
 
         if self.audio_capture is None:
             logger.warning(
                 "Audio capture not available. Real-time recording features will remain disabled."
             )
 
+        # Components
+        self.session_archiver = SessionArchiver(file_manager)
+        self.calendar_integration = CalendarIntegration(db_connection, i18n)
+
         # Default sample rate used for newly created sessions.
-        self.sample_rate = 16000
+        self.sample_rate = self.config.sample_rate
         if self.audio_capture is not None:
             capture_rate = getattr(self.audio_capture, "sample_rate", None)
             if isinstance(capture_rate, (int, float)) and capture_rate > 0:
@@ -132,22 +135,6 @@ class RealtimeRecorder:
 
         logger.info("RealtimeRecorder initialized")
 
-    def _translate(self, key: str, default: str, **kwargs) -> str:
-        """Return localized text for the given key with graceful fallback."""
-        if self.i18n is not None:
-            try:
-                translated = self.i18n.t(key, **kwargs)
-            except Exception as exc:  # noqa: BLE001
-                logger.warning("Translation lookup failed for %s: %s", key, exc)
-            else:
-                if translated and translated != key:
-                    return translated
-
-        try:
-            return default.format(**kwargs)
-        except Exception:  # noqa: BLE001
-            return default
-
     def audio_input_available(self) -> bool:
         """Return ``True`` when microphone input is available."""
         return self.audio_capture is not None
@@ -160,15 +147,7 @@ class RealtimeRecorder:
         on_audio_data: Optional[Callable[[np.ndarray], None]] = None,
         on_marker: Optional[Callable[[Dict[str, Any]], None]] = None,
     ):
-        """Register callback hooks used by the user interface.
-
-        Args:
-            on_transcription: Invoked when new transcription text is available.
-            on_translation: Invoked when new translated text is available.
-            on_error: Invoked when a recoverable error occurs.
-            on_audio_data: Receives audio frames for visualization or metering.
-            on_marker: Invoked when a marker is created during the session.
-        """
+        """Register callback hooks used by the user interface."""
         self.on_transcription_update = on_transcription
         self.on_translation_update = on_translation
         self.on_error = on_error
@@ -199,23 +178,12 @@ class RealtimeRecorder:
         self._event_loop = None
 
     async def start_recording(
-        self, input_source: Optional[int] = None, options: Optional[Dict] = None, event_loop=None
+        self,
+        input_source: Optional[int] = None,
+        options: Optional[Dict] = None,
+        event_loop=None,
     ):
-        """Start a new real-time recording session.
-
-        Args:
-            input_source: Index of the audio input device. ``None`` selects the
-                system default input.
-            options: Optional configuration dictionary. Recognized keys
-                include ``language`` (source language code),
-                ``enable_translation`` (``bool`` flag), ``target_language``
-                (translation target code), ``recording_format`` (``"wav"`` or
-                ``"mp3"``), ``save_recording`` and ``save_transcript``
-                (``bool`` flags), and ``create_calendar_event`` (``bool`` flag).
-                Additional engine-specific options are passed through.
-            event_loop: Optional event loop reference. When provided, the
-                recorder binds its queues and callbacks to this loop.
-        """
+        """Start a new real-time recording session."""
         if self.is_recording:
             logger.warning("Recording is already in progress")
             return
@@ -225,16 +193,6 @@ class RealtimeRecorder:
                 "Audio capture is not available. Install PyAudio to enable real-time recording."
             )
 
-        # 检查语音识别引擎是否可用
-        if hasattr(self.speech_engine, "is_model_available"):
-            if not self.speech_engine.is_model_available():
-                error_msg = (
-                    "Speech recognition model is not available. "
-                    "Please download a model from Settings > Model Management before recording."
-                )
-                logger.error(error_msg)
-                raise RuntimeError(error_msg)
-
         # Store the loop reference so that thread-safe queue operations work.
         if event_loop is not None:
             self._event_loop = event_loop
@@ -243,9 +201,19 @@ class RealtimeRecorder:
 
         # Capture the supplied options.
         self.current_options = options or {}
+        self._apply_session_model_selection()
 
-        # Synchronize the sample rate, preferring explicit options over
-        # capture defaults.
+        # Validate model availability after applying per-session model override.
+        engine = self._resolve_speech_engine()
+        if hasattr(engine, "is_model_available") and not engine.is_model_available():
+            error_msg = (
+                "Speech recognition model is not available. "
+                "Please download a model from Settings > Model Management before recording."
+            )
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
+
+        # Synchronize the sample rate
         option_rate = self.current_options.get("sample_rate")
         if isinstance(option_rate, (int, float)) and option_rate > 0:
             self.sample_rate = int(option_rate)
@@ -254,7 +222,7 @@ class RealtimeRecorder:
             if isinstance(capture_rate, (int, float)) and capture_rate > 0:
                 self.sample_rate = int(capture_rate)
         else:
-            self.sample_rate = 16000
+            self.sample_rate = self.config.sample_rate
 
         if self.audio_capture is not None and hasattr(self.audio_capture, "sample_rate"):
             try:
@@ -307,16 +275,13 @@ class RealtimeRecorder:
         logger.info(f"Recording started (input_source={input_source})")
 
     def _audio_callback(self, audio_chunk: np.ndarray):
-        """Receive audio buffers from the capture thread.
-
-        Args:
-            audio_chunk: ``numpy`` array containing a single audio frame.
-        """
+        """Receive audio buffers from the capture thread."""
         if not self.is_recording:
             return
 
         # Stash audio data so the full session can be persisted.
-        self.recording_audio_buffer.append(audio_chunk.copy())
+        if self.current_options.get("save_recording", True):
+            self.recording_audio_buffer.append(audio_chunk.copy())
 
         # Push audio into the transcription queue in a thread-safe manner.
         try:
@@ -356,18 +321,27 @@ class RealtimeRecorder:
             )
             return
 
-        # Create the VAD detector and the rolling audio buffer.
+        # VAD Configuration
         vad = None
+        vad_threshold = self.current_options.get(
+            "vad_threshold", self.config.vad_threshold
+        )
+        silence_duration_ms = self.current_options.get(
+            "silence_duration_ms", self.config.silence_duration_ms
+        )
+        min_audio_duration = self.current_options.get(
+            "min_audio_duration", self.config.min_audio_duration
+        )
+
         try:
             vad = VADDetector(
-                threshold=0.3,  # Lower threshold makes speech detection easier.
-                silence_duration_ms=1500,  # Reduce silence requirement.
+                threshold=float(vad_threshold),
+                silence_duration_ms=int(silence_duration_ms),
                 method="silero",
             )
             logger.info("VAD detector initialized successfully")
         except Exception as e:
             logger.warning(f"Failed to initialize VAD: {e}. Will process all audio without VAD.")
-            # Continue without VAD when initialization fails.
 
         sample_rate = self.sample_rate if self.sample_rate and self.sample_rate > 0 else 16000
 
@@ -375,8 +349,6 @@ class RealtimeRecorder:
         if audio_buffer is None:
             audio_buffer = AudioBuffer(sample_rate=sample_rate)
             self.audio_buffer = audio_buffer
-
-        min_audio_duration = 3.0  # Require at least three seconds before running inference.
 
         audio_chunks_received = 0
         transcription_attempts = 0
@@ -404,14 +376,11 @@ class RealtimeRecorder:
                 audio_buffer.clear()
                 return
 
-            logger.debug(f"Window audio size: {len(window_audio)} samples")
-
             speech_audio = window_audio
             if vad is not None:
                 try:
                     speech_timestamps = vad.detect_speech(window_audio, sample_rate)
-                    logger.debug(f"VAD detected {len(speech_timestamps)} speech segments")
-
+                    
                     if speech_timestamps:
                         speech_audio = vad.extract_speech(
                             window_audio, speech_timestamps, sample_rate=sample_rate
@@ -426,14 +395,12 @@ class RealtimeRecorder:
 
             try:
                 transcription_attempts += 1
-                logger.info(f"Transcription attempt #{transcription_attempts}")
+                logger.debug(f"Transcription attempt #{transcription_attempts}")
 
                 language = self.current_options.get("language")
                 text = await self.speech_engine.transcribe_stream(
                     speech_audio, language=language, sample_rate=self.sample_rate
                 )
-
-                logger.info(f"Transcription result: '{text}'")
 
                 if text.strip():
                     if self._is_duplicate_transcription(text, last_transcription):
@@ -446,7 +413,6 @@ class RealtimeRecorder:
                         if self.on_transcription_update:
                             try:
                                 self.on_transcription_update(text)
-                                logger.debug("UI callback invoked successfully")
                             except Exception as e:
                                 logger.error(f"Error in transcription callback: {e}")
 
@@ -456,8 +422,6 @@ class RealtimeRecorder:
 
                         logger.info(f"Transcribed successfully: {text[:50]}...")
                         last_transcription = text
-                else:
-                    logger.debug("Transcription returned empty text")
             except Exception as e:
                 logger.error(f"Transcription failed: {e}", exc_info=True)
                 if self.on_error:
@@ -475,10 +439,6 @@ class RealtimeRecorder:
                     continue
 
                 audio_chunks_received += 1
-                logger.debug(
-                    f"Received audio chunk #{audio_chunks_received}, size: {len(audio_chunk)}"
-                )
-
                 audio_buffer.append(audio_chunk)
 
                 try:
@@ -543,7 +503,6 @@ class RealtimeRecorder:
                     source_lang = self.current_options.get("language", "auto")
                     target_lang = self.current_options.get("target_language", "en")
 
-                    # The translation engine was already validated above.
                     translated_text = await self.translation_engine.translate(
                         text, source_lang=source_lang, target_lang=target_lang
                     )
@@ -562,7 +521,6 @@ class RealtimeRecorder:
                         logger.debug(f"Translated: {translated_text}")
 
                 except asyncio.TimeoutError:
-                    # Timeout: continue waiting for more data.
                     continue
                 except Exception as e:
                     logger.error(f"Error in translation stream processing: {e}")
@@ -579,28 +537,7 @@ class RealtimeRecorder:
         logger.info("Translation stream processing stopped")
 
     async def stop_recording(self) -> Dict:
-        """Stop the active recording session and persist its artifacts.
-
-        Returns:
-            Dict: Result payload with at least the following keys:
-                - ``duration`` (float): Session duration in seconds.
-                - ``start_time`` (str): ISO 8601 timestamp for session start.
-                - ``end_time`` (str): ISO 8601 timestamp for session end.
-
-            Optional keys are included when applicable:
-                - ``recording_path`` (str): Location of the saved audio file
-                  when ``save_recording`` is enabled and audio is available.
-                - ``transcript_path`` (str): Location of the saved transcript
-                  when ``save_transcript`` is enabled and text is available.
-                - ``translation_path`` (str): Location of the saved translation
-                  when translation is enabled and output is available.
-                - ``markers`` (List[Dict]): Marker metadata captured during the
-                  session.
-                - ``markers_path`` (str): Location of the exported marker JSON
-                  file when markers exist.
-                - ``event_id`` (str): Identifier of the calendar event when one
-                  is created successfully.
-        """
+        """Stop the active recording session and persist its artifacts."""
         if not self.is_recording:
             logger.warning("Recording is not in progress")
             return {}
@@ -620,6 +557,9 @@ class RealtimeRecorder:
                 await asyncio.wait_for(self.processing_task, timeout=5.0)
             except asyncio.TimeoutError:
                 logger.warning("Processing task timeout")
+                self.processing_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await self.processing_task
             finally:
                 self.processing_task = None
 
@@ -648,35 +588,49 @@ class RealtimeRecorder:
 
         # Persist audio when requested.
         if self.current_options.get("save_recording", True):
-            recording_path = await self._save_recording()
+            recording_format = self.current_options.get("recording_format", "wav")
+            recording_path = await self.session_archiver.save_recording(
+                self.recording_audio_buffer,
+                self.recording_start_time,
+                self.sample_rate,
+                format=recording_format,
+            )
             result["recording_path"] = recording_path
 
         # Persist transcription when requested.
         if self.current_options.get("save_transcript", True):
-            transcript_path = await self._save_transcript()
+            transcript_path = await self.session_archiver.save_text(
+                self.accumulated_transcription,
+                self.recording_start_time,
+                prefix="transcript",
+                subdirectory="Transcripts",
+            )
             result["transcript_path"] = transcript_path
 
         # Persist translation output when requested.
         if self.current_options.get("enable_translation", False):
-            translation_path = await self._save_translation()
-            if translation_path:
-                result["translation_path"] = translation_path
+            target_lang = self.current_options.get("target_language", "en")
+            translation_path = await self.session_archiver.save_text(
+                self.accumulated_translation,
+                self.recording_start_time,
+                prefix=f"translation_{target_lang}",
+                subdirectory="Translations",
+            )
+            result["translation_path"] = translation_path
 
+        # Persist markers.
         with self._marker_lock:
             if self.markers:
                 result["markers"] = [marker.copy() for marker in self.markers]
-                markers_path = self._save_markers()
-                if markers_path:
-                    result["markers_path"] = markers_path
+                markers_path = await self.session_archiver.save_markers(
+                    self.markers, self.recording_start_time
+                )
+                result["markers_path"] = markers_path
 
         # Create a calendar event when requested.
         create_event_requested = self.current_options.get("create_calendar_event", True)
-        if create_event_requested and self.db is None:
-            logger.info("Skipping calendar event creation: database connection is not configured.")
-            create_event_requested = False
-
         if create_event_requested:
-            event_id = await self._create_calendar_event(result)
+            event_id = await self.calendar_integration.create_event(result)
             result["event_id"] = event_id
 
         self._record_model_usage_if_needed()
@@ -693,8 +647,9 @@ class RealtimeRecorder:
         if self._model_usage_recorded or not self._transcription_succeeded:
             return
 
-        manager = getattr(self.speech_engine, "model_manager", None)
-        model_name = getattr(self.speech_engine, "model_size", None)
+        engine = self._resolve_speech_engine()
+        manager = getattr(engine, "model_manager", None)
+        model_name = getattr(engine, "model_size", None)
 
         if not manager or not model_name:
             return
@@ -711,6 +666,74 @@ class RealtimeRecorder:
         else:
             self._model_usage_recorded = True
 
+    def _resolve_speech_engine(self):
+        """Return the concrete speech engine behind optional lazy proxies."""
+        engine = self.speech_engine
+        loader = getattr(engine, "_loader", None)
+        if loader is not None and hasattr(loader, "get"):
+            try:
+                resolved_engine = loader.get()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Failed to resolve speech engine from lazy loader: %s", exc)
+            else:
+                if resolved_engine is not None:
+                    return resolved_engine
+        return engine
+
+    def _apply_session_model_selection(self) -> None:
+        """Apply per-session model selection options when supported by the engine."""
+        selected_model = self.current_options.get("model_name")
+        if not selected_model:
+            return
+
+        engine = self._resolve_speech_engine()
+        model_path = self.current_options.get("model_path")
+
+        if hasattr(engine, "_apply_runtime_model_selection"):
+            try:
+                engine._apply_runtime_model_selection(selected_model, model_path)
+            except Exception as exc:  # noqa: BLE001
+                raise RuntimeError(f"Failed to activate selected model '{selected_model}': {exc}") from exc
+            logger.info("Activated session model: %s", selected_model)
+            return
+
+        if not hasattr(engine, "model_size"):
+            logger.debug("Current speech engine does not support per-session model selection")
+            return
+
+        current_model = getattr(engine, "model_size", None)
+        if current_model == selected_model:
+            return
+
+        manager = getattr(engine, "model_manager", None)
+        if manager is not None and hasattr(manager, "get_model"):
+            try:
+                model_info = manager.get_model(selected_model)
+            except Exception as exc:  # noqa: BLE001
+                raise RuntimeError(f"Failed to resolve selected model '{selected_model}': {exc}") from exc
+            if not model_info or not getattr(model_info, "is_downloaded", False):
+                raise RuntimeError(
+                    f"Selected model '{selected_model}' is not downloaded. "
+                    "Please download it from Settings > Model Management."
+                )
+
+        if model_path and hasattr(engine, "download_root"):
+            try:
+                engine.download_root = str(Path(model_path).expanduser().parent)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Failed to apply model path '%s': %s", model_path, exc)
+
+        try:
+            engine.model_size = selected_model
+            if hasattr(engine, "model"):
+                engine.model = None
+            if hasattr(engine, "_refresh_model_status"):
+                engine._refresh_model_status()
+        except Exception as exc:  # noqa: BLE001
+            raise RuntimeError(f"Failed to activate selected model '{selected_model}': {exc}") from exc
+
+        logger.info("Activated session model: %s", selected_model)
+
     async def _ensure_translation_task_stopped(self) -> None:
         """Wait for the translation coroutine to exit before finishing."""
         task = self.translation_task
@@ -718,7 +741,7 @@ class RealtimeRecorder:
             return
 
         try:
-            await asyncio.wait_for(task, timeout=self.TRANSLATION_TASK_TIMEOUT)
+            await asyncio.wait_for(task, timeout=self.config.translation_task_timeout)
         except asyncio.TimeoutError:
             logger.warning("Translation task timeout; requesting graceful shutdown")
             await self._request_translation_shutdown(task)
@@ -733,14 +756,14 @@ class RealtimeRecorder:
         if queue is not None:
             try:
                 queue.put_nowait(None)
-            except asyncio.QueueFull:  # pragma: no cover - queue is unbounded by default
+            except asyncio.QueueFull:  # pragma: no cover
                 logger.warning("Translation queue full when sending shutdown signal")
 
         if stream_queue is not None:
             self._signal_stream_completion(stream_queue)
 
         try:
-            await asyncio.wait_for(task, timeout=self.TRANSLATION_TASK_SHUTDOWN_TIMEOUT)
+            await asyncio.wait_for(task, timeout=self.config.translation_task_shutdown_timeout)
         except asyncio.TimeoutError:
             logger.error("Translation task did not stop after shutdown request; cancelling")
             task.cancel()
@@ -749,226 +772,6 @@ class RealtimeRecorder:
         finally:
             self._drain_queue(queue)
             self._drain_queue(stream_queue)
-
-    async def _save_recording(self) -> str:
-        """Persist the captured audio to disk and return the file path."""
-        if not self.recording_audio_buffer:
-            logger.warning("No audio data to save")
-            return ""
-
-        # Merge all audio frames.
-        audio_data = np.concatenate(self.recording_audio_buffer)
-
-        # Build the target filename.
-        timestamp = self.recording_start_time.strftime("%Y%m%d_%H%M%S")
-        requested_format = str(self.current_options.get("recording_format", "wav")).lower()
-        base_filename = f"recording_{timestamp}"
-        mp3_requested = requested_format == "mp3"
-        mp3_supported = False
-        if mp3_requested:
-            try:
-                mp3_supported = self._is_mp3_conversion_available()
-            except Exception as exc:  # noqa: BLE001
-                logger.error("Failed to determine MP3 conversion capability: %s", exc)
-                mp3_supported = False
-
-            if not mp3_supported:
-                warning_message = "MP3 recording requires FFmpeg. Saved recording as WAV instead."
-                logger.warning(warning_message)
-                if self.on_error:
-                    self.on_error(warning_message)
-
-        final_format = "mp3" if mp3_requested and mp3_supported else "wav"
-
-        def _generate_filename(extension: str) -> str:
-            return self.file_manager.create_unique_filename(
-                base_filename, extension, subdirectory="Recordings"
-            )
-
-        filename = _generate_filename(final_format)
-
-        # Persist the file to the configured location.
-        try:
-            # Create a temporary WAV file on disk.
-            temp_wav_name = f"{base_filename}.wav"
-            temp_path = self.file_manager.get_temp_path(temp_wav_name)
-
-            # Write the audio payload.
-            write_rate = self.sample_rate if self.sample_rate and self.sample_rate > 0 else 16000
-            sf.write(temp_path, audio_data, write_rate)
-
-            source_path = temp_path
-            temp_mp3_path = None
-            if final_format == "mp3":
-                temp_mp3_name = f"{base_filename}.mp3"
-                temp_mp3_path = self.file_manager.get_temp_path(temp_mp3_name)
-                try:
-                    self._convert_wav_to_mp3(temp_path, temp_mp3_path)
-                    source_path = temp_mp3_path
-                except Exception as exc:  # noqa: BLE001
-                    error_message = (
-                        f"Failed to convert recording to MP3: {exc}. Saved as WAV instead."
-                    )
-                    logger.error(error_message)
-                    if self.on_error:
-                        self.on_error(error_message)
-                    final_format = "wav"
-                    filename = _generate_filename(final_format)
-                    source_path = temp_path
-                    temp_mp3_path = None
-
-            # Move the finished file into place.
-            with open(source_path, "rb") as f:
-                final_path = self.file_manager.save_file(
-                    f.read(), filename, subdirectory="Recordings"
-                )
-
-            # Remove the temporary artifact when finished.
-            try:
-                os.unlink(temp_path)
-            except FileNotFoundError:
-                logger.debug("Temporary WAV file already removed: %s", temp_path)
-            if temp_mp3_path:
-                try:
-                    os.unlink(temp_mp3_path)
-                except FileNotFoundError:
-                    logger.debug("Temporary MP3 file already removed: %s", temp_mp3_path)
-
-            logger.info(f"Recording saved: {final_path}")
-            return final_path
-
-        except Exception as e:
-            logger.error(f"Failed to save recording: {e}")
-            if self.on_error:
-                self.on_error(f"Failed to save recording: {e}")
-            return ""
-
-    def _is_mp3_conversion_available(self) -> bool:
-        """Return ``True`` when FFmpeg-based MP3 conversion is available."""
-        try:
-            from utils.ffmpeg_checker import get_ffmpeg_checker
-        except Exception:  # noqa: BLE001
-            fallback_available = shutil.which("ffmpeg") is not None
-            logger.debug(
-                "FFmpeg checker unavailable; fallback detection result: %s", fallback_available
-            )
-            return fallback_available
-
-        checker = get_ffmpeg_checker()
-        available = checker.is_ffmpeg_available()
-        logger.debug("MP3 conversion availability: %s", available)
-        return available
-
-    def _convert_wav_to_mp3(self, wav_path: str, mp3_path: str) -> None:
-        """Convert a WAV file to MP3 using FFmpeg."""
-        command = ["ffmpeg", "-y", "-i", wav_path, "-codec:a", "libmp3lame", mp3_path]
-        logger.debug("Converting WAV to MP3 via command: %s", " ".join(command))
-        completed = subprocess.run(
-            command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )
-        logger.debug("FFmpeg conversion completed with return code %s", completed.returncode)
-
-    async def _save_transcript(self) -> str:
-        """Persist accumulated transcription text and return the file path."""
-        if not self.accumulated_transcription:
-            logger.warning("No transcription data to save")
-            return ""
-
-        # Combine all transcript fragments.
-        full_transcript = "\n".join(self.accumulated_transcription)
-
-        # Build the output filename.
-        timestamp = self.recording_start_time.strftime("%Y%m%d_%H%M%S")
-
-        def _generate_filename(extension: str) -> str:
-            return self.file_manager.create_unique_filename(
-                f"transcript_{timestamp}", extension, subdirectory="Transcripts"
-            )
-
-        filename = _generate_filename("txt")
-
-        # Save the text to disk.
-        try:
-            final_path = self.file_manager.save_text_file(
-                full_transcript, filename, subdirectory="Transcripts"
-            )
-
-            logger.info(f"Transcript saved: {final_path}")
-            return final_path
-
-        except Exception as e:
-            logger.error(f"Failed to save transcript: {e}")
-            if self.on_error:
-                self.on_error(f"Failed to save transcript: {e}")
-            return ""
-
-    async def _save_translation(self) -> str:
-        """Persist accumulated translation text and return the file path."""
-        if not self.accumulated_translation:
-            logger.warning("No translation data to save")
-            return ""
-
-        # Combine all translation fragments.
-        full_translation = "\n".join(self.accumulated_translation)
-
-        # Build the output filename.
-        timestamp = self.recording_start_time.strftime("%Y%m%d_%H%M%S")
-        target_lang = self.current_options.get("target_language", "en")
-
-        def _generate_filename(extension: str) -> str:
-            return self.file_manager.create_unique_filename(
-                f"translation_{target_lang}_{timestamp}", extension, subdirectory="Translations"
-            )
-
-        filename = _generate_filename("txt")
-
-        # Save the text to disk.
-        try:
-            final_path = self.file_manager.save_text_file(
-                full_translation, filename, subdirectory="Translations"
-            )
-
-            logger.info(f"Translation saved: {final_path}")
-            return final_path
-
-        except Exception as e:
-            logger.error(f"Failed to save translation: {e}")
-            if self.on_error:
-                self.on_error(f"Failed to save translation: {e}")
-            return ""
-
-    def _save_markers(self) -> str:
-        """Persist marker metadata to disk and return the file path."""
-        if not self.markers or not self.recording_start_time:
-            logger.debug("No markers to save")
-            return ""
-
-        payload = {
-            "start_time": self.recording_start_time.isoformat(),
-            "markers": [marker.copy() for marker in self.markers],
-        }
-
-        timestamp = self.recording_start_time.strftime("%Y%m%d_%H%M%S")
-
-        def _generate_filename(extension: str) -> str:
-            return self.file_manager.create_unique_filename(
-                f"markers_{timestamp}", extension, subdirectory="Markers"
-            )
-
-        filename = _generate_filename("json")
-
-        try:
-            json_content = json.dumps(payload, ensure_ascii=False, indent=2)
-            final_path = self.file_manager.save_text_file(
-                json_content, filename, subdirectory="Markers"
-            )
-            logger.info(f"Markers saved: {final_path}")
-            return final_path
-        except Exception as e:  # noqa: BLE001
-            logger.error(f"Failed to save markers: {e}")
-            if self.on_error:
-                self.on_error(f"Failed to save markers: {e}")
-            return ""
 
     def add_marker(self, label: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """Create a marker at the current session position."""
@@ -1003,128 +806,17 @@ class RealtimeRecorder:
         with self._marker_lock:
             return [marker.copy() for marker in self.markers]
 
-    async def _create_calendar_event(self, recording_result: Dict) -> str:
-        """Create a calendar event describing the completed recording session.
-
-        Args:
-            recording_result: Result payload returned by :meth:`stop_recording`.
-
-        Returns:
-            str: Identifier of the created event, or an empty string on failure.
-        """
-        if self.db is None:
-            warning_message = self._translate(
-                "realtime_record.calendar_event.db_missing",
-                (
-                    "Cannot create calendar event because no database connection is configured. "
-                    "Configure the database to enable calendar integrations."
-                ),
-            )
-            logger.warning(warning_message)
-            if self.on_error:
-                try:
-                    self.on_error(warning_message)
-                except Exception as callback_exc:  # noqa: BLE001
-                    logger.error(
-                        "Error invoking calendar warning callback: %s", callback_exc, exc_info=True
-                    )
-            return ""
-
-        try:
-            from data.database.models import CalendarEvent, EventAttachment
-
-            # Create the calendar event entry.
-            start_reference = self.recording_start_time or datetime.now()
-            title_time = start_reference.strftime("%Y-%m-%d %H:%M")
-            duration_value = recording_result.get("duration", 0.0)
-            try:
-                duration_label = f"{float(duration_value):.2f}"
-            except (TypeError, ValueError):
-                duration_label = str(duration_value)
-
-            event = CalendarEvent(
-                title=self._translate(
-                    "realtime_record.calendar_event.title",
-                    "Recording Session - {timestamp}",
-                    timestamp=title_time,
-                ),
-                event_type="Event",
-                start_time=recording_result["start_time"],
-                end_time=recording_result["end_time"],
-                description=self._translate(
-                    "realtime_record.calendar_event.description",
-                    "Recording duration: {duration} seconds",
-                    duration=duration_label,
-                ),
-                source="local",
-            )
-            event.save(self.db)
-
-            # Attach artifacts that were produced during the session.
-            if "recording_path" in recording_result:
-                rec_path = recording_result["recording_path"]
-                if rec_path and os.path.exists(rec_path):
-                    attachment = EventAttachment(
-                        event_id=event.id,
-                        attachment_type="recording",
-                        file_path=rec_path,
-                        file_size=os.path.getsize(rec_path),
-                    )
-                    attachment.save(self.db)
-
-            if "transcript_path" in recording_result:
-                trans_path = recording_result["transcript_path"]
-                if trans_path and os.path.exists(trans_path):
-                    attachment = EventAttachment(
-                        event_id=event.id,
-                        attachment_type="transcript",
-                        file_path=trans_path,
-                        file_size=os.path.getsize(trans_path),
-                    )
-                    attachment.save(self.db)
-
-            # Attach translation output when available.
-            if "translation_path" in recording_result:
-                translation_path = recording_result["translation_path"]
-                if translation_path and os.path.exists(translation_path):
-                    attachment = EventAttachment(
-                        event_id=event.id,
-                        attachment_type="translation",
-                        file_path=translation_path,
-                        file_size=os.path.getsize(translation_path),
-                    )
-                    attachment.save(self.db)
-
-            logger.info(f"Calendar event created: {event.id}")
-            return event.id
-
-        except Exception as e:
-            error_message = self._translate(
-                "realtime_record.calendar_event.creation_failed",
-                "Failed to create calendar event: {error}",
-                error=str(e),
-            )
-            logger.error(error_message)
-            if self.on_error:
-                self.on_error(error_message)
-            return ""
+    def clear_markers(self) -> None:
+        """Clear all markers captured in the current session."""
+        with self._marker_lock:
+            self.markers = []
 
     async def get_transcription_stream(self) -> AsyncIterator[str]:
-        """Yield transcription snippets as they become available.
-
-        Yields:
-            str: Incremental transcription text.
-
-        Note:
-            The callback-based API remains the preferred integration point for
-            UI updates. The async generator is provided for consumers that need
-            a pure asyncio interface.
-        """
+        """Yield transcription snippets as they become available."""
         queue = self._transcription_stream_queue
         if queue is None:
             return
 
-        # Queue items are produced asynchronously by ``_process_audio_stream``.
         while True:
             if not self.is_recording and queue.empty():
                 break
@@ -1140,15 +832,7 @@ class RealtimeRecorder:
             yield item
 
     async def get_translation_stream(self) -> AsyncIterator[str]:
-        """Yield translation snippets as they become available.
-
-        Yields:
-            str: Incremental translation text.
-
-        Note:
-            The callback API remains the primary integration surface. Use the
-            async generator when a coroutine-based interface is preferable.
-        """
+        """Yield translation snippets as they become available."""
         queue = self._translation_stream_queue
         if queue is None:
             return
@@ -1187,7 +871,7 @@ class RealtimeRecorder:
 
         try:
             queue.put_nowait(None)
-        except asyncio.QueueFull:  # pragma: no cover - queue is unbounded by default
+        except asyncio.QueueFull:  # pragma: no cover
             logger.warning("Stream queue full when signaling completion")
 
     def get_recording_duration(self) -> float:
@@ -1271,27 +955,16 @@ class RealtimeRecorder:
         self._release_session_queues()
 
     def _is_duplicate_transcription(self, new_text: str, last_text: str) -> bool:
-        """Return ``True`` when the new transcript duplicates the last output.
-
-        Args:
-            new_text: Latest transcript candidate.
-            last_text: Previous transcript text.
-
-        Returns:
-            bool: ``True`` if the new transcript is considered a duplicate.
-        """
+        """Return ``True`` when the new transcript duplicates the last output."""
         if not last_text:
             return False
 
-        # Exact string equality is a duplication.
         if new_text == last_text:
             return True
 
-        # Approximate similarity detection by checking substring relationships.
         new_lower = new_text.lower().strip()
         last_lower = last_text.lower().strip()
 
-        # Treat the texts as duplicates when they largely overlap in content.
         if new_lower in last_lower or last_lower in new_lower:
             length_ratio = min(len(new_lower), len(last_lower)) / max(
                 len(new_lower), len(last_lower)

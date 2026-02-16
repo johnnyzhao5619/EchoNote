@@ -305,16 +305,16 @@ class TranscriptionSettingsPage(BaseSettingsPage):
                 self.model_size_combo.setCurrentIndex(index)
                 logger.debug(f"Restored model selection: {current_model}")
             else:
-                # Previous selection not available, try to select default model
-                default_model = (
-                    self.settings_manager.get_setting("transcription.faster_whisper.default_model")
+                # Previous selection not available, try to select configured model
+                configured_model = (
+                    self.settings_manager.get_setting("transcription.faster_whisper.model_size")
                     or "base"
                 )
 
-                default_index = self.model_size_combo.findText(default_model)
+                default_index = self.model_size_combo.findText(configured_model)
                 if default_index >= 0:
                     self.model_size_combo.setCurrentIndex(default_index)
-                    logger.info(f"Selected default model: {default_model}")
+                    logger.info(f"Selected configured model: {configured_model}")
                 else:
                     # Default not available, select first model
                     if self.model_size_combo.count() > 0:
@@ -854,6 +854,21 @@ class TranscriptionSettingsPage(BaseSettingsPage):
                 "transcription.default_engine", selected_engine
             )
 
+            # Faster-Whisper settings
+            self.settings_manager.set_setting(
+                "transcription.faster_whisper.model_size", self.model_size_combo.currentText()
+            )
+
+            # Save device using the data (device_id) not the display text
+            device_id = self.device_combo.currentData()
+            self.settings_manager.set_setting(
+                "transcription.faster_whisper.device", device_id if device_id else "auto"
+            )
+
+            self.settings_manager.set_setting(
+                "transcription.faster_whisper.compute_type", self.compute_type_combo.currentText()
+            )
+
             if "transcription_manager" in self.managers:
                 try:
                     reloaded = self.managers["transcription_manager"].reload_engine()
@@ -877,21 +892,6 @@ class TranscriptionSettingsPage(BaseSettingsPage):
                             error=str(e),
                         ),
                     )
-
-            # Faster-Whisper settings
-            self.settings_manager.set_setting(
-                "transcription.faster_whisper.model_size", self.model_size_combo.currentText()
-            )
-
-            # Save device using the data (device_id) not the display text
-            device_id = self.device_combo.currentData()
-            self.settings_manager.set_setting(
-                "transcription.faster_whisper.device", device_id if device_id else "auto"
-            )
-
-            self.settings_manager.set_setting(
-                "transcription.faster_whisper.compute_type", self.compute_type_combo.currentText()
-            )
 
             # Save API keys (encrypted)
             self._save_api_keys()

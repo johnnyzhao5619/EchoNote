@@ -79,6 +79,7 @@ class ModelManagementPage(BaseSettingsPage):
         self.model_manager.models_updated.connect(self._refresh_model_list)
         self.model_manager.downloader.download_progress.connect(self._update_download_progress)
         self.model_manager.downloader.download_completed.connect(self._on_download_completed)
+        self.model_manager.downloader.download_cancelled.connect(self._on_download_cancelled)
         self.model_manager.downloader.download_failed.connect(self._on_download_failed)
         self.model_manager.model_validation_failed.connect(self._on_validation_failed)
 
@@ -570,9 +571,6 @@ class ModelManagementPage(BaseSettingsPage):
                     ),
                 )
 
-                # 刷新模型列表
-                self._refresh_model_list()
-
                 logger.info(f"Model deleted successfully: {model_name}")
             else:
                 # 删除失败 - 使用错误对话框
@@ -763,29 +761,27 @@ class ModelManagementPage(BaseSettingsPage):
         if reply == QMessageBox.StandardButton.Yes:
             # 取消下载
             self.model_manager.cancel_download(model_name)
+            logger.info(f"Cancel requested for model download: {model_name}")
 
-            # 重置 UI
-            if model_name in self.model_cards:
-                card = self.model_cards[model_name]
+    def _reset_download_ui(self, model_name: str) -> None:
+        """恢复下载卡片到初始状态。"""
+        if model_name not in self.model_cards:
+            return
+        card = self.model_cards[model_name]
 
-                # 重新启用下载按钮
-                download_btn = card.findChild(QPushButton, f"download_btn_{model_name}")
-                if download_btn:
-                    download_btn.setEnabled(True)
-                    download_btn.setText(self.i18n.t("settings.model_management.download"))
+        download_btn = card.findChild(QPushButton, f"download_btn_{model_name}")
+        if download_btn:
+            download_btn.setEnabled(True)
+            download_btn.setText(self.i18n.t("settings.model_management.download"))
 
-                # 隐藏进度条
-                progress_bar = card.findChild(QProgressBar, f"progress_bar_{model_name}")
-                if progress_bar:
-                    progress_bar.setVisible(False)
-                    progress_bar.setValue(0)
+        progress_bar = card.findChild(QProgressBar, f"progress_bar_{model_name}")
+        if progress_bar:
+            progress_bar.setVisible(False)
+            progress_bar.setValue(0)
 
-                # 隐藏取消按钮
-                cancel_btn = card.findChild(QPushButton, f"cancel_btn_{model_name}")
-                if cancel_btn:
-                    cancel_btn.setVisible(False)
-
-            logger.info(f"Download cancelled for model: {model_name}")
+        cancel_btn = card.findChild(QPushButton, f"cancel_btn_{model_name}")
+        if cancel_btn:
+            cancel_btn.setVisible(False)
 
     def _clear_layout(self, layout: QVBoxLayout):
         """
@@ -975,8 +971,11 @@ class ModelManagementPage(BaseSettingsPage):
             self.i18n.t("settings.model_management.download_success_message", model=model_name),
         )
 
-        # 刷新模型列表（会自动将模型移到已下载区域）
-        self._refresh_model_list()
+    @Slot(str)
+    def _on_download_cancelled(self, model_name: str):
+        """处理下载取消事件。"""
+        logger.info(f"Download cancelled for model: {model_name}")
+        self._reset_download_ui(model_name)
 
     @Slot(str, str)
     def _on_download_failed(self, model_name: str, error: str):
@@ -990,25 +989,7 @@ class ModelManagementPage(BaseSettingsPage):
         logger.error(f"Download failed for {model_name}: {error}")
 
         # 重置 UI
-        if model_name in self.model_cards:
-            card = self.model_cards[model_name]
-
-            # 重新启用下载按钮
-            download_btn = card.findChild(QPushButton, f"download_btn_{model_name}")
-            if download_btn:
-                download_btn.setEnabled(True)
-                download_btn.setText(self.i18n.t("settings.model_management.download"))
-
-            # 隐藏进度条
-            progress_bar = card.findChild(QProgressBar, f"progress_bar_{model_name}")
-            if progress_bar:
-                progress_bar.setVisible(False)
-                progress_bar.setValue(0)
-
-            # 隐藏取消按钮
-            cancel_btn = card.findChild(QPushButton, f"cancel_btn_{model_name}")
-            if cancel_btn:
-                cancel_btn.setVisible(False)
+        self._reset_download_ui(model_name)
 
         # 显示错误对话框
         error_title = self.i18n.t("settings.model_management.download_error_title")

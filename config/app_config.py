@@ -181,34 +181,23 @@ class ConfigManager:
         if "faster_whisper" in trans_config:
             fw_config = trans_config["faster_whisper"]
 
+            # Validate model_size
+            if "model_size" in fw_config:
+                if not isinstance(fw_config["model_size"], str):
+                    raise TypeError("transcription.faster_whisper.model_size must be a string")
+
+                from core.models.registry import get_default_model_names
+
+                valid_models = list(get_default_model_names())
+                if fw_config["model_size"] not in valid_models:
+                    raise ValueError(
+                        f"transcription.faster_whisper.model_size must be one of {valid_models}"
+                    )
+
             # Validate model_dir
             if "model_dir" in fw_config:
                 if not isinstance(fw_config["model_dir"], str):
                     raise TypeError("transcription.faster_whisper.model_dir must be a string")
-
-            # Validate auto_download_recommended
-            if "auto_download_recommended" in fw_config:
-                if not isinstance(fw_config["auto_download_recommended"], bool):
-                    raise TypeError(
-                        "transcription.faster_whisper.auto_download_recommended "
-                        "must be a boolean"
-                    )
-
-            # Validate default_model
-            if "default_model" in fw_config:
-                if not isinstance(fw_config["default_model"], str):
-                    raise TypeError("transcription.faster_whisper.default_model must be a string")
-
-                # Validate model name is in supported list
-                # Import here to avoid circular dependency
-                from core.models.registry import get_default_model_names
-
-                valid_models = list(get_default_model_names())
-                if fw_config["default_model"] not in valid_models:
-                    raise ValueError(
-                        f"transcription.faster_whisper.default_model must be "
-                        f"one of {valid_models}"
-                    )
 
     def _validate_resource_monitor_config(self) -> None:
         """Validate resource monitor configuration."""

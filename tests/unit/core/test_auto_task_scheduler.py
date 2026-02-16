@@ -744,6 +744,24 @@ class TestSettingsIntegration:
         auto_task_scheduler._on_setting_changed("timeline.reminder_minutes", None)
         assert auto_task_scheduler.reminder_minutes == original_reminder
 
+    def test_build_recording_options_includes_realtime_preferences(self, auto_task_scheduler):
+        event = create_test_event()
+        auto_tasks = {
+            "enable_recording": True,
+            "enable_transcription": True,
+            "enable_translation": True,
+            "translation_target_language": "fr",
+        }
+
+        options = auto_task_scheduler._build_recording_options(event, auto_tasks)
+
+        assert options["recording_format"] == "wav"
+        assert options["save_recording"] is True
+        assert options["save_transcript"] is True
+        assert options["vad_threshold"] == 0.5
+        assert options["silence_duration_ms"] == 2000
+        assert options["min_audio_duration"] == 3.0
+
 
 class TestErrorHandling:
     """Test error handling in scheduler."""

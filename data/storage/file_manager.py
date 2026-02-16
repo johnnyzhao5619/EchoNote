@@ -37,18 +37,26 @@ class FileManager:
     proper permission settings and directory management.
     """
 
-    def __init__(self, base_dir: Optional[str] = None):
+    def __init__(self, base_dir: Optional[str] = None, recordings_dir: Optional[str] = None):
         """
         Initialize file manager.
 
         Args:
             base_dir: Base directory for file storage.
                      Defaults to ~/Documents/EchoNote
+            recordings_dir: Optional directory dedicated to recording files.
+                     When provided, ``subdirectory="Recordings"`` operations
+                     target this directory directly.
         """
         if base_dir is None:
             self.base_dir = Path.home() / "Documents" / "EchoNote"
         else:
             self.base_dir = Path(base_dir).expanduser()
+
+        if recordings_dir is None:
+            self.recordings_dir = self.base_dir / "Recordings"
+        else:
+            self.recordings_dir = Path(recordings_dir).expanduser()
 
         # Create base directory structure
         self._initialize_directories()
@@ -59,8 +67,10 @@ class FileManager:
         """Create base directory structure."""
         directories = [
             self.base_dir,
-            self.base_dir / "Recordings",
+            self.recordings_dir,
             self.base_dir / "Transcripts",
+            self.base_dir / "Translations",
+            self.base_dir / "Markers",
             self.base_dir / "Exports",
             self.base_dir / "Temp",
         ]
@@ -71,6 +81,16 @@ class FileManager:
             self._set_directory_permissions(directory)
 
         logger.debug("Initialized directory structure")
+
+    def _get_subdirectory_path(self, subdirectory: Optional[str]) -> Path:
+        """Resolve supported subdirectory aliases to concrete paths."""
+        if not subdirectory:
+            return self.base_dir
+
+        if subdirectory == "Recordings":
+            return self.recordings_dir
+
+        return self.base_dir / subdirectory
 
     def _set_file_permissions(self, file_path: Path):
         """
@@ -117,7 +137,7 @@ class FileManager:
         """
         # Determine target directory
         if subdirectory:
-            target_dir = self.base_dir / subdirectory
+            target_dir = self._get_subdirectory_path(subdirectory)
             target_dir.mkdir(parents=True, exist_ok=True)
             self._set_directory_permissions(target_dir)
         else:
@@ -366,7 +386,7 @@ class FileManager:
             List of absolute file paths
         """
         if subdirectory:
-            search_dir = self.base_dir / subdirectory
+            search_dir = self._get_subdirectory_path(subdirectory)
         else:
             search_dir = self.base_dir
 
@@ -404,7 +424,7 @@ class FileManager:
 
         # Determine target directory
         if subdirectory:
-            target_dir = self.base_dir / subdirectory
+            target_dir = self._get_subdirectory_path(subdirectory)
         else:
             target_dir = self.base_dir
 

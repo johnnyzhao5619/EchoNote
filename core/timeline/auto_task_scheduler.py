@@ -29,8 +29,8 @@ from typing import Any, Dict, Optional
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
+from core.realtime.integration import save_event_attachments
 from core.timeline.manager import to_local_naive
-from data.database.models import EventAttachment
 from ui.common.notification import get_notification_manager
 from utils.i18n import I18nQtManager
 
@@ -367,7 +367,15 @@ class AutoTaskScheduler:
                     "Failed to load realtime preferences for auto tasks: %s", exc, exc_info=True
                 )
 
-        return {"recording_format": "wav", "auto_save": True}
+        return {
+            "recording_format": "wav",
+            "auto_save": True,
+            "translation_engine": "google",
+            "vad_threshold": 0.5,
+            "silence_duration_ms": 2000,
+            "min_audio_duration": 3.0,
+            "save_transcript": True,
+        }
 
     def _build_recording_options(self, event, auto_tasks: dict) -> Dict[str, Any]:
         """Assemble recording options for auto-started sessions."""
@@ -379,15 +387,27 @@ class AutoTaskScheduler:
         else:
             save_recording = bool(enable_recording)
 
+        enable_transcription = auto_tasks.get("enable_transcription")
+        if enable_transcription is None:
+            save_transcript = bool(preferences.get("save_transcript", True))
+        else:
+            save_transcript = bool(enable_transcription)
+
+        translation_globally_enabled = preferences.get("translation_engine", "google") != "none"
+        enable_translation = bool(auto_tasks.get("enable_translation", False) and translation_globally_enabled)
+
         options = {
             "event_id": event.id,
             "event_title": event.title,
             "language": auto_tasks.get("transcription_language"),
-            "enable_translation": auto_tasks.get("enable_translation", False),
-            "target_language": auto_tasks.get("translation_target_language"),
+            "enable_translation": enable_translation,
+            "target_language": auto_tasks.get("translation_target_language") or "en",
             "recording_format": preferences.get("recording_format", "wav"),
             "save_recording": save_recording,
-            "save_transcript": auto_tasks.get("enable_transcription", True),
+            "save_transcript": save_transcript,
+            "vad_threshold": float(preferences.get("vad_threshold", 0.5)),
+            "silence_duration_ms": int(preferences.get("silence_duration_ms", 2000)),
+            "min_audio_duration": float(preferences.get("min_audio_duration", 3.0)),
             "create_calendar_event": False,
         }
 
@@ -633,44 +653,7 @@ class AutoTaskScheduler:
             recording_result: Result from stop_recording()
         """
         try:
-            import os
-
-            # Save recording attachment
-            recording_path = recording_result.get("recording_path")
-            if recording_path and os.path.exists(recording_path):
-                attachment = EventAttachment(
-                    event_id=event_id,
-                    attachment_type="recording",
-                    file_path=recording_path,
-                    file_size=os.path.getsize(recording_path),
-                )
-                attachment.save(self.db)
-                logger.info(f"Saved recording attachment for event {event_id}")
-
-            # Save transcript attachment
-            transcript_path = recording_result.get("transcript_path")
-            if transcript_path and os.path.exists(transcript_path):
-                attachment = EventAttachment(
-                    event_id=event_id,
-                    attachment_type="transcript",
-                    file_path=transcript_path,
-                    file_size=os.path.getsize(transcript_path),
-                )
-                attachment.save(self.db)
-                logger.info(f"Saved transcript attachment for event {event_id}")
-
-            # Save translation attachment (if exists)
-            translation_path = recording_result.get("translation_path")
-            if translation_path and os.path.exists(translation_path):
-                attachment = EventAttachment(
-                    event_id=event_id,
-                    attachment_type="translation",
-                    file_path=translation_path,
-                    file_size=os.path.getsize(translation_path),
-                )
-                attachment.save(self.db)
-                logger.info(f"Saved translation attachment for event {event_id}")
-
+            save_event_attachments(self.db, event_id, recording_result)
         except Exception as e:
             logger.error(f"Failed to save attachments for event {event_id}: {e}", exc_info=True)
 

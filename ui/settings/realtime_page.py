@@ -86,12 +86,7 @@ class RealtimeSettingsPage(BaseSettingsPage):
         self.source_label = QLabel(self.i18n.t("settings.realtime.input_source"))
         self.source_label.setMinimumWidth(STANDARD_LABEL_WIDTH)
         self.source_combo = QComboBox()
-        self.source_combo.addItems(
-            [
-                self.i18n.t("settings.realtime.default_device"),
-                self.i18n.t("settings.realtime.system_audio"),
-            ]
-        )
+        self.source_combo.addItems([self.i18n.t("settings.realtime.default_device")])
         self.source_combo.currentTextChanged.connect(self._emit_changed)
         source_layout.addWidget(self.source_label)
         source_layout.addWidget(self.source_combo)
@@ -190,12 +185,7 @@ class RealtimeSettingsPage(BaseSettingsPage):
         self.translation_label = QLabel(self.i18n.t("settings.realtime.translation_engine"))
         self.translation_label.setMinimumWidth(STANDARD_LABEL_WIDTH)
         self.translation_combo = QComboBox()
-        self.translation_combo.addItems(
-            [
-                self.i18n.t("settings.realtime.no_translation"),
-                self.i18n.t("settings.realtime.google_translate"),
-            ]
-        )
+        self._populate_translation_options()
         self.translation_combo.currentTextChanged.connect(self._emit_changed)
         translation_layout.addWidget(self.translation_label)
         translation_layout.addWidget(self.translation_combo)
@@ -235,16 +225,11 @@ class RealtimeSettingsPage(BaseSettingsPage):
             # Input source
             input_source = self.settings_manager.get_setting("realtime.default_input_source")
             if input_source:
-                # Map internal value to display text
-                if input_source == "default":
-                    index = 0
-                else:
-                    index = 1
-                self.source_combo.setCurrentIndex(index)
+                self.source_combo.setCurrentIndex(0)
 
             # Gain level
             gain = self.settings_manager.get_setting("realtime.default_gain")
-            if gain:
+            if gain is not None:
                 self.gain_slider.setValue(int(gain * GAIN_SLIDER_DIVISOR))
 
             # Recording format
@@ -272,6 +257,12 @@ class RealtimeSettingsPage(BaseSettingsPage):
             if auto_save is not None:
                 self.auto_save_check.setChecked(auto_save)
 
+            translation_engine = self.settings_manager.get_setting("realtime.translation_engine")
+            if translation_engine in {"none", "google"}:
+                index = self.translation_combo.findData(translation_engine)
+                if index >= 0:
+                    self.translation_combo.setCurrentIndex(index)
+
             logger.debug("Realtime settings loaded")
 
         except Exception as e:
@@ -281,9 +272,7 @@ class RealtimeSettingsPage(BaseSettingsPage):
         """Save realtime settings from UI."""
         try:
             # Input source
-            source_index = self.source_combo.currentIndex()
-            source_value = "default" if source_index == 0 else "system"
-            self.settings_manager.set_setting("realtime.default_input_source", source_value)
+            self.settings_manager.set_setting("realtime.default_input_source", "default")
 
             # Gain level
             gain = self.gain_slider.value() / GAIN_SLIDER_DIVISOR
@@ -301,6 +290,11 @@ class RealtimeSettingsPage(BaseSettingsPage):
             self.settings_manager.set_setting(
                 "realtime.auto_save", self.auto_save_check.isChecked()
             )
+
+            translation_engine = self.translation_combo.currentData()
+            if translation_engine is None:
+                translation_engine = "none"
+            self.settings_manager.set_setting("realtime.translation_engine", translation_engine)
 
             logger.debug("Realtime settings saved")
 
@@ -374,27 +368,27 @@ class RealtimeSettingsPage(BaseSettingsPage):
             current_index = self.source_combo.currentIndex()
             self.source_combo.blockSignals(True)
             self.source_combo.clear()
-            self.source_combo.addItems(
-                [
-                    self.i18n.t("settings.realtime.default_device"),
-                    self.i18n.t("settings.realtime.system_audio"),
-                ]
-            )
+            self.source_combo.addItems([self.i18n.t("settings.realtime.default_device")])
             self.source_combo.setCurrentIndex(current_index)
             self.source_combo.blockSignals(False)
 
         if hasattr(self, "translation_combo"):
-            current_index = self.translation_combo.currentIndex()
+            current_engine = self.translation_combo.currentData()
             self.translation_combo.blockSignals(True)
-            self.translation_combo.clear()
-            self.translation_combo.addItems(
-                [
-                    self.i18n.t("settings.realtime.no_translation"),
-                    self.i18n.t("settings.realtime.google_translate"),
-                ]
-            )
-            self.translation_combo.setCurrentIndex(current_index)
+            self._populate_translation_options()
+            if current_engine is not None:
+                index = self.translation_combo.findData(current_engine)
+                if index >= 0:
+                    self.translation_combo.setCurrentIndex(index)
             self.translation_combo.blockSignals(False)
+
+    def _populate_translation_options(self) -> None:
+        """Populate translation engine options with stable internal values."""
+        if not hasattr(self, "translation_combo"):
+            return
+        self.translation_combo.clear()
+        self.translation_combo.addItem(self.i18n.t("settings.realtime.no_translation"), "none")
+        self.translation_combo.addItem(self.i18n.t("settings.realtime.google_translate"), "google")
 
     def _detect_mp3_support(self) -> bool:
         try:

@@ -345,11 +345,6 @@ class FirstRunSetup:
             else:
                 logger.info("Database initialized without SQLCipher encryption")
 
-        except ImportError:
-            logger.warning(
-                "Database connection module not yet implemented, "
-                "skipping database initialization"
-            )
         except Exception as e:
             logger.error(f"Error initializing database: {e}")
             raise

@@ -19,6 +19,8 @@ import asyncio
 import logging
 from typing import Callable, Optional
 
+from core.models.downloader import DownloadCancelled
+
 
 def run_model_download(
     model_manager,
@@ -38,6 +40,9 @@ def run_model_download(
         if on_success:
             on_success()
         return True
+    except DownloadCancelled:
+        logger.info("Model download cancelled: %s", model_name)
+        return False
     except Exception as exc:  # noqa: BLE001 - need to catch all exceptions for logging
         try:
             loop.stop()

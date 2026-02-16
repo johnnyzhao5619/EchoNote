@@ -106,6 +106,14 @@ class SettingsManager(QObject):
         preferences = {
             "recording_format": realtime_defaults.get("recording_format", "wav"),
             "auto_save": realtime_defaults.get("auto_save", True),
+            "default_input_source": realtime_defaults.get("default_input_source", "default"),
+            "default_gain": realtime_defaults.get("default_gain", 1.0),
+            "translation_engine": realtime_defaults.get("translation_engine", "google"),
+            "vad_threshold": realtime_defaults.get("vad_threshold", 0.3),
+            "silence_duration_ms": realtime_defaults.get("silence_duration_ms", 1500),
+            "min_audio_duration": realtime_defaults.get("min_audio_duration", 3.0),
+            "save_transcript": realtime_defaults.get("save_transcript", True),
+            "create_calendar_event": realtime_defaults.get("create_calendar_event", True),
         }
 
         try:
@@ -121,6 +129,62 @@ class SettingsManager(QObject):
                 preferences["auto_save"] = bool(auto_save)
         except Exception as exc:  # noqa: BLE001
             logger.warning("Failed to read realtime.auto_save: %s", exc, exc_info=True)
+
+        try:
+            input_source = self.get_setting("realtime.default_input_source")
+            if input_source == "default":
+                preferences["default_input_source"] = input_source
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to read realtime.default_input_source: %s", exc, exc_info=True)
+
+        try:
+            gain = self.get_setting("realtime.default_gain")
+            if isinstance(gain, (int, float)) and 0.1 <= float(gain) <= 2.0:
+                preferences["default_gain"] = float(gain)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to read realtime.default_gain: %s", exc, exc_info=True)
+
+        try:
+            translation_engine = self.get_setting("realtime.translation_engine")
+            if translation_engine in ("none", "google"):
+                preferences["translation_engine"] = translation_engine
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to read realtime.translation_engine: %s", exc, exc_info=True)
+
+        try:
+            vad_threshold = self.get_setting("realtime.vad_threshold")
+            if isinstance(vad_threshold, (int, float)) and 0.0 <= float(vad_threshold) <= 1.0:
+                preferences["vad_threshold"] = float(vad_threshold)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to read realtime.vad_threshold: %s", exc, exc_info=True)
+
+        try:
+            silence_duration_ms = self.get_setting("realtime.silence_duration_ms")
+            if isinstance(silence_duration_ms, int) and silence_duration_ms >= 0:
+                preferences["silence_duration_ms"] = silence_duration_ms
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to read realtime.silence_duration_ms: %s", exc, exc_info=True)
+
+        try:
+            min_audio_duration = self.get_setting("realtime.min_audio_duration")
+            if isinstance(min_audio_duration, (int, float)) and float(min_audio_duration) > 0:
+                preferences["min_audio_duration"] = float(min_audio_duration)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to read realtime.min_audio_duration: %s", exc, exc_info=True)
+
+        try:
+            save_transcript = self.get_setting("realtime.save_transcript")
+            if save_transcript is not None:
+                preferences["save_transcript"] = bool(save_transcript)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to read realtime.save_transcript: %s", exc, exc_info=True)
+
+        try:
+            create_calendar_event = self.get_setting("realtime.create_calendar_event")
+            if create_calendar_event is not None:
+                preferences["create_calendar_event"] = bool(create_calendar_event)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to read realtime.create_calendar_event: %s", exc, exc_info=True)
 
         return preferences
 
@@ -280,6 +344,26 @@ class SettingsManager(QObject):
         elif setting_name == "silence_duration_ms":
             if not isinstance(value, int) or value < 0:
                 logger.error("silence_duration_ms must be a non-negative integer, " f"got: {value}")
+                return False
+
+        elif setting_name == "min_audio_duration":
+            if not isinstance(value, (int, float)) or value <= 0:
+                logger.error("min_audio_duration must be a positive number, got: %s", value)
+                return False
+
+        elif setting_name in {"auto_save", "save_transcript", "create_calendar_event"}:
+            if not isinstance(value, bool):
+                logger.error("%s must be a boolean, got: %s", setting_name, type(value).__name__)
+                return False
+
+        elif setting_name == "default_input_source":
+            if value != "default":
+                logger.error("default_input_source must be 'default', got: %s", value)
+                return False
+
+        elif setting_name == "translation_engine":
+            if value not in {"none", "google"}:
+                logger.error("translation_engine must be either 'none' or 'google', got: %s", value)
                 return False
 
         return True

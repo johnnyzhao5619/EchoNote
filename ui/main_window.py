@@ -644,23 +644,19 @@ class MainWindow(QMainWindow):
             if "realtime_recorder" in self.managers:
                 try:
                     realtime_recorder = self.managers["realtime_recorder"]
-                    if (
-                        hasattr(realtime_recorder, "is_recording")
-                        and realtime_recorder.is_recording
-                    ):
+                    realtime_widget = self.pages.get("realtime_record")
+                    cleaned_by_widget = False
+                    if realtime_widget and hasattr(realtime_widget, "_cleanup_resources"):
                         logger.info(self.i18n.t("logging.main_window.stopping_realtime_recorder"))
-                        # Set flag to stop recording
-                        realtime_recorder.is_recording = False
+                        realtime_widget._cleanup_resources()
+                        cleaned_by_widget = True
 
-                        # Stop audio capture
-                        if hasattr(realtime_recorder, "audio_capture"):
-                            try:
-                                realtime_recorder.audio_capture.stop_capture()
-                            except Exception:
-                                pass
-
-                        # Wait briefly for recording to stop
-                        time.sleep(0.5)
+                    # Fallback for exceptional cases where the page is unavailable.
+                    if not cleaned_by_widget and hasattr(realtime_recorder, "audio_capture"):
+                        try:
+                            realtime_recorder.audio_capture.stop_capture()
+                        except Exception:
+                            pass
                 except Exception as e:
                     logger.error(f"Error stopping realtime recorder: {e}")
 

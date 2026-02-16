@@ -273,6 +273,16 @@ class SettingsWidget(BaseWidget):
 
         logger.debug(f"Switched to settings category: {index}")
 
+    def show_page(self, page_id: str) -> bool:
+        """Navigate to a settings category by page identifier."""
+        if page_id not in self.settings_pages:
+            logger.warning("Settings page '%s' not found", page_id)
+            return False
+
+        page_keys = list(self.settings_pages.keys())
+        self.category_list.setCurrentRow(page_keys.index(page_id))
+        return True
+
     def load_settings(self):
         """Load current settings into all pages."""
         try:

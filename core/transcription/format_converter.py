@@ -92,9 +92,14 @@ class FormatConverter:
             raise ValueError("Input must be a dictionary")
             
         if "segments" not in internal_format:
-            # We allow empty segments list, but key must exist or at least be implied
-            # But strict validation is safer
-            logger.warning("Input missing 'segments' key, assuming empty")
+            raise ValueError("Input missing 'segments' key")
+
+        segments = internal_format["segments"]
+        if not isinstance(segments, list):
+            raise ValueError("'segments' must be a list")
+
+        if not segments:
+            raise ValueError("Empty segments list")
 
     def _to_txt(self, segments: List[Dict]) -> str:
         """

@@ -56,6 +56,7 @@ def mock_realtime_recorder():
     # Use PropertyMock to ensure is_recording returns a boolean
     type(recorder).is_recording = PropertyMock(return_value=False)
     recorder.add_marker = Mock()
+    recorder.clear_markers = Mock()
     recorder.set_callbacks = Mock()
     return recorder
 

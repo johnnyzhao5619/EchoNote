@@ -66,7 +66,7 @@ self.add_page('settings', settings_widget)
 
 - **Path**: `realtime.*`
 - **Key Settings**:
-  - `default_input_source`: default/system
+  - `default_input_source`: default
   - `default_gain`: 0.1-2.0
   - `recording_format`: wav/mp3
   - `recording_save_path`: string

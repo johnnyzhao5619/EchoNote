@@ -189,11 +189,14 @@ def main():
 
         # Initialize file manager
         logger.info("Initializing file manager...")
+        from pathlib import Path
+
         from config.constants import DEFAULT_RECORDINGS_PATH
         from data.storage.file_manager import FileManager
 
         recordings_path = config.get("realtime.recording_save_path", DEFAULT_RECORDINGS_PATH)
-        file_manager = FileManager(recordings_path)
+        default_base_dir = str(Path(DEFAULT_RECORDINGS_PATH).expanduser().parent)
+        file_manager = FileManager(base_dir=default_base_dir, recordings_dir=recordings_path)
         managers["file_manager"] = file_manager
         logger.info("File manager initialized")
 
@@ -304,7 +307,15 @@ def main():
         app.processEvents()
 
         logger.info("Initializing realtime recorder...")
+        from core.realtime.config import RealtimeConfig
         from core.realtime.recorder import RealtimeRecorder
+
+        realtime_preferences = settings_manager.get_realtime_preferences()
+        realtime_config = RealtimeConfig(
+            vad_threshold=float(realtime_preferences.get("vad_threshold", 0.5)),
+            silence_duration_ms=int(realtime_preferences.get("silence_duration_ms", 2000)),
+            min_audio_duration=float(realtime_preferences.get("min_audio_duration", 3.0)),
+        )
 
         realtime_recorder = RealtimeRecorder(
             audio_capture=audio_capture,
@@ -313,6 +324,7 @@ def main():
             db_connection=db,
             file_manager=file_manager,
             i18n=i18n,
+            config=realtime_config,
         )
         managers["realtime_recorder"] = realtime_recorder
         logger.info("Realtime recorder initialized")
@@ -446,11 +458,11 @@ def main():
         from utils.post_init_tasks import check_ffmpeg_availability, check_model_availability
 
         check_ffmpeg_availability(config, i18n, main_window)
-        check_model_availability(config, model_manager, i18n, main_window)
 
-        # Start model validation (after Qt event loop is running)
+        # Validate local models before prompting download recommendations.
         logger.info("Starting model validation...")
-        model_manager.start_validation()
+        model_manager.start_validation(deferred=False)
+        check_model_availability(config, model_manager, i18n, main_window)
 
         logger.info("Application initialization complete")
         logger.info("=" * LOG_SEPARATOR_LENGTH)

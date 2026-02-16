@@ -22,6 +22,7 @@ Reference: https://github.com/SYSTRAN/faster-whisper
 
 import logging
 import os
+import threading
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -68,6 +69,7 @@ class FasterWhisperEngine(SpeechEngine):
         self.model = None
         self._vad_model = None
         self._model_available = False  # 标记模型是否可用
+        self._model_state_lock = threading.RLock()
 
         # Validate and adjust device configuration
         from utils.gpu_detector import GPUDetector
@@ -128,134 +130,136 @@ class FasterWhisperEngine(SpeechEngine):
             f"available={self._model_available}"
         )
 
-    def _record_model_usage(self) -> None:
+    def _record_model_usage(self, model_name: Optional[str] = None) -> None:
         """在模型管理器中记录一次模型使用。"""
         if not self.model_manager:
             return
 
+        target_model_name = model_name or self.model_size
         try:
-            self.model_manager.mark_model_used(self.model_size)
+            self.model_manager.mark_model_used(target_model_name)
         except Exception as exc:  # noqa: BLE001
             logger.warning(
                 "Failed to record usage for model '%s': %s",
-                self.model_size,
+                target_model_name,
                 exc,
                 exc_info=True,
             )
 
     def _load_model(self):
         """延迟加载模型"""
-        # 如果模型已加载，直接返回
-        if self.model is not None:
-            return
+        with self._model_state_lock:
+            # 如果模型已加载，直接返回
+            if self.model is not None:
+                return
 
-        # 每次尝试加载前都重新检查模型状态，以反映最新的下载结果
-        if self.model_manager:
-            self._refresh_model_status()
+            # 每次尝试加载前都重新检查模型状态，以反映最新的下载结果
+            if self.model_manager:
+                self._refresh_model_status()
 
-        if self.model is None:
-            # 首先检查模型是否可用
-            if not self._model_available:
-                # 提供更详细的错误信息
-                if self.model_manager:
-                    downloaded_models = self.model_manager.get_downloaded_models()
-                    if downloaded_models:
-                        available_names = ", ".join(m.name for m in downloaded_models)
-                        error_msg = (
-                            f"Model '{self.model_size}' is not downloaded. "
-                            f"Available models: {available_names}. "
-                            f"Please select an available model in Settings > Transcription, "
-                            f"or download '{self.model_size}' from Settings > Model Management."
-                        )
+            if self.model is None:
+                # 首先检查模型是否可用
+                if not self._model_available:
+                    # 提供更详细的错误信息
+                    if self.model_manager:
+                        downloaded_models = self.model_manager.get_downloaded_models()
+                        if downloaded_models:
+                            available_names = ", ".join(m.name for m in downloaded_models)
+                            error_msg = (
+                                f"Model '{self.model_size}' is not downloaded. "
+                                f"Available models: {available_names}. "
+                                f"Please select an available model in Settings > Transcription, "
+                                f"or download '{self.model_size}' from Settings > Model Management."
+                            )
+                        else:
+                            error_msg = (
+                                "No speech recognition models are downloaded. "
+                                "Please download a model from Settings > Model Management."
+                            )
                     else:
-                        error_msg = (
-                            "No speech recognition models are downloaded. "
-                            "Please download a model from Settings > Model Management."
-                        )
-                else:
-                    error_msg = (
-                        f"Model '{self.model_size}' is not available. "
-                        "Please check your model configuration."
-                    )
-                logger.error(error_msg)
-                raise ValueError(error_msg)
-
-            try:
-                from faster_whisper import WhisperModel
-
-                logger.info(f"Loading Faster-Whisper model: {self.model_size}")
-
-                # 确定模型路径
-                if self.model_manager:
-                    # 使用 ModelManager 管理的模型
-                    model_info = self.model_manager.get_model(self.model_size)
-                    if not model_info or not model_info.is_downloaded:
                         error_msg = (
                             f"Model '{self.model_size}' is not available. "
-                            f"Please download it from Settings > Model Management."
+                            "Please check your model configuration."
                         )
-                        logger.error(error_msg)
-                        raise ValueError(error_msg)
+                    logger.error(error_msg)
+                    raise ValueError(error_msg)
 
-                    # 使用模型的本地路径
-                    model_path = model_info.local_path
-                    logger.info(f"Loading model from: {model_path}")
-                else:
-                    # 向后兼容：使用 model_size 和 download_root
-                    model_path = self.model_size
-
-                # 确保在 macOS/非 CUDA 环境下使用 CPU
-                device = self.device
-                compute_type = self.compute_type
-
-                # 如果遇到 CUDA 错误，强制使用 CPU
                 try:
-                    if self.model_manager:
-                        # 使用本地路径加载模型
-                        self.model = WhisperModel(
-                            model_path, device=device, compute_type=compute_type
-                        )
-                    else:
-                        # 使用 model_size 和 download_root 加载模型
-                        self.model = WhisperModel(
-                            model_path,
-                            device=device,
-                            compute_type=compute_type,
-                            download_root=self.download_root,
-                        )
-                except ValueError as e:
-                    if "CUDA" in str(e):
-                        logger.warning(f"CUDA not available: {e}. Falling back to CPU.")
-                        device = "cpu"
-                        compute_type = "int8"
-                        self.device = device
-                        self.compute_type = compute_type
+                    from faster_whisper import WhisperModel
 
+                    logger.info(f"Loading Faster-Whisper model: {self.model_size}")
+
+                    # 确定模型路径
+                    if self.model_manager:
+                        # 使用 ModelManager 管理的模型
+                        model_info = self.model_manager.get_model(self.model_size)
+                        if not model_info or not model_info.is_downloaded:
+                            error_msg = (
+                                f"Model '{self.model_size}' is not available. "
+                                f"Please download it from Settings > Model Management."
+                            )
+                            logger.error(error_msg)
+                            raise ValueError(error_msg)
+
+                        # 使用模型的本地路径
+                        model_path = model_info.local_path
+                        logger.info(f"Loading model from: {model_path}")
+                    else:
+                        # 向后兼容：使用 model_size 和 download_root
+                        model_path = self.model_size
+
+                    # 确保在 macOS/非 CUDA 环境下使用 CPU
+                    device = self.device
+                    compute_type = self.compute_type
+
+                    # 如果遇到 CUDA 错误，强制使用 CPU
+                    try:
                         if self.model_manager:
+                            # 使用本地路径加载模型
                             self.model = WhisperModel(
                                 model_path, device=device, compute_type=compute_type
                             )
                         else:
+                            # 使用 model_size 和 download_root 加载模型
                             self.model = WhisperModel(
                                 model_path,
                                 device=device,
                                 compute_type=compute_type,
                                 download_root=self.download_root,
                             )
-                    else:
-                        raise
+                    except ValueError as e:
+                        if "CUDA" in str(e):
+                            logger.warning(f"CUDA not available: {e}. Falling back to CPU.")
+                            device = "cpu"
+                            compute_type = "int8"
+                            self.device = device
+                            self.compute_type = compute_type
 
-                logger.info(
-                    f"Model loaded successfully (device={device}, compute_type={compute_type})"
-                )
-            except ImportError:
-                raise ImportError(
-                    "faster-whisper is not installed. "
-                    "Please install it with: pip install faster-whisper"
-                )
-            except Exception as e:
-                logger.error(f"Failed to load model: {e}")
-                raise
+                            if self.model_manager:
+                                self.model = WhisperModel(
+                                    model_path, device=device, compute_type=compute_type
+                                )
+                            else:
+                                self.model = WhisperModel(
+                                    model_path,
+                                    device=device,
+                                    compute_type=compute_type,
+                                    download_root=self.download_root,
+                                )
+                        else:
+                            raise
+
+                    logger.info(
+                        f"Model loaded successfully (device={device}, compute_type={compute_type})"
+                    )
+                except ImportError:
+                    raise ImportError(
+                        "faster-whisper is not installed. "
+                        "Please install it with: pip install faster-whisper"
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to load model: {e}")
+                    raise
 
     def _load_vad_model(self):
         """加载 VAD 模型（用于实时转录）"""
@@ -292,17 +296,56 @@ class FasterWhisperEngine(SpeechEngine):
 
     def _refresh_model_status(self) -> None:
         """根据 ModelManager 的最新信息刷新模型缓存状态。"""
-        if not self.model_manager:
-            return
+        with self._model_state_lock:
+            if not self.model_manager:
+                return
 
-        model_info = self.model_manager.get_model(self.model_size)
-        if model_info and model_info.is_downloaded:
-            self._model_available = True
-            if model_info.local_path:
-                self.download_root = str(Path(model_info.local_path).parent)
-        else:
-            self._model_available = False
-            self.download_root = None
+            model_info = self.model_manager.get_model(self.model_size)
+            if model_info and model_info.is_downloaded:
+                self._model_available = True
+                if model_info.local_path:
+                    self.download_root = str(Path(model_info.local_path).parent)
+            else:
+                self._model_available = False
+                self.download_root = None
+
+    def _apply_runtime_model_selection(
+        self,
+        model_name: Optional[str],
+        model_path: Optional[str] = None,
+    ) -> None:
+        """Apply per-request model override for batch/realtime calls."""
+        with self._model_state_lock:
+            if not model_name or model_name == self.model_size:
+                if model_path:
+                    self.download_root = str(Path(model_path).expanduser().parent)
+                return
+
+            if self.model_manager:
+                model_info = self.model_manager.get_model(model_name)
+                if not model_info or not model_info.is_downloaded:
+                    raise ValueError(
+                        f"Model '{model_name}' is not downloaded. "
+                        "Please download it from Settings > Model Management."
+                    )
+
+            self.model_size = model_name
+            if model_path:
+                self.download_root = str(Path(model_path).expanduser().parent)
+            self.model = None
+            self._refresh_model_status()
+            logger.info("Switched faster-whisper runtime model to: %s", model_name)
+
+    def _prepare_active_model(
+        self,
+        model_name: Optional[str] = None,
+        model_path: Optional[str] = None,
+    ):
+        """Prepare and snapshot active model for a transcription request."""
+        with self._model_state_lock:
+            self._apply_runtime_model_selection(model_name, model_path)
+            self._load_model()
+            return self.model, self.model_size
 
     def get_name(self) -> str:
         """获取引擎名称"""
@@ -330,7 +373,10 @@ class FasterWhisperEngine(SpeechEngine):
                 - progress_callback: 进度回调函数
                   (progress: float) -> None
         """
-        self._load_model()
+        active_model, active_model_name = self._prepare_active_model(
+            kwargs.get("model_name"),
+            kwargs.get("model_path"),
+        )
 
         beam_size = kwargs.get("beam_size", 5)
         vad_filter = kwargs.get("vad_filter", True)
@@ -392,7 +438,7 @@ class FasterWhisperEngine(SpeechEngine):
             def do_transcription():
                 """在线程池中执行的同步转录函数"""
                 # 执行转录（返回迭代器）
-                segments_iterator, transcribe_info = self.model.transcribe(
+                segments_iterator, transcribe_info = active_model.transcribe(
                     audio_path,
                     language=language,
                     beam_size=beam_size,
@@ -480,7 +526,7 @@ class FasterWhisperEngine(SpeechEngine):
             )
 
             # 转录成功后记录模型使用
-            self._record_model_usage()
+            self._record_model_usage(active_model_name)
             return result
 
         except Exception as e:
@@ -506,7 +552,7 @@ class FasterWhisperEngine(SpeechEngine):
             **kwargs: 额外参数
                 - use_vad: 是否使用 VAD（默认 False，因为外部已经做了 VAD）
         """
-        self._load_model()
+        active_model, _ = self._prepare_active_model()
 
         # 检查音频长度
         if len(audio_chunk) == 0:
@@ -557,7 +603,7 @@ class FasterWhisperEngine(SpeechEngine):
                 logger.debug(f"Wrote audio to temp file: {tmp_path}")
 
                 # 转录
-                segments, info = self.model.transcribe(
+                segments, info = active_model.transcribe(
                     tmp_path,
                     language=language,
                     beam_size=1,  # 实时转录使用较小的 beam size

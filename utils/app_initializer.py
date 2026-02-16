@@ -208,6 +208,15 @@ def initialize_translation_engine(config):
     def create_translation_engine():
         try:
             logger.info("Loading translation engine...")
+            selected_engine = str(config.get("realtime.translation_engine", "google")).strip().lower()
+            if selected_engine == "none":
+                logger.info("Translation engine disabled by realtime settings")
+                return None
+            if selected_engine != "google":
+                logger.warning(
+                    "Unsupported realtime translation engine '%s'. Falling back to Google.",
+                    selected_engine,
+                )
             from engines.translation.google_translate import GoogleTranslateEngine
 
             # Check if API key is configured

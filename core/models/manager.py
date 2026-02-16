@@ -20,7 +20,7 @@ import threading
 from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 
 import psutil
 from PySide6.QtCore import QCoreApplication, QObject, QTimer, Signal
@@ -67,6 +67,7 @@ class ModelManager(QObject):
         self._lock = threading.RLock()
         self._model_cache: Dict[str, ModelInfo] = {}
         self._model_order: List[str] = []
+        self._invalid_models: Set[str] = set()
         self._dirty = True
 
         self._refresh_cache()
@@ -120,15 +121,19 @@ class ModelManager(QObject):
         return bool(model and model.is_downloaded)
 
     def is_model_in_use(self, name: str) -> bool:
-        """检查模型是否正在使用中（下载中）。
+        """检查模型是否正在使用中（下载中或当前已配置为活动模型）。
 
         Args:
             name: 模型名称。
 
         Returns:
-            如果模型正在下载则返回 True，否则返回 False。
+            如果模型正在下载或当前已配置为活动模型则返回 True，否则返回 False。
         """
-        return self.downloader.is_downloading(name)
+        return self.downloader.is_downloading(name) or self._is_configured_active_model(name)
+
+    def has_active_downloads(self) -> bool:
+        """检查是否存在任意模型下载任务。"""
+        return self.downloader.has_active_downloads()
 
     async def download_model(self, name: str) -> Path:
         """下载指定的模型。
@@ -153,9 +158,6 @@ class ModelManager(QObject):
         logger.info(f"Downloading model: {name}")
         try:
             path = await self.downloader.download(model)
-            self._mark_dirty()
-            self._refresh_cache()
-            self.models_updated.emit()
             return path
         except DownloadCancelled:
             logger.info(f"Model download cancelled: {name}")
@@ -180,14 +182,14 @@ class ModelManager(QObject):
             如果成功删除则返回 True，否则返回 False。
 
         Raises:
-            RuntimeError: 如果模型正在下载中。
+            RuntimeError: 如果模型正在被使用。
         """
         model = self.get_model(name)
         if not model or not model.is_downloaded:
             return False
 
-        if self.downloader.is_downloading(name):
-            raise RuntimeError("Model is downloading")
+        if self.is_model_in_use(name):
+            raise RuntimeError("Model is in use")
 
         path = Path(model.local_path)
         try:
@@ -195,11 +197,15 @@ class ModelManager(QObject):
                 logger.info(f"Removing model directory: {path}")
                 import shutil
 
-                shutil.rmtree(path, ignore_errors=True)
+                shutil.rmtree(path)
+                if path.exists():
+                    raise RuntimeError(f"Model directory still exists after deletion: {path}")
         except Exception as exc:
             logger.error(f"Failed to delete model {name}: {exc}")
             raise
 
+        with self._lock:
+            self._invalid_models.discard(name)
         self._mark_dirty()
         self._refresh_cache()
         self.models_updated.emit()
@@ -229,12 +235,12 @@ class ModelManager(QObject):
             self._refresh_cache()
             self.models_updated.emit()
 
-    def start_validation(self) -> None:
+    def start_validation(self, deferred: bool = True) -> None:
         """启动模型验证过程，检查已下载模型的完整性。"""
         logger.info("Starting model validation")
         self._refresh_cache()
         app = QCoreApplication.instance()
-        if app is None:
+        if not deferred or app is None:
             self._validate_models()
         else:
             QTimer.singleShot(0, self._validate_models)
@@ -279,13 +285,6 @@ class ModelManager(QObject):
         if self._registry.has("tiny"):
             return "tiny"
 
-        default_model = self._config.get(
-            "transcription.faster_whisper.default_model",
-            self._registry.default_model(),
-        )
-        if self._registry.has(default_model):
-            return default_model
-
         return self._registry.default_model()
 
     def get_recommendation_context(self) -> Dict[str, float]:
@@ -329,6 +328,10 @@ class ModelManager(QObject):
 
             for model in base_models:
                 model.ensure_local_state(self._models_dir)
+                if model.name in self._invalid_models:
+                    model.is_downloaded = False
+                    model.local_path = None
+                    model.download_date = None
 
                 stats = usage_stats.get(model.name)
                 if stats:
@@ -347,6 +350,13 @@ class ModelManager(QObject):
         with self._lock:
             self._dirty = True
 
+    def _is_configured_active_model(self, name: str) -> bool:
+        default_engine = str(self._config.get("transcription.default_engine", "faster-whisper"))
+        if default_engine.strip().lower() != "faster-whisper":
+            return False
+        configured_model = self._config.get("transcription.faster_whisper.model_size")
+        return configured_model == name
+
     def _validate_models(self) -> None:
         logger.info("Validating downloaded models")
         updated = False
@@ -354,11 +364,23 @@ class ModelManager(QObject):
             if not model.is_downloaded or not model.local_path:
                 continue
 
-            missing = self._collect_missing_files(Path(model.local_path), model)
+            local_path = Path(model.local_path)
+            missing = self._collect_missing_files(local_path, model)
             if missing:
                 message = f"Missing files: {', '.join(missing)}"
                 logger.warning(f"Model {model.name} validation failed: {message}")
                 self.model_validation_failed.emit(model.name, message)
+
+                with self._lock:
+                    self._invalid_models.add(model.name)
+
+                try:
+                    if local_path.exists():
+                        import shutil
+
+                        shutil.rmtree(local_path)
+                except Exception as exc:
+                    logger.error("Failed to remove invalid model directory %s: %s", local_path, exc)
 
                 with self._lock:
                     cached = self._model_cache.get(model.name)
@@ -395,6 +417,8 @@ class ModelManager(QObject):
 
     def _on_download_completed(self, name: str) -> None:
         logger.info(f"Download completed: {name}")
+        with self._lock:
+            self._invalid_models.discard(name)
         self._mark_dirty()
         self._refresh_cache()
         self.models_updated.emit()

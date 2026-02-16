@@ -143,7 +143,7 @@ class StartupTimer:
 
     def __init__(self):
         """Initialize startup timer."""
-        self.start_time = time.time()
+        self.start_time = time.perf_counter()
         self.checkpoints = {}
 
     def checkpoint(self, name: str):
@@ -153,13 +153,13 @@ class StartupTimer:
         Args:
             name: Checkpoint name
         """
-        elapsed = time.time() - self.start_time
+        elapsed = time.perf_counter() - self.start_time
         self.checkpoints[name] = elapsed
         logger.info(f"Startup checkpoint '{name}': {elapsed:.2f}s")
 
     def get_total_time(self) -> float:
         """Get total elapsed time since start."""
-        return time.time() - self.start_time
+        return time.perf_counter() - self.start_time
 
     def get_checkpoint_time(self, name: str) -> Optional[float]:
         """

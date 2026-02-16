@@ -41,6 +41,20 @@ class TestFileManagerInitialization:
         assert (base_dir / "Exports").exists()
         assert (base_dir / "Temp").exists()
 
+    def test_init_with_custom_recordings_dir(self, tmp_path):
+        """Custom recordings directory should be used for recording files only."""
+        base_dir = tmp_path / "echonote"
+        recordings_dir = tmp_path / "custom_recordings"
+        fm = FileManager(str(base_dir), recordings_dir=str(recordings_dir))
+
+        assert fm.base_dir == base_dir
+        assert fm.recordings_dir == recordings_dir
+        assert recordings_dir.exists()
+        assert (base_dir / "Transcripts").exists()
+
+        file_path = fm.save_file(b"audio", "sample.wav", subdirectory="Recordings")
+        assert Path(file_path).parent == recordings_dir
+
 
 class TestFileSaveOperations:
     """Test file saving operations."""

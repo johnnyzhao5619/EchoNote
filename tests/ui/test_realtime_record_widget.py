@@ -3,7 +3,7 @@
 Tests for realtime record widget.
 """
 
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 from PySide6.QtCore import Qt
@@ -46,14 +46,7 @@ class TestRealtimeRecordWidget:
                 settings_manager=mock_settings_manager,
             )
         yield widget
-        # Cleanup: Stop the async loop
-        try:
-            if widget._async_loop and widget._async_loop.is_running():
-                widget._async_loop.call_soon_threadsafe(widget._async_loop.stop)
-                if widget._async_thread and widget._async_thread.is_alive():
-                    widget._async_thread.join(timeout=1)
-        except:
-            pass
+        widget._cleanup_resources()
 
     def test_widget_creation(self, widget):
         """Test widget can be created."""
@@ -135,14 +128,7 @@ class TestRealtimeRecordWidgetWithoutAudio:
                 recorder=mock_realtime_recorder, audio_capture=None, i18n_manager=mock_i18n
             )
         yield widget
-        # Cleanup
-        try:
-            if widget._async_loop and widget._async_loop.is_running():
-                widget._async_loop.call_soon_threadsafe(widget._async_loop.stop)
-                if widget._async_thread and widget._async_thread.is_alive():
-                    widget._async_thread.join(timeout=1)
-        except:
-            pass
+        widget._cleanup_resources()
 
     def test_widget_without_audio_capture(self, widget_no_audio):
         """Test widget can be created without audio capture."""
@@ -164,14 +150,7 @@ class TestRealtimeRecordWidgetCallbacks:
                 i18n_manager=mock_i18n,
             )
         yield widget
-        # Cleanup
-        try:
-            if widget._async_loop and widget._async_loop.is_running():
-                widget._async_loop.call_soon_threadsafe(widget._async_loop.stop)
-                if widget._async_thread and widget._async_thread.is_alive():
-                    widget._async_thread.join(timeout=1)
-        except:
-            pass
+        widget._cleanup_resources()
 
     def test_on_transcription_callback(self, widget):
         """Test transcription callback."""
@@ -201,3 +180,31 @@ class TestRealtimeRecordWidgetCallbacks:
         marker = {"timestamp": 1.0, "text": "Test marker"}
         # Should not raise exception
         widget._on_marker(marker)
+
+    def test_reset_markers_ui_clears_recorder_markers(self, widget, mock_realtime_recorder):
+        """Resetting markers should clear both UI and recorder state."""
+        widget._markers = [{"index": 1, "offset": 1.2}]
+        widget.markers_list.addItem("marker")
+
+        widget._reset_markers_ui()
+
+        assert widget._markers == []
+        assert widget.markers_list.count() == 0
+        mock_realtime_recorder.clear_markers.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_start_recording_uses_selected_input_device(self, widget, mock_realtime_recorder):
+        """Start recording should use the currently selected device index."""
+        mock_realtime_recorder.start_recording = AsyncMock(return_value=None)
+
+        widget.input_combo.clear()
+        widget.input_combo.addItem("Mic A", 7)
+        widget.input_combo.setCurrentIndex(0)
+
+        start_request = widget._prepare_start_request()
+        assert start_request is not None
+        await widget._start_recording(start_request)
+
+        mock_realtime_recorder.start_recording.assert_awaited_once()
+        _, kwargs = mock_realtime_recorder.start_recording.call_args
+        assert kwargs["input_source"] == 7
