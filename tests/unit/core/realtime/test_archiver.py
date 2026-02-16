@@ -19,7 +19,7 @@ Unit tests for SessionArchiver.
 
 import asyncio
 from datetime import datetime
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import numpy as np
@@ -46,8 +46,7 @@ class TestSessionArchiver:
         audio_buffer = [np.zeros(1000, dtype=np.float32)]
         start_time = datetime(2023, 1, 1, 12, 0, 0)
         
-        with patch("soundfile.write") as mock_sf_write, \
-             patch("builtins.open", new_callable=MagicMock) as mock_open, \
+        with patch("builtins.open", new_callable=MagicMock) as mock_open, \
              patch("os.unlink") as mock_unlink:
             
             path = await archiver.save_recording(
@@ -55,7 +54,6 @@ class TestSessionArchiver:
             )
             
             assert path == "/final/path/file.wav"
-            mock_sf_write.assert_called_once()
             mock_file_manager.save_file.assert_called_once()
             mock_unlink.assert_called_with("/tmp/recording_20230101_120000.wav")
 
@@ -113,3 +111,51 @@ class TestSessionArchiver:
             cmd = mock_run.call_args[0][0]
             assert "ffmpeg" in cmd
             assert "libmp3lame" in cmd
+
+    @pytest.mark.asyncio
+    async def test_save_recording_uses_failed_prefix_without_buffer(self, archiver):
+        """When stream failover produced prefix only, finalize that file directly."""
+        archiver._failed_recording_prefix = {
+            "temp_wav_path": "/tmp/prefix.wav",
+            "base_filename": "recording_20230101_120000",
+        }
+        start_time = datetime(2023, 1, 1, 12, 0, 0)
+
+        with patch.object(
+            archiver, "_run_in_executor", new=AsyncMock(return_value="/final/path/file.wav")
+        ) as mock_exec:
+            path = await archiver.save_recording([], start_time, 16000, format="wav")
+
+        assert path == "/final/path/file.wav"
+        mock_exec.assert_called_once_with(
+            archiver._finalize_recording_sync,
+            "/tmp/prefix.wav",
+            "recording_20230101_120000",
+            "wav",
+        )
+
+    @pytest.mark.asyncio
+    async def test_save_recording_merges_failed_prefix_and_buffer(self, archiver):
+        """When stream failover happened, remaining buffer should merge with prefix."""
+        audio_buffer = [np.zeros(1000, dtype=np.float32)]
+        archiver._failed_recording_prefix = {
+            "temp_wav_path": "/tmp/prefix.wav",
+            "base_filename": "recording_20230101_120000",
+        }
+        start_time = datetime(2023, 1, 1, 12, 0, 0)
+
+        with patch.object(
+            archiver, "_run_in_executor", new=AsyncMock(return_value="/final/path/file.wav")
+        ) as mock_exec, patch("os.unlink") as mock_unlink:
+            path = await archiver.save_recording(audio_buffer, start_time, 16000, format="wav")
+
+        assert path == "/final/path/file.wav"
+        mock_exec.assert_called_once_with(
+            archiver._save_recording_from_buffer_sync,
+            audio_buffer,
+            "recording_20230101_120000",
+            16000,
+            "wav",
+            "/tmp/prefix.wav",
+        )
+        mock_unlink.assert_called_with("/tmp/prefix.wav")

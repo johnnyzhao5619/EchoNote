@@ -70,6 +70,7 @@ class MockRealtimeRecorder:
         self.start_calls = []
         self.stop_calls = []
         self._recording_result = {}
+        self.translation_engine = object()
 
     async def start_recording(self, input_source=None, options=None, event_loop=None):
         """Mock start recording."""
@@ -758,9 +759,44 @@ class TestSettingsIntegration:
         assert options["recording_format"] == "wav"
         assert options["save_recording"] is True
         assert options["save_transcript"] is True
+        assert options["enable_transcription"] is True
         assert options["vad_threshold"] == 0.5
         assert options["silence_duration_ms"] == 2000
         assert options["min_audio_duration"] == 3.0
+
+    def test_build_recording_options_disable_translation_when_transcription_off(
+        self, auto_task_scheduler
+    ):
+        event = create_test_event()
+        auto_tasks = {
+            "enable_recording": True,
+            "enable_transcription": False,
+            "enable_translation": True,
+            "translation_target_language": "fr",
+        }
+
+        options = auto_task_scheduler._build_recording_options(event, auto_tasks)
+
+        assert options["enable_transcription"] is False
+        assert options["enable_translation"] is False
+        assert options["save_transcript"] is False
+
+    def test_build_recording_options_disable_translation_when_engine_unavailable(
+        self, auto_task_scheduler
+    ):
+        event = create_test_event()
+        auto_task_scheduler.realtime_recorder.translation_engine = None
+        auto_tasks = {
+            "enable_recording": True,
+            "enable_transcription": True,
+            "enable_translation": True,
+            "translation_target_language": "fr",
+        }
+
+        options = auto_task_scheduler._build_recording_options(event, auto_tasks)
+
+        assert options["enable_transcription"] is True
+        assert options["enable_translation"] is False
 
 
 class TestErrorHandling:

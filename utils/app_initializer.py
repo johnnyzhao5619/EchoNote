@@ -201,7 +201,7 @@ def initialize_speech_engine(config, model_manager, secrets_manager=None, db_con
     return speech_engine_loader
 
 
-def initialize_translation_engine(config):
+def initialize_translation_engine(config, secrets_manager=None):
     """Initialize translation engine with lazy loading."""
     from utils.startup_optimizer import LazyLoader
 
@@ -219,8 +219,8 @@ def initialize_translation_engine(config):
                 )
             from engines.translation.google_translate import GoogleTranslateEngine
 
-            # Check if API key is configured
-            api_key = config.get("translation.google.api_key")
+            # Check if API key is configured in encrypted secrets storage.
+            api_key = secrets_manager.get_api_key("google") if secrets_manager else None
             if api_key:
                 engine = GoogleTranslateEngine(api_key)
                 logger.info("Translation engine loaded successfully")

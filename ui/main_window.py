@@ -810,6 +810,14 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 logger.error(f"Error reloading realtime recorder engine: {e}")
 
+        # Refresh realtime record UI availability state (e.g. translation controls)
+        realtime_widget = self.pages.get("realtime_record") if hasattr(self, "pages") else None
+        if realtime_widget and hasattr(realtime_widget, "refresh_engine_availability"):
+            try:
+                realtime_widget.refresh_engine_availability()
+            except Exception as e:
+                logger.error(f"Error refreshing realtime record engine availability: {e}")
+
         logger.info(self.i18n.t("logging.main_window.cloud_engines_reload_completed"))
 
     def add_page(self, page_name: str, page_widget: QWidget):

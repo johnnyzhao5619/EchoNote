@@ -110,6 +110,8 @@ class RealtimeRecorder:
 
         # Recording options captured at session start.
         self.current_options = {}
+        self._transcription_enabled = True
+        self._stream_recording_active = False
 
         # Callback functions that notify external observers.
         self.on_transcription_update = None
@@ -200,7 +202,17 @@ class RealtimeRecorder:
             self._event_loop = asyncio.get_event_loop()
 
         # Capture the supplied options.
-        self.current_options = options or {}
+        self.current_options = dict(options or {})
+        self.current_options["enable_transcription"] = bool(
+            self.current_options.get("enable_transcription", True)
+        )
+        if (
+            self.current_options.get("enable_translation", False)
+            and not self.current_options["enable_transcription"]
+        ):
+            logger.warning("Translation requires transcription; disabling translation for this session")
+            self.current_options["enable_translation"] = False
+        self._transcription_enabled = self.current_options["enable_transcription"]
         self._apply_session_model_selection()
 
         # Validate model availability after applying per-session model override.
@@ -242,20 +254,31 @@ class RealtimeRecorder:
         self.accumulated_translation = []
         self._transcription_succeeded = False
         self._model_usage_recorded = False
+        self._stream_recording_active = False
         with self._marker_lock:
             self.markers = []
 
         try:
+            # Start recording stream persistence when enabled.
+            if self.current_options.get("save_recording", True):
+                starter = getattr(self.session_archiver, "start_recording_capture", None)
+                if callable(starter):
+                    started = starter(self.recording_start_time, self.sample_rate)
+                    self._stream_recording_active = started if isinstance(started, bool) else False
+
             # Start audio acquisition.
             self.audio_capture.start_capture(
                 device_index=input_source, callback=self._audio_callback
             )
 
             # Launch asynchronous processing tasks.
-            self.processing_task = asyncio.create_task(self._process_audio_stream())
+            if self._transcription_enabled:
+                self.processing_task = asyncio.create_task(self._process_audio_stream())
+            else:
+                self.processing_task = None
 
             # Launch translation worker when enabled.
-            if self.current_options.get("enable_translation", False):
+            if self.current_options.get("enable_translation", False) and self._transcription_enabled:
                 self.translation_task = asyncio.create_task(self._process_translation_stream())
         except Exception as exc:
             logger.error("Failed to start real-time recording: %s", exc, exc_info=True)
@@ -281,20 +304,44 @@ class RealtimeRecorder:
 
         # Stash audio data so the full session can be persisted.
         if self.current_options.get("save_recording", True):
-            self.recording_audio_buffer.append(audio_chunk.copy())
+            if self._stream_recording_active:
+                append_chunk = getattr(self.session_archiver, "append_recording_chunk", None)
+                if callable(append_chunk) and append_chunk(audio_chunk.copy()):
+                    pass
+                else:
+                    logger.warning(
+                        "Streaming recording persistence failed; falling back to in-memory buffering"
+                    )
+                    preserved_prefix = False
+                    failover = getattr(self.session_archiver, "failover_recording_capture", None)
+                    if callable(failover):
+                        try:
+                            preserved_prefix = bool(failover())
+                        except Exception as exc:  # noqa: BLE001
+                            logger.warning("Streaming failover unavailable: %s", exc)
+
+                    if not preserved_prefix:
+                        aborter = getattr(self.session_archiver, "abort_recording_capture", None)
+                        if callable(aborter):
+                            aborter()
+                    self._stream_recording_active = False
+                    self.recording_audio_buffer.append(audio_chunk.copy())
+            else:
+                self.recording_audio_buffer.append(audio_chunk.copy())
 
         # Push audio into the transcription queue in a thread-safe manner.
         try:
             # ``call_soon_threadsafe`` safely schedules the queue operation.
             if (
-                hasattr(self, "_event_loop")
+                self._transcription_enabled
+                and hasattr(self, "_event_loop")
                 and self._event_loop is not None
                 and self.transcription_queue is not None
             ):
                 self._event_loop.call_soon_threadsafe(
                     self.transcription_queue.put_nowait, audio_chunk.copy()
                 )
-            else:
+            elif self._transcription_enabled:
                 logger.debug("Event loop or transcription queue not ready, audio chunk skipped")
         except Exception as e:
             logger.warning(f"Failed to queue audio chunk: {e}")
@@ -589,16 +636,31 @@ class RealtimeRecorder:
         # Persist audio when requested.
         if self.current_options.get("save_recording", True):
             recording_format = self.current_options.get("recording_format", "wav")
-            recording_path = await self.session_archiver.save_recording(
-                self.recording_audio_buffer,
-                self.recording_start_time,
-                self.sample_rate,
-                format=recording_format,
-            )
+            recording_path = ""
+
+            if self._stream_recording_active:
+                finisher = getattr(self.session_archiver, "finish_recording_capture", None)
+                if callable(finisher):
+                    recording_path = await finisher(format=recording_format)
+                self._stream_recording_active = False
+
+            if not recording_path:
+                recording_path = await self.session_archiver.save_recording(
+                    self.recording_audio_buffer,
+                    self.recording_start_time,
+                    self.sample_rate,
+                    format=recording_format,
+                )
+
             result["recording_path"] = recording_path
+        elif self._stream_recording_active:
+            aborter = getattr(self.session_archiver, "abort_recording_capture", None)
+            if callable(aborter):
+                aborter()
+            self._stream_recording_active = False
 
         # Persist transcription when requested.
-        if self.current_options.get("save_transcript", True):
+        if self._transcription_enabled and self.current_options.get("save_transcript", True):
             transcript_path = await self.session_archiver.save_text(
                 self.accumulated_transcription,
                 self.recording_start_time,
@@ -608,7 +670,7 @@ class RealtimeRecorder:
             result["transcript_path"] = transcript_path
 
         # Persist translation output when requested.
-        if self.current_options.get("enable_translation", False):
+        if self._transcription_enabled and self.current_options.get("enable_translation", False):
             target_lang = self.current_options.get("target_language", "en")
             translation_path = await self.session_archiver.save_text(
                 self.accumulated_translation,
@@ -637,8 +699,14 @@ class RealtimeRecorder:
 
         logger.info(f"Recording stopped: duration={duration:.2f}s")
 
+        # Ensure no dangling temporary streaming resources remain.
+        aborter = getattr(self.session_archiver, "abort_recording_capture", None)
+        if callable(aborter):
+            aborter()
+
         # Release queue references after the session completes.
         self._release_session_queues()
+        self.recording_audio_buffer = []
 
         return result
 
@@ -679,6 +747,33 @@ class RealtimeRecorder:
                 if resolved_engine is not None:
                     return resolved_engine
         return engine
+
+    def reload_engine(self) -> bool:
+        """Reload lazy-loaded engines when credentials or settings change."""
+        if self.is_recording:
+            logger.warning("Skipping engine reload while recording is active")
+            return False
+
+        reloaded = False
+        for engine in (self.speech_engine, self.translation_engine):
+            loader = getattr(engine, "_loader", None)
+            if loader is None:
+                continue
+
+            try:
+                if hasattr(loader, "reload") and callable(loader.reload):
+                    loader.reload()
+                else:
+                    loader._instance = None
+                    loader._initialized = False
+                    loader.get()
+            except Exception as exc:  # noqa: BLE001
+                logger.error("Failed to reload realtime engine: %s", exc, exc_info=True)
+                raise
+            else:
+                reloaded = True
+
+        return reloaded
 
     def _apply_session_model_selection(self) -> None:
         """Apply per-session model selection options when supported by the engine."""
@@ -943,9 +1038,14 @@ class RealtimeRecorder:
 
         self.accumulated_transcription = []
         self.accumulated_translation = []
+        self._stream_recording_active = False
 
         with self._marker_lock:
             self.markers = []
+
+        aborter = getattr(self.session_archiver, "abort_recording_capture", None)
+        if callable(aborter):
+            aborter()
 
         self._drain_queue(self.transcription_queue)
         self._drain_queue(self.translation_queue)

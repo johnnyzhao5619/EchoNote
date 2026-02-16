@@ -247,6 +247,16 @@ class TestRealtimeRecorderLifecycle:
         assert result["event_id"] == "event_123"
 
     @pytest.mark.asyncio
+    async def test_stop_recording_always_cleans_streaming_capture(self, recorder, event_loop):
+        await recorder.start_recording(event_loop=event_loop)
+        recorder.session_archiver.abort_recording_capture = Mock()
+        recorder.recording_audio_buffer.append(np.zeros(10))
+
+        await recorder.stop_recording()
+
+        recorder.session_archiver.abort_recording_capture.assert_called_once()
+
+    @pytest.mark.asyncio
     async def test_start_recording_without_audio_capture(
         self, mock_speech_engine, mock_translation_engine, mock_db, mock_file_manager, event_loop
     ):
@@ -283,6 +293,19 @@ class TestRealtimeRecorderLifecycle:
         }
         await recorder.stop_recording()
 
+    @pytest.mark.asyncio
+    async def test_start_recording_with_transcription_disabled(self, recorder, event_loop):
+        await recorder.start_recording(
+            options={"enable_transcription": False, "enable_translation": True},
+            event_loop=event_loop,
+        )
+
+        assert recorder.processing_task is None
+        assert recorder.translation_task is None
+        assert recorder.current_options["enable_translation"] is False
+
+        await recorder.stop_recording()
+
 
 class TestRealtimeRecorderAudioProcessing:
     def test_audio_callback(self, recorder):
@@ -306,6 +329,51 @@ class TestRealtimeRecorderAudioProcessing:
         recorder._audio_callback(audio_chunk)
 
         assert len(recorder.recording_audio_buffer) == 0
+
+    def test_audio_callback_skips_transcription_queue_when_disabled(self, recorder):
+        recorder.is_recording = True
+        recorder._transcription_enabled = False
+        recorder._event_loop = Mock()
+        recorder.transcription_queue = asyncio.Queue()
+
+        audio_chunk = np.random.rand(1600).astype(np.float32)
+        recorder._audio_callback(audio_chunk)
+
+        recorder._event_loop.call_soon_threadsafe.assert_not_called()
+
+    def test_audio_callback_failover_stream_capture_on_append_failure(self, recorder):
+        recorder.is_recording = True
+        recorder._transcription_enabled = False
+        recorder.current_options = {"save_recording": True}
+        recorder._stream_recording_active = True
+        recorder.session_archiver.append_recording_chunk = Mock(return_value=False)
+        recorder.session_archiver.failover_recording_capture = Mock(return_value=True)
+        recorder.session_archiver.abort_recording_capture = Mock()
+
+        audio_chunk = np.random.rand(1600).astype(np.float32)
+        recorder._audio_callback(audio_chunk)
+
+        recorder.session_archiver.failover_recording_capture.assert_called_once()
+        recorder.session_archiver.abort_recording_capture.assert_not_called()
+        assert recorder._stream_recording_active is False
+        assert len(recorder.recording_audio_buffer) == 1
+
+    def test_audio_callback_abort_when_stream_failover_unavailable(self, recorder):
+        recorder.is_recording = True
+        recorder._transcription_enabled = False
+        recorder.current_options = {"save_recording": True}
+        recorder._stream_recording_active = True
+        recorder.session_archiver.append_recording_chunk = Mock(return_value=False)
+        recorder.session_archiver.failover_recording_capture = Mock(return_value=False)
+        recorder.session_archiver.abort_recording_capture = Mock()
+
+        audio_chunk = np.random.rand(1600).astype(np.float32)
+        recorder._audio_callback(audio_chunk)
+
+        recorder.session_archiver.failover_recording_capture.assert_called_once()
+        recorder.session_archiver.abort_recording_capture.assert_called_once()
+        assert recorder._stream_recording_active is False
+        assert len(recorder.recording_audio_buffer) == 1
 
 
 class TestRealtimeRecorderTranscription:

@@ -210,6 +210,7 @@ class RealtimeRecordWidget(BaseWidget):
         # Initialize UI
         self.setup_ui()
         self._apply_recording_preferences_to_controls()
+        self._refresh_translation_availability()
 
         # Connect language change signal
         self.i18n.language_changed.connect(self._update_ui_text)
@@ -1206,10 +1207,51 @@ class RealtimeRecordWidget(BaseWidget):
 
     def _on_translation_toggled(self, state: int):
         enabled = state == Qt.CheckState.Checked.value
-        if self.recorder.translation_engine:
+        if self._translation_engine_available():
             self.target_lang_combo.setEnabled(enabled)
         else:
             self.target_lang_combo.setEnabled(False)
+
+    def _translation_engine_available(self) -> bool:
+        """Check whether translation engine is currently available."""
+        try:
+            return bool(self.recorder.translation_engine)
+        except Exception:
+            return False
+
+    def _refresh_translation_availability(self) -> None:
+        """Refresh translation-related controls based on runtime engine availability."""
+        available = self._translation_engine_available()
+        tooltip = self.i18n.t("realtime_record.translation_disabled_tooltip")
+
+        if hasattr(self, "enable_translation_checkbox"):
+            if available:
+                self.enable_translation_checkbox.setEnabled(True)
+                self.enable_translation_checkbox.setToolTip("")
+            else:
+                self.enable_translation_checkbox.setChecked(False)
+                self.enable_translation_checkbox.setEnabled(False)
+                self.enable_translation_checkbox.setToolTip(tooltip)
+
+        if hasattr(self, "target_lang_combo"):
+            if available and hasattr(self, "enable_translation_checkbox"):
+                self.target_lang_combo.setEnabled(self.enable_translation_checkbox.isChecked())
+                self.target_lang_combo.setToolTip("")
+            else:
+                self.target_lang_combo.setEnabled(False)
+                self.target_lang_combo.setToolTip(tooltip)
+
+        if hasattr(self, "translation_text"):
+            if available:
+                self.translation_text.setPlaceholderText("")
+            else:
+                self.translation_text.setPlaceholderText(
+                    self.i18n.t("realtime_record.translation_not_available")
+                )
+
+    def refresh_engine_availability(self) -> None:
+        """Public hook used by MainWindow after engine reloads."""
+        self._refresh_translation_availability()
 
     def _add_marker(self):
         if not self.recorder.is_recording:
@@ -1251,6 +1293,7 @@ class RealtimeRecordWidget(BaseWidget):
 
         options: Dict[str, Any] = {
             "language": source_lang,
+            "enable_transcription": True,
             "enable_translation": enable_translation,
             "target_language": target_lang,
             "recording_format": self._recording_format,

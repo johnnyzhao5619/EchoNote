@@ -296,7 +296,9 @@ def main():
         logger.info("Setting up translation engine (lazy loading)...")
         from utils.app_initializer import TranslationEngineProxy, initialize_translation_engine
 
-        translation_engine_loader = initialize_translation_engine(config)
+        translation_engine_loader = initialize_translation_engine(
+            config, managers.get("secrets_manager")
+        )
         managers["translation_engine_loader"] = translation_engine_loader
         managers["translation_engine"] = TranslationEngineProxy(translation_engine_loader)
 

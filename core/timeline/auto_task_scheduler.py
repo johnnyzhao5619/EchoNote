@@ -389,17 +389,26 @@ class AutoTaskScheduler:
 
         enable_transcription = auto_tasks.get("enable_transcription")
         if enable_transcription is None:
-            save_transcript = bool(preferences.get("save_transcript", True))
+            enable_transcription = bool(preferences.get("save_transcript", True))
         else:
-            save_transcript = bool(enable_transcription)
+            enable_transcription = bool(enable_transcription)
+
+        save_transcript = bool(preferences.get("save_transcript", True) and enable_transcription)
 
         translation_globally_enabled = preferences.get("translation_engine", "google") != "none"
-        enable_translation = bool(auto_tasks.get("enable_translation", False) and translation_globally_enabled)
+        translation_runtime_available = self._translation_engine_available()
+        enable_translation = bool(
+            enable_transcription
+            and auto_tasks.get("enable_translation", False)
+            and translation_globally_enabled
+            and translation_runtime_available
+        )
 
         options = {
             "event_id": event.id,
             "event_title": event.title,
             "language": auto_tasks.get("transcription_language"),
+            "enable_transcription": enable_transcription,
             "enable_translation": enable_translation,
             "target_language": auto_tasks.get("translation_target_language") or "en",
             "recording_format": preferences.get("recording_format", "wav"),
@@ -412,6 +421,18 @@ class AutoTaskScheduler:
         }
 
         return options
+
+    def _translation_engine_available(self) -> bool:
+        """Return whether realtime recorder currently has a usable translation engine."""
+        engine = getattr(self.realtime_recorder, "translation_engine", None)
+        if engine is None:
+            return False
+
+        try:
+            return bool(engine)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to evaluate translation engine availability: %s", exc)
+            return False
 
     def _start_auto_tasks(self, event, auto_tasks: dict) -> bool:
         """
