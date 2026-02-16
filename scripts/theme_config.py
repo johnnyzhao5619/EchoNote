@@ -119,54 +119,6 @@ DARK_TO_LIGHT_COLORS = {
     "#4a4a4a": "#d0d0d0",
 }
 
-# Color mapping for High Contrast theme (Dark → High Contrast)
-DARK_TO_HC_COLORS = {
-    # Backgrounds - all black
-    "#000000": "#000000",
-    "#1e1e1e": "#000000",
-    "#1a1d20": "#000000",
-    "#212529": "#000000",
-    "#252525": "#000000",
-    "#2d2d2d": "#000000",
-    "#2a2a2a": "#000000",
-    "#353535": "#000000",
-    "#3a3a3a": "#000000",
-    "#404040": "#FFFF00",
-    "#4a4a4a": "#FFFFFF",
-    "#5a5a5a": "#FFFFFF",
-    # Text colors - all white
-    "#e0e0e0": "#FFFFFF",
-    "#e9ecef": "#FFFFFF",
-    "#ffffff": "#FFFFFF",
-    "#b0b0b0": "#FFFFFF",
-    "#90caf9": "#FFFF00",
-    "#bbdefb": "#FFFF00",
-    # Primary colors - yellow
-    "#42a5f5": "#FFFF00",
-    "#64b5f6": "#FFFF00",
-    "#2196f3": "#FFFF00",
-    "#2d4a5a": "#FFFF00",
-    # Success colors - green
-    "#66bb6a": "#00FF00",
-    "#4CAF50": "#00FF00",
-    "#a5d6a7": "#00FF00",
-    "#c8e6c9": "#00FF00",
-    "#2d5a2f": "#00FF00",
-    "#3d6a3f": "#00FF00",
-    # Error colors - red
-    "#f48fb1": "#FF0000",
-    "#f44336": "#FF0000",
-    "#ef9a9a": "#FF0000",
-    "#ffcdd2": "#FF0000",
-    "#5a2d2d": "#FF0000",
-    # Warning colors - yellow
-    "#ff9800": "#FFFF00",
-    "#ffb74d": "#FFFF00",
-    # Borders - white and thicker
-    "#3a3a3a": "#FFFFFF",
-    "#4a4a4a": "#FFFFFF",
-}
-
 # Theme metadata
 THEME_INFO = {
     "dark": {
@@ -179,11 +131,5 @@ THEME_INFO = {
         "description": "Light theme with blue accents",
         "file": "light.qss",
         "color_map": DARK_TO_LIGHT_COLORS,
-    },
-    "high_contrast": {
-        "name": "High Contrast",
-        "description": "High contrast theme for accessibility (WCAG AAA)",
-        "file": "high_contrast.qss",
-        "color_map": DARK_TO_HC_COLORS,
     },
 }

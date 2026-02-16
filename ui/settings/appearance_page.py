@@ -70,7 +70,6 @@ class AppearanceSettingsPage(BaseSettingsPage):
             [
                 self.i18n.t("settings.appearance.light"),
                 self.i18n.t("settings.appearance.dark"),
-                self.i18n.t("settings.appearance.high_contrast"),
                 self.i18n.t("settings.appearance.system"),
             ]
         )
@@ -124,7 +123,7 @@ class AppearanceSettingsPage(BaseSettingsPage):
             index: Selected theme index
         """
         # Map index to theme name
-        theme_map = {0: "light", 1: "dark", 2: "high_contrast", 3: "system"}
+        theme_map = {0: "light", 1: "dark", 2: "system"}
 
         theme = theme_map.get(index, "light")
 
@@ -145,7 +144,7 @@ class AppearanceSettingsPage(BaseSettingsPage):
             theme = self.settings_manager.get_setting("ui.theme")
             if theme:
                 # Map theme name to index
-                theme_map = {"light": 0, "dark": 1, "high_contrast": 2, "system": 3}
+                theme_map = {"light": 0, "dark": 1, "system": 2}
                 index = theme_map.get(theme, 0)
                 self.theme_combo.setCurrentIndex(index)
 
@@ -158,7 +157,7 @@ class AppearanceSettingsPage(BaseSettingsPage):
         """Save appearance settings from UI."""
         try:
             # Theme
-            theme_map = {0: "light", 1: "dark", 2: "high_contrast", 3: "system"}
+            theme_map = {0: "light", 1: "dark", 2: "system"}
             theme = theme_map.get(self.theme_combo.currentIndex(), "light")
             self.settings_manager.set_setting("ui.theme", theme)
 
@@ -203,7 +202,6 @@ class AppearanceSettingsPage(BaseSettingsPage):
                 [
                     self.i18n.t("settings.appearance.light"),
                     self.i18n.t("settings.appearance.dark"),
-                    self.i18n.t("settings.appearance.high_contrast"),
                     self.i18n.t("settings.appearance.system"),
                 ]
             )

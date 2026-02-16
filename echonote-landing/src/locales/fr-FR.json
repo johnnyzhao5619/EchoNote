@@ -1,7 +1,7 @@
 {
   "hero": {
     "title": "EchoNote",
-    "description": "Une application de prise de notes moderne et open-source avec des fonctionnalités puissantes pour organiser et gérer vos idées",
+    "description": "Une application desktop locale pour la transcription vocale, l'enregistrement en temps réel et la gestion chronologique liée au calendrier",
     "viewOnGitHub": "Voir sur GitHub",
     "subtitle": "Open Source • Gratuit • Multi-plateforme",
     "getStarted": "Commencer",
@@ -17,7 +17,7 @@
   },
   "features": {
     "title": "Fonctionnalités clés",
-    "subtitle": "Découvrez les capacités puissantes d'EchoNote qui rendent la prise de notes plus efficace",
+    "subtitle": "Reliez transcription, planning et contexte temporel dans un flux de travail unifié",
     "callToAction": "Vous voulez en savoir plus sur les détails techniques ?",
     "exploreMore": "Voir les statistiques du projet"
   },

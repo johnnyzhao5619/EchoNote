@@ -10,45 +10,45 @@ const GITHUB_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`
 export const projectConfig: ProjectConfig = {
   name: PROJECT_NAME,
   description:
-    'A modern, open-source note-taking application with powerful features for organizing and managing your thoughts.',
+    'A local-first desktop application for voice transcription, real-time recording, and calendar-aware timeline management.',
   githubUrl: GITHUB_URL,
 
   features: [
     {
-      id: 'markdown-support',
-      icon: '📝',
-      title: 'Markdown Support',
-      description: 'Write notes in Markdown with live preview and syntax highlighting.',
+      id: 'batch-transcription',
+      icon: '🎙️',
+      title: 'Batch Transcription',
+      description: 'Transcribe audio and video files with local models and export to multiple formats.',
     },
     {
-      id: 'organization',
-      icon: '📁',
-      title: 'Smart Organization',
-      description: 'Organize notes with tags, folders, and powerful search capabilities.',
+      id: 'realtime-recording',
+      icon: '⏱️',
+      title: 'Real-time Recording',
+      description: 'Capture microphone audio, annotate key moments, and generate live transcripts.',
     },
     {
-      id: 'sync',
-      icon: '☁️',
-      title: 'Cloud Sync',
-      description: 'Sync your notes across all devices with secure cloud storage.',
+      id: 'calendar-sync',
+      icon: '📅',
+      title: 'Calendar Integration',
+      description: 'Connect Google or Outlook calendars and keep events synced with recordings.',
     },
     {
-      id: 'collaboration',
-      icon: '👥',
-      title: 'Collaboration',
-      description: 'Share and collaborate on notes with team members in real-time.',
+      id: 'timeline',
+      icon: '🧭',
+      title: 'Timeline Intelligence',
+      description: 'Correlate events, recordings, and transcripts in a single searchable timeline.',
     },
     {
-      id: 'themes',
-      icon: '🎨',
-      title: 'Customizable Themes',
-      description: 'Choose from multiple themes or create your own custom appearance.',
+      id: 'privacy-first',
+      icon: '🔒',
+      title: 'Privacy First',
+      description: 'Keep data local with encrypted storage and no mandatory cloud dependency.',
     },
     {
-      id: 'export',
-      icon: '📤',
-      title: 'Export Options',
-      description: 'Export notes to PDF, HTML, or other formats for sharing and archiving.',
+      id: 'multilingual',
+      icon: '🌍',
+      title: 'Multilingual Workflow',
+      description: 'Supports multilingual speech recognition with a translation-ready UI architecture.',
     },
   ],
 
@@ -59,40 +59,23 @@ export const projectConfig: ProjectConfig = {
   },
 
   seo: {
-    title: `${PROJECT_NAME} - Modern Open Source Note-Taking App`,
-    description: `${PROJECT_NAME} is a powerful, open-source note-taking application with Markdown support, cloud sync, and collaboration features. Perfect for developers, writers, and teams.`,
+    title: `${PROJECT_NAME} - Local-First Voice Transcription & Calendar Workflow`,
+    description: `${PROJECT_NAME} is an open-source desktop app for batch transcription, real-time recording, and calendar-aware timeline management.`,
     keywords: [
-      'note-taking',
-      'markdown',
+      'voice transcription',
+      'speech to text',
+      'desktop app',
+      'calendar integration',
+      'timeline',
+      'local first',
       'open-source',
-      'productivity',
-      'collaboration',
-      'cloud-sync',
-      'notes-app',
-      'writing',
-      'documentation',
-      'vue',
-      'typescript',
-      'github',
+      'privacy',
+      'faster-whisper',
     ],
     ogImage: '/og-image.png',
     ogUrl: BASE_URL,
   },
 }
-
-// Language options for the language switcher
-export const languageOptions = [
-  {
-    code: 'zh-CN',
-    name: '中文',
-    flag: '🇨🇳',
-  },
-  {
-    code: 'en-US',
-    name: 'English',
-    flag: '🇺🇸',
-  },
-]
 
 // GitHub repository configuration
 export const githubConfig = {
@@ -119,7 +102,7 @@ export const structuredData = {
     '@type': 'Person',
     name: GITHUB_OWNER,
   },
-  license: 'https://opensource.org/licenses/MIT',
+  license: 'https://www.apache.org/licenses/LICENSE-2.0',
 }
 
 // Technology stack information
@@ -127,20 +110,6 @@ export const techStack = ['Vue 3', 'TypeScript', 'Tailwind CSS']
 
 // License information
 export const licenseInfo = {
-  name: 'MIT License',
-  url: 'https://opensource.org/licenses/MIT',
+  name: 'Apache License 2.0',
+  url: 'https://www.apache.org/licenses/LICENSE-2.0',
 }
-
-// Additional meta tags for better SEO
-export const additionalMetaTags = [
-  { name: 'author', content: GITHUB_OWNER },
-  { name: 'robots', content: 'index, follow' },
-  { name: 'language', content: 'en, zh' },
-  { name: 'revisit-after', content: '7 days' },
-  { name: 'theme-color', content: '#3b82f6' },
-  { property: 'og:type', content: 'website' },
-  { property: 'og:site_name', content: PROJECT_NAME },
-  { name: 'twitter:card', content: 'summary_large_image' },
-  { name: 'twitter:site', content: `@${PROJECT_NAME.toLowerCase()}` },
-  { name: 'twitter:creator', content: `@${GITHUB_OWNER}` },
-]

@@ -327,7 +327,7 @@ class MainWindow(QMainWindow):
         Apply a theme to the application.
 
         Args:
-            theme: Theme name ('light', 'dark', 'high_contrast', or 'system')
+            theme: Theme name ('light', 'dark', or 'system')
         """
         try:
             # Handle system theme

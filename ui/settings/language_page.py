@@ -26,7 +26,7 @@ from PySide6.QtWidgets import QComboBox, QLabel
 
 # Removed over-engineered mixins
 from ui.settings.base_page import BaseSettingsPage
-from utils.i18n import I18nQtManager
+from utils.i18n import I18nQtManager, get_language_display_name, get_translation_codes
 
 logger = logging.getLogger("echonote.ui.settings.language")
 
@@ -64,9 +64,7 @@ class LanguageSettingsPage(BaseSettingsPage):
 
         # Language selection using mixin helper
         self.language_combo = QComboBox()
-
-        # Add language options
-        self.language_combo.addItem(self.i18n.t("settings.language.english"), "en_US")
+        self._populate_language_options()
 
         self.language_combo.currentIndexChanged.connect(self._on_language_changed)
 
@@ -108,6 +106,15 @@ class LanguageSettingsPage(BaseSettingsPage):
         self._emit_changed()
 
         logger.debug(f"Language changed to: {language_code}")
+
+    def _populate_language_options(self):
+        """Populate language selector from available translation files."""
+        codes = get_translation_codes()
+        if not codes:
+            codes = ["en_US"]
+
+        for code in codes:
+            self.language_combo.addItem(get_language_display_name(code, self.i18n), code)
 
     def load_settings(self):
         """Load language settings into UI."""
@@ -167,8 +174,7 @@ class LanguageSettingsPage(BaseSettingsPage):
 
             self.language_combo.blockSignals(True)
             self.language_combo.clear()
-
-            self.language_combo.addItem(self.i18n.t("settings.language.english"), "en_US")
+            self._populate_language_options()
 
             # Restore selection
             for i in range(self.language_combo.count()):

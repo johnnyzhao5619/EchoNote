@@ -26,6 +26,7 @@ from collections.abc import Mapping
 from typing import Any, Dict, Optional
 
 from PySide6.QtCore import QObject, Signal
+from utils.i18n import get_translation_codes
 
 logger = logging.getLogger(__name__)
 
@@ -333,7 +334,9 @@ class SettingsManager(QObject):
                 return False
 
         elif setting_name == "language":
-            valid_languages = ["en_US"]
+            valid_languages = get_translation_codes()
+            if not valid_languages:
+                valid_languages = ["en_US"]
             if value not in valid_languages:
                 logger.error(f"Invalid language: {value}. " f"Must be one of {valid_languages}")
                 return False

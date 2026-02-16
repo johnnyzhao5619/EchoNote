@@ -68,7 +68,7 @@ class TestI18nEnhanced:
             }
 
             # Write translation files
-            with open(translations_dir / "en_US.json", "w", encoding="utf-8") as f:
+            with open(translations_dir / "zh_CN.json", "w", encoding="utf-8") as f:
                 json.dump(zh_translations, f, ensure_ascii=False, indent=2)
 
             with open(translations_dir / "en_US.json", "w", encoding="utf-8") as f:
@@ -79,7 +79,7 @@ class TestI18nEnhanced:
     @pytest.fixture
     def i18n_manager(self, temp_translations_dir):
         """Create I18nManager instance with test data."""
-        return I18nManager(str(temp_translations_dir), "en_US")
+        return I18nManager(str(temp_translations_dir), "zh_CN")
 
     def test_simple_translation(self, i18n_manager):
         """Test basic translation functionality."""
@@ -170,6 +170,19 @@ class TestI18nEnhanced:
         # Test parameters in English
         result = i18n_manager.t("simple.with_param", value="test value")
         assert result == "Parameter: test value"
+
+    def test_fallback_translation_lookup(self, temp_translations_dir):
+        """Test missing key fallback to fallback language."""
+        zh_path = temp_translations_dir / "zh_CN.json"
+        with open(zh_path, "r", encoding="utf-8") as f:
+            zh_data = json.load(f)
+
+        del zh_data["simple"]["message"]
+        with open(zh_path, "w", encoding="utf-8") as f:
+            json.dump(zh_data, f, ensure_ascii=False, indent=2)
+
+        i18n = I18nManager(str(temp_translations_dir), "zh_CN", fallback_language="en_US")
+        assert i18n.t("simple.message") == "Simple message"
 
     def test_template_caching(self, i18n_manager):
         """Test template caching functionality."""

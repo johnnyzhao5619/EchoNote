@@ -1,7 +1,7 @@
 {
   "hero": {
     "title": "EchoNote",
-    "description": "现代化的开源笔记应用，具有强大的功能来组织和管理您的想法",
+    "description": "本地优先的桌面应用，聚焦语音转写、实时录音与日历联动时间线",
     "viewOnGitHub": "查看 GitHub",
     "subtitle": "开源 • 免费 • 跨平台",
     "getStarted": "开始使用",
@@ -17,7 +17,7 @@
   },
   "features": {
     "title": "主要特性",
-    "subtitle": "探索 EchoNote 的强大功能，让您的笔记体验更加高效",
+    "subtitle": "通过统一流程连接转写、日程与时间线上下文",
     "callToAction": "想了解更多技术细节？",
     "exploreMore": "查看项目统计"
   },

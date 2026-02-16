@@ -96,7 +96,7 @@ self.add_page('settings', settings_widget)
 ### 6. Language Settings
 
 - **Path**: `ui.language`
-- **Values**: en_US
+- **Values**: discovered from `resources/translations/*.json` (e.g. `en_US`, `zh_CN`, `fr_FR`)
 
 ## API Reference
 

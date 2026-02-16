@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 from config.app_config import get_app_dir
+from utils.i18n import get_language_display_name, get_translation_codes
 from utils.model_download import run_model_download
 
 if TYPE_CHECKING:
@@ -435,7 +436,11 @@ class FirstRunWizard:
                     layout.addWidget(lang_label)
 
                     self.language_combo = QComboBox()
-                    self.language_combo.addItem("English", "en_US")
+                    language_codes = get_translation_codes()
+                    if not language_codes:
+                        language_codes = ["en_US"]
+                    for code in language_codes:
+                        self.language_combo.addItem(get_language_display_name(code, i18n), code)
 
                     # Set current language
                     current_lang = config_manager.get("ui.language", "en_US")
@@ -749,7 +754,7 @@ class FirstRunWizard:
                 config_manager.save()
 
                 # Apply language change
-                i18n.set_language(selected_language)
+                i18n.change_language(selected_language)
 
                 logger.info(
                     f"First run wizard completed: "

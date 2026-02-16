@@ -23,8 +23,8 @@
 
 ```bash
 # 1. Create virtual environment
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
 
 # 2. Install dependencies
 pip install -r requirements.txt
@@ -46,7 +46,7 @@ python main.py
 - **📅 Calendar Integration**: Sync with Google Calendar and Outlook, manage local events
 - **⏰ Timeline Intelligence**: Correlate events with recordings, automated task scheduling
 - **🔒 Privacy-First**: Encrypted local storage, no cloud dependency required
-- **🌍 Multi-language**: Built-in internationalization (English, Chinese, French)
+- **🌍 Multilingual**: Multilingual speech recognition with extensible UI i18n support
 - **🎨 Accessibility**: Keyboard navigation, screen reader support, multiple themes
 
 ### 📋 System Requirements
@@ -78,7 +78,7 @@ EchoNote/
 | ---------------- | ------------------ | ---------------------------------------------------------- |
 | **Developers**   | API reference      | [`docs/DEVELOPER_GUIDE.md`](docs/DEVELOPER_GUIDE.md)       |
 | **Contributors** | Coding standards   | [`docs/CODE_STANDARDS.md`](docs/CODE_STANDARDS.md)         |
-| **Maintainers**  | Version management | [`docs/VERSION_MANAGEMENT.md`](docs/VERSION_MANAGEMENT.md) |
+| **Maintainers**  | CI/CD guide        | [`docs/CI_CD_GUIDE.md`](docs/CI_CD_GUIDE.md)               |
 
 ### 🧪 Development & Testing
 
@@ -89,7 +89,7 @@ pip install -r requirements-dev.txt
 # Run tests
 pytest tests/unit                    # Unit tests
 pytest tests/integration             # Integration tests
-pytest tests/e2e_performance_test.py # Performance tests
+pytest tests/performance             # Performance tests
 
 # Code quality checks
 python scripts/sync_version.py       # Version consistency
@@ -105,7 +105,7 @@ Released under the [Apache 2.0 License](LICENSE). PySide6 (LGPL v3) is used for 
 ## 📊 Project Status
 
 - **Version**: v1.2.0 (Latest maintenance release)
-- **Test Coverage**: 607 tests, 100% pass rate
+- **Test Suite**: unit / integration / UI / performance categories
 - **Code Quality**: Excellent (PEP 8 compliant, type-annotated)
 - **Documentation**: Complete and restructured
 - **License**: Apache 2.0 (fully compliant)
@@ -122,8 +122,8 @@ We welcome contributions! Please see our [Contributing Guide](docs/CONTRIBUTING.
 ## 📞 Support
 
 - **Documentation**: [`docs/`](docs/) directory
-- **Issues**: [GitHub Issues](https://github.com/your-org/echonote/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/your-org/echonote/discussions)
+- **Issues**: [GitHub Issues](https://github.com/johnnyzhao5619/EchoNote/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/johnnyzhao5619/EchoNote/discussions)
 
 ---
 

@@ -55,11 +55,62 @@ LANGUAGE_OPTION_KEYS = [
     ("ko", "realtime_record.available_languages.ko"),
 ]
 
+LANGUAGE_LABEL_KEYS = {
+    "en_US": "settings.language.english",
+    "zh_CN": "settings.language.chinese",
+    "fr_FR": "settings.language.french",
+}
+
+
+def get_translation_codes(translations_dir: str | Path | None = None) -> list[str]:
+    """
+    Return available UI language codes from translation files.
+
+    Args:
+        translations_dir: Optional translation directory override
+
+    Returns:
+        Sorted list of language codes discovered from ``*.json`` files.
+    """
+    if translations_dir is None:
+        translations_dir = Path(__file__).parent.parent / "resources" / "translations"
+    else:
+        translations_dir = Path(translations_dir)
+
+    if not translations_dir.exists():
+        return []
+
+    return sorted(file.stem for file in translations_dir.glob("*.json"))
+
+
+def get_language_display_name(language_code: str, i18n_manager=None) -> str:
+    """
+    Resolve a human-readable language name for UI selectors.
+
+    Args:
+        language_code: Language code such as ``en_US``
+        i18n_manager: Optional i18n manager used to localize names
+
+    Returns:
+        Display label for the language code
+    """
+    key = LANGUAGE_LABEL_KEYS.get(language_code)
+    if key and i18n_manager is not None:
+        translated = i18n_manager.t(key)
+        if translated != key:
+            return translated
+    return language_code
+
 
 class I18nManager:
     """Basic translation manager without Qt dependencies with enhanced dynamic string support."""
 
-    def __init__(self, translations_dir: str = None, default_language: str = "en_US"):
+    def __init__(
+        self,
+        translations_dir: str = None,
+        default_language: str = "en_US",
+        fallback_language: str = "en_US",
+    ):
         """
         Initialize the translation manager.
 
@@ -74,10 +125,35 @@ class I18nManager:
 
         self.translations_dir = translations_dir
         self.current_language = default_language
+        self.fallback_language = fallback_language
         self.translations: Dict[str, Any] = {}
+        self.fallback_translations: Dict[str, Any] = {}
         self._template_cache: Dict[str, Template] = {}
         self._parameter_cache: Dict[str, List[str]] = {}
+        self._load_fallback_translations()
         self._load_translations(default_language)
+
+    def _load_fallback_translations(self) -> None:
+        """Load fallback language translations used for missing-key recovery."""
+        translation_file = self.translations_dir / f"{self.fallback_language}.json"
+
+        try:
+            with open(translation_file, "r", encoding="utf-8") as f:
+                self.fallback_translations = json.load(f)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Could not load fallback translations (%s): %s", translation_file, exc)
+            self.fallback_translations = {}
+
+    @staticmethod
+    def _lookup_key(translations: Dict[str, Any], key: str) -> Any:
+        """Lookup nested translation value using dot notation."""
+        value: Any = translations
+        for part in key.split("."):
+            if isinstance(value, dict) and part in value:
+                value = value[part]
+            else:
+                return None
+        return value
 
     def _load_translations(self, language: str) -> None:
         """
@@ -119,18 +195,21 @@ class I18nManager:
         # Handle fallback parameter
         fallback = kwargs.pop("fallback", None)
 
-        # Navigate nested keys
-        keys = key.split(".")
-        value = self.translations
-
-        for k in keys:
-            if isinstance(value, dict) and k in value:
-                value = value[k]
-            else:
+        # Navigate nested keys with fallback to fallback_language
+        value = self._lookup_key(self.translations, key)
+        if value is None:
+            value = self._lookup_key(self.fallback_translations, key)
+            if value is None:
                 logger.warning(
                     f"Translation key not found: {key} (language: {self.current_language})"
                 )
                 return fallback if fallback is not None else key
+            logger.debug(
+                "Using fallback translation for key '%s' (language: %s, fallback: %s)",
+                key,
+                self.current_language,
+                self.fallback_language,
+            )
 
         # Ensure we have a string
         if not isinstance(value, str):
@@ -470,7 +549,12 @@ if QT_AVAILABLE:
 
         language_changed = Signal(str)
 
-        def __init__(self, translations_dir: str = None, default_language: str = "en_US"):
+        def __init__(
+            self,
+            translations_dir: str = None,
+            default_language: str = "en_US",
+            fallback_language: str = "en_US",
+        ):
             """
             Initialize the Qt-enabled translation manager.
 
@@ -479,7 +563,7 @@ if QT_AVAILABLE:
                 default_language: Default language code
             """
             QObject.__init__(self)
-            I18nManager.__init__(self, translations_dir, default_language)
+            I18nManager.__init__(self, translations_dir, default_language, fallback_language)
 
         def change_language(self, language: str) -> None:
             """

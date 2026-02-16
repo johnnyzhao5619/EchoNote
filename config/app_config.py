@@ -27,6 +27,8 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Dict
 
+from utils.i18n import get_translation_codes
+
 from .__version__ import get_version
 
 APP_DIR_NAME = ".echonote"
@@ -244,7 +246,9 @@ class ConfigManager:
             raise ValueError(f"ui.theme must be one of {valid_themes}")
 
         # Validate language value
-        valid_languages = ["en_US"]
+        valid_languages = get_translation_codes()
+        if not valid_languages:
+            valid_languages = ["en_US"]
         if ui_config["language"] not in valid_languages:
             raise ValueError(f"ui.language must be one of {valid_languages}")
 

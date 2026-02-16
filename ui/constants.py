@@ -41,7 +41,7 @@ MAX_SEARCH_RESULTS = 1000
 PAGINATION_THRESHOLD = 0.8
 
 # Theme constants
-HIGHLIGHT_COLORS = {"light": "#FFEB3B", "dark": "#FF9800", "high_contrast": "#FFFF00"}
+HIGHLIGHT_COLORS = {"light": "#FFEB3B", "dark": "#FF9800"}
 
 # Sidebar constants
 SIDEBAR_WIDTH = 200

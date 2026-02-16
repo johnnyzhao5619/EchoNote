@@ -578,8 +578,6 @@ class SearchWidget(BaseWidget):
                 theme = self.settings_manager.get_setting("ui.theme")
                 if theme == "dark":
                     return QColor("#FF9800")  # Orange for dark theme
-                elif theme == "high_contrast":
-                    return QColor("#FFFF00")  # Yellow for high contrast
                 else:
                     return QColor("#FFEB3B")  # Yellow for light theme
             except Exception:
