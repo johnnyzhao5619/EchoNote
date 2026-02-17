@@ -354,6 +354,8 @@ MIN_FUTURE_WINDOW_MINUTES = 15  # Minimum future window for reminders
 AUDIO_CHUNK_MEMORY_BYTES_PER_SAMPLE = 4  # float32 samples use 4 bytes each
 
 # Numeric Conversion
+PERCENTAGE_MULTIPLIER = 100.0
+
 # ============================================================================
 # Transcription Constants
 # ============================================================================
@@ -440,4 +442,3 @@ SUPPORTED_TASK_STATUSES = [
     TASK_STATUS_FAILED,
     TASK_STATUS_CANCELLED,
 ]
-
