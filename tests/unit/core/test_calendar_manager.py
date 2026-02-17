@@ -12,7 +12,9 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 
 from core.calendar.manager import CalendarManager
-from data.database.models import CalendarEvent, CalendarEventLink, EventAttachment
+from data.database.models import CalendarEvent, CalendarEventLink, CalendarSyncStatus, EventAttachment
+from core.calendar.constants import CalendarSource, EventType
+from core.calendar.exceptions import EventNotFoundError
 
 
 class MockDatabaseConnection:
@@ -70,6 +72,10 @@ class MockSyncAdapter:
         self.updated_events = []
         self.deleted_events = []
         self.fetched_events = []
+        self.revoked = False
+        self.access_token = "token"
+        self.refresh_token = "refresh"
+        self.expires_at = "2099-01-01T00:00:00"
 
     def create_event(self, event):
         """Mock create event."""
@@ -88,6 +94,10 @@ class MockSyncAdapter:
     def fetch_events(self, since=None):
         """Mock fetch events."""
         return self.fetched_events
+
+    def revoke_access(self):
+        """Mock revoke access."""
+        self.revoked = True
 
 
 class MockFileManager:
@@ -267,14 +277,14 @@ class TestCalendarManagerUpdateEvent:
     def test_update_event_not_found(self, calendar_manager):
         """Test updating non-existent event."""
         with patch.object(CalendarEvent, "get_by_id", return_value=None):
-            with pytest.raises(ValueError, match="Event not found"):
+            with pytest.raises(EventNotFoundError):
                 calendar_manager.update_event("nonexistent", {"title": "New"})
 
     def test_update_readonly_event(self, calendar_manager):
         """Test updating readonly event."""
         mock_event = Mock()
         mock_event.is_readonly = True
-        mock_event.source = "google"
+        mock_event.source = CalendarSource.GOOGLE
 
         with patch.object(CalendarEvent, "get_by_id", return_value=mock_event):
             with pytest.raises(ValueError, match="Cannot update readonly event"):
@@ -321,14 +331,14 @@ class TestCalendarManagerDeleteEvent:
     def test_delete_event_not_found(self, calendar_manager):
         """Test deleting non-existent event."""
         with patch.object(CalendarEvent, "get_by_id", return_value=None):
-            with pytest.raises(ValueError, match="Event not found"):
+            with pytest.raises(EventNotFoundError):
                 calendar_manager.delete_event("nonexistent")
 
     def test_delete_readonly_event(self, calendar_manager):
         """Test deleting readonly event."""
         mock_event = Mock()
         mock_event.is_readonly = True
-        mock_event.source = "google"
+        mock_event.source = CalendarSource.GOOGLE
 
         with patch.object(CalendarEvent, "get_by_id", return_value=mock_event):
             with pytest.raises(ValueError, match="Cannot delete readonly event"):
@@ -389,16 +399,16 @@ class TestCalendarManagerGetEvents:
         start_date = "2025-11-01T00:00:00"
         end_date = "2025-11-30T23:59:59"
 
-        mock_event1 = Mock(id="event_1", event_type="Meeting", title="Team Meeting", description="")
-        mock_event2 = Mock(id="event_2", event_type="Task", title="Code Review", description="")
-        mock_event3 = Mock(id="event_3", event_type="Meeting", title="Planning", description="")
+        mock_event1 = Mock(id="event_1", event_type=EventType.EVENT, title="Team Meeting", description="")
+        mock_event2 = Mock(id="event_2", event_type=EventType.TASK, title="Code Review", description="")
+        mock_event3 = Mock(id="event_3", event_type=EventType.EVENT, title="Planning", description="")
 
         with patch.object(
             CalendarEvent, "get_by_time_range", return_value=[mock_event1, mock_event2, mock_event3]
         ):
             # Filter by event_type
             events = calendar_manager.get_events(
-                start_date, end_date, filters={"event_type": "Meeting"}
+                start_date, end_date, filters={"event_type": EventType.EVENT}
             )
             assert len(events) == 2
 
@@ -430,7 +440,7 @@ class TestCalendarManagerSyncExternal:
         # The actual sync logic is complex and would need more detailed mocking
         with patch.object(calendar_manager.db, "execute", return_value=[]):
             try:
-                calendar_manager.sync_external_calendar("google")
+                calendar_manager.sync_external_calendar(CalendarSource.GOOGLE)
             except AttributeError:
                 # Expected if internal methods are not fully mocked
                 pass
@@ -439,6 +449,42 @@ class TestCalendarManagerSyncExternal:
         """Test sync with invalid provider."""
         with pytest.raises(ValueError, match="Sync adapter for invalid not found"):
             calendar_manager.sync_external_calendar("invalid")
+
+
+class TestCalendarManagerProviderDisconnect:
+    """Test provider account disconnect cleanup."""
+
+    def test_disconnect_provider_account_cleans_state(self, calendar_manager, mock_sync_adapters):
+        """Disconnect should revoke, delete token/sync status, then remove provider data."""
+        mock_oauth_manager = Mock()
+        calendar_manager.oauth_manager = mock_oauth_manager
+        mock_sync_status = Mock()
+
+        with patch.object(CalendarSyncStatus, "get_by_provider", return_value=mock_sync_status):
+            with patch.object(calendar_manager, "disconnect_provider") as mock_disconnect_provider:
+                calendar_manager.disconnect_provider_account("google")
+
+        assert mock_sync_adapters["google"].revoked is True
+        assert mock_sync_adapters["google"].access_token is None
+        assert mock_sync_adapters["google"].refresh_token is None
+        assert mock_sync_adapters["google"].expires_at is None
+        mock_oauth_manager.delete_token.assert_called_once_with("google")
+        mock_sync_status.delete.assert_called_once_with(calendar_manager.db)
+        mock_disconnect_provider.assert_called_once_with("google")
+
+    def test_disconnect_provider_account_continues_after_revoke_failure(self, calendar_manager):
+        """Disconnect should continue cleanup even if provider revoke fails."""
+        failing_adapter = Mock()
+        failing_adapter.revoke_access.side_effect = RuntimeError("revoke failed")
+        calendar_manager.sync_adapters["google"] = failing_adapter
+        calendar_manager.oauth_manager = Mock()
+
+        with patch.object(CalendarSyncStatus, "get_by_provider", return_value=None):
+            with patch.object(calendar_manager, "disconnect_provider") as mock_disconnect_provider:
+                calendar_manager.disconnect_provider_account("google")
+
+        calendar_manager.oauth_manager.delete_token.assert_called_once_with("google")
+        mock_disconnect_provider.assert_called_once_with("google")
 
 
 class TestCalendarManagerUtilities:

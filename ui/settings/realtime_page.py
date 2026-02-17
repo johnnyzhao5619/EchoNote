@@ -28,10 +28,12 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QDoubleSpinBox,
     QFileDialog,
     QLabel,
     QLineEdit,
     QSlider,
+    QSpinBox,
 )
 
 from config.constants import (
@@ -41,12 +43,28 @@ from config.constants import (
     GAIN_SLIDER_MIN,
     GAIN_SLIDER_TICK_INTERVAL,
     STANDARD_LABEL_WIDTH,
+    SUPPORTED_RECORDING_FORMATS,
+    SUPPORTED_REALTIME_TRANSLATION_ENGINES,
+    RECORDING_FORMAT_WAV,
+    RECORDING_FORMAT_MP3,
+    TRANSLATION_ENGINE_NONE,
+    TRANSLATION_ENGINE_GOOGLE,
 )
 from ui.base_widgets import create_button, create_hbox, create_vbox
 from ui.settings.base_page import BaseSettingsPage
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.settings.realtime")
+
+VAD_THRESHOLD_MIN = 0.0
+VAD_THRESHOLD_MAX = 1.0
+VAD_THRESHOLD_STEP = 0.05
+SILENCE_DURATION_MS_MIN = 0
+SILENCE_DURATION_MS_MAX = 60000
+SILENCE_DURATION_MS_STEP = 100
+MIN_AUDIO_DURATION_SEC_MIN = 0.1
+MIN_AUDIO_DURATION_SEC_MAX = 300.0
+MIN_AUDIO_DURATION_SEC_STEP = 0.1
 
 
 class RealtimeSettingsPage(BaseSettingsPage):
@@ -133,13 +151,13 @@ class RealtimeSettingsPage(BaseSettingsPage):
         self.format_label = QLabel(self.i18n.t("settings.realtime.recording_format"))
         self.format_label.setMinimumWidth(STANDARD_LABEL_WIDTH)
         self.format_combo = QComboBox()
-        self.format_combo.addItems(["wav", "mp3"])
+        self.format_combo.addItems(SUPPORTED_RECORDING_FORMATS)
         if not self._mp3_supported:
-            index = self.format_combo.findText("mp3")
+            index = self.format_combo.findText(RECORDING_FORMAT_MP3)
             if index >= 0:
                 model = self.format_combo.model()
                 model.setData(model.index(index, 0), False, Qt.ItemDataRole.EnabledRole)
-            self.format_combo.setCurrentText("wav")
+            self.format_combo.setCurrentText(RECORDING_FORMAT_WAV)
             self.format_combo.setToolTip(self.i18n.t("settings.realtime.mp3_requires_ffmpeg"))
         else:
             self.format_combo.setToolTip(self.i18n.t("settings.realtime.mp3_enabled_ffmpeg"))
@@ -192,6 +210,69 @@ class RealtimeSettingsPage(BaseSettingsPage):
         translation_layout.addStretch()
         self.content_layout.addLayout(translation_layout)
 
+        self.add_spacing(20)
+
+        # Processing settings section
+        self.processing_title = QLabel(self.i18n.t("settings.realtime.processing"))
+        self.processing_title.setFont(font)
+        self.content_layout.addWidget(self.processing_title)
+
+        self.save_transcript_check = QCheckBox(self.i18n.t("settings.realtime.save_transcript"))
+        self.save_transcript_check.stateChanged.connect(self._emit_changed)
+        self.content_layout.addWidget(self.save_transcript_check)
+
+        self.create_calendar_event_check = QCheckBox(
+            self.i18n.t("settings.realtime.create_calendar_event")
+        )
+        self.create_calendar_event_check.stateChanged.connect(self._emit_changed)
+        self.content_layout.addWidget(self.create_calendar_event_check)
+
+        vad_layout = create_hbox()
+        self.vad_threshold_label = QLabel(self.i18n.t("settings.realtime.vad_threshold"))
+        self.vad_threshold_label.setMinimumWidth(STANDARD_LABEL_WIDTH)
+        self.vad_threshold_spin = QDoubleSpinBox()
+        self.vad_threshold_spin.setRange(VAD_THRESHOLD_MIN, VAD_THRESHOLD_MAX)
+        self.vad_threshold_spin.setSingleStep(VAD_THRESHOLD_STEP)
+        self.vad_threshold_spin.setDecimals(2)
+        self.vad_threshold_spin.valueChanged.connect(self._emit_changed)
+        vad_layout.addWidget(self.vad_threshold_label)
+        vad_layout.addWidget(self.vad_threshold_spin)
+        vad_layout.addStretch()
+        self.content_layout.addLayout(vad_layout)
+
+        silence_layout = create_hbox()
+        self.silence_duration_label = QLabel(
+            self.i18n.t("settings.realtime.silence_duration_ms")
+        )
+        self.silence_duration_label.setMinimumWidth(STANDARD_LABEL_WIDTH)
+        self.silence_duration_spin = QSpinBox()
+        self.silence_duration_spin.setRange(SILENCE_DURATION_MS_MIN, SILENCE_DURATION_MS_MAX)
+        self.silence_duration_spin.setSingleStep(SILENCE_DURATION_MS_STEP)
+        self.silence_duration_spin.valueChanged.connect(self._emit_changed)
+        silence_layout.addWidget(self.silence_duration_label)
+        silence_layout.addWidget(self.silence_duration_spin)
+        silence_layout.addStretch()
+        self.content_layout.addLayout(silence_layout)
+
+        min_audio_layout = create_hbox()
+        self.min_audio_duration_label = QLabel(
+            self.i18n.t("settings.realtime.min_audio_duration")
+        )
+        self.min_audio_duration_label.setMinimumWidth(STANDARD_LABEL_WIDTH)
+        self.min_audio_duration_spin = QDoubleSpinBox()
+        self.min_audio_duration_spin.setRange(
+            MIN_AUDIO_DURATION_SEC_MIN, MIN_AUDIO_DURATION_SEC_MAX
+        )
+        self.min_audio_duration_spin.setSingleStep(MIN_AUDIO_DURATION_SEC_STEP)
+        self.min_audio_duration_spin.setDecimals(1)
+        self.min_audio_duration_spin.valueChanged.connect(self._emit_changed)
+        min_audio_layout.addWidget(self.min_audio_duration_label)
+        min_audio_layout.addWidget(self.min_audio_duration_spin)
+        min_audio_layout.addStretch()
+        self.content_layout.addLayout(min_audio_layout)
+
+        self._update_spinbox_suffixes()
+
         # Add stretch at the end
         self.content_layout.addStretch()
 
@@ -235,12 +316,12 @@ class RealtimeSettingsPage(BaseSettingsPage):
             # Recording format
             recording_format = self.settings_manager.get_setting("realtime.recording_format")
             if recording_format:
-                if recording_format == "mp3" and not self._mp3_supported:
+                if recording_format == RECORDING_FORMAT_MP3 and not self._mp3_supported:
                     logger.warning(
                         "MP3 format selected in settings but FFmpeg is unavailable. "
                         "Falling back to WAV in UI."
                     )
-                    self.format_combo.setCurrentText("wav")
+                    self.format_combo.setCurrentText(RECORDING_FORMAT_WAV)
                 else:
                     index = self.format_combo.findText(recording_format)
                     if index >= 0:
@@ -258,10 +339,32 @@ class RealtimeSettingsPage(BaseSettingsPage):
                 self.auto_save_check.setChecked(auto_save)
 
             translation_engine = self.settings_manager.get_setting("realtime.translation_engine")
-            if translation_engine in {"none", "google"}:
+            if translation_engine in {TRANSLATION_ENGINE_NONE, TRANSLATION_ENGINE_GOOGLE}:
                 index = self.translation_combo.findData(translation_engine)
                 if index >= 0:
                     self.translation_combo.setCurrentIndex(index)
+
+            save_transcript = self.settings_manager.get_setting("realtime.save_transcript")
+            if save_transcript is not None:
+                self.save_transcript_check.setChecked(bool(save_transcript))
+
+            create_calendar_event = self.settings_manager.get_setting(
+                "realtime.create_calendar_event"
+            )
+            if create_calendar_event is not None:
+                self.create_calendar_event_check.setChecked(bool(create_calendar_event))
+
+            vad_threshold = self.settings_manager.get_setting("realtime.vad_threshold")
+            if isinstance(vad_threshold, (int, float)):
+                self.vad_threshold_spin.setValue(float(vad_threshold))
+
+            silence_duration_ms = self.settings_manager.get_setting("realtime.silence_duration_ms")
+            if isinstance(silence_duration_ms, int):
+                self.silence_duration_spin.setValue(silence_duration_ms)
+
+            min_audio_duration = self.settings_manager.get_setting("realtime.min_audio_duration")
+            if isinstance(min_audio_duration, (int, float)):
+                self.min_audio_duration_spin.setValue(float(min_audio_duration))
 
             logger.debug("Realtime settings loaded")
 
@@ -272,29 +375,39 @@ class RealtimeSettingsPage(BaseSettingsPage):
         """Save realtime settings from UI."""
         try:
             # Input source
-            self.settings_manager.set_setting("realtime.default_input_source", "default")
+            self._set_setting_or_raise("realtime.default_input_source", "default")
 
             # Gain level
             gain = self.gain_slider.value() / GAIN_SLIDER_DIVISOR
-            self.settings_manager.set_setting("realtime.default_gain", gain)
+            self._set_setting_or_raise("realtime.default_gain", gain)
 
             # Recording format
-            self.settings_manager.set_setting(
-                "realtime.recording_format", self._get_selected_format()
-            )
+            self._set_setting_or_raise("realtime.recording_format", self._get_selected_format())
 
             # Recording save path
-            self.settings_manager.set_setting("realtime.recording_save_path", self.path_edit.text())
+            self._set_setting_or_raise("realtime.recording_save_path", self.path_edit.text())
 
             # Auto-save
-            self.settings_manager.set_setting(
-                "realtime.auto_save", self.auto_save_check.isChecked()
-            )
+            self._set_setting_or_raise("realtime.auto_save", self.auto_save_check.isChecked())
 
             translation_engine = self.translation_combo.currentData()
             if translation_engine is None:
-                translation_engine = "none"
-            self.settings_manager.set_setting("realtime.translation_engine", translation_engine)
+                translation_engine = TRANSLATION_ENGINE_NONE
+            self._set_setting_or_raise("realtime.translation_engine", translation_engine)
+
+            self._set_setting_or_raise(
+                "realtime.save_transcript", self.save_transcript_check.isChecked()
+            )
+            self._set_setting_or_raise(
+                "realtime.create_calendar_event", self.create_calendar_event_check.isChecked()
+            )
+            self._set_setting_or_raise("realtime.vad_threshold", self.vad_threshold_spin.value())
+            self._set_setting_or_raise(
+                "realtime.silence_duration_ms", self.silence_duration_spin.value()
+            )
+            self._set_setting_or_raise(
+                "realtime.min_audio_duration", self.min_audio_duration_spin.value()
+            )
 
             logger.debug("Realtime settings saved")
 
@@ -333,6 +446,8 @@ class RealtimeSettingsPage(BaseSettingsPage):
             self.recording_title.setText(self.i18n.t("settings.realtime.recording"))
         if hasattr(self, "translation_title"):
             self.translation_title.setText(self.i18n.t("settings.realtime.translation"))
+        if hasattr(self, "processing_title"):
+            self.processing_title.setText(self.i18n.t("settings.realtime.processing"))
 
         # Update labels
         if hasattr(self, "source_label"):
@@ -345,6 +460,16 @@ class RealtimeSettingsPage(BaseSettingsPage):
             self.path_label.setText(self.i18n.t("settings.realtime.recording_path"))
         if hasattr(self, "translation_label"):
             self.translation_label.setText(self.i18n.t("settings.realtime.translation_engine"))
+        if hasattr(self, "vad_threshold_label"):
+            self.vad_threshold_label.setText(self.i18n.t("settings.realtime.vad_threshold"))
+        if hasattr(self, "silence_duration_label"):
+            self.silence_duration_label.setText(
+                self.i18n.t("settings.realtime.silence_duration_ms")
+            )
+        if hasattr(self, "min_audio_duration_label"):
+            self.min_audio_duration_label.setText(
+                self.i18n.t("settings.realtime.min_audio_duration")
+            )
 
         # Update buttons
         if hasattr(self, "browse_button"):
@@ -353,9 +478,16 @@ class RealtimeSettingsPage(BaseSettingsPage):
         # Update checkbox
         if hasattr(self, "auto_save_check"):
             self.auto_save_check.setText(self.i18n.t("settings.realtime.auto_save"))
+        if hasattr(self, "save_transcript_check"):
+            self.save_transcript_check.setText(self.i18n.t("settings.realtime.save_transcript"))
+        if hasattr(self, "create_calendar_event_check"):
+            self.create_calendar_event_check.setText(
+                self.i18n.t("settings.realtime.create_calendar_event")
+            )
 
         if hasattr(self, "format_hint_label"):
             self._update_format_hint_text()
+        self._update_spinbox_suffixes()
 
         if hasattr(self, "format_combo"):
             if not self._mp3_supported:
@@ -382,13 +514,24 @@ class RealtimeSettingsPage(BaseSettingsPage):
                     self.translation_combo.setCurrentIndex(index)
             self.translation_combo.blockSignals(False)
 
+    def _update_spinbox_suffixes(self) -> None:
+        """Update localized unit suffixes for numeric controls."""
+        if hasattr(self, "silence_duration_spin"):
+            self.silence_duration_spin.setSuffix(
+                f" {self.i18n.t('settings.realtime.milliseconds_short')}"
+            )
+        if hasattr(self, "min_audio_duration_spin"):
+            self.min_audio_duration_spin.setSuffix(
+                f" {self.i18n.t('settings.realtime.seconds_short')}"
+            )
+
     def _populate_translation_options(self) -> None:
         """Populate translation engine options with stable internal values."""
         if not hasattr(self, "translation_combo"):
             return
         self.translation_combo.clear()
-        self.translation_combo.addItem(self.i18n.t("settings.realtime.no_translation"), "none")
-        self.translation_combo.addItem(self.i18n.t("settings.realtime.google_translate"), "google")
+        self.translation_combo.addItem(self.i18n.t("settings.realtime.no_translation"), TRANSLATION_ENGINE_NONE)
+        self.translation_combo.addItem(self.i18n.t("settings.realtime.google_translate"), TRANSLATION_ENGINE_GOOGLE)
 
     def _detect_mp3_support(self) -> bool:
         try:
@@ -417,6 +560,6 @@ class RealtimeSettingsPage(BaseSettingsPage):
 
     def _get_selected_format(self) -> str:
         current = self.format_combo.currentText()
-        if current == "mp3" and not self._mp3_supported:
-            return "wav"
+        if current == RECORDING_FORMAT_MP3 and not self._mp3_supported:
+            return RECORDING_FORMAT_WAV
         return current

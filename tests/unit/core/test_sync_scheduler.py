@@ -122,17 +122,6 @@ class TestSyncSchedulerManualSync:
         # Should log warning but not raise
         sync_scheduler.sync_now()
 
-    def test_trigger_sync_now_deprecated(self, sync_scheduler):
-        """Test deprecated trigger_sync_now method."""
-        sync_scheduler.start()
-
-        # Should work but log deprecation warning
-        sync_scheduler.trigger_sync_now()
-
-        # Cleanup
-        sync_scheduler.stop()
-
-
 class TestSyncSchedulerSyncAll:
     """Test sync all functionality."""
 

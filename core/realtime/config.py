@@ -42,6 +42,16 @@ class RealtimeConfig:
     # Default Paths (can be overridden by FileManager or User settings)
     base_recording_dir: Path = field(default_factory=lambda: Path.home() / "Documents" / "EchoNote")
     
+    @classmethod
+    def from_dict(cls, config_dict: dict) -> "RealtimeConfig":
+        """Create a RealtimeConfig instance from a dictionary."""
+        from dataclasses import fields
+        
+        valid_keys = {f.name for f in fields(cls)}
+        filtered_args = {k: v for k, v in config_dict.items() if k in valid_keys}
+        
+        return cls(**filtered_args)
+
     @property
     def recordings_dir(self) -> Path:
         return self.base_recording_dir / "Recordings"

@@ -61,7 +61,8 @@
     "past_days": 30,
     "future_days": 30,
     "reminder_minutes": 5,
-    "page_size": 50
+    "page_size": 50,
+    "auto_start_enabled": true
   },
   "resource_monitor": {
     "low_memory_mb": 500,

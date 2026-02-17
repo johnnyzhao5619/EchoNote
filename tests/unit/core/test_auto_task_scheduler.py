@@ -698,6 +698,26 @@ class TestAutoStopTasks:
         # Should not call stop_recording
         assert len(mock_realtime_recorder.stop_calls) == 0
 
+    def test_stop_auto_tasks_clears_stale_tracking_when_loop_invalid(
+        self,
+        auto_task_scheduler,
+    ):
+        """即使录制循环异常，也应清理内存态，避免脏状态残留。"""
+        event = create_test_event(event_id="stale-event")
+        auto_task_scheduler.active_recordings[event.id] = {
+            "event": event,
+            "auto_tasks": {},
+            "start_time": datetime.now(),
+            "loop": None,
+            "thread": None,
+        }
+        auto_task_scheduler.started_events.add(event.id)
+
+        auto_task_scheduler._stop_auto_tasks(event)
+
+        assert event.id not in auto_task_scheduler.active_recordings
+        assert event.id not in auto_task_scheduler.started_events
+
 
 class TestSettingsIntegration:
     """Test integration with settings manager."""

@@ -209,7 +209,16 @@ class TimelineManager:
 
         if context["has_date_filter"]:
             event_start = to_local_naive(event.start_time)
-            if not (context["start_dt"] <= event_start <= context["end_dt"]):
+            event_end_raw = getattr(event, "end_time", None) or event.start_time
+            try:
+                event_end = to_local_naive(event_end_raw)
+            except Exception:
+                event_end = event_start
+
+            if event_end < event_start:
+                event_start, event_end = event_end, event_start
+
+            if event_end < context["start_dt"] or event_start > context["end_dt"]:
                 return False
 
         attendees_filter = context["attendees_filter"]
@@ -438,6 +447,10 @@ class TimelineManager:
             "translation_target_language": None,
         }
 
+    def get_default_auto_task_config(self) -> Dict[str, Any]:
+        """Return a fresh default auto-task configuration payload."""
+        return self._default_auto_task_config()
+
     def _get_attachments_map(
         self, event_ids: Iterable[str], base_map: Optional[Dict[str, List[EventAttachment]]] = None
     ) -> Dict[str, List[EventAttachment]]:
@@ -661,6 +674,16 @@ class TimelineManager:
                     else:
                         config = dict(config)
                     future_event_items[event_id]["auto_tasks"] = config
+
+            def _event_sort_key(item: Dict[str, Any]) -> datetime:
+                event = item["event"]
+                try:
+                    return to_local_naive(event.start_time)
+                except Exception:  # pragma: no cover - defensive fallback
+                    return datetime.min
+
+            # Keep search ordering deterministic for the UI.
+            results.sort(key=_event_sort_key, reverse=True)
 
             logger.debug(f"Search found {len(results)} events for query: {query}")
             return results

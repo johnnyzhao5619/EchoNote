@@ -10,6 +10,13 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFileDialog, QMessageBox
 
 from ui.batch_transcribe.widget import BatchTranscribeWidget
+from config.constants import (
+    TASK_STATUS_PENDING,
+    TASK_STATUS_PROCESSING,
+    TASK_STATUS_COMPLETED,
+    TASK_STATUS_FAILED,
+    TASK_STATUS_CANCELLED,
+)
 
 
 class TestBatchTranscribeWidget:
@@ -138,7 +145,9 @@ class TestBatchTranscribeWidget:
     def test_clear_queue_restarts_processing(self, mock_question, widget, mock_transcription_manager):
         """Clearing queue should restart processing after cleanup."""
         mock_question.return_value = QMessageBox.StandardButton.Yes
-        mock_transcription_manager.get_all_tasks.return_value = [{"id": "task-1", "status": "pending"}]
+        mock_question.return_value = QMessageBox.StandardButton.Yes
+        mock_transcription_manager.get_all_tasks.return_value = [{"id": "task-1", "status": TASK_STATUS_PENDING}]
+        mock_transcription_manager.delete_task.return_value = True
         mock_transcription_manager.delete_task.return_value = True
 
         with patch.object(widget, "_remove_task_item"):
@@ -155,8 +164,8 @@ class TestBatchTranscribeWidget:
         """Clearing queue should retry deletion for in-flight processing tasks."""
         mock_question.return_value = QMessageBox.StandardButton.Yes
         mock_transcription_manager.get_all_tasks.side_effect = [
-            [{"id": "task-1", "status": "processing"}],
-            [{"id": "task-1", "status": "cancelled"}],
+            [{"id": "task-1", "status": TASK_STATUS_PROCESSING}],
+            [{"id": "task-1", "status": TASK_STATUS_CANCELLED}],
         ]
         mock_transcription_manager.delete_task.side_effect = [False, True]
         mock_single_shot.side_effect = lambda _ms, callback: callback()
@@ -216,7 +225,9 @@ class TestBatchTranscribeWidget:
     
     def test_handle_task_added_event(self, widget):
         """Test handling task_added event."""
-        task_data = {"id": "new-task", "status": "pending", "file_name": "test.mp3"}
+    def test_handle_task_added_event(self, widget):
+        """Test handling task_added event."""
+        task_data = {"id": "new-task", "status": TASK_STATUS_PENDING, "file_name": "test.mp3"}
         
         # Simulate event
         widget._handle_manager_event("task_added", task_data)
@@ -227,12 +238,14 @@ class TestBatchTranscribeWidget:
         
     def test_handle_task_updated_event(self, widget):
         """Test handling task_updated event."""
+    def test_handle_task_updated_event(self, widget):
+        """Test handling task_updated event."""
         # Add initial task
-        task_data = {"id": "task-1", "status": "pending", "file_name": "test.mp3"}
+        task_data = {"id": "task-1", "status": TASK_STATUS_PENDING, "file_name": "test.mp3"}
         widget._add_task_item(task_data)
         
         # Simulate update event
-        update_data = {"id": "task-1", "status": "processing", "progress": 50.0}
+        update_data = {"id": "task-1", "status": TASK_STATUS_PROCESSING, "progress": 50.0}
         
         # Mock item update method
         with patch.object(widget.task_items["task-1"], "update_task_data") as mock_update:
@@ -242,7 +255,7 @@ class TestBatchTranscribeWidget:
     def test_handle_task_deleted_event(self, widget):
         """Test handling task_deleted event."""
         # Add initial task
-        task_data = {"id": "task-1", "status": "pending", "file_name": "test.mp3"}
+        task_data = {"id": "task-1", "status": TASK_STATUS_PENDING, "file_name": "test.mp3"}
         widget._add_task_item(task_data)
         
         # Simulate delete event

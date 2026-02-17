@@ -30,6 +30,8 @@ from data.database.models import (
     CalendarSyncStatus,
     EventAttachment,
 )
+from core.calendar.constants import CalendarSource, EventType, SyncStatus
+from core.calendar.exceptions import CalendarError, EventNotFoundError, SyncError
 from data.storage.file_manager import FileManager
 
 logger = logging.getLogger("echonote.calendar.manager")
@@ -109,7 +111,7 @@ class CalendarManager:
             # Create local event
             event = CalendarEvent(
                 title=event_data.get("title", ""),
-                event_type=event_data.get("event_type", "Event"),
+                event_type=event_data.get("event_type", EventType.EVENT),
                 start_time=event_data.get("start_time", ""),
                 end_time=event_data.get("end_time", ""),
                 location=event_data.get("location"),
@@ -117,7 +119,7 @@ class CalendarManager:
                 description=event_data.get("description"),
                 reminder_minutes=event_data.get("reminder_minutes"),
                 recurrence_rule=event_data.get("recurrence_rule"),
-                source="local",
+                source=CalendarSource.LOCAL,
                 is_readonly=False,
             )
 
@@ -163,7 +165,7 @@ class CalendarManager:
             event = CalendarEvent.get_by_id(self.db, event_id)
 
             if not event:
-                raise ValueError(f"Event not found: {event_id}")
+                raise EventNotFoundError(event_id)
 
             if event.is_readonly:
                 raise ValueError(f"Cannot update readonly event from {event.source}")
@@ -250,8 +252,10 @@ class CalendarManager:
                     sync_failures.append(link.provider)
 
             if sync_failures:
-                raise RuntimeError(
-                    "本地事件已更新，但以下提供商同步失败: " + ", ".join(sorted(set(sync_failures)))
+                failed_msg = ", ".join(sorted(set(sync_failures)))
+                raise SyncError(
+                    f"Local event updated, but sync failed for: {failed_msg}",
+                    failed_providers=sync_failures
                 )
 
         except Exception as e:
@@ -269,7 +273,7 @@ class CalendarManager:
             event = CalendarEvent.get_by_id(self.db, event_id)
 
             if not event:
-                raise ValueError(f"Event not found: {event_id}")
+                raise EventNotFoundError(event_id)
 
             if event.is_readonly:
                 raise ValueError(f"Cannot delete readonly event from {event.source}")
@@ -309,9 +313,10 @@ class CalendarManager:
                     sync_failures.append(link.provider)
 
             if sync_failures:
-                raise RuntimeError(
-                    "已阻止本地删除。请先处理以下提供商的同步失败: "
-                    + ", ".join(sorted(set(sync_failures)))
+                failed_msg = ", ".join(sorted(set(sync_failures)))
+                raise SyncError(
+                    f"Local deletion blocked. Sync failed for: {failed_msg}",
+                    failed_providers=sync_failures
                 )
 
             if links:
@@ -447,120 +452,8 @@ class CalendarManager:
                 if external_id and external_id not in existing_map:
                     existing_map[external_id] = row["id"]
 
-            token_before_refresh: Optional[Dict[str, Any]] = None
-            refresh_result: Dict[str, Any] = {}
-
-            if self.oauth_manager and hasattr(adapter, "refresh_access_token"):
-                if not getattr(adapter, "refresh_token", None):
-                    logger.warning(
-                        "Adapter %s has no refresh_token; skipping token refresh", provider
-                    )
-                else:
-                    try:
-                        token_before_refresh = self.oauth_manager.get_token(provider)
-
-                        def _resolve_expires_in(
-                            data: Dict[str, Any], context: str
-                        ) -> Optional[int]:
-                            expires_in_value = data.get("expires_in")
-                            if expires_in_value is not None:
-                                return expires_in_value
-
-                            expires_at_value = data.get("expires_at")
-                            if not expires_at_value:
-                                return None
-
-                            try:
-                                expires_at_dt = datetime.fromisoformat(expires_at_value)
-                                current_time = (
-                                    datetime.now(expires_at_dt.tzinfo)
-                                    if expires_at_dt.tzinfo
-                                    else datetime.now()
-                                )
-                                resolved = max(
-                                    int((expires_at_dt - current_time).total_seconds()), 0
-                                )
-                                logger.debug(
-                                    "Derived expires_in=%s from expires_at during %s for %s",
-                                    resolved,
-                                    context,
-                                    provider,
-                                )
-                                return resolved
-                            except ValueError:
-                                logger.warning(
-                                    "Unable to parse expires_at during %s for %s: %s",
-                                    context,
-                                    provider,
-                                    expires_at_value,
-                                )
-                                return None
-
-                        def refresh_callback(refresh_token: str):
-                            adapter.refresh_token = refresh_token
-                            refreshed = adapter.refresh_access_token()
-
-                            new_refresh_token = refreshed.get("refresh_token")
-                            if new_refresh_token:
-                                adapter.refresh_token = new_refresh_token
-
-                            adapter.access_token = refreshed.get("access_token")
-                            adapter.expires_at = refreshed.get("expires_at")
-                            if refreshed.get("token_type"):
-                                setattr(adapter, "token_type", refreshed.get("token_type"))
-
-                            resolved_expires_in = _resolve_expires_in(refreshed, "refresh callback")
-
-                            refresh_result.clear()
-                            refresh_result.update(refreshed)
-                            if resolved_expires_in is not None:
-                                refresh_result["expires_in"] = resolved_expires_in
-
-                            return {
-                                "access_token": refreshed.get("access_token"),
-                                "expires_in": resolved_expires_in,
-                                "token_type": refreshed.get("token_type"),
-                                "refresh_token": refreshed.get("refresh_token"),
-                                "expires_at": refreshed.get("expires_at"),
-                            }
-
-                        token_data = self.oauth_manager.refresh_token_if_needed(
-                            provider, refresh_callback
-                        )
-
-                        if refresh_result and refresh_result.get("access_token"):
-                            expires_in_for_update = _resolve_expires_in(
-                                refresh_result, "post-refresh update"
-                            )
-                            self.oauth_manager.update_access_token(
-                                provider,
-                                refresh_result.get("access_token"),
-                                expires_in_for_update,
-                                token_type=refresh_result.get("token_type"),
-                                refresh_token=refresh_result.get("refresh_token"),
-                                expires_at=refresh_result.get("expires_at"),
-                            )
-
-                        if token_data:
-                            adapter.access_token = token_data.get("access_token")
-                            adapter.expires_at = token_data.get("expires_at")
-
-                            refreshed_token = token_data.get("refresh_token")
-                            if refreshed_token:
-                                adapter.refresh_token = refreshed_token
-
-                        if (
-                            token_before_refresh
-                            and token_data
-                            and token_data.get("access_token")
-                            != token_before_refresh.get("access_token")
-                        ):
-                            logger.info("Access token for %s refreshed successfully", provider)
-
-                    except ValueError as token_error:
-                        logger.warning("Skipping token refresh for %s: %s", provider, token_error)
-                    except Exception as token_error:
-                        logger.error("Token refresh failed for %s: %s", provider, token_error)
+            if self.oauth_manager:
+                self._refresh_provider_token(provider, adapter)
 
             # Get sync status
             sync_status = CalendarSyncStatus.get_by_provider(self.db, provider)
@@ -579,6 +472,7 @@ class CalendarManager:
 
             external_events = result.get("events", [])
             new_sync_token = result.get("sync_token")
+            is_incremental = bool(result.get("is_incremental", bool(sync_status.sync_token)))
 
             deleted_external_ids = set(result.get("deleted", []) or [])
             remote_external_ids: set = set()
@@ -599,9 +493,15 @@ class CalendarManager:
 
                 self._save_external_event(ext_event, provider)
 
-            removable_ids = (
-                {external_id for external_id in existing_map} - remote_external_ids
-            ) | (deleted_external_ids & set(existing_map.keys()))
+            existing_external_ids = set(existing_map.keys())
+            if is_incremental:
+                # Incremental APIs only return changed records. Never infer deletion
+                # from absence in this response.
+                removable_ids = deleted_external_ids & existing_external_ids
+            else:
+                removable_ids = (existing_external_ids - remote_external_ids) | (
+                    deleted_external_ids & existing_external_ids
+                )
 
             for external_id in removable_ids:
                 event_id = existing_map.get(external_id)
@@ -617,6 +517,75 @@ class CalendarManager:
 
         except Exception as e:
             logger.error(f"Failed to sync external calendar {provider}: {e}")
+            raise
+
+    def disconnect_provider(self, provider: str) -> None:
+        """Detach all local data linked to an external provider.
+
+        This operation removes provider links from local events and deletes
+        provider-owned mirrored events plus their attachments.
+        """
+        try:
+            link_rows = self.db.execute(
+                "SELECT event_id, external_id FROM calendar_event_links WHERE provider = ?",
+                (provider,),
+            )
+            for row in link_rows or []:
+                self._remove_external_event(
+                    row.get("event_id"),
+                    provider,
+                    row.get("external_id"),
+                )
+
+            # Also clean up provider-owned legacy rows that may not have links.
+            provider_events = self.db.execute(
+                "SELECT id FROM calendar_events WHERE source = ?",
+                (provider,),
+            )
+            for row in provider_events or []:
+                event_id = row.get("id")
+                if event_id:
+                    self._remove_external_event(event_id, provider)
+
+        except Exception as exc:
+            logger.error("Failed to disconnect provider %s: %s", provider, exc)
+            raise
+
+    def disconnect_provider_account(self, provider: str) -> None:
+        """Disconnect an external provider account and clean related state.
+
+        This operation revokes provider access when supported, deletes any
+        stored OAuth token and sync status row, then removes provider-linked
+        local events and attachments.
+        """
+        try:
+            adapter = self.sync_adapters.get(provider)
+            if adapter and hasattr(adapter, "revoke_access"):
+                try:
+                    adapter.revoke_access()
+                except Exception as exc:  # noqa: BLE001 - continue cleanup
+                    logger.warning("Could not revoke access for provider %s: %s", provider, exc)
+            if adapter:
+                # Clear in-memory credentials so disconnected accounts do not
+                # retain stale tokens for the current process lifetime.
+                for token_attr in ("access_token", "refresh_token", "expires_at"):
+                    if hasattr(adapter, token_attr):
+                        setattr(adapter, token_attr, None)
+
+            if self.oauth_manager:
+                try:
+                    self.oauth_manager.delete_token(provider)
+                except Exception as exc:  # noqa: BLE001 - continue cleanup
+                    logger.warning("Could not delete OAuth token for %s: %s", provider, exc)
+
+            sync_status = CalendarSyncStatus.get_by_provider(self.db, provider)
+            if sync_status:
+                sync_status.delete(self.db)
+
+            self.disconnect_provider(provider)
+
+        except Exception as exc:
+            logger.error("Failed to disconnect provider account %s: %s", provider, exc)
             raise
 
     def _push_to_external(self, event: CalendarEvent, provider: str) -> Optional[str]:
@@ -783,7 +752,7 @@ class CalendarManager:
 
                 event = CalendarEvent(
                     title=ext_event.get("title", ""),
-                    event_type=ext_event.get("event_type", "Event"),
+                    event_type=ext_event.get("event_type", EventType.EVENT),
                     start_time=normalized_start,
                     end_time=normalized_end,
                     location=ext_event.get("location"),
@@ -1002,3 +971,125 @@ class CalendarManager:
             start_dt.astimezone(timezone.utc),
             end_dt.astimezone(timezone.utc),
         )
+
+    def _refresh_provider_token(self, provider: str, adapter: Any) -> None:
+        """
+        Refresh OAuth token for provider if needed.
+
+        Args:
+            provider: Provider name
+            adapter: Sync adapter instance
+        """
+        if not self.oauth_manager or not hasattr(adapter, "refresh_access_token"):
+            return
+
+        if not getattr(adapter, "refresh_token", None):
+            logger.warning(
+                "Adapter %s has no refresh_token; skipping token refresh", provider
+            )
+            return
+
+        try:
+            token_before_refresh = self.oauth_manager.get_token(provider)
+            refresh_result: Dict[str, Any] = {}
+
+            def _resolve_expires_in(data: Dict[str, Any], context: str) -> Optional[int]:
+                expires_in_value = data.get("expires_in")
+                if expires_in_value is not None:
+                    return expires_in_value
+
+                expires_at_value = data.get("expires_at")
+                if not expires_at_value:
+                    return None
+
+                try:
+                    expires_at_dt = datetime.fromisoformat(expires_at_value)
+                    current_time = (
+                        datetime.now(expires_at_dt.tzinfo)
+                        if expires_at_dt.tzinfo
+                        else datetime.now()
+                    )
+                    resolved = max(
+                        int((expires_at_dt - current_time).total_seconds()), 0
+                    )
+                    logger.debug(
+                        "Derived expires_in=%s from expires_at during %s for %s",
+                        resolved,
+                        context,
+                        provider,
+                    )
+                    return resolved
+                except ValueError:
+                    logger.warning(
+                        "Unable to parse expires_at during %s for %s: %s",
+                        context,
+                        provider,
+                        expires_at_value,
+                    )
+                    return None
+
+            def refresh_callback(refresh_token: str):
+                adapter.refresh_token = refresh_token
+                refreshed = adapter.refresh_access_token()
+
+                new_refresh_token = refreshed.get("refresh_token")
+                if new_refresh_token:
+                    adapter.refresh_token = new_refresh_token
+
+                adapter.access_token = refreshed.get("access_token")
+                adapter.expires_at = refreshed.get("expires_at")
+                if refreshed.get("token_type"):
+                    setattr(adapter, "token_type", refreshed.get("token_type"))
+
+                resolved_expires_in = _resolve_expires_in(refreshed, "refresh callback")
+
+                refresh_result.clear()
+                refresh_result.update(refreshed)
+                if resolved_expires_in is not None:
+                    refresh_result["expires_in"] = resolved_expires_in
+
+                return {
+                    "access_token": refreshed.get("access_token"),
+                    "expires_in": resolved_expires_in,
+                    "token_type": refreshed.get("token_type"),
+                    "refresh_token": refreshed.get("refresh_token"),
+                    "expires_at": refreshed.get("expires_at"),
+                }
+
+            token_data = self.oauth_manager.refresh_token_if_needed(
+                provider, refresh_callback
+            )
+
+            if refresh_result and refresh_result.get("access_token"):
+                expires_in_for_update = _resolve_expires_in(
+                    refresh_result, "post-refresh update"
+                )
+                self.oauth_manager.update_access_token(
+                    provider,
+                    refresh_result.get("access_token"),
+                    expires_in_for_update,
+                    token_type=refresh_result.get("token_type"),
+                    refresh_token=refresh_result.get("refresh_token"),
+                    expires_at=refresh_result.get("expires_at"),
+                )
+
+            if token_data:
+                adapter.access_token = token_data.get("access_token")
+                adapter.expires_at = token_data.get("expires_at")
+
+                refreshed_token = token_data.get("refresh_token")
+                if refreshed_token:
+                    adapter.refresh_token = refreshed_token
+
+            if (
+                token_before_refresh
+                and token_data
+                and token_data.get("access_token")
+                != token_before_refresh.get("access_token")
+            ):
+                logger.info("Access token for %s refreshed successfully", provider)
+
+        except ValueError as token_error:
+            logger.warning("Skipping token refresh for %s: %s", provider, token_error)
+        except Exception as token_error:
+            logger.error("Token refresh failed for %s: %s", provider, token_error)

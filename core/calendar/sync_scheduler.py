@@ -20,7 +20,6 @@ Manages automatic periodic synchronization of external calendars.
 """
 
 import logging
-import time
 from typing import Dict, Optional
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -51,7 +50,7 @@ class SyncScheduler:
         self.is_running = False
 
         # Track retry attempts for each provider
-        # Format: {provider: {'attempts': int, 'last_attempt': float}}
+        # Format: {provider: {'attempts': int}}
         self.retry_state: Dict[str, Dict] = {}
 
         logger.info(f"SyncScheduler initialized with {interval_minutes}min interval")
@@ -124,15 +123,6 @@ class SyncScheduler:
         except Exception as e:
             logger.error(f"Failed to trigger manual sync: {e}")
 
-    def trigger_sync_now(self):
-        """
-        Alias for sync_now() for backward compatibility.
-
-        Deprecated: Use sync_now() instead.
-        """
-        logger.warning("trigger_sync_now() is deprecated, use sync_now() instead")
-        self.sync_now()
-
     def _sync_all(self):
         """
         Synchronize all connected external calendars.
@@ -198,7 +188,7 @@ class SyncScheduler:
         """
         # Initialize retry state if not exists
         if provider not in self.retry_state:
-            self.retry_state[provider] = {"attempts": 0, "last_attempt": time.time()}
+            self.retry_state[provider] = {"attempts": 0}
 
         # Increment retry attempts
         self.retry_state[provider]["attempts"] += 1

@@ -97,6 +97,31 @@ class TestTimelineManagerGetEvents:
 
         assert isinstance(result, dict)
 
+    def test_get_timeline_events_date_filter_uses_overlap(
+        self, timeline_manager, mock_calendar_manager
+    ):
+        """跨天事件只要与筛选日期重叠就应被包含。"""
+        center_time = datetime(2025, 11, 2, 12, 0, 0)
+        spanning_event = Mock()
+        spanning_event.id = "event_overlap"
+        spanning_event.title = "Overnight Event"
+        spanning_event.start_time = "2025-11-01T23:00:00"
+        spanning_event.end_time = "2025-11-02T01:00:00"
+        spanning_event.event_type = "Event"
+        spanning_event.source = "local"
+        spanning_event.attendees = []
+        mock_calendar_manager.get_events.return_value = [spanning_event]
+
+        result = timeline_manager.get_timeline_events(
+            center_time,
+            past_days=2,
+            future_days=1,
+            filters={"start_date": "2025-11-02", "end_date": "2025-11-02"},
+        )
+
+        assert len(result["past_events"]) == 1
+        assert result["past_events"][0]["event"].id == "event_overlap"
+
 
 class TestTimelineManagerSearch:
     """Test search functionality."""
@@ -120,6 +145,33 @@ class TestTimelineManagerSearch:
             results = timeline_manager.search_events("test", filters={"event_type": "Meeting"})
 
             assert isinstance(results, list)
+
+    def test_search_events_sorted_by_start_time_desc(self, timeline_manager):
+        """搜索结果应按开始时间倒序稳定返回。"""
+        older = Mock()
+        older.id = "event_old"
+        older.title = "Old Event"
+        older.description = ""
+        older.start_time = "2025-11-01T09:00:00"
+        older.end_time = "2025-11-01T10:00:00"
+        older.event_type = "Event"
+        older.source = "local"
+        older.attendees = []
+
+        newer = Mock()
+        newer.id = "event_new"
+        newer.title = "New Event"
+        newer.description = ""
+        newer.start_time = "2025-11-02T09:00:00"
+        newer.end_time = "2025-11-02T10:00:00"
+        newer.event_type = "Event"
+        newer.source = "local"
+        newer.attendees = []
+
+        with patch("data.database.models.CalendarEvent.search", return_value=[older, newer]):
+            results = timeline_manager.search_events("")
+
+        assert [item["event"].id for item in results] == ["event_new", "event_old"]
 
 
 class TestTimelineManagerArtifacts:
@@ -158,9 +210,21 @@ class TestTimelineManagerAutoTask:
     """Test auto-task configuration."""
 
     def test_default_auto_task_config(self, timeline_manager):
-        """Test default auto-task config."""
-        # TimelineManager has _default_auto_task_config method
-        assert hasattr(timeline_manager, "_default_auto_task_config")
+        """Default auto-task config should be exposed via public API and be copy-safe."""
+        first = timeline_manager.get_default_auto_task_config()
+        second = timeline_manager.get_default_auto_task_config()
+
+        assert first == {
+            "enable_transcription": False,
+            "enable_recording": False,
+            "transcription_language": None,
+            "enable_translation": False,
+            "translation_target_language": None,
+        }
+        assert second == first
+
+        first["enable_recording"] = True
+        assert second["enable_recording"] is False
 
 
 class TestTimelineManagerUtilities:

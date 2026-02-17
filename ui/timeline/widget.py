@@ -42,7 +42,6 @@ from ui.qt_imports import (
 )
 from ui.signal_helpers import (
     connect_button_with_callback,
-    connect_text_changed,
     connect_value_changed,
 )
 
@@ -53,6 +52,7 @@ if TYPE_CHECKING:
 from core.timeline.manager import to_local_naive
 from ui.base_widgets import BaseWidget, create_button, create_hbox, create_vbox
 from utils.i18n import I18nQtManager
+from core.calendar.constants import EventType, CalendarSource
 
 if TYPE_CHECKING:  # pragma: no cover - imported for type checking only
     from ui.timeline.event_card import EventCard
@@ -107,7 +107,6 @@ class TimelineWidget(BaseWidget):
         self.event_cards: List[QWidget] = []
         self._audio_player_dialogs: Dict[str, "AudioPlayerDialog"] = {}
         self._text_viewer_dialogs: Dict[str, "TranscriptViewerDialog"] = {}
-        self._auto_task_state_cache: Dict[str, Dict[str, Any]] = {}
 
         # Current filters
         self.current_query = ""
@@ -182,7 +181,6 @@ class TimelineWidget(BaseWidget):
         self.search_input.setPlaceholderText(self.i18n.t("timeline.search_placeholder"))
         self.search_input.setClearButtonEnabled(True)
         self.search_input.returnPressed.connect(self._on_search)
-        connect_text_changed(self.search_input, lambda text: None)  # Could add live search later
         search_row.addWidget(self.search_input, stretch=2)
 
         # Search button
@@ -217,18 +215,18 @@ class TimelineWidget(BaseWidget):
         # Filter by event type
         self.type_filter = QComboBox()
         self.type_filter.addItem(self.i18n.t("timeline.filter_all"), None)
-        self.type_filter.addItem(self.i18n.t("timeline.filter_event"), "Event")
-        self.type_filter.addItem(self.i18n.t("timeline.filter_task"), "Task")
-        self.type_filter.addItem(self.i18n.t("timeline.filter_appointment"), "Appointment")
+        self.type_filter.addItem(self.i18n.t("timeline.filter_event"), EventType.EVENT)
+        self.type_filter.addItem(self.i18n.t("timeline.filter_task"), EventType.TASK)
+        self.type_filter.addItem(self.i18n.t("timeline.filter_appointment"), EventType.APPOINTMENT)
         self.type_filter.currentIndexChanged.connect(self._on_filter_changed)
         filter_row.addWidget(self.type_filter, stretch=1)
 
         # Filter by source
         self.source_filter = QComboBox()
         self.source_filter.addItem(self.i18n.t("timeline.source_all"), None)
-        self.source_filter.addItem(self.i18n.t("timeline.source_local"), "local")
-        self.source_filter.addItem(self.i18n.t("timeline.source_google"), "google")
-        self.source_filter.addItem(self.i18n.t("timeline.source_outlook"), "outlook")
+        self.source_filter.addItem(self.i18n.t("timeline.source_local"), CalendarSource.LOCAL)
+        self.source_filter.addItem(self.i18n.t("timeline.source_google"), CalendarSource.GOOGLE)
+        self.source_filter.addItem(self.i18n.t("timeline.source_outlook"), CalendarSource.OUTLOOK)
         self.source_filter.currentIndexChanged.connect(self._on_filter_changed)
         filter_row.addWidget(self.source_filter, stretch=1)
 
@@ -668,16 +666,11 @@ class TimelineWidget(BaseWidget):
             self.timeline_layout.insertWidget(insert_pos, card)
             self.event_cards.append(card)
 
-        if is_future:
-            auto_tasks = event_data.get("auto_tasks") or {}
-            self._auto_task_state_cache[card.calendar_event.id] = dict(auto_tasks)
-
     def get_event_card_by_id(self, event_id: str) -> Optional["EventCard"]:
         """Return the event card associated with the given event id."""
         for card in self.event_cards:
-            if not hasattr(card, "event"):
-                continue
-            if getattr(card.event, "id", None) == event_id:
+            event = getattr(card, "calendar_event", None)
+            if getattr(event, "id", None) == event_id:
                 return cast("EventCard", card)
         return None
 
@@ -789,8 +782,6 @@ class TimelineWidget(BaseWidget):
             config: Auto-task configuration
         """
         card = self.get_event_card_by_id(event_id)
-        if card:
-            self._auto_task_state_cache[event_id] = dict(config)
 
         try:
             self.timeline_manager.set_auto_task(event_id, config)
@@ -813,7 +804,7 @@ class TimelineWidget(BaseWidget):
 
             if persisted_config is None:
                 try:
-                    persisted_config = self.timeline_manager._default_auto_task_config()
+                    persisted_config = self.timeline_manager.get_default_auto_task_config()
                 except Exception as default_error:  # pragma: no cover
                     logger.error(
                         "Failed to obtain default auto-task config: %s",
@@ -823,8 +814,6 @@ class TimelineWidget(BaseWidget):
 
             if card:
                 card.apply_auto_task_config(persisted_config)
-
-            self._auto_task_state_cache[event_id] = dict(persisted_config)
 
             title = self.i18n.t("timeline.auto_task_save_failed_title")
             message = self.i18n.t("timeline.auto_task_save_failed_message").format(error=str(exc))

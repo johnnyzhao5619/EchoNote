@@ -26,7 +26,7 @@ import threading
 import webbrowser
 from html import escape
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from typing import Dict, Optional, Tuple
+from typing import Optional, Tuple
 from urllib.parse import parse_qs, urlparse
 
 from PySide6.QtCore import Qt, QTimer, Signal
@@ -34,6 +34,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QHBoxLayout,
     QLabel,
+    QMessageBox,
     QProgressBar,
     QTextEdit,
     QVBoxLayout,
@@ -160,15 +161,11 @@ class OAuthDialog(QDialog):
 
         self.expected_state = state
         self.code_verifier = code_verifier
-        self._authorization_context: Dict[str, str] = {
-            "provider": provider,
-            "state": state,
-            "code_verifier": code_verifier,
-        }
 
         # OAuth callback server
         self.callback_server: Optional[HTTPServer] = None
         self.callback_thread: Optional[threading.Thread] = None
+        self._callback_stop_event = threading.Event()
 
         # Authorization result
         self.auth_code: Optional[str] = None
@@ -283,20 +280,27 @@ class OAuthDialog(QDialog):
 
         except Exception as e:
             logger.error(f"Error starting authorization: {e}")
-            self._show_error(f"Failed to start authorization: {str(e)}")
+            self._show_error(
+                self.i18n.t("calendar_hub.oauth_dialog.start_authorization_failed", error=str(e))
+            )
             self._reset_ui()
 
     def _start_callback_server(self):
         """Start local HTTP server to receive OAuth callback."""
         try:
-            # Set callback handler
-            OAuthCallbackHandler.callback_received = self._on_callback_received
-            OAuthCallbackHandler.i18n = self.i18n
+            self._callback_stop_event.clear()
+
+            # Bind callback context to a per-dialog handler class to avoid cross-dialog races.
+            handler_cls = type("DialogOAuthCallbackHandler", (OAuthCallbackHandler,), {})
+            handler_cls.callback_received = self._on_callback_received
+            handler_cls.i18n = self.i18n
 
             # Create server
             self.callback_server = HTTPServer(
-                (self.callback_host, self.callback_port), OAuthCallbackHandler
+                (self.callback_host, self.callback_port), handler_cls
             )
+            # Keep request loop interruptible so cancellation can stop quickly.
+            self.callback_server.timeout = 0.5
 
             # Start server in separate thread
             self.callback_thread = threading.Thread(target=self._run_callback_server, daemon=True)
@@ -443,12 +447,19 @@ class OAuthDialog(QDialog):
 
     def _run_callback_server(self):
         """Run callback server (in separate thread)."""
-        try:
-            # Handle single request
-            self.callback_server.handle_request()
+        server = self.callback_server
+        if server is None:
+            return
 
+        try:
+            while not self._callback_stop_event.is_set():
+                server.handle_request()
+        except OSError as exc:
+            if not self._callback_stop_event.is_set():
+                logger.error("OAuth callback server socket error: %s", exc)
         except Exception as e:
-            logger.error(f"Error in callback server: {e}")
+            if not self._callback_stop_event.is_set():
+                logger.error(f"Error in callback server: {e}")
 
     def _on_callback_received(
         self, code: Optional[str], error: Optional[str], state: Optional[str]
@@ -474,9 +485,8 @@ class OAuthDialog(QDialog):
         try:
             if self.auth_code:
                 if self.callback_state != self.expected_state:
-                    mismatch_message = (
-                        "Authorization state mismatch detected. "
-                        "The flow was cancelled for your safety."
+                    mismatch_message = self.i18n.t(
+                        "calendar_hub.oauth_dialog.state_mismatch_message"
                     )
                     self.status_label.setText(
                         self.i18n.t("calendar_hub.oauth_dialog.authorization_failed")
@@ -528,7 +538,9 @@ class OAuthDialog(QDialog):
 
         except Exception as e:
             logger.error(f"Error processing callback: {e}")
-            self._show_error(f"Error processing authorization: {str(e)}")
+            self._show_error(
+                self.i18n.t("calendar_hub.oauth_dialog.process_authorization_failed", error=str(e))
+            )
             self._reset_ui()
 
         finally:
@@ -538,13 +550,22 @@ class OAuthDialog(QDialog):
     def _stop_callback_server(self):
         """Stop callback server."""
         try:
-            if self.callback_server:
-                self.callback_server.shutdown()
-                self.callback_server = None
+            self._callback_stop_event.set()
 
-            if self.callback_thread:
-                self.callback_thread.join(timeout=1)
-                self.callback_thread = None
+            server = self.callback_server
+            thread = self.callback_thread
+
+            if server:
+                try:
+                    server.server_close()
+                except Exception as exc:
+                    logger.debug("Error while closing OAuth callback server socket: %s", exc)
+
+            if thread and thread.is_alive():
+                thread.join(timeout=1)
+
+            self.callback_server = None
+            self.callback_thread = None
 
             logger.debug("OAuth callback server stopped")
 
@@ -575,7 +596,11 @@ class OAuthDialog(QDialog):
         Args:
             message: Error message
         """
-        self.show_error(self.i18n.t("calendar_hub.oauth_dialog.authorization_error"), message)
+        QMessageBox.critical(
+            self,
+            self.i18n.t("calendar_hub.oauth_dialog.authorization_error"),
+            message,
+        )
 
     def closeEvent(self, event):
         """Handle dialog close event."""

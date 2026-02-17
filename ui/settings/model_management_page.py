@@ -1402,17 +1402,27 @@ class ModelConfigDialog(QDialog):
                 return
 
             # 保存配置
-            settings_manager.set_setting(f"{config_key}.device", selected_device)
-            settings_manager.set_setting(
-                f"{config_key}.compute_type", compute_type_combo.currentText()
-            )
-            settings_manager.set_setting(f"{config_key}.vad_filter", vad_checkbox.isChecked())
-            settings_manager.set_setting(
-                f"{config_key}.vad_threshold_ms", vad_threshold_spin.value()
-            )
+            updates = [
+                (f"{config_key}.device", selected_device),
+                (f"{config_key}.compute_type", compute_type_combo.currentText()),
+                (f"{config_key}.vad_filter", vad_checkbox.isChecked()),
+                (f"{config_key}.vad_threshold_ms", vad_threshold_spin.value()),
+            ]
+            for key, value in updates:
+                if not settings_manager.set_setting(key, value):
+                    self.show_warning(
+                        i18n.t("settings.model_management.validation_error"),
+                        i18n.t("settings.error.setting_update_failed", key=key),
+                    )
+                    return
 
             # 保存到磁盘
-            settings_manager.save_settings()
+            if not settings_manager.save_settings():
+                self.show_warning(
+                    i18n.t("settings.model_management.validation_error"),
+                    i18n.t("exceptions.settings.failed_to_save_to_disk"),
+                )
+                return
 
             logger.info(f"Configuration saved for model: {model.name}")
             self.accept()

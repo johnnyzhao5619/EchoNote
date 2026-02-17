@@ -575,6 +575,7 @@ class AutoTaskScheduler:
         Args:
             event: CalendarEvent instance
         """
+        should_remove_active_state = False
         try:
             if event.id not in self.active_recordings:
                 logger.debug(f"No active recording for event {event.id}, skipping stop")
@@ -616,6 +617,7 @@ class AutoTaskScheduler:
                     self._save_event_attachments(event.id, result)
 
                     logger.info(f"Successfully stopped auto tasks for event {event.id}")
+                    should_remove_active_state = True
 
                     # Send success notification
                     duration = result.get("duration", 0)
@@ -631,6 +633,7 @@ class AutoTaskScheduler:
                     self.notification_manager.send_success(title, message)
                 else:
                     logger.warning(f"Event loop for event {event.id} is closed or invalid")
+                    should_remove_active_state = True
 
             except Exception as e:
                 logger.error(f"Error stopping recording for event {event.id}: {e}", exc_info=True)
@@ -643,10 +646,8 @@ class AutoTaskScheduler:
                         loop.close()
                     except Exception:
                         pass
+                should_remove_active_state = True
                 raise
-
-            # Remove from active recordings
-            del self.active_recordings[event.id]
 
         except Exception as e:
             logger.error(f"Failed to stop auto tasks for event {event.id}: {e}", exc_info=True)
@@ -664,6 +665,11 @@ class AutoTaskScheduler:
             # Send error notification
             self.notification_manager.send_error(title, message)
             # Don't raise - we want the scheduler to continue
+        finally:
+            # Always clear stale in-memory tracking when a stop was attempted.
+            if should_remove_active_state:
+                self.active_recordings.pop(event.id, None)
+                self.started_events.discard(event.id)
 
     def _save_event_attachments(self, event_id: str, recording_result: Dict[str, Any]):
         """

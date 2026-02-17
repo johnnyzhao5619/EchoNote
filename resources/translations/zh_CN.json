@@ -39,45 +39,6 @@
     "next": "Next",
     "close": "Close"
   },
-  "data_management": {
-    "title": "Data Management",
-    "clear_all": "Clear All Data",
-    "confirm_cleanup": "Confirm Data Cleanup",
-    "confirm_delete": "Are you sure you want to delete ALL user data?",
-    "final_confirmation": "Final Confirmation",
-    "last_chance": "This is your last chance to cancel!",
-    "cleanup_progress": "Cleanup in Progress",
-    "cleanup_complete": "Cleanup Complete",
-    "cleanup_success": "All user data has been deleted successfully.",
-    "cleanup_errors": "Cleanup Completed with Errors",
-    "cleanup_partial": "Data cleanup completed, but some items could not be deleted.",
-    "storage_labels": {
-      "database": "Database: Calculating...",
-      "configuration": "Configuration: Calculating...",
-      "recordings": "Recordings: Calculating...",
-      "transcripts": "Transcripts: Calculating...",
-      "logs": "Logs: Calculating...",
-      "total": "Total: Calculating...",
-      "database_prefix": "Database",
-      "configuration_prefix": "Configuration",
-      "recordings_prefix": "Recordings",
-      "transcripts_prefix": "Transcripts",
-      "logs_prefix": "Logs",
-      "total_prefix": "Total",
-      "files": "files"
-    },
-    "storage_status": {
-      "exists": "exists",
-      "not_found": "not found"
-    },
-    "clear_all_description": "This will delete:\n• Database (all tasks, events, and settings)\n• Configuration files\n• All recordings\n• All transcripts\n• Log files",
-    "confirm_delete_details": "This will permanently delete approximately {size} of data.\n\nThis operation cannot be undone!\n\nThe application will need to be restarted after cleanup.",
-    "final_confirmation_details": "Type 'DELETE' in the confirmation dialog to proceed.\n\nAre you absolutely sure you want to delete all data?",
-    "cleanup_progress_message": "Deleting all user data...",
-    "cleanup_success_details": "Deleted {count} items.\n\nPlease restart the application.",
-    "more_errors": "... and {count} more errors",
-    "cleanup_partial_details": "Deleted: {deleted} items\nFailed: {failed} items"
-  },
   "sidebar": {
     "batch_transcribe": "批量转写",
     "realtime_record": "实时录音",
@@ -284,6 +245,9 @@
       "auth_failed_heading": "授权失败",
       "auth_failed_content": "<p>错误：{error}</p><p>你可以关闭此窗口后重试。</p>",
       "unknown_error": "未知错误",
+      "state_mismatch_message": "检测到授权 state 不匹配。出于安全原因，本次授权已取消。",
+      "start_authorization_failed": "启动授权失败：{error}",
+      "process_authorization_failed": "处理授权回调失败：{error}",
       "connect_title": "连接 {provider} 日历",
       "instructions_html": "<p>连接 {provider} 日历步骤：</p><ol><li>点击下方“开始授权”按钮</li><li>浏览器会打开 {provider} 授权页面</li><li>按提示登录 {provider} 账号</li><li>授予 EchoNote 访问日历权限</li><li>授权完成后会自动跳转回 EchoNote</li></ol><p><strong>说明：</strong>EchoNote 仅访问日历数据，不会保存你的密码。</p>"
     },
@@ -291,20 +255,52 @@
       "add_calendar_account": "添加日历账号",
       "connect_google": "连接 Google 日历",
       "connect_outlook": "连接 Outlook 日历",
+      "connect_failed_message": "连接 {provider} 日历失败：\n{error}",
+      "disconnect_confirm_message": "确定要断开 {provider} 日历吗？\n\n这将：\n- 移除来自 {provider} 的所有同步事件\n- 删除已保存的 OAuth 凭据\n- 停止自动同步",
       "syncing": "同步中...",
       "sync_error": "同步错误",
+      "sync_failed_message": "同步日历失败：{error}",
       "never_synced": "从未同步",
+      "last_sync": "上次同步：{time_ago}",
       "previous": "上一个",
       "next": "下一个",
       "sync_now_tooltip": "立即同步日历数据",
       "sync_now": "立即同步",
+      "no_accounts_message": "当前没有已连接的外部日历账号。请先添加账号。",
+      "sync_success_message": "已成功同步 {count} 个日历。",
+      "sync_partial_message": "已同步 {success_count} 个日历，{error_count} 个失败。详情请查看日志。",
       "time_ago_just_now": "刚刚",
       "time_ago_minutes": "{minutes} 分钟前",
       "time_ago_hours": "{hours} 小时前",
       "time_ago_days": "{days} 天前"
     },
     "calendar_view": {
-      "no_events": "当日无事件"
+      "no_events": "当日无事件",
+      "weekday_mon": "周一",
+      "weekday_tue": "周二",
+      "weekday_wed": "周三",
+      "weekday_thu": "周四",
+      "weekday_fri": "周五",
+      "weekday_sat": "周六",
+      "weekday_sun": "周日",
+      "more_events": "另有 {count} 项"
+    }
+  },
+  "calendar": {
+    "success": {
+      "event_created": "事件创建成功。",
+      "event_updated": "事件更新成功。",
+      "connected": "{provider} 日历连接成功。",
+      "disconnected": "{provider} 日历断开成功。"
+    },
+    "warning": {
+      "sync_failed": "日历同步失败：{error}"
+    },
+    "error": {
+      "save_failed": "保存事件失败：{error}",
+      "sync_not_configured": "{provider} 日历同步未配置。",
+      "auth_failed": "授权流程失败：{error}",
+      "disconnect_failed": "断开日历账号失败：{error}"
     }
   },
   "timeline": {
@@ -456,7 +452,9 @@
       "title": "错误",
       "load_failed": "加载设置失败：{error}",
       "save_failed": "保存设置失败：{error}",
-      "reset_failed": "重置设置失败：{error}"
+      "reset_failed": "重置设置失败：{error}",
+      "rollback_failed": "保存失败后回滚内存设置失败，请重新加载设置。",
+      "setting_update_failed": "更新设置失败：{key}"
     },
     "success": {
       "title": "成功",
@@ -471,6 +469,9 @@
     "validation": {
       "title": "校验错误"
     },
+    "warning": {
+      "post_save_actions_partial": "设置已保存，但部分运行时更新失败：{details}"
+    },
     "appearance": {
       "title": "外观设置",
       "theme": "主题",
@@ -481,7 +482,7 @@
       "system": "跟随系统",
       "preview": "预览",
       "preview_text": "这是主题预览",
-      "theme_info": "主题修改会立即应用到整个应用"
+      "theme_info": "主题修改会在点击保存后生效"
     },
     "language": {
       "title": "语言设置",
@@ -491,7 +492,7 @@
       "chinese": "中文（简体）",
       "english": "英语",
       "french": "法语",
-      "change_info": "语言修改会立即应用到整个应用",
+      "change_info": "语言修改会在点击保存后生效",
       "restart_required": "部分界面可能需要重启后完全生效"
     },
     "transcription": {
@@ -546,6 +547,7 @@
       "engine_reload_warning_title": "引擎重载提示",
       "engine_reload_warning_message": "设置已保存，但引擎“{engine}”未立即重载，变更将在下次转写时生效。",
       "engine_reload_failed_message": "设置已保存，但重载引擎“{engine}”失败：{error}",
+      "api_keys_save_failed_message": "设置已保存，但更新加密 API Key 失败：{error}",
       "error": {
         "empty_path": "保存路径不能为空",
         "invalid_path": "路径无效：{error}"
@@ -570,6 +572,14 @@
       "translation_engine": "翻译引擎",
       "no_translation": "不翻译",
       "google_translate": "Google 翻译",
+      "processing": "处理设置",
+      "save_transcript": "保存转写结果",
+      "create_calendar_event": "创建日历事件",
+      "vad_threshold": "VAD 阈值",
+      "silence_duration_ms": "静音时长",
+      "min_audio_duration": "最小音频时长",
+      "milliseconds_short": "毫秒",
+      "seconds_short": "秒",
       "error": {
         "empty_path": "保存路径不能为空",
         "invalid_path": "路径无效：{error}"
@@ -595,6 +605,7 @@
       "view_range": "查看范围",
       "past_days": "过去天数",
       "future_days": "未来天数",
+      "page_size": "每页事件数",
       "days": "天",
       "notifications": "通知设置",
       "reminder_time": "提醒时间",
@@ -848,9 +859,6 @@
       },
       "model_management_page": {
         "initialized": "Model management page initialized"
-      },
-      "data_management_page": {
-        "cleanup_completed_successfully": "Data cleanup completed successfully"
       }
     },
     "calendar_hub": {
@@ -946,17 +954,12 @@
     }
   },
   "dialogs": {
-    "settings": {
-      "data_management": {
-        "cleanup_failed": "Cleanup Failed"
-      }
-    },
     "calendar_hub": {
-      "authorization_failed": "Authorization Failed",
-      "disconnect_account": "Disconnect Account",
-      "no_accounts": "No Accounts",
-      "sync_complete": "Sync Complete",
-      "sync_completed_with_errors": "Sync Completed with Errors"
+      "authorization_failed": "授权失败",
+      "disconnect_account": "断开账号",
+      "no_accounts": "无账号",
+      "sync_complete": "同步完成",
+      "sync_completed_with_errors": "同步完成（有错误）"
     }
   },
   "ffmpeg": {
@@ -1120,7 +1123,5 @@
       "insufficient_resources": "Please free up disk space or memory and retry",
       "validation_failed": "Please check if input content meets requirements"
     }
-  },
-  "settings.cleanup_warning": "⚠️ Warning: Data cleanup operations cannot be undone!\nPlease make sure you have backed up any important data.",
-  "calendar_hub.no_accounts_message": "No external calendar accounts connected. Please add an account first."
+  }
 }

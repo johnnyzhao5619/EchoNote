@@ -92,6 +92,20 @@ class TimelineSettingsPage(BaseSettingsPage):
         future_layout.addStretch()
         self.content_layout.addLayout(future_layout)
 
+        # Page size
+        page_size_layout = create_hbox()
+        self.page_size_label = QLabel(self.i18n.t("settings.timeline.page_size"))
+        self.page_size_label.setMinimumWidth(200)
+        self.page_size_spin = QSpinBox()
+        self.page_size_spin.setMinimum(1)
+        self.page_size_spin.setMaximum(500)
+        self.page_size_spin.setValue(50)
+        self.page_size_spin.valueChanged.connect(self._emit_changed)
+        page_size_layout.addWidget(self.page_size_label)
+        page_size_layout.addWidget(self.page_size_spin)
+        page_size_layout.addStretch()
+        self.content_layout.addLayout(page_size_layout)
+
         self.add_spacing(20)
 
         # Notification settings section
@@ -139,16 +153,20 @@ class TimelineSettingsPage(BaseSettingsPage):
         try:
             # View range
             past_days = self.settings_manager.get_setting("timeline.past_days")
-            if past_days:
+            if past_days is not None:
                 self.past_days_spin.setValue(past_days)
 
             future_days = self.settings_manager.get_setting("timeline.future_days")
-            if future_days:
+            if future_days is not None:
                 self.future_days_spin.setValue(future_days)
+
+            page_size = self.settings_manager.get_setting("timeline.page_size")
+            if page_size is not None:
+                self.page_size_spin.setValue(page_size)
 
             # Reminder time
             reminder_minutes = self.settings_manager.get_setting("timeline.reminder_minutes")
-            if reminder_minutes:
+            if reminder_minutes is not None:
                 index = self.reminder_combo.findText(str(reminder_minutes))
                 if index >= 0:
                     self.reminder_combo.setCurrentIndex(index)
@@ -167,16 +185,17 @@ class TimelineSettingsPage(BaseSettingsPage):
         """Save timeline settings from UI."""
         try:
             # View range
-            self.settings_manager.set_setting("timeline.past_days", self.past_days_spin.value())
+            self._set_setting_or_raise("timeline.past_days", self.past_days_spin.value())
 
-            self.settings_manager.set_setting("timeline.future_days", self.future_days_spin.value())
+            self._set_setting_or_raise("timeline.future_days", self.future_days_spin.value())
+            self._set_setting_or_raise("timeline.page_size", self.page_size_spin.value())
 
             # Reminder time
             reminder_minutes = int(self.reminder_combo.currentText())
-            self.settings_manager.set_setting("timeline.reminder_minutes", reminder_minutes)
+            self._set_setting_or_raise("timeline.reminder_minutes", reminder_minutes)
 
             # Auto-start
-            self.settings_manager.set_setting(
+            self._set_setting_or_raise(
                 "timeline.auto_start_enabled", self.auto_start_check.isChecked()
             )
 
@@ -211,6 +230,8 @@ class TimelineSettingsPage(BaseSettingsPage):
             self.past_label.setText(self.i18n.t("settings.timeline.past_days"))
         if hasattr(self, "future_label"):
             self.future_label.setText(self.i18n.t("settings.timeline.future_days"))
+        if hasattr(self, "page_size_label"):
+            self.page_size_label.setText(self.i18n.t("settings.timeline.page_size"))
         if hasattr(self, "reminder_label"):
             self.reminder_label.setText(self.i18n.t("settings.timeline.reminder_time"))
         if hasattr(self, "reminder_suffix"):

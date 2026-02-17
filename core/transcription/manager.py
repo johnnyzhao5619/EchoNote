@@ -128,7 +128,8 @@ class TranscriptionManager:
             max_concurrent=max_concurrent, max_retries=max_retries, retry_delay=retry_delay
         )
 
-        self._default_output_format = self.config.get("default_output_format", "txt")
+        from config.constants import DEFAULT_OUTPUT_FORMAT
+        self._default_output_format = self.config.get("default_output_format", DEFAULT_OUTPUT_FORMAT)
 
         # Initialize format converter
         self.format_converter = FormatConverter()
@@ -321,11 +322,13 @@ class TranscriptionManager:
             )
 
         # Create task record
+        from config.constants import TASK_STATUS_PENDING
+
         task = TranscriptionTask(
             file_path=str(file_path),
             file_name=file_path.name,
             file_size=file_path.stat().st_size,
-            status="pending",
+            status=TASK_STATUS_PENDING,
             language=options.get("language"),
             engine=self.speech_engine.get_name(),
             output_format=options.get("output_format", self._default_output_format),
@@ -693,7 +696,8 @@ class TranscriptionManager:
             ensure_not_cancelled("after loading task from database")
 
             # Update status to processing
-            task.status = "processing"
+            from config.constants import TASK_STATUS_PROCESSING
+            task.status = TASK_STATUS_PROCESSING
             task.started_at = datetime.now().isoformat()
             task.progress = 0.0
             task.save(self.db)
@@ -760,8 +764,9 @@ class TranscriptionManager:
         except asyncio.CancelledError:
             logger.info(f"Task {task_id} cancelled")
             # Update status to cancelled
+            from config.constants import TASK_STATUS_CANCELLED
             if task:
-                task.status = "cancelled"
+                task.status = TASK_STATUS_CANCELLED
                 task.save(self.db)
                 self._notify_listeners("task_updated", task.to_dict())
                 self._notify_listeners("task_cancelled", {"id": task_id})
@@ -772,8 +777,9 @@ class TranscriptionManager:
         except Exception as e:
             logger.error(f"Error processing task {task_id}: {e}", exc_info=True)
             # Update status to failed
+            from config.constants import TASK_STATUS_FAILED
             if task:
-                task.status = "failed"
+                task.status = TASK_STATUS_FAILED
                 task.error_message = str(e)
                 task.save(self.db)
                 self._notify_listeners("task_updated", task.to_dict())
@@ -812,8 +818,9 @@ class TranscriptionManager:
         if "duration" in result:
             task.audio_duration = result["duration"]
 
+        from config.constants import TASK_STATUS_COMPLETED
         # Update status
-        task.status = "completed"
+        task.status = TASK_STATUS_COMPLETED
         task.completed_at = datetime.now().isoformat()
         task.progress = 100.0
         task.save(self.db)
@@ -923,6 +930,7 @@ class TranscriptionManager:
             return False
 
         import asyncio
+        from config.constants import TASK_STATUS_CANCELLED
 
         # Cancel in queue (schedule in background event loop)
         future = asyncio.run_coroutine_threadsafe(self.task_queue.cancel_task(task_id), self._loop)
@@ -934,7 +942,7 @@ class TranscriptionManager:
                 # Update database
                 task = TranscriptionTask.get_by_id(self.db, task_id)
                 if task:
-                    task.status = "cancelled"
+                    task.status = TASK_STATUS_CANCELLED
                     task.save(self.db)
 
                 logger.info(f"Task {task_id} cancelled")
@@ -954,19 +962,21 @@ class TranscriptionManager:
         Returns:
             True if retry was initiated, False otherwise
         """
+        from config.constants import TASK_STATUS_FAILED, TASK_STATUS_PENDING
+
         task = TranscriptionTask.get_by_id(self.db, task_id)
         if not task:
             logger.warning(f"Cannot retry task {task_id}: not found")
             return False
 
-        if task.status != "failed":
+        if task.status != TASK_STATUS_FAILED:
             logger.warning(
                 f"Cannot retry task {task_id}: status is {task.status}, " f"not 'failed'"
             )
             return False
 
         # Reset task status
-        task.status = "pending"
+        task.status = TASK_STATUS_PENDING
         task.progress = 0.0
         task.error_message = None
         task.started_at = None
@@ -1040,7 +1050,9 @@ class TranscriptionManager:
         if self._task_engine_options.pop(task_id, None) is not None:
             self._persist_task_engine_options()
 
-        if task.status == "processing":
+        from config.constants import TASK_STATUS_PROCESSING
+
+        if task.status == TASK_STATUS_PROCESSING:
             # Processing tasks must be cancelled first; deleting here can race
             # with in-flight worker callbacks and produce inconsistent states.
             logger.warning(

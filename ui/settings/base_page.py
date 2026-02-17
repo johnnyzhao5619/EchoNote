@@ -20,7 +20,7 @@ Provides common functionality for all settings pages.
 """
 
 import logging
-from typing import Tuple
+from typing import TypedDict, Tuple
 
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QFont
@@ -30,6 +30,14 @@ from ui.base_widgets import BaseWidget
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.settings.base")
+
+
+class PostSaveMessage(TypedDict, total=False):
+    """Structured message returned by ``apply_post_save`` hooks."""
+
+    level: str
+    message: str
+    source: str
 
 
 class BaseSettingsPage(BaseWidget):
@@ -111,6 +119,15 @@ class BaseSettingsPage(BaseWidget):
         Should be overridden by subclasses.
         """
 
+    def apply_post_save(self):
+        """
+        Apply runtime side effects after global settings save succeeds.
+
+        Subclasses can override this for non-persistent follow-up actions
+        (engine reload, key refresh, etc.). Optional return value:
+        list[PostSaveMessage].
+        """
+
     def validate_settings(self) -> Tuple[bool, str]:
         """
         Validate settings before saving.
@@ -132,3 +149,15 @@ class BaseSettingsPage(BaseWidget):
     def _emit_changed(self):
         """Emit settings changed signal."""
         self.settings_changed.emit()
+
+    def _set_setting_or_raise(self, key: str, value):
+        """
+        Persist a setting and raise when manager rejects it.
+
+        Args:
+            key: Setting key in dot notation
+            value: Value to store
+        """
+        updated = self.settings_manager.set_setting(key, value)
+        if not updated:
+            raise ValueError(self.i18n.t("settings.error.setting_update_failed", key=key))

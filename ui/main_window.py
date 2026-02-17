@@ -788,18 +788,9 @@ class MainWindow(QMainWindow):
         Handle API keys updated event.
 
         This method is called when API keys are saved in settings.
-        It notifies relevant components to reload their engines with new keys.
+        It notifies realtime components to refresh cloud-engine availability.
         """
         logger.info(self.i18n.t("logging.main_window.api_keys_updated"))
-
-        # Notify transcription manager to reload engines if needed
-        transcription_manager = self.managers.get("transcription_manager")
-        if transcription_manager and hasattr(transcription_manager, "reload_engine"):
-            try:
-                transcription_manager.reload_engine()
-                logger.info(self.i18n.t("logging.main_window.transcription_engine_reloaded"))
-            except Exception as e:
-                logger.error(f"Error reloading transcription engine: {e}")
 
         # Notify realtime recorder to reload engines if needed
         realtime_recorder = self.managers.get("realtime_recorder")

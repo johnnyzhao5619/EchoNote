@@ -39,45 +39,6 @@
     "next": "Next",
     "close": "Close"
   },
-  "data_management": {
-    "title": "Data Management",
-    "clear_all": "Clear All Data",
-    "confirm_cleanup": "Confirm Data Cleanup",
-    "confirm_delete": "Are you sure you want to delete ALL user data?",
-    "final_confirmation": "Final Confirmation",
-    "last_chance": "This is your last chance to cancel!",
-    "cleanup_progress": "Cleanup in Progress",
-    "cleanup_complete": "Cleanup Complete",
-    "cleanup_success": "All user data has been deleted successfully.",
-    "cleanup_errors": "Cleanup Completed with Errors",
-    "cleanup_partial": "Data cleanup completed, but some items could not be deleted.",
-    "storage_labels": {
-      "database": "Database: Calculating...",
-      "configuration": "Configuration: Calculating...",
-      "recordings": "Recordings: Calculating...",
-      "transcripts": "Transcripts: Calculating...",
-      "logs": "Logs: Calculating...",
-      "total": "Total: Calculating...",
-      "database_prefix": "Database",
-      "configuration_prefix": "Configuration",
-      "recordings_prefix": "Recordings",
-      "transcripts_prefix": "Transcripts",
-      "logs_prefix": "Logs",
-      "total_prefix": "Total",
-      "files": "files"
-    },
-    "storage_status": {
-      "exists": "exists",
-      "not_found": "not found"
-    },
-    "clear_all_description": "This will delete:\n• Database (all tasks, events, and settings)\n• Configuration files\n• All recordings\n• All transcripts\n• Log files",
-    "confirm_delete_details": "This will permanently delete approximately {size} of data.\n\nThis operation cannot be undone!\n\nThe application will need to be restarted after cleanup.",
-    "final_confirmation_details": "Type 'DELETE' in the confirmation dialog to proceed.\n\nAre you absolutely sure you want to delete all data?",
-    "cleanup_progress_message": "Deleting all user data...",
-    "cleanup_success_details": "Deleted {count} items.\n\nPlease restart the application.",
-    "more_errors": "... and {count} more errors",
-    "cleanup_partial_details": "Deleted: {deleted} items\nFailed: {failed} items"
-  },
   "sidebar": {
     "batch_transcribe": "Batch Transcribe",
     "realtime_record": "Real-time Record",
@@ -284,6 +245,9 @@
       "auth_failed_heading": "Authorization Failed",
       "auth_failed_content": "<p>Error: {error}</p><p>You can close this window and try again.</p>",
       "unknown_error": "Unknown error",
+      "state_mismatch_message": "Authorization state mismatch detected. The flow was cancelled for your safety.",
+      "start_authorization_failed": "Failed to start authorization: {error}",
+      "process_authorization_failed": "Error processing authorization: {error}",
       "connect_title": "Connect {provider} Calendar",
       "instructions_html": "<p>To connect your {provider} calendar:</p><ol><li>Click the \"Start Authorization\" button below</li><li>Your browser will open to {provider}'s authorization page</li><li>Sign in to your {provider} account if needed</li><li>Grant EchoNote permission to access your calendar</li><li>You will be redirected back to EchoNote automatically</li></ol><p><strong>Note:</strong> EchoNote will only access your calendar data. We never store your password.</p>"
     },
@@ -291,20 +255,52 @@
       "add_calendar_account": "Add Calendar Account",
       "connect_google": "Connect Google Calendar",
       "connect_outlook": "Connect Outlook Calendar",
+      "connect_failed_message": "Failed to connect {provider} calendar:\n{error}",
+      "disconnect_confirm_message": "Are you sure you want to disconnect {provider} calendar?\n\nThis will:\n- Remove all synced events from {provider}\n- Delete stored OAuth tokens\n- Stop automatic synchronization",
       "syncing": "Syncing...",
       "sync_error": "Sync Error",
+      "sync_failed_message": "Failed to sync calendars: {error}",
       "never_synced": "Never synced",
+      "last_sync": "Last sync: {time_ago}",
       "previous": "Previous",
       "next": "Next",
       "sync_now_tooltip": "Sync calendar data immediately",
       "sync_now": "Sync Now",
+      "no_accounts_message": "No external calendar accounts connected. Please add an account first.",
+      "sync_success_message": "Successfully synced {count} calendar(s).",
+      "sync_partial_message": "Synced {success_count} calendar(s), {error_count} failed. Check logs for details.",
       "time_ago_just_now": "just now",
       "time_ago_minutes": "{minutes}m ago",
       "time_ago_hours": "{hours}h ago",
       "time_ago_days": "{days}d ago"
     },
     "calendar_view": {
-      "no_events": "No events for this day"
+      "no_events": "No events for this day",
+      "weekday_mon": "Mon",
+      "weekday_tue": "Tue",
+      "weekday_wed": "Wed",
+      "weekday_thu": "Thu",
+      "weekday_fri": "Fri",
+      "weekday_sat": "Sat",
+      "weekday_sun": "Sun",
+      "more_events": "+{count} more"
+    }
+  },
+  "calendar": {
+    "success": {
+      "event_created": "Event created successfully.",
+      "event_updated": "Event updated successfully.",
+      "connected": "{provider} calendar connected successfully.",
+      "disconnected": "{provider} calendar disconnected successfully."
+    },
+    "warning": {
+      "sync_failed": "Calendar sync failed: {error}"
+    },
+    "error": {
+      "save_failed": "Failed to save event: {error}",
+      "sync_not_configured": "{provider} calendar sync is not configured.",
+      "auth_failed": "Failed to complete authorization: {error}",
+      "disconnect_failed": "Failed to disconnect calendar account: {error}"
     }
   },
   "timeline": {
@@ -456,7 +452,9 @@
       "title": "Error",
       "load_failed": "Failed to load settings: {error}",
       "save_failed": "Failed to save settings: {error}",
-      "reset_failed": "Failed to reset settings: {error}"
+      "reset_failed": "Failed to reset settings: {error}",
+      "rollback_failed": "The application restored in-memory settings failed after save error. Please reload settings.",
+      "setting_update_failed": "Failed to update setting: {key}"
     },
     "success": {
       "title": "Success",
@@ -471,6 +469,9 @@
     "validation": {
       "title": "Validation Error"
     },
+    "warning": {
+      "post_save_actions_partial": "Settings were saved, but some runtime updates failed: {details}"
+    },
     "appearance": {
       "title": "Appearance Settings",
       "theme": "Theme",
@@ -481,7 +482,7 @@
       "system": "System",
       "preview": "Preview",
       "preview_text": "This is a theme preview",
-      "theme_info": "Theme changes will be applied immediately to the entire application"
+      "theme_info": "Theme changes apply after clicking Save."
     },
     "language": {
       "title": "Language Settings",
@@ -491,7 +492,7 @@
       "chinese": "Chinese (Simplified)",
       "english": "English",
       "french": "Français",
-      "change_info": "Language changes will be applied immediately to the entire application",
+      "change_info": "Language changes apply after clicking Save.",
       "restart_required": "Language changes will take effect after restart"
     },
     "transcription": {
@@ -546,6 +547,7 @@
       "engine_reload_warning_title": "Engine Reload Notice",
       "engine_reload_warning_message": "Settings were saved, but engine '{engine}' was not reloaded immediately. Changes will apply on next transcription.",
       "engine_reload_failed_message": "Settings were saved, but reloading engine '{engine}' failed: {error}",
+      "api_keys_save_failed_message": "Settings were saved, but updating encrypted API keys failed: {error}",
       "error": {
         "empty_path": "Save path cannot be empty",
         "invalid_path": "Invalid path: {error}"
@@ -570,6 +572,14 @@
       "translation_engine": "Translation Engine",
       "no_translation": "No Translation",
       "google_translate": "Google Translate",
+      "processing": "Processing Settings",
+      "save_transcript": "Save Transcription Output",
+      "create_calendar_event": "Create Calendar Event",
+      "vad_threshold": "VAD Threshold",
+      "silence_duration_ms": "Silence Duration",
+      "min_audio_duration": "Minimum Audio Duration",
+      "milliseconds_short": "ms",
+      "seconds_short": "s",
       "error": {
         "empty_path": "Save path cannot be empty",
         "invalid_path": "Invalid path: {error}"
@@ -595,6 +605,7 @@
       "view_range": "View Range",
       "past_days": "Past Days",
       "future_days": "Future Days",
+      "page_size": "Events Per Page",
       "days": "days",
       "notifications": "Notification Settings",
       "reminder_time": "Reminder Time",
@@ -846,9 +857,6 @@
       },
       "model_management_page": {
         "initialized": "Model management page initialized"
-      },
-      "data_management_page": {
-        "cleanup_completed_successfully": "Data cleanup completed successfully"
       }
     },
     "calendar_hub": {
@@ -944,11 +952,6 @@
     }
   },
   "dialogs": {
-    "settings": {
-      "data_management": {
-        "cleanup_failed": "Cleanup Failed"
-      }
-    },
     "calendar_hub": {
       "authorization_failed": "Authorization Failed",
       "disconnect_account": "Disconnect Account",
@@ -1118,7 +1121,5 @@
       "insufficient_resources": "Please free up disk space or memory and retry",
       "validation_failed": "Please check if input content meets requirements"
     }
-  },
-  "settings.cleanup_warning": "⚠️ Warning: Data cleanup operations cannot be undone!\nPlease make sure you have backed up any important data.",
-  "calendar_hub.no_accounts_message": "No external calendar accounts connected. Please add an account first."
+  }
 }

@@ -105,7 +105,7 @@ class AudioPlayer(BaseWidget):
             parent: Parent widget
             auto_load: Whether to immediately load the audio file.
         """
-        super().__init__(parent)
+        super().__init__(i18n, parent)
 
         self.file_path = file_path
         self.i18n = i18n
@@ -805,7 +805,8 @@ class AudioPlayerDialog(QDialog):
         Args:
             error_msg: Error message
         """
-        self.show_error(
+        QMessageBox.critical(
+            self,
             self.i18n.t("common.error"),
             self.i18n.t("timeline.audio_player.dialog_error_body", message=error_msg),
         )

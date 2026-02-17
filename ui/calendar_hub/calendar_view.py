@@ -21,13 +21,14 @@ Provides month, week, and day views for displaying calendar events.
 
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QDate, QLocale, Qt, Signal
 from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
     QLabel,
+    QPushButton,
     QScrollArea,
     QVBoxLayout,
     QWidget,
@@ -37,6 +38,88 @@ from ui.base_widgets import BaseWidget
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.calendar_view")
+
+
+def _parse_datetime(value: Any) -> Optional[datetime]:
+    """Parse values into local naive datetimes for UI comparisons."""
+    if isinstance(value, datetime):
+        dt = value
+    elif isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        if text.endswith("Z"):
+            text = f"{text[:-1]}+00:00"
+        try:
+            dt = datetime.fromisoformat(text)
+        except ValueError:
+            return None
+    else:
+        return None
+
+    if dt.tzinfo is not None:
+        return dt.astimezone().replace(tzinfo=None)
+    return dt
+
+
+def _event_bounds(calendar_event: Any) -> Optional[Tuple[datetime, datetime]]:
+    """Return normalized event start/end bounds."""
+    start_dt = _parse_datetime(getattr(calendar_event, "start_time", None))
+    end_dt = _parse_datetime(getattr(calendar_event, "end_time", None))
+    if start_dt is None or end_dt is None:
+        return None
+
+    if end_dt <= start_dt:
+        end_dt = start_dt + timedelta(seconds=1)
+    return start_dt, end_dt
+
+
+def _event_sort_key(calendar_event: Any) -> datetime:
+    bounds = _event_bounds(calendar_event)
+    if bounds is None:
+        return datetime.max
+    return bounds[0]
+
+
+def _get_weekday_labels(i18n: I18nQtManager) -> List[str]:
+    keys_with_defaults = [
+        ("calendar_hub.calendar_view.weekday_mon", "Mon"),
+        ("calendar_hub.calendar_view.weekday_tue", "Tue"),
+        ("calendar_hub.calendar_view.weekday_wed", "Wed"),
+        ("calendar_hub.calendar_view.weekday_thu", "Thu"),
+        ("calendar_hub.calendar_view.weekday_fri", "Fri"),
+        ("calendar_hub.calendar_view.weekday_sat", "Sat"),
+        ("calendar_hub.calendar_view.weekday_sun", "Sun"),
+    ]
+
+    labels: List[str] = []
+    for key, default in keys_with_defaults:
+        translated = i18n.t(key)
+        labels.append(default if translated == key else translated)
+    return labels
+
+
+def _format_more_events_text(i18n: I18nQtManager, count: int) -> str:
+    translated = i18n.t("calendar_hub.calendar_view.more_events", count=count)
+    if translated == "calendar_hub.calendar_view.more_events":
+        return f"+{count} more"
+    return translated
+
+
+def _get_ui_locale(i18n: I18nQtManager) -> QLocale:
+    language_code = getattr(i18n, "current_language", None)
+    if isinstance(language_code, str) and language_code.strip():
+        return QLocale(language_code)
+    return QLocale.system()
+
+
+def _load_events_safe(calendar_manager: Any, start_date: datetime, end_date: datetime) -> List[Any]:
+    """Load events for a time range with consistent error handling."""
+    try:
+        return calendar_manager.get_events(start_date=start_date, end_date=end_date)
+    except Exception as exc:
+        logger.error("Error loading events: %s", exc)
+        return []
 
 
 class EventCard(QFrame):
@@ -79,17 +162,16 @@ class EventCard(QFrame):
         layout.addWidget(title_label)
 
         # Event time
-        # Parse datetime if it's a string
-        if isinstance(self.calendar_event.start_time, str):
-            start_dt = datetime.fromisoformat(self.calendar_event.start_time)
-            end_dt = datetime.fromisoformat(self.calendar_event.end_time)
+        bounds = _event_bounds(self.calendar_event)
+        if bounds is not None:
+            start_dt, end_dt = bounds
+            time_text = f"{start_dt.strftime('%H:%M')} - {end_dt.strftime('%H:%M')}"
         else:
-            start_dt = self.calendar_event.start_time
-            end_dt = self.calendar_event.end_time
+            start_value = getattr(self.calendar_event, "start_time", "")
+            end_value = getattr(self.calendar_event, "end_time", "")
+            time_text = f"{start_value} - {end_value}"
 
-        start_time = start_dt.strftime("%H:%M")
-        end_time = end_dt.strftime("%H:%M")
-        time_label = QLabel(f"{start_time} - {end_time}")
+        time_label = QLabel(time_text)
         time_label.setProperty("role", "event-time")
         layout.addWidget(time_label)
 
@@ -116,15 +198,12 @@ class MonthView(BaseWidget):
             i18n: Internationalization manager
             parent: Parent widget
         """
-        super().__init__(parent)
+        super().__init__(i18n, parent)
         self.calendar_manager = calendar_manager
         self.i18n = i18n
 
         # Current date
         self.current_date = datetime.now()
-
-        # Event source types (colors defined in QSS)
-        self.source_types = ["local", "google", "outlook"]
 
         self.setup_ui()
 
@@ -144,7 +223,7 @@ class MonthView(BaseWidget):
         self.calendar_grid.setSpacing(1)
 
         # Add day headers
-        day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        day_names = _get_weekday_labels(self.i18n)
         for col, day_name in enumerate(day_names):
             header = QLabel(day_name)
             header.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -162,7 +241,9 @@ class MonthView(BaseWidget):
     def refresh_view(self):
         """Refresh the calendar view with current month data."""
         # Update header
-        self.header_label.setText(self.current_date.strftime("%B %Y"))
+        locale = _get_ui_locale(self.i18n)
+        month_date = QDate(self.current_date.year, self.current_date.month, 1)
+        self.header_label.setText(locale.toString(month_date, "MMMM yyyy"))
 
         # Clear existing cells
         for cell in self.day_cells.values():
@@ -170,36 +251,42 @@ class MonthView(BaseWidget):
         self.day_cells.clear()
 
         # Get first day of month
-        first_day = self.current_date.replace(day=1)
+        first_day = self.current_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
         # Get day of week (0=Monday, 6=Sunday)
         start_weekday = first_day.weekday()
 
         # Get number of days in month
         if self.current_date.month == 12:
-            next_month = self.current_date.replace(year=self.current_date.year + 1, month=1, day=1)
+            next_month = first_day.replace(year=first_day.year + 1, month=1)
         else:
-            next_month = self.current_date.replace(month=self.current_date.month + 1, day=1)
+            next_month = first_day.replace(month=first_day.month + 1)
         days_in_month = (next_month - first_day).days
 
         # Load events for the month
         month_start = first_day
-        month_end = next_month - timedelta(days=1)
+        month_end = next_month
         events = self._load_events(month_start, month_end)
 
-        # Group events by day
-        events_by_day: Dict[int, List[Any]] = {}
-        for calendar_event in events:
-            # Parse start_time if it's a string
-            if isinstance(calendar_event.start_time, str):
-                start_dt = datetime.fromisoformat(calendar_event.start_time)
-            else:
-                start_dt = calendar_event.start_time
+        # Group events by overlap with each visible day.
+        events_by_day: Dict[int, List[Any]] = {day: [] for day in range(1, days_in_month + 1)}
+        day_windows: Dict[int, Tuple[datetime, datetime]] = {}
+        for day in range(1, days_in_month + 1):
+            day_start = first_day + timedelta(days=day - 1)
+            day_windows[day] = (day_start, day_start + timedelta(days=1))
 
-            day = start_dt.day
-            if day not in events_by_day:
-                events_by_day[day] = []
-            events_by_day[day].append(calendar_event)
+        for calendar_event in events:
+            bounds = _event_bounds(calendar_event)
+            if bounds is None:
+                continue
+            event_start, event_end = bounds
+
+            for day, (day_start, day_end) in day_windows.items():
+                if event_start < day_end and event_end > day_start:
+                    events_by_day[day].append(calendar_event)
+
+        for day_events in events_by_day.values():
+            day_events.sort(key=_event_sort_key)
 
         # Create calendar cells
         row = 1
@@ -242,14 +329,20 @@ class MonthView(BaseWidget):
 
         # Event indicators (show up to 3 events)
         for calendar_event in events[:3]:
-            indicator = QLabel("●")
+            indicator = QPushButton("●")
+            indicator.setFlat(True)
+            indicator.setCursor(Qt.CursorShape.PointingHandCursor)
+            indicator.setToolTip(getattr(calendar_event, "title", ""))
             indicator.setProperty("role", "event-indicator")
             indicator.setProperty("source", calendar_event.source)
+            indicator.clicked.connect(
+                lambda _checked=False, event_id=calendar_event.id: self.event_clicked.emit(event_id)
+            )
             layout.addWidget(indicator)
 
         # Show "+N more" if there are more events
         if len(events) > 3:
-            more_label = QLabel(f"+{len(events) - 3} more")
+            more_label = QLabel(_format_more_events_text(self.i18n, len(events) - 3))
             more_label.setProperty("role", "more-events")
             layout.addWidget(more_label)
 
@@ -268,12 +361,7 @@ class MonthView(BaseWidget):
         Returns:
             List of events
         """
-        try:
-            events = self.calendar_manager.get_events(start_date=start_date, end_date=end_date)
-            return events
-        except Exception as e:
-            logger.error(f"Error loading events: {e}")
-            return []
+        return _load_events_safe(self.calendar_manager, start_date, end_date)
 
     def set_date(self, date: datetime):
         """
@@ -331,9 +419,6 @@ class WeekView(BaseWidget):
         # Current date
         self.current_date = datetime.now()
 
-        # Event source types (colors defined in QSS)
-        self.source_types = ["local", "google", "outlook"]
-
         self.setup_ui()
 
     def setup_ui(self):
@@ -366,12 +451,20 @@ class WeekView(BaseWidget):
     def refresh_view(self):
         """Refresh the week view with current week data."""
         # Get week start (Monday)
-        week_start = self.current_date - timedelta(days=self.current_date.weekday())
-        week_end = week_start + timedelta(days=6)
+        week_start = (
+            self.current_date - timedelta(days=self.current_date.weekday())
+        ).replace(hour=0, minute=0, second=0, microsecond=0)
+        week_end = week_start + timedelta(days=7)
+        week_end_display = week_end - timedelta(days=1)
+        locale = _get_ui_locale(self.i18n)
 
         # Update header
+        start_qdate = QDate(week_start.year, week_start.month, week_start.day)
+        end_qdate = QDate(
+            week_end_display.year, week_end_display.month, week_end_display.day
+        )
         self.header_label.setText(
-            f"{week_start.strftime('%b %d')} - " f"{week_end.strftime('%b %d, %Y')}"
+            f"{locale.toString(start_qdate, 'MMM dd')} - {locale.toString(end_qdate, 'MMM dd, yyyy')}"
         )
 
         # Clear existing grid
@@ -381,7 +474,7 @@ class WeekView(BaseWidget):
                 item.widget().deleteLater()
 
         # Add day headers
-        day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        day_names = _get_weekday_labels(self.i18n)
         for col, day_name in enumerate(day_names):
             date = week_start + timedelta(days=col)
             header = QLabel(f"{day_name}\n{date.day}")
@@ -392,19 +485,25 @@ class WeekView(BaseWidget):
         # Load events for the week
         events = self._load_events(week_start, week_end)
 
-        # Group events by day
-        events_by_day: Dict[int, List[Any]] = {}
-        for calendar_event in events:
-            # Parse start_time if it's a string
-            if isinstance(calendar_event.start_time, str):
-                start_dt = datetime.fromisoformat(calendar_event.start_time)
-            else:
-                start_dt = calendar_event.start_time
+        # Group events by overlap with each day in this week.
+        events_by_day: Dict[int, List[Any]] = {day: [] for day in range(7)}
+        day_windows: Dict[int, Tuple[datetime, datetime]] = {}
+        for day in range(7):
+            day_start = week_start + timedelta(days=day)
+            day_windows[day] = (day_start, day_start + timedelta(days=1))
 
-            weekday = start_dt.weekday()
-            if weekday not in events_by_day:
-                events_by_day[weekday] = []
-            events_by_day[weekday].append(calendar_event)
+        for calendar_event in events:
+            bounds = _event_bounds(calendar_event)
+            if bounds is None:
+                continue
+            event_start, event_end = bounds
+
+            for day, (day_start, day_end) in day_windows.items():
+                if event_start < day_end and event_end > day_start:
+                    events_by_day[day].append(calendar_event)
+
+        for day_events in events_by_day.values():
+            day_events.sort(key=_event_sort_key)
 
         # Create day columns
         for col in range(7):
@@ -426,13 +525,7 @@ class WeekView(BaseWidget):
         layout = QVBoxLayout(column)
         # # layout.setSpacing(4)
 
-        # Sort events by start time
-        def get_start_time(e):
-            if isinstance(e.start_time, str):
-                return datetime.fromisoformat(e.start_time)
-            return e.start_time
-
-        sorted_events = sorted(events, key=get_start_time)
+        sorted_events = sorted(events, key=_event_sort_key)
 
         # Add event cards
         for calendar_event in sorted_events:
@@ -455,12 +548,7 @@ class WeekView(BaseWidget):
         Returns:
             List of events
         """
-        try:
-            events = self.calendar_manager.get_events(start_date=start_date, end_date=end_date)
-            return events
-        except Exception as e:
-            logger.error(f"Error loading events: {e}")
-            return []
+        return _load_events_safe(self.calendar_manager, start_date, end_date)
 
     def set_date(self, date: datetime):
         """
@@ -512,9 +600,6 @@ class DayView(BaseWidget):
         # Current date
         self.current_date = datetime.now()
 
-        # Event source types (colors defined in QSS)
-        self.source_types = ["local", "google", "outlook"]
-
         self.setup_ui()
 
     def setup_ui(self):
@@ -547,7 +632,11 @@ class DayView(BaseWidget):
     def refresh_view(self):
         """Refresh the day view with current day data."""
         # Update header
-        self.header_label.setText(self.current_date.strftime("%A, %B %d, %Y"))
+        locale = _get_ui_locale(self.i18n)
+        current_qdate = QDate(
+            self.current_date.year, self.current_date.month, self.current_date.day
+        )
+        self.header_label.setText(locale.toString(current_qdate, "dddd, MMMM dd, yyyy"))
 
         # Clear existing events
         while self.events_layout.count():
@@ -560,13 +649,7 @@ class DayView(BaseWidget):
         day_end = day_start + timedelta(days=1)
         events = self._load_events(day_start, day_end)
 
-        # Sort events by start time
-        def get_start_time(e):
-            if isinstance(e.start_time, str):
-                return datetime.fromisoformat(e.start_time)
-            return e.start_time
-
-        sorted_events = sorted(events, key=get_start_time)
+        sorted_events = sorted(events, key=_event_sort_key)
 
         # Add event cards
         if sorted_events:
@@ -594,12 +677,7 @@ class DayView(BaseWidget):
         Returns:
             List of events
         """
-        try:
-            events = self.calendar_manager.get_events(start_date=start_date, end_date=end_date)
-            return events
-        except Exception as e:
-            logger.error(f"Error loading events: {e}")
-            return []
+        return _load_events_safe(self.calendar_manager, start_date, end_date)
 
     def set_date(self, date: datetime):
         """

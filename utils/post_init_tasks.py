@@ -24,6 +24,8 @@ import logging
 
 logger = logging.getLogger("echonote.post_init")
 
+from config.constants import ENGINE_FASTER_WHISPER
+
 
 def check_ffmpeg_availability(config, i18n, main_window):
     """Check FFmpeg availability and show installation dialog if needed."""
@@ -56,9 +58,9 @@ def check_model_availability(config, model_manager, i18n, main_window):
     """Check model availability and show recommendation dialog if needed."""
     logger.info("Checking if model recommendation is needed...")
     default_engine = str(
-        config.get("transcription.default_engine", "faster-whisper")
+        config.get("transcription.default_engine", ENGINE_FASTER_WHISPER)
     ).strip().lower()
-    if default_engine != "faster-whisper":
+    if default_engine != ENGINE_FASTER_WHISPER:
         logger.info(
             "Default speech engine is '%s'; skipping local model recommendation",
             default_engine,
@@ -119,9 +121,19 @@ def start_background_services(managers, config, db, logger):
 
     if "auto_task_scheduler" in managers and managers["auto_task_scheduler"]:
         try:
-            logger.info("Starting auto task scheduler...")
-            managers["auto_task_scheduler"].start()
-            logger.info("Auto task scheduler started")
+            auto_start_enabled = config.get("timeline.auto_start_enabled", True)
+            if isinstance(auto_start_enabled, str):
+                normalized = auto_start_enabled.strip().lower()
+                auto_start_enabled = normalized not in {"0", "false", "no", "off"}
+            else:
+                auto_start_enabled = bool(auto_start_enabled)
+
+            if auto_start_enabled:
+                logger.info("Starting auto task scheduler...")
+                managers["auto_task_scheduler"].start()
+                logger.info("Auto task scheduler started")
+            else:
+                logger.info("Auto task scheduler disabled by timeline.auto_start_enabled")
         except Exception as e:
             logger.error(f"Could not start auto task scheduler: {e}")
 

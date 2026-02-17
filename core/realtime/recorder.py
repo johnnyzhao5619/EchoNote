@@ -33,6 +33,7 @@ from core.realtime.audio_buffer import AudioBuffer
 from core.realtime.config import RealtimeConfig
 from core.realtime.archiver import SessionArchiver
 from core.realtime.integration import CalendarIntegration
+from config.constants import RECORDING_FORMAT_WAV
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +73,19 @@ class RealtimeRecorder:
         self.db = db_connection
         # file_manager is used by session_archiver
         self.i18n = i18n
-        self.config = config or RealtimeConfig()
+        
+        if config:
+            self.config = config
+        else:
+            # Load defaults from centralized configuration
+            try:
+                from config.app_config import ConfigManager
+                config_manager = ConfigManager()
+                realtime_settings = config_manager.get("realtime", {})
+                self.config = RealtimeConfig.from_dict(realtime_settings)
+            except Exception as e:
+                logger.warning(f"Failed to load realtime config from ConfigManager: {e}")
+                self.config = RealtimeConfig()
 
         if self.audio_capture is None:
             logger.warning(
@@ -635,7 +648,7 @@ class RealtimeRecorder:
 
         # Persist audio when requested.
         if self.current_options.get("save_recording", True):
-            recording_format = self.current_options.get("recording_format", "wav")
+            recording_format = self.current_options.get("recording_format", RECORDING_FORMAT_WAV)
             recording_path = ""
 
             if self._stream_recording_active:

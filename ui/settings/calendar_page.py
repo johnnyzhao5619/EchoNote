@@ -129,31 +129,31 @@ class CalendarSettingsPage(BaseSettingsPage):
 
     def _on_add_google_clicked(self):
         """Handle add Google account button click."""
-        self.show_info(
-            self.i18n.t("settings.calendar.add_account"),
-            self.i18n.t("settings.calendar.google_oauth_info"),
-        )
-
-        # In a real implementation, this would:
-        # 1. Get calendar_manager from self.managers
-        # 2. Initiate OAuth flow
-        # 3. Add account to list on success
-
-        logger.info(self.i18n.t("logging.settings.calendar_page.add_google_account_clicked"))
+        self._connect_provider("google")
 
     def _on_add_outlook_clicked(self):
         """Handle add Outlook account button click."""
-        self.show_info(
-            self.i18n.t("settings.calendar.add_account"),
-            self.i18n.t("settings.calendar.outlook_oauth_info"),
-        )
+        self._connect_provider("outlook")
 
-        # In a real implementation, this would:
-        # 1. Get calendar_manager from self.managers
-        # 2. Initiate OAuth flow
-        # 3. Add account to list on success
+    def _connect_provider(self, provider: str) -> None:
+        """Connect a provider account using the calendar hub workflow."""
+        calendar_hub = self._get_calendar_hub_widget()
+        if calendar_hub is None:
+            self.show_warning(
+                self.i18n.t("common.error"),
+                self.i18n.t("calendar.error.sync_not_configured", provider=provider.capitalize()),
+            )
+            return
 
-        logger.info(self.i18n.t("logging.settings.calendar_page.add_outlook_account_clicked"))
+        try:
+            calendar_hub.start_oauth_flow(provider)
+            self.load_settings()
+        except Exception as exc:
+            logger.error("Failed to connect provider %s from settings page: %s", provider, exc)
+            self.show_error(
+                self.i18n.t("common.error"),
+                self.i18n.t("calendar.error.auth_failed", error=str(exc)),
+            )
 
     def _on_remove_clicked(self):
         """Handle remove account button click."""
@@ -177,31 +177,52 @@ class CalendarSettingsPage(BaseSettingsPage):
         )
 
         if reply == QMessageBox.StandardButton.Yes:
-            # Remove from list
-            row = self.accounts_list.row(item)
-            self.accounts_list.takeItem(row)
+            provider = account_data.get("provider")
+            if not provider:
+                return
 
-            # In a real implementation, this would also:
-            # 1. Revoke OAuth token
-            # 2. Remove from database
-            # 3. Stop syncing
+            try:
+                calendar_hub = self._get_calendar_hub_widget()
+                if calendar_hub is not None:
+                    calendar_hub.disconnect_account(provider, confirm=False)
+                else:
+                    self._disconnect_provider_without_hub(provider)
 
-            self._emit_changed()
+                self.load_settings()
+                logger.info("Removed account for provider: %s", provider)
+            except Exception as exc:
+                logger.error("Failed to remove account for provider %s: %s", provider, exc)
+                self.show_error(
+                    self.i18n.t("common.error"),
+                    self.i18n.t("calendar.error.disconnect_failed", error=str(exc)),
+                )
 
-            logger.info(f"Removed account: {account_data.get('email')}")
+    def _disconnect_provider_without_hub(self, provider: str) -> None:
+        """Fallback disconnect path when calendar hub widget is unavailable."""
+        calendar_manager = self.managers.get("calendar_manager")
+        if not calendar_manager:
+            raise RuntimeError("calendar_manager is not available")
+
+        calendar_manager.disconnect_provider_account(provider)
 
     def load_settings(self):
         """Load calendar settings into UI."""
         try:
             # Clear existing items
             self.accounts_list.clear()
+            calendar_manager = self.managers.get("calendar_manager")
+            if not calendar_manager:
+                logger.warning("calendar_manager is unavailable when loading calendar settings")
+                return
 
-            # In a real implementation, this would:
-            # 1. Query database for connected accounts
-            # 2. Add each account to the list
+            from data.database.models import CalendarSyncStatus
 
-            # For now, we'll just check if there are any sync status records
-            # This is a placeholder implementation
+            statuses = CalendarSyncStatus.get_all_active(calendar_manager.db)
+            for status in statuses:
+                self.add_account_to_list(
+                    provider=status.provider,
+                    email=status.user_email or "",
+                )
 
             logger.debug("Calendar settings loaded")
 
@@ -253,7 +274,10 @@ class CalendarSettingsPage(BaseSettingsPage):
         if hasattr(self, "remove_button"):
             self.remove_button.setText(self.i18n.t("settings.calendar.remove_account"))
 
-    def add_account_to_list(self, provider: str, email: str, status: str = "Connected"):
+        # Rebuild account list so provider labels follow current language.
+        self.load_settings()
+
+    def add_account_to_list(self, provider: str, email: str, status: str = ""):
         """
         Add an account to the list.
 
@@ -262,8 +286,31 @@ class CalendarSettingsPage(BaseSettingsPage):
             email: Account email
             status: Connection status
         """
-        item = QListWidgetItem(f"{provider}: {email} ({status})")
+        provider_label = self._get_provider_label(provider)
+        if status:
+            item = QListWidgetItem(f"{provider_label}: {email} ({status})")
+        else:
+            item = QListWidgetItem(f"{provider_label}: {email}")
         item.setData(
             Qt.ItemDataRole.UserRole, {"provider": provider, "email": email, "status": status}
         )
         self.accounts_list.addItem(item)
+
+    def _get_provider_label(self, provider: str) -> str:
+        providers_map = {}
+        if isinstance(self.i18n.translations, dict):
+            providers_map = self.i18n.translations.get("calendar_hub", {}).get("providers", {})
+        if isinstance(providers_map, dict):
+            label = providers_map.get(provider)
+            if isinstance(label, str) and label:
+                return label
+        return provider.capitalize()
+
+    def _get_calendar_hub_widget(self):
+        """Return the existing calendar hub widget when available."""
+        main_window = self.managers.get("main_window")
+        if not main_window:
+            return None
+        pages = getattr(main_window, "pages", {})
+        widget = pages.get("calendar_hub") if isinstance(pages, dict) else None
+        return widget

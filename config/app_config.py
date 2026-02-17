@@ -275,6 +275,10 @@ class ConfigManager:
             key: Configuration key (supports dot notation)
             value: Value to set
         """
+        # Validate before setting
+        if not self.validate_setting(key, value):
+            raise ValueError(f"Invalid value for configuration key '{key}': {value}")
+
         keys = key.split(".")
         config = self._config
 
@@ -286,6 +290,139 @@ class ConfigManager:
 
         # Set the value
         config[keys[-1]] = value
+
+    def validate_setting(self, key: str, value: Any) -> bool:
+        """
+        Validate a specific configuration setting.
+
+        Args:
+            key: Setting key (dot notation)
+            value: Value to validate
+
+        Returns:
+            True if valid, False otherwise
+        """
+        parts = key.split(".")
+        if len(parts) < 2:
+            # Top-level keys like 'version' are read-only or handled separately
+            return True
+
+        category = parts[0]
+        setting = ".".join(parts[1:])
+
+        try:
+            if category == "transcription":
+                return self._validate_transcription_setting(setting, value)
+            elif category == "realtime":
+                return self._validate_realtime_setting(setting, value)
+            elif category == "calendar":
+                return self._validate_calendar_setting(setting, value)
+            elif category == "timeline":
+                return self._validate_timeline_setting(setting, value)
+            elif category == "resource_monitor":
+                return self._validate_resource_monitor_setting(setting, value)
+            elif category == "ui":
+                return self._validate_ui_setting(setting, value)
+            
+            return True
+        except Exception as e:
+            logger.error(f"Validation error for {key}: {e}")
+            return False
+
+    def _validate_transcription_setting(self, setting: str, value: Any) -> bool:
+        from config.constants import (
+            SUPPORTED_TRANSCRIPTION_FORMATS,
+            SUPPORTED_TRANSCRIPTION_ENGINES,
+        )
+
+        if setting == "default_output_format":
+             return value in SUPPORTED_TRANSCRIPTION_FORMATS
+        elif setting == "max_concurrent_tasks":
+            return isinstance(value, int) and 1 <= value <= 5
+        elif setting == "default_engine":
+            return value in SUPPORTED_TRANSCRIPTION_ENGINES
+        elif setting == "default_save_path":
+            return isinstance(value, str) and len(value.strip()) > 0
+        elif setting == "faster_whisper.model_size":
+            from core.models.registry import get_default_model_names
+            return isinstance(value, str) and value in get_default_model_names()
+        elif setting == "faster_whisper.model_dir":
+             return isinstance(value, str)
+        # Task queue settings
+        elif setting.startswith("task_queue."):
+            sub = setting.split(".", 1)[1]
+            if sub == "max_concurrent_tasks":
+                return isinstance(value, int) and 1 <= value <= 5
+            elif sub == "max_retries":
+                return isinstance(value, int) and value >= 0
+            elif sub == "retry_delay":
+                return isinstance(value, (int, float)) and value >= 0
+        return True
+
+    def _validate_realtime_setting(self, setting: str, value: Any) -> bool:
+        from config.constants import (
+            SUPPORTED_RECORDING_FORMATS,
+            SUPPORTED_REALTIME_TRANSLATION_ENGINES,
+        )
+
+        if setting == "recording_format":
+             return value in SUPPORTED_RECORDING_FORMATS
+        elif setting == "auto_save":
+            return isinstance(value, bool)
+        elif setting == "default_input_source":
+             # 'default' or valid device ID (string)
+            return isinstance(value, str)
+        elif setting == "default_gain":
+             # 0.1 to 10.0
+             return isinstance(value, (int, float)) and 0.0 <= value <= 10.0
+        elif setting == "translation_engine":
+             return value in SUPPORTED_REALTIME_TRANSLATION_ENGINES
+        elif setting == "vad_threshold":
+             return isinstance(value, (int, float)) and 0.0 <= value <= 1.0
+        elif setting == "silence_duration_ms":
+             return isinstance(value, int) and value >= 0
+        elif setting == "min_audio_duration":
+             return isinstance(value, (int, float)) and value >= 0
+        elif setting == "save_transcript" or setting == "create_calendar_event":
+             return isinstance(value, bool)
+        elif setting == "recording_save_path":
+             return isinstance(value, str)
+        return True
+
+    def _validate_calendar_setting(self, setting: str, value: Any) -> bool:
+        if setting == "default_view":
+            return value in ["month", "week", "day"]
+        elif setting == "sync_interval_minutes":
+             return isinstance(value, int) and value >= 1
+        elif setting.startswith("colors."):
+             return isinstance(value, str) and value.startswith("#") and len(value) == 7
+        return True
+
+    def _validate_timeline_setting(self, setting: str, value: Any) -> bool:
+        if setting in ["past_days", "future_days"]:
+            return isinstance(value, int) and value >= 1
+        elif setting == "reminder_minutes":
+             return value in [5, 10, 15, 30]
+        elif setting == "page_size":
+             return isinstance(value, int) and value >= 1
+        elif setting == "auto_start_enabled":
+             return isinstance(value, bool)
+        return True
+
+    def _validate_resource_monitor_setting(self, setting: str, value: Any) -> bool:
+        if setting == "low_memory_mb":
+            return isinstance(value, (int, float)) and 64 <= float(value) <= 1048576
+        elif setting == "high_cpu_percent":
+             return isinstance(value, (int, float)) and 1 <= float(value) <= 100
+        return True
+
+    def _validate_ui_setting(self, setting: str, value: Any) -> bool:
+        if setting == "theme":
+            return value in ["light", "dark", "system"]
+        elif setting == "language":
+            valid = get_translation_codes() or ["en_US"]
+            return value in valid
+        return True
 
     def save(self) -> None:
         """Save the current configuration to the user config file."""
@@ -323,6 +460,27 @@ class ConfigManager:
             Complete configuration dictionary
         """
         return self._clone_value(self._config)
+
+    def replace_all(self, config: Dict[str, Any]) -> None:
+        """
+        Replace in-memory configuration with a validated snapshot.
+
+        Args:
+            config: Full configuration snapshot
+        """
+        if not isinstance(config, dict):
+            raise TypeError("config must be a dictionary")
+
+        candidate = self._clone_value(config)
+        candidate["version"] = get_version()
+
+        previous = self._config
+        self._config = candidate
+        try:
+            self._validate_config()
+        except Exception:
+            self._config = previous
+            raise
 
     def reload(self) -> None:
         """Reload configuration from disk."""

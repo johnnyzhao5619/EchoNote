@@ -98,14 +98,8 @@ class LanguageSettingsPage(BaseSettingsPage):
         Args:
             index: Selected language index
         """
-        language_code = self.language_combo.itemData(index)
-
-        # Apply language change immediately
-        self.i18n.change_language(language_code)
-
         self._emit_changed()
-
-        logger.debug(f"Language changed to: {language_code}")
+        logger.debug("Language selection changed: index=%s", index)
 
     def _populate_language_options(self):
         """Populate language selector from available translation files."""
@@ -138,7 +132,7 @@ class LanguageSettingsPage(BaseSettingsPage):
         try:
             # Language
             language_code = self.language_combo.currentData()
-            self.settings_manager.set_setting("ui.language", language_code)
+            self._set_setting_or_raise("ui.language", language_code)
 
             logger.debug("Language settings saved")
 

@@ -30,9 +30,6 @@ def test_cleanup_uses_realtime_widget_cleanup_when_recording():
 
 def test_on_api_keys_updated_reload_and_refresh_realtime_widget():
     """API key update should reload engines and refresh realtime widget availability."""
-    transcription_manager = Mock()
-    transcription_manager.reload_engine = Mock()
-
     realtime_recorder = Mock()
     realtime_recorder.reload_engine = Mock()
 
@@ -43,13 +40,11 @@ def test_on_api_keys_updated_reload_and_refresh_realtime_widget():
     fake_window.i18n = Mock()
     fake_window.i18n.t = Mock(side_effect=lambda key, **kwargs: key)
     fake_window.managers = {
-        "transcription_manager": transcription_manager,
         "realtime_recorder": realtime_recorder,
     }
     fake_window.pages = {"realtime_record": realtime_widget}
 
     MainWindow._on_api_keys_updated(fake_window)
 
-    transcription_manager.reload_engine.assert_called_once()
     realtime_recorder.reload_engine.assert_called_once()
     realtime_widget.refresh_engine_availability.assert_called_once()

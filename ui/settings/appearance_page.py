@@ -122,20 +122,8 @@ class AppearanceSettingsPage(BaseSettingsPage):
         Args:
             index: Selected theme index
         """
-        # Map index to theme name
-        theme_map = {0: "light", 1: "dark", 2: "system"}
-
-        theme = theme_map.get(index, "light")
-
-        # Apply theme immediately for preview
-        if "main_window" in self.managers:
-            main_window = self.managers["main_window"]
-            if hasattr(main_window, "apply_theme"):
-                main_window.apply_theme(theme)
-
         self._emit_changed()
-
-        logger.debug(f"Theme changed to: {theme}")
+        logger.debug("Theme selection changed: index=%s", index)
 
     def load_settings(self):
         """Load appearance settings into UI."""
@@ -159,7 +147,7 @@ class AppearanceSettingsPage(BaseSettingsPage):
             # Theme
             theme_map = {0: "light", 1: "dark", 2: "system"}
             theme = theme_map.get(self.theme_combo.currentIndex(), "light")
-            self.settings_manager.set_setting("ui.theme", theme)
+            self._set_setting_or_raise("ui.theme", theme)
 
             logger.debug("Appearance settings saved")
 

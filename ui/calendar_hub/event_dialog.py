@@ -43,6 +43,7 @@ from ui.base_widgets import (
     create_hbox,
     create_primary_button,
 )
+from core.calendar.constants import EventType
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.event_dialog")
@@ -269,7 +270,7 @@ class EventDialog(QDialog):
 
         # Type
         if "event_type" in self.event_data:
-            type_map = {"Event": 0, "Task": 1, "Appointment": 2}
+            type_map = {EventType.EVENT: 0, EventType.TASK: 1, EventType.APPOINTMENT: 2}
             index = type_map.get(self.event_data["event_type"], 0)
             self.type_combo.setCurrentIndex(index)
 
@@ -375,7 +376,7 @@ class EventDialog(QDialog):
             Event data dictionary
         """
         # Get event type
-        type_map = ["Event", "Task", "Appointment"]
+        type_map = [EventType.EVENT, EventType.TASK, EventType.APPOINTMENT]
         event_type = type_map[self.type_combo.currentIndex()]
 
         # Get reminder minutes

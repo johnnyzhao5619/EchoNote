@@ -105,6 +105,7 @@ class GoogleCalendarAdapter(OAuthCalendarAdapter):
             Dictionary with events and new sync token
         """
         try:
+            is_incremental = bool(last_sync_token)
             events = []
             deleted_events: List[str] = []
             page_token = None
@@ -162,7 +163,12 @@ class GoogleCalendarAdapter(OAuthCalendarAdapter):
 
             self.logger.info("Fetched %s events from Google", len(events))
 
-            return {"events": events, "deleted": deleted_events, "sync_token": new_sync_token}
+            return {
+                "events": events,
+                "deleted": deleted_events,
+                "sync_token": new_sync_token,
+                "is_incremental": is_incremental,
+            }
 
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 410:

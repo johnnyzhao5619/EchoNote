@@ -160,6 +160,10 @@ class TestSettingsWidgetCategories:
         """Test category list has items."""
         assert widget.category_list.count() >= 5
 
+    def test_category_count_matches_page_count(self, widget):
+        """Category list and page stack should stay aligned."""
+        assert widget.category_list.count() == len(widget.settings_pages)
+
     def test_category_items_have_data(self, widget):
         """Test category items have user data."""
         for i in range(widget.category_list.count()):
@@ -167,6 +171,14 @@ class TestSettingsWidgetCategories:
             data = item.data(Qt.ItemDataRole.UserRole)
             assert data is not None
             assert isinstance(data, str)
+
+    def test_model_management_hidden_without_model_manager(self, widget):
+        """Model management category should be hidden when manager is unavailable."""
+        category_ids = [
+            widget.category_list.item(i).data(Qt.ItemDataRole.UserRole)
+            for i in range(widget.category_list.count())
+        ]
+        assert "model_management" not in category_ids
 
     def test_category_change_updates_page(self, widget):
         """Test changing category updates the displayed page."""
@@ -177,3 +189,138 @@ class TestSettingsWidgetCategories:
             widget.category_list.setCurrentRow(1)
             new_index = widget.pages_container.currentIndex()
             assert new_index != initial_index or widget.category_list.count() == 1
+
+
+def test_save_failure_rolls_back_settings_and_runtime_state(qapp, mock_i18n):
+    settings_manager = MagicMock()
+    settings_snapshot = {
+        "ui": {"theme": "light", "language": "en_US"},
+        "timeline": {"past_days": 30},
+    }
+    settings_manager.get_all_settings.return_value = settings_snapshot
+    settings_manager.save_settings.return_value = False
+    settings_manager.restore_settings_snapshot.return_value = True
+
+    main_window = Mock()
+    mock_i18n.change_language = Mock()
+
+    widget = SettingsWidget(
+        settings_manager=settings_manager,
+        i18n=mock_i18n,
+        managers={"settings_manager": settings_manager, "main_window": main_window},
+    )
+
+    page = Mock()
+    page.validate_settings.return_value = (True, "")
+    widget.settings_pages = {"dummy": page}
+    widget.show_error = Mock()
+
+    assert widget.save_settings() is False
+
+    settings_manager.restore_settings_snapshot.assert_called_once_with(settings_snapshot)
+    main_window.apply_theme.assert_called_once_with("light")
+    mock_i18n.change_language.assert_called_once_with("en_US")
+
+
+def test_save_success_applies_runtime_state_once(qapp, mock_i18n):
+    settings_manager = MagicMock()
+    settings_manager.save_settings.return_value = True
+    settings_manager.get_all_settings.return_value = {"ui": {"theme": "dark", "language": "zh_CN"}}
+
+    def _get_setting(key):
+        mapping = {
+            "ui.theme": "dark",
+            "ui.language": "zh_CN",
+        }
+        return mapping.get(key)
+
+    settings_manager.get_setting.side_effect = _get_setting
+
+    main_window = Mock()
+    mock_i18n.change_language = Mock()
+
+    widget = SettingsWidget(
+        settings_manager=settings_manager,
+        i18n=mock_i18n,
+        managers={"settings_manager": settings_manager, "main_window": main_window},
+    )
+
+    page = Mock()
+    page.validate_settings.return_value = (True, "")
+    widget.settings_pages = {"dummy": page}
+    widget.show_info = Mock()
+
+    assert widget.save_settings() is True
+
+    main_window.apply_theme.assert_called_once_with("dark")
+    mock_i18n.change_language.assert_called_once_with("zh_CN")
+
+
+def test_save_success_runs_page_post_save_hook(qapp, mock_i18n):
+    settings_manager = MagicMock()
+    settings_manager.save_settings.return_value = True
+    settings_manager.get_all_settings.return_value = {"ui": {}}
+    settings_manager.get_setting.return_value = None
+
+    widget = SettingsWidget(
+        settings_manager=settings_manager,
+        i18n=mock_i18n,
+        managers={"settings_manager": settings_manager},
+    )
+
+    page = Mock()
+    page.validate_settings.return_value = (True, "")
+    page.apply_post_save = Mock()
+    widget.settings_pages = {"dummy": page}
+    widget.show_info = Mock()
+
+    assert widget.save_settings() is True
+    page.apply_post_save.assert_called_once()
+
+
+def test_save_failure_skips_page_post_save_hook(qapp, mock_i18n):
+    settings_manager = MagicMock()
+    settings_manager.save_settings.return_value = False
+    settings_manager.get_all_settings.return_value = {"ui": {}}
+    settings_manager.restore_settings_snapshot.return_value = True
+
+    widget = SettingsWidget(
+        settings_manager=settings_manager,
+        i18n=mock_i18n,
+        managers={"settings_manager": settings_manager},
+    )
+
+    page = Mock()
+    page.validate_settings.return_value = (True, "")
+    page.apply_post_save = Mock()
+    widget.settings_pages = {"dummy": page}
+    widget.show_error = Mock()
+
+    assert widget.save_settings() is False
+    page.apply_post_save.assert_not_called()
+
+
+def test_save_success_with_post_save_warning_shows_warning_only(qapp, mock_i18n):
+    settings_manager = MagicMock()
+    settings_manager.save_settings.return_value = True
+    settings_manager.get_all_settings.return_value = {"ui": {}}
+    settings_manager.get_setting.return_value = None
+
+    widget = SettingsWidget(
+        settings_manager=settings_manager,
+        i18n=mock_i18n,
+        managers={"settings_manager": settings_manager},
+    )
+
+    page = Mock()
+    page.validate_settings.return_value = (True, "")
+    page.apply_post_save = Mock(
+        return_value=[{"level": "warning", "source": "dummy", "message": "runtime update failed"}]
+    )
+    widget.settings_pages = {"dummy": page}
+    widget.show_warning = Mock()
+    widget.show_info = Mock()
+
+    assert widget.save_settings() is True
+    widget.show_warning.assert_called_once()
+    widget.show_info.assert_not_called()

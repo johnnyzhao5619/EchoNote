@@ -4,6 +4,7 @@
 from unittest.mock import Mock, patch
 
 from utils.post_init_tasks import check_model_availability
+from config.constants import ENGINE_FASTER_WHISPER
 
 
 def _build_config(default_engine: str):
@@ -19,7 +20,7 @@ def _build_config(default_engine: str):
 
 
 def test_check_model_availability_skips_when_download_active():
-    config = _build_config("faster-whisper")
+    config = _build_config(ENGINE_FASTER_WHISPER)
     model_manager = Mock()
     model_manager.get_downloaded_models.return_value = []
     model_manager.has_active_downloads.return_value = True
@@ -31,7 +32,7 @@ def test_check_model_availability_skips_when_download_active():
 
 
 def test_check_model_availability_shows_dialog_when_no_model_and_no_download():
-    config = _build_config("faster-whisper")
+    config = _build_config(ENGINE_FASTER_WHISPER)
     model_manager = Mock()
     model_manager.get_downloaded_models.return_value = []
     model_manager.has_active_downloads.return_value = False

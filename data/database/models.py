@@ -25,8 +25,12 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, time, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
-
 from data.database.encryption_helper import decrypt_sensitive_field, encrypt_sensitive_field
+from core.calendar.constants import CalendarSource, EventType
+from config.constants import (
+    DEFAULT_TRANSCRIPTION_ENGINE,
+    TASK_STATUS_PENDING,
+)
 
 logger = logging.getLogger("echonote.database.models")
 
@@ -50,10 +54,10 @@ class TranscriptionTask:
     file_name: str = ""
     file_size: Optional[int] = None
     audio_duration: Optional[float] = None
-    status: str = "pending"  # pending/processing/completed/failed
+    status: str = TASK_STATUS_PENDING  # pending/processing/completed/failed
     progress: float = 0.0
     language: Optional[str] = None
-    engine: str = "faster-whisper"
+    engine: str = DEFAULT_TRANSCRIPTION_ENGINE
     output_format: Optional[str] = None
     output_path: Optional[str] = None
     error_message: Optional[str] = None
@@ -165,7 +169,7 @@ class CalendarEvent:
 
     id: str = field(default_factory=generate_uuid)
     title: str = ""
-    event_type: str = "Event"  # Event/Task/Appointment
+    event_type: str = EventType.EVENT  # Event/Task/Appointment
     start_time: str = ""
     end_time: str = ""
     location: Optional[str] = None
@@ -174,7 +178,7 @@ class CalendarEvent:
     reminder_minutes: Optional[int] = None
     reminder_use_default: Optional[bool] = None
     recurrence_rule: Optional[str] = None
-    source: str = "local"  # local/google/outlook
+    source: str = CalendarSource.LOCAL  # local/google/outlook
     external_id: Optional[str] = None
     is_readonly: bool = False
     created_at: str = field(default_factory=current_timestamp)

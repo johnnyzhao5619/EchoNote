@@ -102,90 +102,33 @@ class SettingsManager(QObject):
 
     def get_realtime_preferences(self) -> Dict[str, Any]:
         """Return realtime recording preferences with defaults applied."""
+        # Get defaults from configuration schema
         realtime_defaults = self._default_config.get("realtime", {})
+        
+        from config.constants import (
+            RECORDING_FORMAT_WAV,
+            TRANSLATION_ENGINE_GOOGLE,
+        )
+
+        # Start with defaults
         preferences = {
-            "recording_format": realtime_defaults.get("recording_format", "wav"),
+            "recording_format": realtime_defaults.get("recording_format", RECORDING_FORMAT_WAV),
             "auto_save": realtime_defaults.get("auto_save", True),
             "default_input_source": realtime_defaults.get("default_input_source", "default"),
             "default_gain": realtime_defaults.get("default_gain", 1.0),
-            "translation_engine": realtime_defaults.get("translation_engine", "google"),
-            "vad_threshold": realtime_defaults.get("vad_threshold", 0.3),
-            "silence_duration_ms": realtime_defaults.get("silence_duration_ms", 1500),
+            "translation_engine": realtime_defaults.get("translation_engine", TRANSLATION_ENGINE_GOOGLE),
+            "vad_threshold": realtime_defaults.get("vad_threshold", 0.5),
+            "silence_duration_ms": realtime_defaults.get("silence_duration_ms", 2000),
             "min_audio_duration": realtime_defaults.get("min_audio_duration", 3.0),
             "save_transcript": realtime_defaults.get("save_transcript", True),
             "create_calendar_event": realtime_defaults.get("create_calendar_event", True),
         }
 
-        try:
-            recording_format = self.get_setting("realtime.recording_format")
-            if recording_format in ("wav", "mp3"):
-                preferences["recording_format"] = recording_format
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Failed to read realtime.recording_format: %s", exc, exc_info=True)
-
-        try:
-            auto_save = self.get_setting("realtime.auto_save")
-            if auto_save is not None:
-                preferences["auto_save"] = bool(auto_save)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Failed to read realtime.auto_save: %s", exc, exc_info=True)
-
-        try:
-            input_source = self.get_setting("realtime.default_input_source")
-            if input_source == "default":
-                preferences["default_input_source"] = input_source
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Failed to read realtime.default_input_source: %s", exc, exc_info=True)
-
-        try:
-            gain = self.get_setting("realtime.default_gain")
-            if isinstance(gain, (int, float)) and 0.1 <= float(gain) <= 2.0:
-                preferences["default_gain"] = float(gain)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Failed to read realtime.default_gain: %s", exc, exc_info=True)
-
-        try:
-            translation_engine = self.get_setting("realtime.translation_engine")
-            if translation_engine in ("none", "google"):
-                preferences["translation_engine"] = translation_engine
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Failed to read realtime.translation_engine: %s", exc, exc_info=True)
-
-        try:
-            vad_threshold = self.get_setting("realtime.vad_threshold")
-            if isinstance(vad_threshold, (int, float)) and 0.0 <= float(vad_threshold) <= 1.0:
-                preferences["vad_threshold"] = float(vad_threshold)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Failed to read realtime.vad_threshold: %s", exc, exc_info=True)
-
-        try:
-            silence_duration_ms = self.get_setting("realtime.silence_duration_ms")
-            if isinstance(silence_duration_ms, int) and silence_duration_ms >= 0:
-                preferences["silence_duration_ms"] = silence_duration_ms
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Failed to read realtime.silence_duration_ms: %s", exc, exc_info=True)
-
-        try:
-            min_audio_duration = self.get_setting("realtime.min_audio_duration")
-            if isinstance(min_audio_duration, (int, float)) and float(min_audio_duration) > 0:
-                preferences["min_audio_duration"] = float(min_audio_duration)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Failed to read realtime.min_audio_duration: %s", exc, exc_info=True)
-
-        try:
-            save_transcript = self.get_setting("realtime.save_transcript")
-            if save_transcript is not None:
-                preferences["save_transcript"] = bool(save_transcript)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Failed to read realtime.save_transcript: %s", exc, exc_info=True)
-
-        try:
-            create_calendar_event = self.get_setting("realtime.create_calendar_event")
-            if create_calendar_event is not None:
-                preferences["create_calendar_event"] = bool(create_calendar_event)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Failed to read realtime.create_calendar_event: %s", exc, exc_info=True)
-
+        # Override with current settings
+        current_settings = self.config_manager.get("realtime", {})
+        if current_settings:
+            preferences.update(current_settings)
+            
         return preferences
 
     def set_setting(self, key: str, value: Any) -> bool:
@@ -200,15 +143,15 @@ class SettingsManager(QObject):
             True if setting was successfully set, False otherwise
         """
         try:
-            # Validate the setting
-            if not self.validate_setting(key, value):
-                logger.error(f"Validation failed for setting '{key}' " f"with value: {value}")
+            # Delegate validation to ConfigManager
+            if not self.config_manager.validate_setting(key, value):
+                logger.error(f"Validation failed for setting '{key}' with value: {value}")
                 return False
 
             # Get old value for comparison
             old_value = self.get_setting(key)
 
-            # Set the value
+            # Set the value (ConfigManager checks validation again, but that's safe)
             self.config_manager.set(key, value)
             logger.info(f"Setting '{key}' changed from {old_value} to {value}")
 
@@ -222,30 +165,6 @@ class SettingsManager(QObject):
             logger.error(f"Error setting '{key}': {e}")
             return False
 
-    def get_all_settings(self) -> Dict[str, Any]:
-        """
-        Get all settings.
-
-        Returns:
-            Dictionary containing all settings
-        """
-        return self.config_manager.get_all()
-
-    def save_settings(self) -> bool:
-        """
-        Save current settings to disk.
-
-        Returns:
-            True if settings were successfully saved, False otherwise
-        """
-        try:
-            self.config_manager.save()
-            logger.info("Settings saved successfully")
-            return True
-        except Exception as e:
-            logger.error(f"Error saving settings: {e}")
-            return False
-
     def validate_setting(self, key: str, value: Any) -> bool:
         """
         Validate a setting value.
@@ -257,175 +176,7 @@ class SettingsManager(QObject):
         Returns:
             True if value is valid, False otherwise
         """
-        try:
-            # Split key to get category and setting name
-            parts = key.split(".")
-
-            if len(parts) < 2:
-                logger.warning(f"Invalid setting key format: {key}")
-                return False
-
-            category = parts[0]
-            setting_name = ".".join(parts[1:])
-
-            # Validate based on category
-            if category == "transcription":
-                return self._validate_transcription_setting(setting_name, value)
-            elif category == "realtime":
-                return self._validate_realtime_setting(setting_name, value)
-            elif category == "calendar":
-                return self._validate_calendar_setting(setting_name, value)
-            elif category == "timeline":
-                return self._validate_timeline_setting(setting_name, value)
-            elif category == "ui":
-                return self._validate_ui_setting(setting_name, value)
-            else:
-                # For unknown categories, perform basic type checking
-                logger.warning(f"No specific validation for category: {category}")
-                return True
-
-        except Exception as e:
-            logger.error(f"Error validating setting '{key}': {e}")
-            return False
-
-    def _validate_transcription_setting(self, setting_name: str, value: Any) -> bool:
-        """Validate transcription settings."""
-        if setting_name == "default_output_format":
-            valid_formats = ["txt", "srt", "md"]
-            if value not in valid_formats:
-                logger.error(f"Invalid output format: {value}. " f"Must be one of {valid_formats}")
-                return False
-
-        elif setting_name == "max_concurrent_tasks":
-            if not isinstance(value, int) or not (1 <= value <= 5):
-                logger.error(
-                    "max_concurrent_tasks must be an integer " f"between 1 and 5, got: {value}"
-                )
-                return False
-
-        elif setting_name == "default_engine":
-            valid_engines = ["faster-whisper", "openai", "google", "azure"]
-            if value not in valid_engines:
-                logger.error(f"Invalid engine: {value}. " f"Must be one of {valid_engines}")
-                return False
-
-        elif setting_name == "default_save_path":
-            if not isinstance(value, str) or not value.strip():
-                logger.error("default_save_path must be a non-empty string")
-                return False
-
-        return True
-
-    def _validate_realtime_setting(self, setting_name: str, value: Any) -> bool:
-        """Validate realtime recording settings."""
-        if setting_name == "default_gain":
-            if not isinstance(value, (int, float)) or not (0.1 <= value <= 2.0):
-                logger.error("default_gain must be a number between 0.1 and 2.0, " f"got: {value}")
-                return False
-
-        elif setting_name == "recording_format":
-            valid_formats = ["wav", "mp3"]
-            if value not in valid_formats:
-                logger.error(
-                    f"Invalid recording format: {value}. " f"Must be one of {valid_formats}"
-                )
-                return False
-
-        elif setting_name == "recording_save_path":
-            if not isinstance(value, str) or not value.strip():
-                logger.error("recording_save_path must be a non-empty string")
-                return False
-
-        elif setting_name == "vad_threshold":
-            if not isinstance(value, (int, float)) or not (0.0 <= value <= 1.0):
-                logger.error("vad_threshold must be a number between 0.0 and 1.0, " f"got: {value}")
-                return False
-
-        elif setting_name == "silence_duration_ms":
-            if not isinstance(value, int) or value < 0:
-                logger.error("silence_duration_ms must be a non-negative integer, " f"got: {value}")
-                return False
-
-        elif setting_name == "min_audio_duration":
-            if not isinstance(value, (int, float)) or value <= 0:
-                logger.error("min_audio_duration must be a positive number, got: %s", value)
-                return False
-
-        elif setting_name in {"auto_save", "save_transcript", "create_calendar_event"}:
-            if not isinstance(value, bool):
-                logger.error("%s must be a boolean, got: %s", setting_name, type(value).__name__)
-                return False
-
-        elif setting_name == "default_input_source":
-            if value != "default":
-                logger.error("default_input_source must be 'default', got: %s", value)
-                return False
-
-        elif setting_name == "translation_engine":
-            if value not in {"none", "google"}:
-                logger.error("translation_engine must be either 'none' or 'google', got: %s", value)
-                return False
-
-        return True
-
-    def _validate_calendar_setting(self, setting_name: str, value: Any) -> bool:
-        """Validate calendar settings."""
-        if setting_name == "default_view":
-            valid_views = ["month", "week", "day"]
-            if value not in valid_views:
-                logger.error(f"Invalid calendar view: {value}. " f"Must be one of {valid_views}")
-                return False
-
-        elif setting_name == "sync_interval_minutes":
-            if not isinstance(value, int) or value < 1:
-                logger.error("sync_interval_minutes must be a positive integer, " f"got: {value}")
-                return False
-
-        elif setting_name.startswith("colors."):
-            # Validate color hex code
-            if not isinstance(value, str) or not value.startswith("#") or len(value) != 7:
-                logger.error("Color must be a hex code (e.g., #2196F3), " f"got: {value}")
-                return False
-
-        return True
-
-    def _validate_timeline_setting(self, setting_name: str, value: Any) -> bool:
-        """Validate timeline settings."""
-        if setting_name in ["past_days", "future_days"]:
-            if not isinstance(value, int) or value < 1:
-                logger.error(f"{setting_name} must be a positive integer, " f"got: {value}")
-                return False
-
-        elif setting_name == "reminder_minutes":
-            valid_values = [5, 10, 15, 30]
-            if value not in valid_values:
-                logger.error(f"reminder_minutes must be one of {valid_values}, " f"got: {value}")
-                return False
-
-        elif setting_name == "page_size":
-            if not isinstance(value, int) or value < 1:
-                logger.error(f"page_size must be a positive integer, got: {value}")
-                return False
-
-        return True
-
-    def _validate_ui_setting(self, setting_name: str, value: Any) -> bool:
-        """Validate UI settings."""
-        if setting_name == "theme":
-            valid_themes = ["light", "dark", "system"]
-            if value not in valid_themes:
-                logger.error(f"Invalid theme: {value}. " f"Must be one of {valid_themes}")
-                return False
-
-        elif setting_name == "language":
-            valid_languages = get_translation_codes()
-            if not valid_languages:
-                valid_languages = ["en_US"]
-            if value not in valid_languages:
-                logger.error(f"Invalid language: {value}. " f"Must be one of {valid_languages}")
-                return False
-
-        return True
+        return self.config_manager.validate_setting(key, value)
 
     def reset_to_default(self, key: Optional[str] = None) -> bool:
         """

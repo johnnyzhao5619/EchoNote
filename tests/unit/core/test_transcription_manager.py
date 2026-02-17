@@ -16,6 +16,13 @@ import pytest
 
 from core.transcription.manager import TaskNotFoundError, TranscriptionManager
 from data.database.models import TranscriptionTask
+from config.constants import (
+    TASK_STATUS_PENDING,
+    TASK_STATUS_PROCESSING,
+    TASK_STATUS_COMPLETED,
+    TASK_STATUS_FAILED,
+    TASK_STATUS_CANCELLED,
+)
 
 
 class MockDatabaseConnection:
@@ -191,7 +198,7 @@ class TestTranscriptionManager:
         # Verify task was saved to database
         assert task_id in manager.db.tasks
         task_data = manager.db.tasks[task_id]
-        assert task_data["status"] == "pending"
+        assert task_data["status"] == TASK_STATUS_PENDING
         assert task_data["file_name"] == temp_audio_file.name
 
     def test_add_task_with_options(self, manager, temp_audio_file):
@@ -260,7 +267,7 @@ class TestTranscriptionManager:
             await manager._process_task_async(task_id, cancel_event=asyncio.Event())
 
         assert mock_export.call_count == 2
-        assert manager.db.tasks[task_id]["status"] == "completed"
+        assert manager.db.tasks[task_id]["status"] == TASK_STATUS_COMPLETED
 
     def test_add_task_file_not_found(self, manager):
         """Test adding a task with non-existent file."""
@@ -301,7 +308,7 @@ class TestTranscriptionManager:
 
         assert status is not None
         assert status["id"] == task_id
-        assert status["status"] == "pending"
+        assert status["status"] == TASK_STATUS_PENDING
         assert status["file_name"] == temp_audio_file.name
 
     def test_get_task_status_nonexistent(self, manager):
@@ -333,10 +340,10 @@ class TestTranscriptionManager:
         task_id = manager.add_task(str(file1))
 
         # Manually update status
-        manager.db.tasks[task_id]["status"] = "completed"
+        manager.db.tasks[task_id]["status"] = TASK_STATUS_COMPLETED
 
-        completed_tasks = manager.get_all_tasks(status="completed")
-        pending_tasks = manager.get_all_tasks(status="pending")
+        completed_tasks = manager.get_all_tasks(status=TASK_STATUS_COMPLETED)
+        pending_tasks = manager.get_all_tasks(status=TASK_STATUS_PENDING)
 
         assert len(completed_tasks) == 1
         assert len(pending_tasks) == 0
@@ -386,7 +393,7 @@ class TestTranscriptionManager:
     def test_delete_processing_task_returns_false(self, manager, temp_audio_file):
         """Processing tasks should not be deleted directly."""
         task_id = manager.add_task(str(temp_audio_file))
-        manager.db.tasks[task_id]["status"] = "processing"
+        manager.db.tasks[task_id]["status"] = TASK_STATUS_PROCESSING
 
         result = manager.delete_task(task_id)
 
@@ -399,7 +406,7 @@ class TestTranscriptionManager:
         task_id = manager.add_task(str(temp_audio_file))
 
         # Manually set task as completed
-        manager.db.tasks[task_id]["status"] = "completed"
+        manager.db.tasks[task_id]["status"] = TASK_STATUS_COMPLETED
 
         # Create fake internal format file
         internal_data = {
@@ -474,7 +481,7 @@ class TestTranscriptionManager:
         task_id = manager.add_task(str(temp_audio_file))
 
         # Manually set task as processing
-        manager.db.tasks[task_id]["status"] = "processing"
+        manager.db.tasks[task_id]["status"] = TASK_STATUS_PROCESSING
 
         # Should have running tasks
         result = manager.has_running_tasks()

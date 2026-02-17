@@ -354,4 +354,90 @@ MIN_FUTURE_WINDOW_MINUTES = 15  # Minimum future window for reminders
 AUDIO_CHUNK_MEMORY_BYTES_PER_SAMPLE = 4  # float32 samples use 4 bytes each
 
 # Numeric Conversion
-PERCENTAGE_MULTIPLIER = 100  # For converting ratios to percentages
+# ============================================================================
+# Transcription Constants
+# ============================================================================
+
+# Supported Engines
+ENGINE_FASTER_WHISPER = "faster-whisper"
+ENGINE_OPENAI = "openai"
+ENGINE_GOOGLE = "google"
+ENGINE_AZURE = "azure"
+
+SUPPORTED_TRANSCRIPTION_ENGINES = [
+    ENGINE_FASTER_WHISPER,
+    ENGINE_OPENAI,
+    ENGINE_GOOGLE,
+    ENGINE_AZURE,
+]
+
+# Supported Output Formats
+FORMAT_TXT = "txt"
+FORMAT_SRT = "srt"
+FORMAT_MD = "md"
+
+SUPPORTED_TRANSCRIPTION_FORMATS = [
+    FORMAT_TXT,
+    FORMAT_SRT,
+    FORMAT_MD,
+]
+
+# Compute Types
+COMPUTE_TYPE_INT8 = "int8"
+COMPUTE_TYPE_FLOAT16 = "float16"
+COMPUTE_TYPE_FLOAT32 = "float32"
+
+SUPPORTED_COMPUTE_TYPES = [
+    COMPUTE_TYPE_INT8,
+    COMPUTE_TYPE_FLOAT16,
+    COMPUTE_TYPE_FLOAT32,
+]
+
+# Default Values
+DEFAULT_TRANSCRIPTION_ENGINE = ENGINE_FASTER_WHISPER
+DEFAULT_OUTPUT_FORMAT = FORMAT_TXT
+DEFAULT_COMPUTE_TYPE = COMPUTE_TYPE_INT8
+
+
+# ============================================================================
+# Realtime Recording Constants
+# ============================================================================
+
+# Recording Formats
+RECORDING_FORMAT_WAV = "wav"
+RECORDING_FORMAT_MP3 = "mp3"
+
+SUPPORTED_RECORDING_FORMATS = [
+    RECORDING_FORMAT_WAV,
+    RECORDING_FORMAT_MP3,
+]
+
+# Translation Engines (Realtime)
+TRANSLATION_ENGINE_NONE = "none"
+# Note: Google Translate typically used for lightweight realtime translation
+TRANSLATION_ENGINE_GOOGLE = "google" 
+
+SUPPORTED_REALTIME_TRANSLATION_ENGINES = [
+    TRANSLATION_ENGINE_NONE,
+    TRANSLATION_ENGINE_GOOGLE,
+]
+
+
+# ============================================================================
+# Transcription Status Constants
+# ============================================================================
+
+TASK_STATUS_PENDING = "pending"
+TASK_STATUS_PROCESSING = "processing"
+TASK_STATUS_COMPLETED = "completed"
+TASK_STATUS_FAILED = "failed"
+TASK_STATUS_CANCELLED = "cancelled"
+
+SUPPORTED_TASK_STATUSES = [
+    TASK_STATUS_PENDING,
+    TASK_STATUS_PROCESSING,
+    TASK_STATUS_COMPLETED,
+    TASK_STATUS_FAILED,
+    TASK_STATUS_CANCELLED,
+]
+

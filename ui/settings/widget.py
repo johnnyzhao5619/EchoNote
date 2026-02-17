@@ -38,6 +38,7 @@ from PySide6.QtWidgets import (
 )
 
 from ui.base_widgets import BaseWidget, create_button, create_hbox, create_vbox
+from ui.settings.base_page import PostSaveMessage
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.settings")
@@ -160,15 +161,10 @@ class SettingsWidget(BaseWidget):
         category_list = QListWidget()
         category_list.setFixedWidth(200)
 
-        # Define categories
+        # Define categories based on available pages/managers
         categories = [
-            ("transcription", "settings.category.transcription"),
-            ("realtime", "settings.category.realtime"),
-            ("model_management", "settings.category.model_management"),
-            ("calendar", "settings.category.calendar"),
-            ("timeline", "settings.category.timeline"),
-            ("appearance", "settings.category.appearance"),
-            ("language", "settings.category.language"),
+            (category_id, f"settings.category.{category_id}")
+            for category_id in self._get_available_category_ids()
         ]
 
         # Add category items
@@ -239,15 +235,7 @@ class SettingsWidget(BaseWidget):
             # Create placeholder pages if real ones fail
             from PySide6.QtWidgets import QLabel, QVBoxLayout
 
-            categories = [
-                "transcription",
-                "realtime",
-                "model_management",
-                "calendar",
-                "timeline",
-                "appearance",
-                "language",
-            ]
+            categories = self._get_available_category_ids()
 
             for category in categories:
                 placeholder = QWidget()
@@ -261,6 +249,20 @@ class SettingsWidget(BaseWidget):
 
             logger.warning(f"Created {len(categories)} placeholder settings pages")
 
+    def _get_available_category_ids(self) -> list[str]:
+        """Return category IDs that should be visible for this session."""
+        categories = [
+            "transcription",
+            "realtime",
+            "calendar",
+            "timeline",
+            "appearance",
+            "language",
+        ]
+        if "model_manager" in self.managers:
+            categories.insert(2, "model_management")
+        return categories
+
     def _on_category_changed(self, index: int):
         """
         Handle category selection change.
@@ -268,10 +270,12 @@ class SettingsWidget(BaseWidget):
         Args:
             index: Selected category index
         """
-        # Switch to corresponding page
-        self.pages_container.setCurrentIndex(index)
-
-        logger.debug(f"Switched to settings category: {index}")
+        # Switch to corresponding page if index is valid
+        if 0 <= index < self.pages_container.count():
+            self.pages_container.setCurrentIndex(index)
+            logger.debug(f"Switched to settings category: {index}")
+        else:
+            logger.warning("Invalid settings category index: %s", index)
 
     def show_page(self, page_id: str) -> bool:
         """Navigate to a settings category by page identifier."""
@@ -279,9 +283,14 @@ class SettingsWidget(BaseWidget):
             logger.warning("Settings page '%s' not found", page_id)
             return False
 
-        page_keys = list(self.settings_pages.keys())
-        self.category_list.setCurrentRow(page_keys.index(page_id))
-        return True
+        for row in range(self.category_list.count()):
+            item = self.category_list.item(row)
+            if item.data(Qt.ItemDataRole.UserRole) == page_id:
+                self.category_list.setCurrentRow(row)
+                return True
+
+        logger.warning("Settings category for page '%s' not found in navigation list", page_id)
+        return False
 
     def load_settings(self):
         """Load current settings into all pages."""
@@ -314,16 +323,18 @@ class SettingsWidget(BaseWidget):
         Returns:
             True if settings were saved successfully
         """
+        settings_snapshot: Dict[str, Any] = self.settings_manager.get_all_settings()
         try:
             # Validate settings in all pages
-            for page_id, page_widget in self.settings_pages.items():
+            for _page_id, page_widget in self.settings_pages.items():
                 if hasattr(page_widget, "validate_settings"):
                     is_valid, error_msg = page_widget.validate_settings()
                     if not is_valid:
                         self.show_warning(self.i18n.t("settings.validation.title"), error_msg)
                         # Switch to the page with error
-                        page_index = list(self.settings_pages.keys()).index(page_id)
-                        self.category_list.setCurrentRow(page_index)
+                        page_index = self.pages_container.indexOf(page_widget)
+                        if page_index >= 0:
+                            self.category_list.setCurrentRow(page_index)
                         return False
 
             # Save settings from each page
@@ -335,6 +346,12 @@ class SettingsWidget(BaseWidget):
             if not self.settings_manager.save_settings():
                 raise Exception(self.i18n.t("exceptions.settings.failed_to_save_to_disk"))
 
+            # Run page-level post-save side effects only after disk save succeeds.
+            has_post_save_warnings = self._run_page_post_save_hooks()
+
+            # Apply runtime-only settings after global save succeeds.
+            self._apply_post_save_runtime_state()
+
             # Update original settings
             self.original_settings = self.settings_manager.get_all_settings()
 
@@ -345,21 +362,158 @@ class SettingsWidget(BaseWidget):
             # Emit signal
             self.settings_saved.emit()
 
-            # Show success message
-            self.show_info(
-                self.i18n.t("settings.success.title"), self.i18n.t("settings.success.saved")
-            )
+            # Show success message only when no post-save warnings were reported.
+            if not has_post_save_warnings:
+                self.show_info(
+                    self.i18n.t("settings.success.title"), self.i18n.t("settings.success.saved")
+                )
 
             logger.info(self.i18n.t("logging.settings.saved_successfully"))
             return True
 
         except Exception as e:
             logger.error(f"Error saving settings: {e}")
+            rollback_succeeded = self._rollback_settings(settings_snapshot)
+            error_message = self.i18n.t("settings.error.save_failed", error=str(e))
+            if not rollback_succeeded:
+                error_message = (
+                    f"{error_message}\n{self.i18n.t('settings.error.rollback_failed')}"
+                )
             self.show_error(
                 self.i18n.t("settings.error.title"),
-                self.i18n.t("settings.error.save_failed", error=str(e)),
+                error_message,
             )
             return False
+
+    def _rollback_settings(self, snapshot: Dict[str, Any]) -> bool:
+        """Rollback in-memory settings and runtime side effects after save failure."""
+        if not isinstance(snapshot, dict):
+            return False
+
+        restore_settings = getattr(self.settings_manager, "restore_settings_snapshot", None)
+        if not callable(restore_settings):
+            return False
+
+        restored = bool(restore_settings(snapshot))
+        if not restored:
+            return False
+
+        self._restore_runtime_state(snapshot)
+        return True
+
+    def _apply_post_save_runtime_state(self) -> None:
+        """Apply runtime-only settings that should follow successful global save."""
+        try:
+            theme = self.settings_manager.get_setting("ui.theme")
+            main_window = self.managers.get("main_window")
+            if (
+                isinstance(theme, str)
+                and main_window is not None
+                and hasattr(main_window, "apply_theme")
+            ):
+                main_window.apply_theme(theme)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to apply theme after saving settings: %s", exc, exc_info=True)
+
+        try:
+            language = self.settings_manager.get_setting("ui.language")
+            if isinstance(language, str) and hasattr(self.i18n, "change_language"):
+                self.i18n.change_language(language)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Failed to apply language after saving settings: %s", exc, exc_info=True
+            )
+
+    def _run_page_post_save_hooks(self) -> bool:
+        """Run optional page post-save hooks and return whether warnings were shown."""
+        warnings: list[PostSaveMessage] = []
+
+        for page_id, page_widget in self.settings_pages.items():
+            post_save = getattr(page_widget, "apply_post_save", None)
+            if not callable(post_save):
+                continue
+
+            try:
+                result = post_save()
+                warnings.extend(self._normalize_post_save_messages(page_id, result))
+            except Exception as exc:  # noqa: BLE001
+                logger.error(
+                    "Post-save hook failed for settings page '%s': %s",
+                    page_id,
+                    exc,
+                    exc_info=True,
+                )
+                warnings.append(
+                    {
+                        "level": "warning",
+                        "source": page_id,
+                        "message": str(exc),
+                    }
+                )
+
+        if warnings:
+            details = "; ".join(
+                f"[{item.get('source', 'settings')}/{item.get('level', 'warning')}] "
+                f"{item.get('message', '')}"
+                for item in warnings
+            )
+            self.show_warning(
+                self.i18n.t("common.warning"),
+                self.i18n.t("settings.warning.post_save_actions_partial", details=details),
+            )
+            return True
+
+        return False
+
+    def _normalize_post_save_messages(self, page_id: str, result: Any) -> list[PostSaveMessage]:
+        """Normalize post-save hook return values to structured message objects."""
+        normalized: list[PostSaveMessage] = []
+        items: list[Any]
+
+        if isinstance(result, str):
+            items = [result]
+        elif isinstance(result, (list, tuple, set)):
+            items = list(result)
+        elif isinstance(result, dict):
+            items = [result]
+        else:
+            return normalized
+
+        for item in items:
+            if isinstance(item, str):
+                message = item.strip()
+                if message:
+                    normalized.append({"level": "warning", "source": page_id, "message": message})
+                continue
+
+            if isinstance(item, dict):
+                message = str(item.get("message", "")).strip()
+                if not message:
+                    continue
+                level = str(item.get("level", "warning")).strip() or "warning"
+                source = str(item.get("source", page_id)).strip() or page_id
+                normalized.append({"level": level, "source": source, "message": message})
+
+        return normalized
+
+    def _restore_runtime_state(self, snapshot: Dict[str, Any]) -> None:
+        """Restore runtime-only side effects (theme/language) from snapshot."""
+        ui_settings = snapshot.get("ui")
+        if not isinstance(ui_settings, dict):
+            return
+
+        theme = ui_settings.get("theme")
+        main_window = self.managers.get("main_window")
+        if (
+            isinstance(theme, str)
+            and main_window is not None
+            and hasattr(main_window, "apply_theme")
+        ):
+            main_window.apply_theme(theme)
+
+        language = ui_settings.get("language")
+        if isinstance(language, str) and hasattr(self.i18n, "change_language"):
+            self.i18n.change_language(language)
 
     def _on_settings_changed(self):
         """Handle settings change in any page."""

@@ -16,6 +16,12 @@ from data.database.models import (
     current_timestamp,
     generate_uuid,
 )
+from config.constants import (
+    TASK_STATUS_PENDING,
+    TASK_STATUS_COMPLETED,
+    DEFAULT_TRANSCRIPTION_ENGINE,
+    ENGINE_FASTER_WHISPER,
+)
 
 
 class TestHelperFunctions:
@@ -49,9 +55,9 @@ class TestTranscriptionTask:
 
         assert task.id is not None
         assert len(task.id) == 36
-        assert task.status == "pending"
+        assert task.status == TASK_STATUS_PENDING
         assert task.progress == 0.0
-        assert task.engine == "faster-whisper"
+        assert task.engine == DEFAULT_TRANSCRIPTION_ENGINE
 
     def test_create_with_values(self):
         """Test creating task with specific values."""
@@ -72,10 +78,10 @@ class TestTranscriptionTask:
             "file_name": "test.wav",
             "file_size": 1024,
             "audio_duration": 60.0,
-            "status": "completed",
+            "status": TASK_STATUS_COMPLETED,
             "progress": 100.0,
             "language": "en",
-            "engine": "faster-whisper",
+            "engine": ENGINE_FASTER_WHISPER,
             "output_format": "txt",
             "output_path": "/tmp/output.txt",
             "error_message": None,
@@ -88,7 +94,7 @@ class TestTranscriptionTask:
 
         assert task.id == "test-id"
         assert task.file_path == "/tmp/test.wav"
-        assert task.status == "completed"
+        assert task.status == TASK_STATUS_COMPLETED
         assert task.progress == 100.0
 
     def test_save(self):
@@ -116,10 +122,10 @@ class TestTranscriptionTask:
                     "file_name": "test.wav",
                     "file_size": 1024,
                     "audio_duration": 60.0,
-                    "status": "completed",
+                    "status": TASK_STATUS_COMPLETED,
                     "progress": 100.0,
                     "language": "en",
-                    "engine": "faster-whisper",
+                    "engine": ENGINE_FASTER_WHISPER,
                     "output_format": "txt",
                     "output_path": "/tmp/output.txt",
                     "error_message": None,
@@ -155,10 +161,10 @@ class TestTranscriptionTask:
                     "file_name": "test1.wav",
                     "file_size": 1024,
                     "audio_duration": 60.0,
-                    "status": "completed",
+                    "status": TASK_STATUS_COMPLETED,
                     "progress": 100.0,
                     "language": "en",
-                    "engine": "faster-whisper",
+                    "engine": ENGINE_FASTER_WHISPER,
                     "output_format": "txt",
                     "output_path": "/tmp/output1.txt",
                     "error_message": None,
@@ -172,10 +178,10 @@ class TestTranscriptionTask:
                     "file_name": "test2.wav",
                     "file_size": 2048,
                     "audio_duration": 120.0,
-                    "status": "pending",
+                    "status": TASK_STATUS_PENDING,
                     "progress": 0.0,
                     "language": "zh",
-                    "engine": "faster-whisper",
+                    "engine": ENGINE_FASTER_WHISPER,
                     "output_format": None,
                     "output_path": None,
                     "error_message": None,
@@ -197,7 +203,7 @@ class TestTranscriptionTask:
         mock_db = Mock()
         mock_db.execute = Mock(return_value=[])
 
-        TranscriptionTask.get_all(mock_db, status="completed")
+        TranscriptionTask.get_all(mock_db, status=TASK_STATUS_COMPLETED)
 
         call_args = mock_db.execute.call_args
         assert "WHERE status = ?" in call_args[0][0]

@@ -71,6 +71,11 @@ self.add_page('settings', settings_widget)
   - `recording_format`: wav/mp3
   - `recording_save_path`: string
   - `auto_save`: boolean
+  - `save_transcript`: boolean
+  - `create_calendar_event`: boolean
+  - `vad_threshold`: 0.0-1.0
+  - `silence_duration_ms`: integer >= 0
+  - `min_audio_duration`: number > 0
 
 ### 3. Calendar Settings
 
@@ -118,6 +123,7 @@ self.add_page('settings', settings_widget)
 
 - `load_settings()`: Load settings into UI
 - `save_settings()`: Save settings from UI
+- `apply_post_save()`: Run runtime side effects after global save succeeds (optional return: `[{level, source, message}]`)
 - `validate_settings()`: Validate settings (returns tuple)
 - `update_translations()`: Update UI text after language change
 
@@ -126,6 +132,7 @@ self.add_page('settings', settings_widget)
 - `add_section_title(title)`: Add section title
 - `add_spacing(height)`: Add vertical spacing
 - `_emit_changed()`: Emit settings changed signal
+- `_set_setting_or_raise(key, value)`: Save one key and fail fast on validation error
 
 ## Validation
 
@@ -180,10 +187,7 @@ if value:
     self.my_setting_edit.setText(value)
 
 # In save_settings()
-self.settings_manager.set_setting(
-    'category.my_setting',
-    self.my_setting_edit.text()
-)
+self._set_setting_or_raise('category.my_setting', self.my_setting_edit.text())
 
 # In validate_settings()
 if not self.my_setting_edit.text():

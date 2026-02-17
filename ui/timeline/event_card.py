@@ -142,8 +142,6 @@ class EventCard(QFrame):
         self.is_future = is_future
         self.i18n = i18n
 
-        # Lazy load artifacts
-        self.artifacts_loaded = False
         self.artifacts = event_data.get("artifacts", {})
 
         # Badge label references for translation updates
@@ -156,9 +154,6 @@ class EventCard(QFrame):
 
         # Setup UI
         self.setup_ui()
-
-        # Store reference for future updates
-        self.is_future = is_future
 
         logger.debug(f"Event card created: {self.calendar_event.id}")
 
@@ -221,7 +216,7 @@ class EventCard(QFrame):
         except Exception as exc:  # pragma: no cover - defensive log
             logger.warning(
                 "Failed to localize event time for %s: %s",
-                getattr(self.event, "id", "<unknown>"),
+                getattr(self.calendar_event, "id", "<unknown>"),
                 exc,
             )
             time_str = f"{start_value} - {end_value}"
@@ -356,7 +351,7 @@ class EventCard(QFrame):
         self.translation_language_combo.currentIndexChanged.connect(self._on_auto_task_changed)
         actions_layout.addWidget(self.translation_language_combo)
 
-        self._set_translation_controls_enabled(enable_translation)
+        self._apply_translation_dependency()
 
         actions_layout.addStretch()
 
@@ -370,10 +365,6 @@ class EventCard(QFrame):
             Actions layout
         """
         actions_layout = create_hbox(spacing=10)
-
-        # Lazy load artifacts if not loaded
-        if not self.artifacts_loaded:
-            self._load_artifacts()
 
         # Recording button
         has_recording = bool(self.artifacts.get("recording"))
@@ -455,37 +446,24 @@ class EventCard(QFrame):
 
             self.translation_language_combo.blockSignals(False)
 
-        self._set_translation_controls_enabled(enable_translation)
-
-    def _load_artifacts(self):
-        """Lazy load artifacts for past events."""
-        if not self.artifacts_loaded and not self.is_future:
-            # Artifacts should already be in event_data
-            # This is just a placeholder for future optimization
-            self.artifacts_loaded = True
-            logger.debug(f"Artifacts loaded for event: {self.calendar_event.id}")
+        self._apply_translation_dependency()
 
     def _on_auto_task_changed(self):
         """Handle auto-task configuration change."""
         auto_tasks = self.event_data.get("auto_tasks", {}) or {}
+        enable_translation = self._apply_translation_dependency()
         config = {
             "enable_transcription": self.transcription_checkbox.isChecked(),
             "enable_recording": self.recording_checkbox.isChecked(),
-            "enable_translation": False,
+            "enable_translation": enable_translation,
             "translation_target_language": None,
         }
 
         if "transcription_language" in auto_tasks:
             config["transcription_language"] = auto_tasks.get("transcription_language")
 
-        if self.translation_checkbox:
-            enable_translation = self.translation_checkbox.isChecked()
-            config["enable_translation"] = enable_translation
-
-            if enable_translation and self.translation_language_combo:
-                config["translation_target_language"] = (
-                    self.translation_language_combo.currentData()
-                )
+        if enable_translation and self.translation_language_combo:
+            config["translation_target_language"] = self.translation_language_combo.currentData()
 
         self.event_data["auto_tasks"] = dict(config)
 
@@ -494,8 +472,7 @@ class EventCard(QFrame):
 
     def _on_translation_toggled(self):
         """Handle enable translation toggle changes."""
-        enable_translation = self.translation_checkbox.isChecked()
-        self._set_translation_controls_enabled(enable_translation)
+        self._apply_translation_dependency()
         self._on_auto_task_changed()
 
     def _set_translation_controls_enabled(self, enabled: bool):
@@ -504,6 +481,32 @@ class EventCard(QFrame):
             self.translation_language_label.setEnabled(enabled)
         if self.translation_language_combo:
             self.translation_language_combo.setEnabled(enabled)
+
+    def _apply_translation_dependency(self) -> bool:
+        """
+        Keep translation options consistent with transcription state.
+
+        Returns:
+            bool: Whether translation is effectively enabled.
+        """
+        transcription_enabled = bool(
+            self.transcription_checkbox and self.transcription_checkbox.isChecked()
+        )
+
+        if self.translation_checkbox:
+            self.translation_checkbox.setEnabled(transcription_enabled)
+            if not transcription_enabled and self.translation_checkbox.isChecked():
+                self.translation_checkbox.blockSignals(True)
+                self.translation_checkbox.setChecked(False)
+                self.translation_checkbox.blockSignals(False)
+
+        translation_enabled = bool(
+            transcription_enabled
+            and self.translation_checkbox
+            and self.translation_checkbox.isChecked()
+        )
+        self._set_translation_controls_enabled(translation_enabled)
+        return translation_enabled
 
     def _on_play_recording(self):
         """Handle play recording button click."""
@@ -573,7 +576,7 @@ class EventCard(QFrame):
 
     def _get_event_type_badge_text(self) -> str:
         """Return translated text for the event type badge."""
-        event_type = getattr(self.event, "event_type", "") or ""
+        event_type = getattr(self.calendar_event, "event_type", "") or ""
         translation_key = self.EVENT_TYPE_TRANSLATION_MAP.get(event_type.lower())
         if translation_key:
             return self.i18n.t(translation_key)
@@ -581,7 +584,7 @@ class EventCard(QFrame):
 
     def _get_source_badge_text(self) -> str:
         """Return translated text for the source badge."""
-        source = getattr(self.event, "source", "") or ""
+        source = getattr(self.calendar_event, "source", "") or ""
         translation_key = self.SOURCE_TRANSLATION_MAP.get(source.lower())
         if translation_key:
             return self.i18n.t(translation_key)

@@ -36,9 +36,18 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from config.constants import (
+    SUPPORTED_TRANSCRIPTION_FORMATS,
+    SUPPORTED_TRANSCRIPTION_ENGINES,
+    SUPPORTED_COMPUTE_TYPES,
+    ENGINE_FASTER_WHISPER,
+    ENGINE_OPENAI,
+    ENGINE_GOOGLE,
+    ENGINE_AZURE,
+)
 from core.models.registry import get_default_model_names
 from ui.base_widgets import create_button, create_hbox, create_vbox
-from ui.settings.base_page import BaseSettingsPage
+from ui.settings.base_page import BaseSettingsPage, PostSaveMessage
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.settings.transcription")
@@ -89,7 +98,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         self.format_label = QLabel(self.i18n.t("settings.transcription.output_format"))
         self.format_label.setMinimumWidth(200)
         self.format_combo = QComboBox()
-        self.format_combo.addItems(["txt", "srt", "md"])
+        self.format_combo.addItems(SUPPORTED_TRANSCRIPTION_FORMATS)
         self.format_combo.currentTextChanged.connect(self._emit_changed)
         format_layout.addWidget(self.format_label)
         format_layout.addWidget(self.format_combo)
@@ -185,7 +194,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         self.engine_label = QLabel(self.i18n.t("settings.transcription.engine_select"))
         self.engine_label.setMinimumWidth(200)
         self.engine_combo = QComboBox()
-        self.engine_combo.addItems(["faster-whisper", "openai", "google", "azure"])
+        self.engine_combo.addItems(SUPPORTED_TRANSCRIPTION_ENGINES)
         self.engine_combo.currentTextChanged.connect(self._on_engine_changed)
         engine_layout.addWidget(self.engine_label)
         engine_layout.addWidget(self.engine_combo)
@@ -232,7 +241,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
 
         # Compute type
         self.compute_type_combo = QComboBox()
-        self.compute_type_combo.addItems(["int8", "float16", "float32"])
+        self.compute_type_combo.addItems(SUPPORTED_COMPUTE_TYPES)
         self.compute_type_combo.currentTextChanged.connect(self._emit_changed)
         self.compute_type_label = QLabel(self.i18n.t("settings.transcription.compute_type"))
         whisper_layout.addRow(self.compute_type_label, self.compute_type_combo)
@@ -485,13 +494,13 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         from PySide6.QtWidgets import QApplication, QMessageBox
 
         # Get API key
-        if provider == "openai":
+        if provider == ENGINE_OPENAI:
             api_key = self.openai_key_edit.text()
             test_button = self.openai_test_button
-        elif provider == "google":
+        elif provider == ENGINE_GOOGLE:
             api_key = self.google_key_edit.text()
             test_button = self.google_test_button
-        elif provider == "azure":
+        elif provider == ENGINE_AZURE:
             api_key = self.azure_key_edit.text()
             test_button = self.azure_test_button
         else:
@@ -619,8 +628,8 @@ class TranscriptionSettingsPage(BaseSettingsPage):
             engine: Selected engine name
         """
         # Show/hide engine-specific configs
-        is_whisper = engine == "faster-whisper"
-        is_cloud = engine in ["openai", "google", "azure"]
+        is_whisper = engine == ENGINE_FASTER_WHISPER
+        is_cloud = engine in [ENGINE_OPENAI, ENGINE_GOOGLE, ENGINE_AZURE]
 
         self.whisper_group.setVisible(is_whisper)
         self.cloud_group.setVisible(is_cloud)
@@ -824,77 +833,34 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         """Save transcription settings from UI."""
         try:
             # General settings
-            self.settings_manager.set_setting(
+            self._set_setting_or_raise(
                 "transcription.default_output_format", self.format_combo.currentText()
             )
 
             # Update max concurrent tasks
             new_max_concurrent = self.concurrent_spin.value()
-            self.settings_manager.set_setting(
-                "transcription.max_concurrent_tasks", new_max_concurrent
-            )
+            self._set_setting_or_raise("transcription.max_concurrent_tasks", new_max_concurrent)
 
-            # Update transcription manager if available
-            if "transcription_manager" in self.managers:
-                try:
-                    self.managers["transcription_manager"].update_max_concurrent(new_max_concurrent)
-                    logger.info(
-                        f"Updated transcription manager max_concurrent to " f"{new_max_concurrent}"
-                    )
-                except Exception as e:
-                    logger.error(f"Failed to update transcription manager " f"max_concurrent: {e}")
-
-            self.settings_manager.set_setting(
-                "transcription.default_save_path", self.path_edit.text()
-            )
+            self._set_setting_or_raise("transcription.default_save_path", self.path_edit.text())
 
             # Engine settings
             selected_engine = self.engine_combo.currentText()
-            self.settings_manager.set_setting(
-                "transcription.default_engine", selected_engine
-            )
+            self._set_setting_or_raise("transcription.default_engine", selected_engine)
 
             # Faster-Whisper settings
-            self.settings_manager.set_setting(
+            self._set_setting_or_raise(
                 "transcription.faster_whisper.model_size", self.model_size_combo.currentText()
             )
 
             # Save device using the data (device_id) not the display text
             device_id = self.device_combo.currentData()
-            self.settings_manager.set_setting(
+            self._set_setting_or_raise(
                 "transcription.faster_whisper.device", device_id if device_id else "auto"
             )
 
-            self.settings_manager.set_setting(
+            self._set_setting_or_raise(
                 "transcription.faster_whisper.compute_type", self.compute_type_combo.currentText()
             )
-
-            if "transcription_manager" in self.managers:
-                try:
-                    reloaded = self.managers["transcription_manager"].reload_engine()
-                    if reloaded:
-                        logger.info(f"Reloaded transcription engine after selecting {selected_engine}")
-                    else:
-                        self.show_warning(
-                            self.i18n.t("settings.transcription.engine_reload_warning_title"),
-                            self.i18n.t(
-                                "settings.transcription.engine_reload_warning_message",
-                                engine=selected_engine,
-                            ),
-                        )
-                except Exception as e:
-                    logger.error(f"Failed to reload transcription engine: {e}")
-                    self.show_warning(
-                        self.i18n.t("settings.transcription.engine_reload_warning_title"),
-                        self.i18n.t(
-                            "settings.transcription.engine_reload_failed_message",
-                            engine=selected_engine,
-                            error=str(e),
-                        ),
-                    )
-
-            # Save API keys (encrypted)
-            self._save_api_keys()
 
             logger.debug("Transcription settings saved")
 
@@ -902,46 +868,125 @@ class TranscriptionSettingsPage(BaseSettingsPage):
             logger.error(f"Error saving transcription settings: {e}")
             raise
 
-    def _save_api_keys(self):
-        """Save API keys with encryption."""
+    def apply_post_save(self) -> list[PostSaveMessage]:
+        """Apply non-persistent transcription side effects after global save."""
+        warnings: list[PostSaveMessage] = []
+        new_max_concurrent = self.concurrent_spin.value()
+        selected_engine = self.engine_combo.currentText()
+
+        if "transcription_manager" in self.managers:
+            try:
+                self.managers["transcription_manager"].update_max_concurrent(new_max_concurrent)
+                logger.info("Updated transcription manager max_concurrent to %s", new_max_concurrent)
+            except Exception as exc:  # noqa: BLE001
+                logger.error("Failed to update transcription manager max_concurrent: %s", exc)
+
+            try:
+                reloaded = self.managers["transcription_manager"].reload_engine()
+                if reloaded:
+                    logger.info("Reloaded transcription engine after selecting %s", selected_engine)
+                else:
+                    warnings.append(
+                        {
+                            "level": "warning",
+                            "source": "transcription",
+                            "message": self.i18n.t(
+                                "settings.transcription.engine_reload_warning_message",
+                                engine=selected_engine,
+                            ),
+                        }
+                    )
+            except Exception as exc:  # noqa: BLE001
+                logger.error("Failed to reload transcription engine: %s", exc)
+                warnings.append(
+                    {
+                        "level": "warning",
+                        "source": "transcription",
+                        "message": self.i18n.t(
+                            "settings.transcription.engine_reload_failed_message",
+                            engine=selected_engine,
+                            error=str(exc),
+                        ),
+                    }
+                )
+
+        # Save API keys (encrypted) after settings are durably persisted.
+        try:
+            self._save_api_keys()
+        except Exception as exc:  # noqa: BLE001
+            warnings.append(
+                {
+                    "level": "warning",
+                    "source": "transcription",
+                    "message": self.i18n.t(
+                        "settings.transcription.api_keys_save_failed_message", error=str(exc)
+                    ),
+                }
+            )
+
+        return warnings
+
+    def _save_api_keys(self) -> bool:
+        """Save API keys with encryption and emit updates only on actual changes."""
         if "secrets_manager" not in self.managers:
             logger.warning(
                 self.i18n.t(
                     "logging.settings.transcription_page.no_secrets_manager_skipping_api_key_saving"
                 )
             )
-            return
+            return False
 
         secrets_manager = self.managers["secrets_manager"]
 
         try:
+            has_changes = False
+
+            def normalize(value: str | None) -> str:
+                return (value or "").strip()
+
             # Save OpenAI API key
-            openai_key = self.openai_key_edit.text().strip()
-            if openai_key:
-                secrets_manager.set_api_key("openai", openai_key)
-            else:
-                secrets_manager.delete_api_key("openai")
+            openai_key = normalize(self.openai_key_edit.text())
+            current_openai_key = normalize(secrets_manager.get_api_key("openai"))
+            if openai_key != current_openai_key:
+                has_changes = True
+                if openai_key:
+                    secrets_manager.set_api_key("openai", openai_key)
+                else:
+                    secrets_manager.delete_api_key("openai")
 
             # Save Google API key
-            google_key = self.google_key_edit.text().strip()
-            if google_key:
-                secrets_manager.set_api_key("google", google_key)
-            else:
-                secrets_manager.delete_api_key("google")
+            google_key = normalize(self.google_key_edit.text())
+            current_google_key = normalize(secrets_manager.get_api_key("google"))
+            if google_key != current_google_key:
+                has_changes = True
+                if google_key:
+                    secrets_manager.set_api_key("google", google_key)
+                else:
+                    secrets_manager.delete_api_key("google")
 
             # Save Azure API key
-            azure_key = self.azure_key_edit.text().strip()
-            if azure_key:
-                secrets_manager.set_api_key("azure", azure_key)
-            else:
-                secrets_manager.delete_api_key("azure")
+            azure_key = normalize(self.azure_key_edit.text())
+            current_azure_key = normalize(secrets_manager.get_api_key("azure"))
+            if azure_key != current_azure_key:
+                has_changes = True
+                if azure_key:
+                    secrets_manager.set_api_key("azure", azure_key)
+                else:
+                    secrets_manager.delete_api_key("azure")
 
             # Save Azure region
-            azure_region = self.azure_region_edit.text().strip()
-            if azure_region:
-                secrets_manager.set_secret("azure_region", azure_region)
-            else:
-                secrets_manager.delete_secret("azure_region")
+            azure_region = normalize(self.azure_region_edit.text())
+            current_azure_region = normalize(secrets_manager.get_secret("azure_region"))
+            if azure_region != current_azure_region:
+                has_changes = True
+                if azure_region:
+                    secrets_manager.set_secret("azure_region", azure_region)
+                else:
+                    secrets_manager.delete_secret("azure_region")
+
+            if not has_changes:
+                logger.debug("API keys unchanged, skipping update signal")
+                return False
 
             logger.info(self.i18n.t("logging.settings.transcription_page.api_keys_encrypted_saved"))
 
@@ -951,6 +996,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
             logger.info(
                 self.i18n.t("logging.settings.transcription_page.api_keys_updated_signal_emitted")
             )
+            return True
 
         except Exception as e:
             logger.error(f"Error saving API keys: {e}")

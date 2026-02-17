@@ -21,6 +21,7 @@ and account management.
 """
 
 import logging
+import threading
 from datetime import datetime
 from typing import Any, Dict, Optional, Tuple
 from urllib.parse import urlparse
@@ -48,6 +49,8 @@ from ui.base_widgets import (
     create_vbox,
 )
 from utils.i18n import I18nQtManager
+from core.calendar.constants import CalendarSource
+from core.calendar.exceptions import SyncError
 
 logger = logging.getLogger("echonote.ui.calendar_hub")
 
@@ -68,6 +71,8 @@ class CalendarHubWidget(BaseWidget):
     date_changed = Signal(object)  # datetime
     create_event_requested = Signal()
     add_account_requested = Signal()
+    manual_sync_finished = Signal(int, int, str)  # success_count, error_count, fatal_error
+    oauth_connect_finished = Signal(object)  # {"provider": str, "success": bool, ...}
 
     def __init__(
         self,
@@ -92,17 +97,21 @@ class CalendarHubWidget(BaseWidget):
         self._config_manager = None
 
         # Current view and date
-        self.current_view = "week"
+        self.current_view = self._load_default_view()
         self.current_date = None  # Will be set by calendar view
 
         # Connected accounts
         self.connected_accounts: Dict[str, Optional[str]] = {}
+        self._manual_sync_thread: Optional[threading.Thread] = None
+        self._oauth_connect_thread: Optional[threading.Thread] = None
 
         # Setup UI
         self.setup_ui()
 
         # Connect language change signal
         self.i18n.language_changed.connect(self._on_language_changed)
+        self.manual_sync_finished.connect(self._on_manual_sync_finished)
+        self.oauth_connect_finished.connect(self._on_oauth_connect_finished)
 
         # Load existing connected accounts
         self._load_connected_accounts()
@@ -154,14 +163,17 @@ class CalendarHubWidget(BaseWidget):
 
         self.week_btn = create_button(self.i18n.t("calendar_hub.view_week"))
         self.week_btn.setCheckable(True)
-        self.week_btn.setChecked(True)  # Default view
+        self.week_btn.setChecked(self.current_view == "week")
         self.week_btn.setObjectName("view_button")
         view_group.addButton(self.week_btn)
 
         self.day_btn = create_button(self.i18n.t("calendar_hub.view_day"))
         self.day_btn.setCheckable(True)
+        self.day_btn.setChecked(self.current_view == "day")
         self.day_btn.setObjectName("view_button")
         view_group.addButton(self.day_btn)
+
+        self.month_btn.setChecked(self.current_view == "month")
 
         # Connect view buttons using helper
         from ui.signal_helpers import connect_view_buttons
@@ -271,6 +283,12 @@ class CalendarHubWidget(BaseWidget):
         self.week_view = WeekView(self.calendar_manager, self.i18n)
         self.day_view = DayView(self.calendar_manager, self.i18n)
 
+        # Keep all views aligned to one shared date cursor.
+        shared_date = self.week_view.current_date
+        self.month_view.set_date(shared_date)
+        self.day_view.set_date(shared_date)
+        self.current_date = shared_date
+
         # Connect view signals
         self.month_view.date_changed.connect(self._on_date_changed)
         self.month_view.event_clicked.connect(self._on_event_clicked)
@@ -286,10 +304,36 @@ class CalendarHubWidget(BaseWidget):
         container.addWidget(self.week_view)
         container.addWidget(self.day_view)
 
-        # Set default view (week)
-        container.setCurrentIndex(1)
+        view_index = {"month": 0, "week": 1, "day": 2}
+        container.setCurrentIndex(view_index.get(self.current_view, 1))
 
         return container
+
+    def _load_default_view(self) -> str:
+        """Load the preferred initial calendar view from config."""
+        valid_views = {"month", "week", "day"}
+        default_view = "week"
+
+        try:
+            if self._config_manager is None:
+                from config.app_config import ConfigManager
+
+                self._config_manager = ConfigManager()
+
+            configured = self._config_manager.get("calendar.default_view")
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.warning("Failed to load calendar.default_view from config: %s", exc)
+            return default_view
+
+        if isinstance(configured, str):
+            normalized = configured.strip().lower()
+            if normalized in valid_views:
+                return normalized
+
+        if configured is not None:
+            logger.warning("Invalid calendar.default_view value: %r; using week view", configured)
+
+        return default_view
 
     def _on_view_changed(self, view: str):
         """
@@ -303,6 +347,11 @@ class CalendarHubWidget(BaseWidget):
         # Update view container
         view_index = {"month": 0, "week": 1, "day": 2}
         self.view_container.setCurrentIndex(view_index[view])
+
+        # Keep target view in sync with the global date cursor.
+        target_view = {"month": self.month_view, "week": self.week_view, "day": self.day_view}[view]
+        if self.current_date is not None:
+            target_view.set_date(self.current_date)
 
         # Emit signal
         self.view_changed.emit(view)
@@ -413,6 +462,12 @@ class CalendarHubWidget(BaseWidget):
                         # Create new event
                         self._create_event(data)
 
+                except SyncError as e:
+                    logger.warning(f"Event saved with sync errors: {e}")
+                    self.show_warning(
+                        self.i18n.t("common.warning"),
+                        self.i18n.t("calendar.warning.sync_failed", error=str(e))
+                    )
                 except Exception as e:
                     logger.error(f"Error saving event: {e}")
 
@@ -505,12 +560,12 @@ class CalendarHubWidget(BaseWidget):
 
         # Google Calendar button
         google_btn = create_button(self.i18n.t("calendar_hub.widget.connect_google"))
-        google_btn.clicked.connect(lambda: self._start_oauth_flow("google", dialog))
+        google_btn.clicked.connect(lambda: self._start_oauth_flow(CalendarSource.GOOGLE, dialog))
         layout.addWidget(google_btn)
 
         # Outlook Calendar button
         outlook_btn = create_button(self.i18n.t("calendar_hub.widget.connect_outlook"))
-        outlook_btn.clicked.connect(lambda: self._start_oauth_flow("outlook", dialog))
+        outlook_btn.clicked.connect(lambda: self._start_oauth_flow(CalendarSource.OUTLOOK, dialog))
         layout.addWidget(outlook_btn)
 
         # Cancel button
@@ -520,7 +575,7 @@ class CalendarHubWidget(BaseWidget):
 
         dialog.exec()
 
-    def _start_oauth_flow(self, provider: str, parent_dialog: QDialog):
+    def _start_oauth_flow(self, provider: str, parent_dialog: Optional[QDialog] = None):
         """
         Start OAuth authorization flow.
 
@@ -558,7 +613,8 @@ class CalendarHubWidget(BaseWidget):
                 )
 
             # Close parent dialog
-            parent_dialog.accept()
+            if parent_dialog is not None:
+                parent_dialog.accept()
 
             # Show OAuth dialog
             from ui.calendar_hub.oauth_dialog import OAuthDialog
@@ -593,6 +649,10 @@ class CalendarHubWidget(BaseWidget):
                 self.i18n.t("common.error"),
                 self.i18n.t("calendar.error.auth_failed", error=str(e)),
             )
+
+    def start_oauth_flow(self, provider: str) -> None:
+        """Public wrapper used by other pages to connect a provider account."""
+        self._start_oauth_flow(provider, parent_dialog=None)
 
     def _load_oauth_callback_settings(self, provider: str) -> Tuple[Optional[str], Optional[int]]:
         """Load configured OAuth callback host and port."""
@@ -640,18 +700,51 @@ class CalendarHubWidget(BaseWidget):
             code: Authorization code
             code_verifier: PKCE code verifier tied to the authorization request
         """
+        if self._oauth_connect_thread and self._oauth_connect_thread.is_alive():
+            logger.warning("OAuth completion already in progress; ignoring duplicate request")
+            return
+
+        # Keep account actions deterministic while OAuth token exchange is running.
+        self.add_account_btn.setEnabled(False)
+        self.sync_now_btn.setEnabled(False)
+        self.sync_status_label.setText(self.i18n.t("calendar_hub.widget.syncing"))
+        self.sync_status_label.setProperty("state", "syncing")
+
         try:
-            # Get sync adapter
+            self._oauth_connect_thread = threading.Thread(
+                target=self._run_oauth_completion,
+                args=(provider, code, code_verifier),
+                daemon=True,
+            )
+            self._oauth_connect_thread.start()
+        except Exception as exc:
+            self._oauth_connect_thread = None
+            self.add_account_btn.setEnabled(True)
+            if not (self._manual_sync_thread and self._manual_sync_thread.is_alive()):
+                self.sync_now_btn.setEnabled(True)
+            self._handle_oauth_error(provider, str(exc) or repr(exc))
+
+    def _run_oauth_completion(self, provider: str, code: str, code_verifier: str) -> None:
+        """Exchange OAuth code, persist account state, and perform initial sync."""
+        payload: Dict[str, Any] = {
+            "provider": provider,
+            "success": False,
+            "email": None,
+            "error": "",
+            "initial_sync_error": "",
+        }
+
+        try:
             adapter = self.calendar_manager.sync_adapters[provider]
             existing_refresh_token = getattr(adapter, "refresh_token", None)
 
-            # Exchange code for token
             token_data = adapter.exchange_code_for_token(code, code_verifier=code_verifier)
 
             expires_in = token_data.get("expires_in")
-            if expires_in is None and token_data.get("expires_at"):
+            expires_at_value = token_data.get("expires_at")
+            if expires_in is None and expires_at_value:
                 try:
-                    expires_at_dt = datetime.fromisoformat(token_data["expires_at"])
+                    expires_at_dt = datetime.fromisoformat(expires_at_value)
                     expires_delta = int((expires_at_dt - datetime.now()).total_seconds())
                     expires_in = max(expires_delta, 0)
                     logger.debug(
@@ -663,8 +756,9 @@ class CalendarHubWidget(BaseWidget):
                     logger.warning(
                         "Invalid expires_at format received for %s: %s",
                         provider,
-                        token_data["expires_at"],
+                        expires_at_value,
                     )
+
             token_type = token_data.get("token_type", "Bearer")
 
             logger.debug(
@@ -674,7 +768,6 @@ class CalendarHubWidget(BaseWidget):
                 token_data.get("expires_at"),
             )
 
-            # Store token using OAuthManager
             self.oauth_manager.store_token(
                 provider=provider,
                 access_token=token_data["access_token"],
@@ -683,7 +776,6 @@ class CalendarHubWidget(BaseWidget):
                 token_type=token_type,
             )
 
-            # Update adapter with stored token
             adapter.access_token = token_data["access_token"]
 
             new_refresh_token = token_data.get("refresh_token")
@@ -699,10 +791,8 @@ class CalendarHubWidget(BaseWidget):
                 if retained_refresh:
                     adapter.refresh_token = retained_refresh
 
-            # Get user email (try to fetch from provider)
             email = self._get_user_email(provider, adapter)
 
-            # Create or update CalendarSyncStatus record
             from data.database.models import CalendarSyncStatus
 
             db = self.calendar_manager.db
@@ -720,24 +810,46 @@ class CalendarHubWidget(BaseWidget):
             else:
                 logger.debug("Creating new sync status for %s", provider)
                 sync_status = CalendarSyncStatus(
-                    provider=provider, user_email=email, is_active=True
+                    provider=provider,
+                    user_email=email,
+                    is_active=True,
                 )
 
             sync_status.save(db)
 
-            # Add connected account badge
-            self.add_connected_account(provider, email)
+            payload["email"] = email
 
-            # Trigger initial sync
             try:
                 self.calendar_manager.sync_external_calendar(provider)
             except Exception as sync_error:
-                logger.warning(f"Initial sync failed: {sync_error}")
+                sync_error_text = str(sync_error) or repr(sync_error)
+                payload["initial_sync_error"] = sync_error_text
+                logger.warning("Initial sync failed for %s: %s", provider, sync_error_text)
 
-            # Refresh view
+            payload["success"] = True
+
+        except Exception as exc:  # noqa: BLE001
+            payload["error"] = str(exc) or repr(exc)
+            logger.error("Error completing OAuth flow for %s: %s", provider, exc, exc_info=True)
+
+        self.oauth_connect_finished.emit(payload)
+
+    def _on_oauth_connect_finished(self, payload: Dict[str, Any]) -> None:
+        """Apply OAuth completion result on the UI thread."""
+        provider = str(payload.get("provider", ""))
+        success = bool(payload.get("success"))
+
+        try:
+            if not success:
+                error_text = str(payload.get("error", "")) or "Unknown error"
+                self._handle_oauth_error(provider, error_text)
+                return
+
+            email = payload.get("email")
+            self.add_connected_account(provider, email if isinstance(email, str) else None)
+
             self._refresh_current_view()
-
-            # Show success message
+            self._update_sync_status()
 
             provider_name = self._get_provider_display_name(provider)
             self.show_info(
@@ -745,11 +857,20 @@ class CalendarHubWidget(BaseWidget):
                 self.i18n.t("calendar.success.connected", provider=provider_name),
             )
 
-            logger.info(f"OAuth flow completed for {provider}")
+            initial_sync_error = str(payload.get("initial_sync_error", "")).strip()
+            if initial_sync_error:
+                self.show_warning(
+                    self.i18n.t("common.warning"),
+                    self.i18n.t("calendar.warning.sync_failed", error=initial_sync_error),
+                )
 
-        except Exception as e:
-            logger.error(f"Error completing OAuth flow: {e}")
-            self._handle_oauth_error(provider, str(e))
+            logger.info("OAuth flow completed for %s", provider)
+        finally:
+            self.add_account_btn.setEnabled(True)
+            if not (self._manual_sync_thread and self._manual_sync_thread.is_alive()):
+                self.sync_now_btn.setEnabled(True)
+            self._oauth_connect_thread = None
+            self._update_sync_status()
 
     def _get_user_email(self, provider: str, adapter) -> Optional[str]:
         """
@@ -780,7 +901,7 @@ class CalendarHubWidget(BaseWidget):
         headers = {"Authorization": f"Bearer {access_token}"}
 
         try:
-            if provider == "google":
+            if provider == CalendarSource.GOOGLE:
                 with httpx.Client() as client:
                     response = client.get(
                         "https://www.googleapis.com/oauth2/v2/userinfo",
@@ -802,7 +923,7 @@ class CalendarHubWidget(BaseWidget):
                         response.status_code,
                     )
 
-            elif provider == "outlook":
+            elif provider == CalendarSource.OUTLOOK:
                 with httpx.Client() as client:
                     response = client.get(
                         "https://graph.microsoft.com/v1.0/me",
@@ -847,7 +968,11 @@ class CalendarHubWidget(BaseWidget):
 
         self.show_error(
             self.i18n.t("dialogs.calendar_hub.authorization_failed"),
-            f"Failed to connect {provider_name} calendar:\n{error}",
+            self.i18n.t(
+                "calendar_hub.widget.connect_failed_message",
+                provider=provider_name,
+                error=error,
+            ),
         )
 
         logger.error(f"OAuth error for {provider}: {error}")
@@ -974,7 +1099,7 @@ class CalendarHubWidget(BaseWidget):
 
             logger.info(f"Removed connected account: {provider}")
 
-    def disconnect_account(self, provider: str):
+    def disconnect_account(self, provider: str, *, confirm: bool = True):
         """
         Disconnect an external calendar account.
 
@@ -982,45 +1107,26 @@ class CalendarHubWidget(BaseWidget):
             provider: Provider name (google/outlook)
         """
         try:
-            from data.database.models import CalendarSyncStatus
-
             provider_name = self._get_provider_display_name(provider)
 
-            # Confirm with user
-            reply = QMessageBox.question(
-                self,
-                self.i18n.t("dialogs.calendar_hub.disconnect_account"),
-                f"Are you sure you want to disconnect {provider_name} calendar?\n\n"
-                f"This will:\n"
-                f"- Remove all synced events from {provider_name}\n"
-                f"- Delete stored OAuth tokens\n"
-                f"- Stop automatic synchronization",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
-            )
+            if confirm:
+                # Confirm with user
+                reply = QMessageBox.question(
+                    self,
+                    self.i18n.t("dialogs.calendar_hub.disconnect_account"),
+                    self.i18n.t(
+                        "calendar_hub.widget.disconnect_confirm_message",
+                        provider=provider_name,
+                    ),
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No,
+                )
 
-            if reply != QMessageBox.StandardButton.Yes:
-                return
+                if reply != QMessageBox.StandardButton.Yes:
+                    return
 
-            # Delete OAuth token
-            self.oauth_manager.delete_token(provider)
-
-            # Delete CalendarSyncStatus
-            sync_status = CalendarSyncStatus.get_by_provider(self.calendar_manager.db, provider)
-            if sync_status:
-                sync_status.delete(self.calendar_manager.db)
-
-            # Delete all events from this provider
-            query = "DELETE FROM calendar_events WHERE source = ?"
-            self.calendar_manager.db.execute(query, (provider,), commit=True)
-
-            # Revoke access with provider (if adapter supports it)
-            if provider in self.calendar_manager.sync_adapters:
-                try:
-                    adapter = self.calendar_manager.sync_adapters[provider]
-                    adapter.revoke_access()
-                except Exception as e:
-                    logger.warning(f"Could not revoke access: {e}")
+            # Disconnect provider account and remove linked local data.
+            self.calendar_manager.disconnect_provider_account(provider)
 
             # Remove account badge
             self.remove_connected_account(provider)
@@ -1046,12 +1152,16 @@ class CalendarHubWidget(BaseWidget):
 
     def _on_sync_now_clicked(self):
         """Handle sync now button click."""
+        if self._manual_sync_thread and self._manual_sync_thread.is_alive():
+            logger.debug("Manual sync already in progress; ignoring duplicate request")
+            return
+
         try:
             if not self.connected_accounts:
 
                 self.show_info(
                     self.i18n.t("dialogs.calendar_hub.no_accounts"),
-                    "No external calendar accounts connected. " "Please add an account first.",
+                    self.i18n.t("calendar_hub.widget.no_accounts_message"),
                 )
                 return
 
@@ -1060,49 +1170,77 @@ class CalendarHubWidget(BaseWidget):
             self.sync_status_label.setText(self.i18n.t("calendar_hub.widget.syncing"))
             self.sync_status_label.setProperty("state", "syncing")
 
-            # Sync all connected accounts
-            success_count = 0
-            error_count = 0
-
-            for provider in self.connected_accounts.keys():
-                try:
-                    self.calendar_manager.sync_external_calendar(provider)
-                    success_count += 1
-                    logger.info(f"Successfully synced {provider}")
-                except Exception as e:
-                    error_count += 1
-                    logger.error(f"Failed to sync {provider}: {e}")
-
-            # Refresh view
-            self._refresh_current_view()
-
-            # Update sync status
-            self._update_sync_status()
-
-            # Show result
-
-            if error_count == 0:
-                self.show_info(
-                    self.i18n.t("dialogs.calendar_hub.sync_complete"),
-                    f"Successfully synced {success_count} calendar(s).",
-                )
-            else:
-                self.show_warning(
-                    self.i18n.t("dialogs.calendar_hub.sync_completed_with_errors"),
-                    f"Synced {success_count} calendar(s), "
-                    f"{error_count} failed. Check logs for details.",
-                )
+            providers = list(self.connected_accounts.keys())
+            self._manual_sync_thread = threading.Thread(
+                target=self._run_manual_sync,
+                args=(providers,),
+                daemon=True,
+            )
+            self._manual_sync_thread.start()
 
         except Exception as e:
             logger.error(f"Error during manual sync: {e}")
 
             self.show_error(
                 self.i18n.t("calendar_hub.widget.sync_error"),
-                f"Failed to sync calendars: {str(e)}",
+                self.i18n.t("calendar_hub.widget.sync_failed_message", error=str(e)),
             )
+            if not (self._oauth_connect_thread and self._oauth_connect_thread.is_alive()):
+                self.sync_now_btn.setEnabled(True)
+            self._update_sync_status()
+
+    def _run_manual_sync(self, providers: list[str]) -> None:
+        """Synchronize selected providers in a background thread."""
+        success_count = 0
+        error_count = 0
+        fatal_error = ""
+
+        try:
+            for provider in providers:
+                try:
+                    self.calendar_manager.sync_external_calendar(provider)
+                    success_count += 1
+                    logger.info("Successfully synced %s", provider)
+                except Exception as exc:
+                    error_count += 1
+                    logger.error("Failed to sync %s: %s", provider, exc)
+        except Exception as exc:  # pragma: no cover - defensive guard
+            fatal_error = str(exc) or repr(exc)
+            logger.error("Error during manual sync thread execution: %s", exc, exc_info=True)
+
+        self.manual_sync_finished.emit(success_count, error_count, fatal_error)
+
+    def _on_manual_sync_finished(self, success_count: int, error_count: int, fatal_error: str) -> None:
+        """Handle manual sync completion in the UI thread."""
+        try:
+            if fatal_error:
+                self.show_error(
+                    self.i18n.t("calendar_hub.widget.sync_error"),
+                    self.i18n.t("calendar_hub.widget.sync_failed_message", error=fatal_error),
+                )
+                return
+
+            self._refresh_current_view()
+            self._update_sync_status()
+
+            if error_count == 0:
+                self.show_info(
+                    self.i18n.t("dialogs.calendar_hub.sync_complete"),
+                    self.i18n.t("calendar_hub.widget.sync_success_message", count=success_count),
+                )
+            else:
+                self.show_warning(
+                    self.i18n.t("dialogs.calendar_hub.sync_completed_with_errors"),
+                    self.i18n.t(
+                        "calendar_hub.widget.sync_partial_message",
+                        success_count=success_count,
+                        error_count=error_count,
+                    ),
+                )
         finally:
-            # Re-enable sync button
-            self.sync_now_btn.setEnabled(True)
+            if not (self._oauth_connect_thread and self._oauth_connect_thread.is_alive()):
+                self.sync_now_btn.setEnabled(True)
+            self._manual_sync_thread = None
 
     def _update_sync_status(self):
         """Update sync status label with last sync time."""
@@ -1143,7 +1281,9 @@ class CalendarHubWidget(BaseWidget):
                     days = int(delta.total_seconds() / 86400)
                     time_ago = self.i18n.t("calendar_hub.widget.time_ago_days", days=days)
 
-                self.sync_status_label.setText(f"Last sync: {time_ago}")
+                self.sync_status_label.setText(
+                    self.i18n.t("calendar_hub.widget.last_sync", time_ago=time_ago)
+                )
                 self.sync_status_label.setProperty("state", None)  # Reset to default
             else:
                 self.sync_status_label.setText(self.i18n.t("calendar_hub.widget.never_synced"))
@@ -1170,6 +1310,16 @@ class CalendarHubWidget(BaseWidget):
         self.sync_now_btn.setText("🔄 " + self.i18n.t("calendar_hub.sync_now"))
         self.sync_now_btn.setToolTip(self.i18n.t("calendar_hub.sync_now_tooltip"))
         self.add_account_btn.setText("+ " + self.i18n.t("calendar_hub.add_account"))
+
+        # Refresh account labels with localized provider names.
+        for provider, email in self.connected_accounts.items():
+            self._update_account_badge_label(provider, email)
+
+        # Refresh child views so weekday labels and day-level text are localized.
+        self.month_view.refresh_view()
+        self.week_view.refresh_view()
+        self.day_view.refresh_view()
+        self._update_sync_status()
 
     def _on_language_changed(self, language: str):
         """

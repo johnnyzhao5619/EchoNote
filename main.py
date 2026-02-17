@@ -343,7 +343,7 @@ def main():
         logger.info("Initializing calendar sync adapters...")
         from utils.app_initializer import initialize_calendar_adapters
 
-        sync_adapters = initialize_calendar_adapters(config, oauth_manager)
+        sync_adapters = initialize_calendar_adapters(config, oauth_manager, secrets_manager)
         managers["sync_adapters"] = sync_adapters
 
         # Initialize calendar manager
@@ -353,7 +353,12 @@ def main():
         logger.info("Initializing calendar manager...")
         from core.calendar.manager import CalendarManager
 
-        calendar_manager = CalendarManager(db, sync_adapters, oauth_manager=oauth_manager)
+        calendar_manager = CalendarManager(
+            db,
+            sync_adapters,
+            oauth_manager=oauth_manager,
+            file_manager=file_manager,
+        )
         managers["calendar_manager"] = calendar_manager
         logger.info("Calendar manager initialized")
 

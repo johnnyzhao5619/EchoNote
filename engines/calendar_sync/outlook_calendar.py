@@ -136,6 +136,7 @@ class OutlookCalendarAdapter(OAuthCalendarAdapter):
             Dictionary with events and new delta link
         """
         try:
+            is_incremental = bool((last_sync_token or "").strip())
             events = []
             deleted_events: List[str] = []
             new_delta_link = None
@@ -204,7 +205,12 @@ class OutlookCalendarAdapter(OAuthCalendarAdapter):
 
             self.logger.info("Fetched %s events from Outlook", len(events))
 
-            return {"events": events, "deleted": deleted_events, "sync_token": new_delta_link}
+            return {
+                "events": events,
+                "deleted": deleted_events,
+                "sync_token": new_delta_link,
+                "is_incremental": is_incremental,
+            }
 
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 410:
