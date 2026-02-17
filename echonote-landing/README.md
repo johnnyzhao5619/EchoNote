@@ -6,7 +6,10 @@ This is the only actively maintained landing implementation.
 The old static page under `docs/landing/` is archived and should not receive feature updates.
 The site is intentionally maintained as a single-page landing (`/` only).
 
-## v1.3.0 Highlights
+## v1.3.1 Highlights
+
+- Fixed stale settings API references in desktop settings flows after `SettingsManager` refactor.
+- Aligned settings save/rollback path with `ConfigManager` (`get_all` / `save` / `replace_all`).
 
 - Single-page information architecture (removed legacy `/about` route and template residue).
 - Header navigation hardening across breakpoints (`md`/`lg`/`xl`), including compact `More` menu behavior.

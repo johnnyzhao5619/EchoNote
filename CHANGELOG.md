@@ -5,6 +5,19 @@ All notable changes to EchoNote will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-02-17
+
+### Fixed
+
+- **Settings Startup Error**: Resolved `SettingsManager` stale API calls (`get_all_settings`) that caused settings panel load failure.
+- **Settings Persistence Path**: Updated settings save and rollback flows to use `ConfigManager` APIs (`get_all`, `save`, `replace_all`) after manager refactor.
+- **Shutdown Save Hook**: Fixed main window shutdown settings persistence path to avoid calling removed `SettingsManager.save_settings`.
+
+### Changed
+
+- **Model Management Save Flow**: Aligned model settings dialog persistence with the current `config_manager.save()` path.
+- **Version and Docs Alignment**: Bumped project and landing references to `v1.3.1` to keep release metadata consistent.
+
 ## [1.3.0] - 2026-02-17
 
 ### Added

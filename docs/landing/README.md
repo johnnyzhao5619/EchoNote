@@ -7,7 +7,7 @@
 - 活跃实现：`echonote-landing/`
 - 开发说明：`echonote-landing/README.md`
 - 部署说明：`echonote-landing/DEPLOYMENT.md`
-- 当前版本基线：`v1.3.0`
+- 当前版本基线：`v1.3.1`
 
 ## 归档策略
 
