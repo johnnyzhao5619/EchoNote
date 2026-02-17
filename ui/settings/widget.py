@@ -292,11 +292,60 @@ class SettingsWidget(BaseWidget):
         logger.warning("Settings category for page '%s' not found in navigation list", page_id)
         return False
 
+    def _get_config_manager(self):
+        """Return ConfigManager attached to settings manager."""
+        config_manager = getattr(self.settings_manager, "config_manager", None)
+        if config_manager is None:
+            raise RuntimeError("SettingsManager.config_manager is unavailable")
+        return config_manager
+
+    def _get_settings_snapshot(self) -> Dict[str, Any]:
+        """Capture current settings snapshot from config manager."""
+        config_manager = self._get_config_manager()
+        get_all = getattr(config_manager, "get_all", None)
+        if not callable(get_all):
+            raise RuntimeError("ConfigManager.get_all is unavailable")
+
+        snapshot = get_all()
+        if not isinstance(snapshot, dict):
+            raise TypeError("ConfigManager.get_all must return a dictionary snapshot")
+        return snapshot
+
+    def _persist_settings(self) -> None:
+        """Persist current in-memory settings to disk."""
+        config_manager = self._get_config_manager()
+        save = getattr(config_manager, "save", None)
+        if not callable(save):
+            raise RuntimeError("ConfigManager.save is unavailable")
+        save()
+
+    def _restore_settings_snapshot(self, snapshot: Dict[str, Any]) -> bool:
+        """Restore full settings snapshot in memory."""
+        if not isinstance(snapshot, dict):
+            return False
+
+        try:
+            config_manager = self._get_config_manager()
+            replace_all = getattr(config_manager, "replace_all", None)
+            if not callable(replace_all):
+                return False
+
+            replace_all(snapshot)
+
+            setting_changed = getattr(self.settings_manager, "setting_changed", None)
+            emit = getattr(setting_changed, "emit", None)
+            if callable(emit):
+                emit("*", None)
+            return True
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Error restoring settings snapshot: %s", exc, exc_info=True)
+            return False
+
     def load_settings(self):
         """Load current settings into all pages."""
         try:
             # Store original settings for change detection
-            self.original_settings = self.settings_manager.get_all_settings()
+            self.original_settings = self._get_settings_snapshot()
 
             # Load settings into each page
             for page_widget in self.settings_pages.values():
@@ -323,7 +372,7 @@ class SettingsWidget(BaseWidget):
         Returns:
             True if settings were saved successfully
         """
-        settings_snapshot: Dict[str, Any] = self.settings_manager.get_all_settings()
+        settings_snapshot: Dict[str, Any] = self._get_settings_snapshot()
         try:
             # Validate settings in all pages
             for _page_id, page_widget in self.settings_pages.items():
@@ -343,8 +392,7 @@ class SettingsWidget(BaseWidget):
                     page_widget.save_settings()
 
             # Persist to disk
-            if not self.settings_manager.save_settings():
-                raise Exception(self.i18n.t("exceptions.settings.failed_to_save_to_disk"))
+            self._persist_settings()
 
             # Run page-level post-save side effects only after disk save succeeds.
             has_post_save_warnings = self._run_page_post_save_hooks()
@@ -353,7 +401,7 @@ class SettingsWidget(BaseWidget):
             self._apply_post_save_runtime_state()
 
             # Update original settings
-            self.original_settings = self.settings_manager.get_all_settings()
+            self.original_settings = self._get_settings_snapshot()
 
             # Reset change flag
             self.has_unsaved_changes = False
@@ -390,11 +438,7 @@ class SettingsWidget(BaseWidget):
         if not isinstance(snapshot, dict):
             return False
 
-        restore_settings = getattr(self.settings_manager, "restore_settings_snapshot", None)
-        if not callable(restore_settings):
-            return False
-
-        restored = bool(restore_settings(snapshot))
+        restored = self._restore_settings_snapshot(snapshot)
         if not restored:
             return False
 

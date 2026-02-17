@@ -79,11 +79,14 @@ def mock_audio_capture():
 def mock_settings_manager():
     """Create a mock SettingsManager for testing."""
     manager = MagicMock()
+    manager.config_manager = MagicMock()
+    manager.config_manager.get_all = Mock(return_value={})
+    manager.config_manager.save = Mock()
+    manager.config_manager.replace_all = Mock()
     manager.get = Mock(side_effect=lambda key, default=None: default)
     manager.set = Mock()
     manager.save = Mock()
     manager.get_all = Mock(return_value={})
-    manager.get_all_settings = Mock(return_value={})
     manager.get_realtime_preferences = Mock(
         return_value={"recording_format": "wav", "auto_save": True}
     )

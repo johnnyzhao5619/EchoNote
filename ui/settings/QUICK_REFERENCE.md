@@ -110,7 +110,7 @@ self.add_page('settings', settings_widget)
 **Methods**:
 
 - `load_settings()`: Load settings from manager
-- `save_settings()`: Save settings to manager
+- `save_settings()`: Save page values, then persist via `settings_manager.config_manager.save()`
 - `check_unsaved_changes()`: Check for unsaved changes
 
 **Signals**:
@@ -199,7 +199,7 @@ if not self.my_setting_edit.text():
 ### Settings Not Saving
 
 - Check if validation is passing
-- Check if SettingsManager.save_settings() is called
+- Check if `settings_manager.config_manager.save()` is called successfully
 - Check file permissions on config file
 
 ### UI Not Updating After Language Change

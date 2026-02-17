@@ -1417,7 +1417,19 @@ class ModelConfigDialog(QDialog):
                     return
 
             # 保存到磁盘
-            if not settings_manager.save_settings():
+            config_manager = getattr(settings_manager, "config_manager", None)
+            save_config = getattr(config_manager, "save", None)
+            if not callable(save_config):
+                self.show_warning(
+                    i18n.t("settings.model_management.validation_error"),
+                    i18n.t("exceptions.settings.failed_to_save_to_disk"),
+                )
+                return
+
+            try:
+                save_config()
+            except Exception as exc:  # noqa: BLE001
+                logger.error("Failed to persist model settings: %s", exc, exc_info=True)
                 self.show_warning(
                     i18n.t("settings.model_management.validation_error"),
                     i18n.t("exceptions.settings.failed_to_save_to_disk"),

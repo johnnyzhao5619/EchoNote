@@ -693,9 +693,11 @@ class MainWindow(QMainWindow):
             if "settings_manager" in self.managers:
                 try:
                     settings_manager = self.managers["settings_manager"]
-                    if hasattr(settings_manager, "save_settings"):
+                    config_manager = getattr(settings_manager, "config_manager", None)
+                    save_config = getattr(config_manager, "save", None)
+                    if callable(save_config):
                         logger.info(self.i18n.t("logging.main_window.saving_settings"))
-                        settings_manager.save_settings()
+                        save_config()
                 except Exception as e:
                     logger.error(f"Error saving settings: {e}")
 

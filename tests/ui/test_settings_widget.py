@@ -53,7 +53,7 @@ class TestSettingsWidget:
     def test_widget_has_original_settings(self, widget):
         """Test widget has original settings dictionary."""
         assert hasattr(widget, "original_settings")
-        # original_settings is set from get_all_settings() which returns a Mock in tests
+        # original_settings is set from config_manager.get_all() in tests
         # Just verify it exists
         assert widget.original_settings is not None
 
@@ -193,13 +193,13 @@ class TestSettingsWidgetCategories:
 
 def test_save_failure_rolls_back_settings_and_runtime_state(qapp, mock_i18n):
     settings_manager = MagicMock()
+    settings_manager.config_manager = MagicMock()
     settings_snapshot = {
         "ui": {"theme": "light", "language": "en_US"},
         "timeline": {"past_days": 30},
     }
-    settings_manager.get_all_settings.return_value = settings_snapshot
-    settings_manager.save_settings.return_value = False
-    settings_manager.restore_settings_snapshot.return_value = True
+    settings_manager.config_manager.get_all.return_value = settings_snapshot
+    settings_manager.config_manager.save.side_effect = OSError("disk full")
 
     main_window = Mock()
     mock_i18n.change_language = Mock()
@@ -217,15 +217,18 @@ def test_save_failure_rolls_back_settings_and_runtime_state(qapp, mock_i18n):
 
     assert widget.save_settings() is False
 
-    settings_manager.restore_settings_snapshot.assert_called_once_with(settings_snapshot)
+    settings_manager.config_manager.replace_all.assert_called_once_with(settings_snapshot)
     main_window.apply_theme.assert_called_once_with("light")
     mock_i18n.change_language.assert_called_once_with("en_US")
 
 
 def test_save_success_applies_runtime_state_once(qapp, mock_i18n):
     settings_manager = MagicMock()
-    settings_manager.save_settings.return_value = True
-    settings_manager.get_all_settings.return_value = {"ui": {"theme": "dark", "language": "zh_CN"}}
+    settings_manager.config_manager = MagicMock()
+    settings_manager.config_manager.save.return_value = None
+    settings_manager.config_manager.get_all.return_value = {
+        "ui": {"theme": "dark", "language": "zh_CN"}
+    }
 
     def _get_setting(key):
         mapping = {
@@ -258,8 +261,9 @@ def test_save_success_applies_runtime_state_once(qapp, mock_i18n):
 
 def test_save_success_runs_page_post_save_hook(qapp, mock_i18n):
     settings_manager = MagicMock()
-    settings_manager.save_settings.return_value = True
-    settings_manager.get_all_settings.return_value = {"ui": {}}
+    settings_manager.config_manager = MagicMock()
+    settings_manager.config_manager.save.return_value = None
+    settings_manager.config_manager.get_all.return_value = {"ui": {}}
     settings_manager.get_setting.return_value = None
 
     widget = SettingsWidget(
@@ -280,9 +284,9 @@ def test_save_success_runs_page_post_save_hook(qapp, mock_i18n):
 
 def test_save_failure_skips_page_post_save_hook(qapp, mock_i18n):
     settings_manager = MagicMock()
-    settings_manager.save_settings.return_value = False
-    settings_manager.get_all_settings.return_value = {"ui": {}}
-    settings_manager.restore_settings_snapshot.return_value = True
+    settings_manager.config_manager = MagicMock()
+    settings_manager.config_manager.save.side_effect = RuntimeError("write failed")
+    settings_manager.config_manager.get_all.return_value = {"ui": {}}
 
     widget = SettingsWidget(
         settings_manager=settings_manager,
@@ -302,8 +306,9 @@ def test_save_failure_skips_page_post_save_hook(qapp, mock_i18n):
 
 def test_save_success_with_post_save_warning_shows_warning_only(qapp, mock_i18n):
     settings_manager = MagicMock()
-    settings_manager.save_settings.return_value = True
-    settings_manager.get_all_settings.return_value = {"ui": {}}
+    settings_manager.config_manager = MagicMock()
+    settings_manager.config_manager.save.return_value = None
+    settings_manager.config_manager.get_all.return_value = {"ui": {}}
     settings_manager.get_setting.return_value = None
 
     widget = SettingsWidget(
