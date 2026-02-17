@@ -1,5 +1,5 @@
 import { createI18n } from 'vue-i18n'
-import { DEFAULT_LOCALE, FALLBACK_LOCALE } from './locales'
+import { FALLBACK_LOCALE, resolveInitialLocale } from './locales'
 import zhCN from '../locales/zh-CN.json'
 import zhTW from '../locales/zh-TW.json'
 import enUS from '../locales/en-US.json'
@@ -14,7 +14,7 @@ const messages = {
 
 const i18n = createI18n({
   legacy: false,
-  locale: DEFAULT_LOCALE,
+  locale: resolveInitialLocale(),
   fallbackLocale: FALLBACK_LOCALE,
   messages,
 })

@@ -1,35 +1,97 @@
 {
   "hero": {
     "title": "EchoNote",
-    "description": "Une application desktop locale pour la transcription vocale, l'enregistrement en temps réel et la gestion chronologique liée au calendrier",
+    "headline": "De la voix à l'action, en local",
+    "description": "Une application desktop local-first pour la transcription vocale, l'enregistrement en temps réel et les workflows de timeline liés au calendrier.",
+    "releaseBadge": "Nouvelle version {version}",
     "viewOnGitHub": "Voir sur GitHub",
     "subtitle": "Open Source • Gratuit • Multi-plateforme",
     "getStarted": "Commencer",
-    "learnMore": "En savoir plus"
+    "learnMore": "En savoir plus",
+    "quickLinks": {
+      "documentation": "Documentation",
+      "issues": "Issues",
+      "releases": "Versions",
+      "license": "Licence"
+    }
   },
   "header": {
     "github": "Voir sur GitHub",
-    "toggleMenu": "Basculer le menu"
+    "toggleMenu": "Basculer le menu",
+    "skipToContent": "Aller au contenu",
+    "languageSwitcher": "Sélecteur de langue",
+    "more": "Plus"
   },
   "nav": {
-    "home": "Accueil",
-    "about": "À propos"
+    "features": "Fonctionnalités",
+    "howItWorks": "Fonctionnement",
+    "stats": "Statistiques",
+    "documentation": "Documentation",
+    "issues": "Issues",
+    "releases": "Versions"
   },
   "features": {
     "title": "Fonctionnalités clés",
-    "subtitle": "Reliez transcription, planning et contexte temporel dans un flux de travail unifié",
+    "subtitle": "Reliez transcription, planning et contexte temporel dans un flux de travail unifié.",
     "callToAction": "Vous voulez en savoir plus sur les détails techniques ?",
-    "exploreMore": "Voir les statistiques du projet"
+    "exploreMore": "Voir les statistiques du projet",
+    "items": {
+      "batchTranscription": {
+        "title": "Transcription par lot",
+        "description": "Transcrivez des fichiers audio et vidéo avec des modèles locaux et exportez dans plusieurs formats."
+      },
+      "realtimeRecording": {
+        "title": "Enregistrement en temps réel",
+        "description": "Capturez l'audio microphone, annotez les moments clés et générez des transcriptions en direct."
+      },
+      "calendarIntegration": {
+        "title": "Intégration calendrier",
+        "description": "Connectez Google ou Outlook et synchronisez les événements avec les enregistrements."
+      },
+      "timelineIntelligence": {
+        "title": "Intelligence de timeline",
+        "description": "Corrélez événements, enregistrements et transcriptions dans une timeline unique et searchable."
+      },
+      "privacyFirst": {
+        "title": "Confidentialité d'abord",
+        "description": "Conservez les données en local avec stockage chiffré et sans dépendance cloud obligatoire."
+      },
+      "multilingualWorkflow": {
+        "title": "Workflow multilingue",
+        "description": "Prend en charge la reconnaissance vocale multilingue avec une architecture UI prête pour la traduction."
+      }
+    }
+  },
+  "howItWorks": {
+    "title": "Comment fonctionne EchoNote",
+    "subtitle": "Un workflow pragmatique conçu pour la confidentialité, la vitesse et la fiabilité.",
+    "steps": {
+      "capture": {
+        "title": "Capturer",
+        "description": "Démarrez une réunion ou importez un audio. EchoNote capture un signal fidèle et l'aligne sur votre timeline d'événements."
+      },
+      "transcribe": {
+        "title": "Transcrire en local",
+        "description": "Des modèles IA locaux convertissent la parole en texte sur votre machine. L'audio ne quitte pas l'appareil par défaut."
+      },
+      "organize": {
+        "title": "Organiser et rechercher",
+        "description": "Relisez les transcriptions, générez des résumés et recherchez sur toute votre timeline de réunions et notes."
+      }
+    }
   },
   "github": {
     "title": "Statistiques du projet",
-    "subtitle": "Consultez les données en temps réel et l'activité de la communauté pour EchoNote sur GitHub",
+    "subtitle": "Consultez les données du dépôt en temps réel et l'activité de la communauté sur GitHub.",
+    "dataSource": "Source des données : API REST GitHub",
     "stars": "Étoiles",
     "forks": "Forks",
     "issues": "Issues",
     "repository": "Informations du dépôt",
+    "license": "Licence",
     "latestRelease": "Dernière version",
     "released": "Publié le",
+    "updatedOn": "Mis à jour le",
     "viewRelease": "Voir la version",
     "noReleases": "Aucune version encore",
     "openSource": "Open Source",
@@ -39,13 +101,16 @@
   },
   "footer": {
     "copyright": "Droits d'auteur",
+    "openSource": "Ressources Open Source",
     "links": "Liens",
     "sourceCode": "Code source",
     "documentation": "Documentation",
     "releases": "Versions",
+    "issues": "Issues",
+    "contributing": "Contribuer",
+    "discussions": "Discussions",
     "legal": "Légal",
     "license": "Licence :",
-    "builtWith": "Construit avec :",
     "starOnGitHub": "Étoiler sur GitHub"
   }
 }

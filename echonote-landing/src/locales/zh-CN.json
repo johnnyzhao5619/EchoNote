@@ -1,35 +1,97 @@
 {
   "hero": {
     "title": "EchoNote",
-    "description": "本地优先的桌面应用，聚焦语音转写、实时录音与日历联动时间线",
+    "headline": "从语音到行动，全程本地",
+    "description": "本地优先的桌面应用，聚焦语音转写、实时录音与日历联动时间线。",
+    "releaseBadge": "新版本 {version} 已发布",
     "viewOnGitHub": "查看 GitHub",
     "subtitle": "开源 • 免费 • 跨平台",
     "getStarted": "开始使用",
-    "learnMore": "了解更多"
+    "learnMore": "了解更多",
+    "quickLinks": {
+      "documentation": "文档",
+      "issues": "问题反馈",
+      "releases": "发布版本",
+      "license": "许可证"
+    }
   },
   "header": {
     "github": "查看 GitHub",
-    "toggleMenu": "切换菜单"
+    "toggleMenu": "切换菜单",
+    "skipToContent": "跳转到正文",
+    "languageSwitcher": "语言切换",
+    "more": "更多"
   },
   "nav": {
-    "home": "首页",
-    "about": "关于"
+    "features": "功能特性",
+    "howItWorks": "工作流程",
+    "stats": "项目数据",
+    "documentation": "文档",
+    "issues": "问题反馈",
+    "releases": "发布版本"
   },
   "features": {
     "title": "主要特性",
-    "subtitle": "通过统一流程连接转写、日程与时间线上下文",
+    "subtitle": "通过统一流程连接转写、日程与时间线上下文。",
     "callToAction": "想了解更多技术细节？",
-    "exploreMore": "查看项目统计"
+    "exploreMore": "查看项目统计",
+    "items": {
+      "batchTranscription": {
+        "title": "批量转写",
+        "description": "使用本地模型转写音频/视频文件，并导出为多种格式。"
+      },
+      "realtimeRecording": {
+        "title": "实时录音",
+        "description": "采集麦克风音频，标注关键片段，并生成实时转写文本。"
+      },
+      "calendarIntegration": {
+        "title": "日历集成",
+        "description": "连接 Google 或 Outlook 日历，让事件与录音保持同步。"
+      },
+      "timelineIntelligence": {
+        "title": "时间线智能",
+        "description": "在统一可搜索时间线中关联事件、录音与转写。"
+      },
+      "privacyFirst": {
+        "title": "隐私优先",
+        "description": "数据默认保留本地，支持加密存储，无强制云依赖。"
+      },
+      "multilingualWorkflow": {
+        "title": "多语言工作流",
+        "description": "支持多语言语音识别，并具备可扩展的多语言界面架构。"
+      }
+    }
+  },
+  "howItWorks": {
+    "title": "EchoNote 如何工作",
+    "subtitle": "围绕隐私、速度和可靠输出设计的实用流程。",
+    "steps": {
+      "capture": {
+        "title": "采集与记录",
+        "description": "开始会议或导入音频。EchoNote 采集高保真音频并与事件时间线对齐。"
+      },
+      "transcribe": {
+        "title": "本地转写",
+        "description": "本地 AI 模型在你的设备上完成语音转文字，默认不上传音频数据。"
+      },
+      "organize": {
+        "title": "整理与检索",
+        "description": "回看转写内容、生成摘要，并在完整会议时间线中快速搜索。"
+      }
+    }
   },
   "github": {
     "title": "项目统计",
-    "subtitle": "查看 EchoNote 在 GitHub 上的实时数据和社区活跃度",
+    "subtitle": "查看 EchoNote 在 GitHub 上的实时仓库数据与社区活跃度。",
+    "dataSource": "数据来源：GitHub REST API",
     "stars": "Stars",
     "forks": "Forks",
     "issues": "Issues",
     "repository": "仓库信息",
+    "license": "许可证",
     "latestRelease": "最新版本",
     "released": "发布于",
+    "updatedOn": "更新于",
     "viewRelease": "查看版本",
     "noReleases": "暂无发布版本",
     "openSource": "开源",
@@ -39,13 +101,16 @@
   },
   "footer": {
     "copyright": "版权所有",
+    "openSource": "开源资源",
     "links": "相关链接",
     "sourceCode": "源代码",
     "documentation": "文档",
     "releases": "发布版本",
+    "issues": "问题反馈",
+    "contributing": "贡献指南",
+    "discussions": "讨论区",
     "legal": "法律信息",
     "license": "许可证:",
-    "builtWith": "构建技术:",
     "starOnGitHub": "在 GitHub 上点赞"
   }
 }

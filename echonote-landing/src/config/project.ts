@@ -4,11 +4,14 @@ import type { ProjectConfig } from '../types'
 const GITHUB_OWNER = 'johnnyzhao5619'
 const GITHUB_REPO = 'EchoNote'
 const PROJECT_NAME = 'EchoNote'
+const PROJECT_RELEASE_TAG = 'v1.3.0'
 const BASE_URL = `https://${GITHUB_OWNER}.github.io/${GITHUB_REPO}`
 const GITHUB_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`
+const DOCS_URL = `${GITHUB_URL}/tree/main/docs`
 
 export const projectConfig: ProjectConfig = {
   name: PROJECT_NAME,
+  releaseTag: PROJECT_RELEASE_TAG,
   description:
     'A local-first desktop application for voice transcription, real-time recording, and calendar-aware timeline management.',
   githubUrl: GITHUB_URL,
@@ -17,45 +20,70 @@ export const projectConfig: ProjectConfig = {
     {
       id: 'batch-transcription',
       icon: '🎙️',
-      title: 'Batch Transcription',
-      description: 'Transcribe audio and video files with local models and export to multiple formats.',
+      title: 'features.items.batchTranscription.title',
+      description: 'features.items.batchTranscription.description',
     },
     {
       id: 'realtime-recording',
       icon: '⏱️',
-      title: 'Real-time Recording',
-      description: 'Capture microphone audio, annotate key moments, and generate live transcripts.',
+      title: 'features.items.realtimeRecording.title',
+      description: 'features.items.realtimeRecording.description',
     },
     {
       id: 'calendar-sync',
       icon: '📅',
-      title: 'Calendar Integration',
-      description: 'Connect Google or Outlook calendars and keep events synced with recordings.',
+      title: 'features.items.calendarIntegration.title',
+      description: 'features.items.calendarIntegration.description',
     },
     {
       id: 'timeline',
       icon: '🧭',
-      title: 'Timeline Intelligence',
-      description: 'Correlate events, recordings, and transcripts in a single searchable timeline.',
+      title: 'features.items.timelineIntelligence.title',
+      description: 'features.items.timelineIntelligence.description',
     },
     {
       id: 'privacy-first',
       icon: '🔒',
-      title: 'Privacy First',
-      description: 'Keep data local with encrypted storage and no mandatory cloud dependency.',
+      title: 'features.items.privacyFirst.title',
+      description: 'features.items.privacyFirst.description',
     },
     {
       id: 'multilingual',
       icon: '🌍',
-      title: 'Multilingual Workflow',
-      description: 'Supports multilingual speech recognition with a translation-ready UI architecture.',
+      title: 'features.items.multilingualWorkflow.title',
+      description: 'features.items.multilingualWorkflow.description',
     },
   ],
 
+  howItWorks: [
+    {
+      step: 1,
+      title: 'howItWorks.steps.capture.title',
+      description: 'howItWorks.steps.capture.description',
+      icon: 'mic'
+    },
+    {
+      step: 2,
+      title: 'howItWorks.steps.transcribe.title',
+      description: 'howItWorks.steps.transcribe.description',
+      icon: 'cpu'
+    },
+    {
+      step: 3,
+      title: 'howItWorks.steps.organize.title',
+      description: 'howItWorks.steps.organize.description',
+      icon: 'search'
+    }
+  ],
+
   links: {
-    documentation: `${GITHUB_URL}/wiki`,
+    documentation: DOCS_URL,
     demo: `${BASE_URL}/demo`,
     download: `${GITHUB_URL}/releases/latest`,
+    issues: `${GITHUB_URL}/issues`,
+    discussions: `${GITHUB_URL}/discussions`,
+    contributing: `${GITHUB_URL}/blob/main/docs/CONTRIBUTING.md`,
+    license: `${GITHUB_URL}/blob/main/LICENSE`,
   },
 
   seo: {
@@ -104,9 +132,6 @@ export const structuredData = {
   },
   license: 'https://www.apache.org/licenses/LICENSE-2.0',
 }
-
-// Technology stack information
-export const techStack = ['Vue 3', 'TypeScript', 'Tailwind CSS']
 
 // License information
 export const licenseInfo = {

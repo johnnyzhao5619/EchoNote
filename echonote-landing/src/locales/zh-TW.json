@@ -1,35 +1,97 @@
 {
   "hero": {
     "title": "EchoNote",
-    "description": "本地優先的桌面應用，專注於語音轉寫、即時錄音與日曆整合時間線",
+    "headline": "從語音到行動，全程本地",
+    "description": "本地優先的桌面應用，專注於語音轉寫、即時錄音與日曆整合時間線。",
+    "releaseBadge": "新版本 {version} 已發布",
     "viewOnGitHub": "查看 GitHub",
     "subtitle": "開源 • 免費 • 跨平台",
     "getStarted": "開始使用",
-    "learnMore": "了解更多"
+    "learnMore": "了解更多",
+    "quickLinks": {
+      "documentation": "文件",
+      "issues": "問題回報",
+      "releases": "發布版本",
+      "license": "授權"
+    }
   },
   "header": {
     "github": "查看 GitHub",
-    "toggleMenu": "切換選單"
+    "toggleMenu": "切換選單",
+    "skipToContent": "跳到主要內容",
+    "languageSwitcher": "語言切換",
+    "more": "更多"
   },
   "nav": {
-    "home": "首頁",
-    "about": "關於"
+    "features": "功能特色",
+    "howItWorks": "運作流程",
+    "stats": "專案數據",
+    "documentation": "文件",
+    "issues": "問題回報",
+    "releases": "發布版本"
   },
   "features": {
     "title": "主要特性",
-    "subtitle": "以單一流程串接轉寫、排程與時間線脈絡",
+    "subtitle": "以單一流程串接轉寫、排程與時間線脈絡。",
     "callToAction": "想了解更多技術細節？",
-    "exploreMore": "查看專案統計"
+    "exploreMore": "查看專案統計",
+    "items": {
+      "batchTranscription": {
+        "title": "批次轉寫",
+        "description": "使用本地模型轉寫音訊/影片檔案，並匯出多種格式。"
+      },
+      "realtimeRecording": {
+        "title": "即時錄音",
+        "description": "擷取麥克風音訊，標記關鍵片段，並生成即時逐字稿。"
+      },
+      "calendarIntegration": {
+        "title": "日曆整合",
+        "description": "連接 Google 或 Outlook 日曆，讓事件與錄音保持同步。"
+      },
+      "timelineIntelligence": {
+        "title": "時間線智慧",
+        "description": "在單一可搜尋時間線中關聯事件、錄音與轉寫。"
+      },
+      "privacyFirst": {
+        "title": "隱私優先",
+        "description": "資料預設留在本地，支援加密儲存，無強制雲端依賴。"
+      },
+      "multilingualWorkflow": {
+        "title": "多語言流程",
+        "description": "支援多語言語音辨識，並具備可擴充的多語介面架構。"
+      }
+    }
+  },
+  "howItWorks": {
+    "title": "EchoNote 如何運作",
+    "subtitle": "以隱私、速度與可靠輸出為核心設計的實務流程。",
+    "steps": {
+      "capture": {
+        "title": "採集與記錄",
+        "description": "開始會議或匯入音訊。EchoNote 擷取高保真音訊並對齊事件時間線。"
+      },
+      "transcribe": {
+        "title": "本地轉寫",
+        "description": "本地 AI 模型在你的裝置上完成語音轉文字，預設不上傳音訊資料。"
+      },
+      "organize": {
+        "title": "整理與搜尋",
+        "description": "回看逐字稿、生成摘要，並在完整會議時間線中快速搜尋。"
+      }
+    }
   },
   "github": {
     "title": "專案統計",
-    "subtitle": "查看 EchoNote 在 GitHub 上的即時資料和社群活躍度",
+    "subtitle": "查看 EchoNote 在 GitHub 上的即時儲存庫數據與社群活躍度。",
+    "dataSource": "資料來源：GitHub REST API",
     "stars": "Stars",
     "forks": "Forks",
     "issues": "Issues",
     "repository": "儲存庫資訊",
+    "license": "授權",
     "latestRelease": "最新版本",
     "released": "發布於",
+    "updatedOn": "更新於",
     "viewRelease": "查看版本",
     "noReleases": "暫無發布版本",
     "openSource": "開源",
@@ -39,13 +101,16 @@
   },
   "footer": {
     "copyright": "版權所有",
+    "openSource": "開源資源",
     "links": "相關連結",
     "sourceCode": "原始碼",
     "documentation": "文件",
     "releases": "發布版本",
+    "issues": "問題回報",
+    "contributing": "貢獻指南",
+    "discussions": "討論區",
     "legal": "法律資訊",
     "license": "授權條款:",
-    "builtWith": "建構技術:",
     "starOnGitHub": "在 GitHub 上按讚"
   }
 }

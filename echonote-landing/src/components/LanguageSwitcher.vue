@@ -1,14 +1,16 @@
 <template>
   <div class="language-switcher">
-    <button 
-      v-for="localeConfig in supportedLocales"
-      :key="localeConfig.code"
-      @click="switchLanguage(localeConfig.code)"
-      :class="{ 'active': currentLocale === localeConfig.code }"
-      class="px-3 py-1 mx-1 rounded border transition-colors"
+    <label class="sr-only" for="locale-switcher">{{ t('header.languageSwitcher') }}</label>
+    <select
+      id="locale-switcher"
+      v-model="currentLocale"
+      class="h-10 min-w-[7.5rem] rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none transition-colors hover:border-slate-300 focus:border-slate-400"
+      :aria-label="t('header.languageSwitcher')"
     >
-      {{ localeConfig.name }}
-    </button>
+      <option v-for="localeConfig in supportedLocales" :key="localeConfig.code" :value="localeConfig.code">
+        {{ localeConfig.name }}
+      </option>
+    </select>
   </div>
 </template>
 
@@ -17,19 +19,20 @@ import { useI18n } from 'vue-i18n'
 import { computed } from 'vue'
 import { SUPPORTED_LOCALES } from '../i18n/locales'
 
-const { locale } = useI18n()
+const { locale, t } = useI18n()
 
 const supportedLocales = SUPPORTED_LOCALES
-const currentLocale = computed(() => locale.value)
-
-const switchLanguage = (lang: string) => {
-  locale.value = lang
-}
+const currentLocale = computed({
+  get: () => locale.value,
+  set: (lang: string) => {
+    locale.value = lang
+  },
+})
 </script>
 
 <style scoped>
-.active {
-  background-color: #3b82f6;
-  color: white;
+.language-switcher {
+  display: flex;
+  align-items: center;
 }
 </style>

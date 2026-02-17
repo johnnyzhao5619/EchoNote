@@ -5,6 +5,26 @@ All notable changes to EchoNote will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-02-17
+
+### Added
+
+- **Landing Navigation Resilience**: Introduced compact desktop `More` menu behavior for `lg~xl` widths to prevent header overflow in longer locales.
+- **Locale Persistence**: Persisted selected landing page language in `localStorage` and synchronized `<html lang>` for accessibility and SEO consistency.
+- **Release Documentation**: Added explicit `v1.3.0` highlights and deployment baseline updates in landing documentation.
+
+### Changed
+
+- **Landing Information Architecture**: Finalized single-page structure by removing the legacy `/about` route and template view.
+- **Header Breakpoint Strategy**: Unified breakpoint visibility rules across mobile toggle, mobile menu panel, and desktop navigation blocks.
+- **Language Switcher UX**: Replaced multi-button language controls with a stable single-select control to avoid wrapping and layout drift.
+- **Project Versioning**: Bumped canonical application and landing versions to `1.3.0` across version source files.
+
+### Fixed
+
+- **Narrow-Width Header Bug**: Resolved the issue where clicking the top-right menu button showed only an `X` icon without opening the menu (caused by `md`/`lg` breakpoint mismatch).
+- **Long Locale Header Overflow**: Fixed top navigation instability in English/French locales caused by long labels and wrapping controls.
+
 ## [1.2.0] - 2025-11-01
 
 ### Added

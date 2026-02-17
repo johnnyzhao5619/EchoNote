@@ -79,6 +79,16 @@ Topic-specific documentation:
 
 ---
 
+## 🌐 Website / Landing Page
+
+- Active implementation: [`echonote-landing/`](../echonote-landing/)
+- Development guide: [`echonote-landing/README.md`](../echonote-landing/README.md)
+- Deployment guide: [`echonote-landing/DEPLOYMENT.md`](../echonote-landing/DEPLOYMENT.md)
+- Archived implementation: [`docs/landing/`](landing/) (historical reference only)
+- Current release (`v1.3.0`) includes single-page architecture, i18n persistence, and responsive header stability improvements.
+
+---
+
 ## 🌐 Multi-Language Support
 
 EchoNote documentation is available in multiple languages:
@@ -112,5 +122,5 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ---
 
-**Last Updated**: October 31, 2025  
-**Version**: v1.1.0
+**Last Updated**: February 17, 2026  
+**Version**: v1.3.0

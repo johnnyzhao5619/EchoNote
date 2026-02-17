@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { projectConfig } from '../config/project'
 import { useResponsiveImage } from '../composables/useLogo'
+import bannerUrl from '@/assets/Banner.svg'
 import type { ActionButton } from '../types'
 
 const { t } = useI18n()
@@ -14,7 +16,7 @@ const {
   imageAlt: bannerAlt,
   handleImageError: handleBannerError,
   handleImageLoad: handleBannerLoad
-} = useResponsiveImage('/Banner.png', 'EchoNote application interface preview')
+} = useResponsiveImage(bannerUrl, 'EchoNote application interface preview')
 
 interface Props {
   title?: string
@@ -35,108 +37,128 @@ withDefaults(defineProps<Props>(), {
   })
 })
 
-// Button style classes - optimized for mobile
-const buttonClasses = {
-  base: 'inline-flex items-center justify-center px-4 sm:px-6 py-3 sm:py-3 font-semibold rounded-lg transition-all duration-200 transform active:scale-95 sm:hover:scale-105',
-  primary: 'bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800 shadow-lg hover:shadow-xl',
-  secondary: 'bg-white text-blue-600 border-2 border-blue-600 hover:bg-blue-50 active:bg-blue-100 shadow-md hover:shadow-lg'
+const scrollToFeatures = (e: Event) => {
+  e.preventDefault()
+  const el = document.getElementById('features')
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth' })
+  }
 }
 
-const getButtonClasses = (type: 'primary' | 'secondary') => 
-  `${buttonClasses.base} ${buttonClasses[type]}`
+const releaseBadge = computed(() =>
+  t('hero.releaseBadge', { version: projectConfig.releaseTag || 'latest' }),
+)
+
+const quickLinks = computed(() => {
+  const items = [
+    { label: t('hero.quickLinks.documentation'), href: projectConfig.links.documentation },
+    { label: t('hero.quickLinks.issues'), href: projectConfig.links.issues },
+    { label: t('hero.quickLinks.releases'), href: projectConfig.links.download },
+    { label: t('hero.quickLinks.license'), href: projectConfig.links.license },
+  ]
+  return items.filter((item): item is { label: string; href: string } => Boolean(item.href))
+})
 </script>
 
 <template>
-  <section 
-    class="relative bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 py-12 sm:py-16 md:py-20 lg:py-32 overflow-hidden"
+  <section
+    class="section-shell relative overflow-hidden bg-slate-50"
     :style="backgroundImage ? `background-image: url(${backgroundImage})` : ''"
   >
-    <!-- Background decoration -->
-    <div class="absolute inset-0 bg-gradient-to-br from-blue-600/5 to-purple-600/5"></div>
-    
-    <!-- Animated background elements for desktop -->
-    <div class="absolute inset-0 overflow-hidden pointer-events-none">
-      <div class="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-blue-400/10 to-purple-400/10 rounded-full blur-3xl animate-pulse"></div>
-      <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-tr from-indigo-400/10 to-pink-400/10 rounded-full blur-3xl animate-pulse animation-delay-1000"></div>
+    <div class="absolute inset-0 bg-slate-50">
+      <div class="absolute right-[-5%] top-[-10%] h-[500px] w-[500px] animate-float rounded-full bg-sky-200/40 blur-[100px]"></div>
+      <div class="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] bg-blue-200/40 rounded-full blur-[100px] animate-float animation-delay-200"></div>
+      <div class="absolute top-[20%] left-[20%] w-[300px] h-[300px] bg-indigo-200/40 rounded-full blur-[80px] animate-float animation-delay-600"></div>
     </div>
 
-    <div class="relative max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 text-center">
-      <!-- Main title -->
-      <h1 class="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-bold text-gray-900 mb-4 sm:mb-6 leading-tight animate-fade-in-up">
-        <span class="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent bg-size-200 animate-gradient-x">
-          {{ title }}
-        </span>
-      </h1>
-
-      <!-- Description -->
-      <p class="text-lg sm:text-xl md:text-2xl lg:text-3xl text-gray-600 mb-8 sm:mb-10 md:mb-12 max-w-4xl mx-auto leading-relaxed px-2 animate-fade-in-up animation-delay-300">
-        {{ description }}
-      </p>
-
-      <!-- Action buttons -->
-      <div class="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center px-4 animate-fade-in-up animation-delay-600">
-        <!-- Primary action button -->
-        <a 
-          v-if="primaryAction"
-          :href="primaryAction.url"
-          :target="primaryAction.external ? '_blank' : '_self'"
-          :rel="primaryAction.external ? 'noopener noreferrer' : ''"
-          :class="`${getButtonClasses(primaryAction.type)} group w-full sm:w-auto min-w-[200px] text-center touch-manipulation relative overflow-hidden`"
-        >
-          <div class="absolute inset-0 bg-gradient-to-r from-blue-700 to-purple-700 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-          <div class="relative flex items-center justify-center">
-            <svg v-if="primaryAction.external" class="w-4 h-4 sm:w-5 sm:h-5 mr-2 transition-transform duration-200 group-hover:rotate-12" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd" d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401z" clip-rule="evenodd" />
-            </svg>
-            {{ t(primaryAction.text) }}
+    <div class="site-container relative z-10">
+      <div class="grid items-center gap-12 lg:grid-cols-[1.05fr_0.95fr]">
+        <div class="text-center lg:text-left">
+          <div class="mb-6 inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-sm font-medium text-blue-700 animate-fade-in-up">
+            <span class="relative flex h-2 w-2">
+              <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75"></span>
+              <span class="relative inline-flex h-2 w-2 rounded-full bg-blue-500"></span>
+            </span>
+            {{ releaseBadge }}
           </div>
-        </a>
 
-        <!-- Secondary action button -->
-        <a 
-          v-if="secondaryAction"
-          :href="secondaryAction.url"
-          :target="secondaryAction.external ? '_blank' : '_self'"
-          :rel="secondaryAction.external ? 'noopener noreferrer' : ''"
-          :class="`${getButtonClasses(secondaryAction.type)} group w-full sm:w-auto min-w-[200px] text-center touch-manipulation relative overflow-hidden`"
-        >
-          <div class="absolute inset-0 bg-gradient-to-r from-blue-100 to-indigo-100 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-          <div class="relative">
-            {{ t(secondaryAction.text) }}
+          <h1 class="mb-6 text-4xl font-bold tracking-tight text-slate-900 animate-fade-in-up animation-delay-100 sm:text-5xl md:text-6xl">
+            {{ title }}
+          </h1>
+
+          <p class="mx-auto mb-10 max-w-2xl text-lg leading-relaxed text-slate-600 animate-fade-in-up animation-delay-200 lg:mx-0">
+            {{ description }}
+          </p>
+
+          <div class="mb-8 flex w-full flex-col gap-4 animate-fade-in-up animation-delay-300 sm:w-auto sm:flex-row lg:justify-start">
+            <a
+              v-if="primaryAction"
+              :href="primaryAction.url"
+              :target="primaryAction.external ? '_blank' : '_self'"
+              rel="noopener noreferrer"
+              class="group relative inline-flex items-center justify-center overflow-hidden rounded-full bg-slate-900 px-8 py-3.5 text-base font-semibold text-white transition-all duration-200 hover:-translate-y-1 hover:bg-slate-800 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-2"
+            >
+              <div class="absolute inset-0 h-full w-full bg-gradient-to-r from-blue-600 to-indigo-600 opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
+              <span class="relative flex items-center gap-2">
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0110 4.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.203 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.942.359.31.678.921.678 1.856 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0020 10.017C20 4.484 15.522 0 10 0z" clip-rule="evenodd"></path></svg>
+                {{ t(primaryAction.text) }}
+              </span>
+            </a>
+
+            <a
+              v-if="secondaryAction"
+              :href="secondaryAction.url"
+              @click="secondaryAction.url === '#features' ? scrollToFeatures($event) : null"
+              class="group inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-8 py-3.5 text-base font-semibold text-slate-700 transition-all duration-200 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-slate-200 focus:ring-offset-2"
+            >
+              {{ t(secondaryAction.text) }}
+            </a>
           </div>
-        </a>
-      </div>
 
-      <!-- Banner Image -->
-      <div class="mt-10 sm:mt-12 md:mt-16 max-w-4xl mx-auto px-2 animate-fade-in-up animation-delay-900">
-        <div class="group relative rounded-lg sm:rounded-xl overflow-hidden shadow-xl sm:shadow-2xl transition-all duration-500 hover:shadow-3xl hover:-translate-y-2">
-          <div class="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-          <img 
-            :src="bannerSrc"
-            :alt="bannerAlt"
-            class="w-full h-auto transition-all duration-500 group-hover:scale-105"
-            :class="{ 'opacity-50': bannerLoading }"
-            @error="handleBannerError"
-            @load="handleBannerLoad"
-            loading="lazy"
-          />
-          <!-- Loading placeholder -->
-          <div 
-            v-if="bannerLoading && !bannerError"
-            class="absolute inset-0 bg-gray-100 animate-pulse flex items-center justify-center"
-          >
-            <div class="text-gray-400">
-              <svg class="w-8 h-8 sm:w-12 sm:h-12" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd" />
-              </svg>
-            </div>
+          <div class="flex flex-wrap items-center justify-center gap-2 text-sm text-slate-600 lg:justify-start">
+            <a
+              v-for="link in quickLinks"
+              :key="link.href"
+              :href="link.href"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="rounded-full border border-slate-200 bg-white px-3 py-1.5 font-medium transition-colors hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900"
+            >
+              {{ link.label }}
+            </a>
           </div>
         </div>
-      </div>
 
-      <!-- Additional info -->
-      <div class="mt-8 sm:mt-10 md:mt-12 text-xs sm:text-sm text-gray-500 px-4">
-        <p>{{ t('hero.subtitle') }}</p>
+        <div class="relative w-full max-w-4xl animate-fade-in-up animation-delay-600 lg:ml-auto">
+          <div class="relative rounded-xl bg-slate-900 p-2 shadow-2xl ring-1 ring-slate-900/10">
+            <div class="absolute left-0 right-0 top-0 flex h-8 items-center space-x-2 rounded-t-lg bg-slate-800 px-4">
+              <div class="h-3 w-3 rounded-full bg-red-500"></div>
+              <div class="h-3 w-3 rounded-full bg-yellow-500"></div>
+              <div class="h-3 w-3 rounded-full bg-green-500"></div>
+            </div>
+
+            <div class="mt-6 aspect-[16/10] overflow-hidden rounded-lg bg-slate-800">
+              <img
+                :src="bannerSrc"
+                :alt="bannerAlt"
+                class="h-full w-full object-cover"
+                :class="{ 'opacity-50': bannerLoading }"
+                @error="handleBannerError"
+                @load="handleBannerLoad"
+              />
+              <div
+                v-if="bannerLoading && !bannerError"
+                class="absolute inset-0 flex items-center justify-center"
+              >
+                <div class="h-12 w-12 animate-spin rounded-full border-4 border-slate-600 border-t-white"></div>
+              </div>
+            </div>
+
+            <div class="pointer-events-none absolute inset-0 rounded-xl bg-gradient-to-tr from-white/5 to-transparent"></div>
+          </div>
+
+          <div class="absolute -inset-4 -z-10 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 opacity-20 blur-2xl transition-opacity duration-500"></div>
+        </div>
       </div>
     </div>
   </section>

@@ -1,48 +1,52 @@
-# echonote-landing
+# EchoNote Landing
 
-This template should help get you started developing with Vue 3 in Vite.
+Vue 3 + TypeScript + Tailwind CSS landing site for EchoNote.
 
-## Recommended IDE Setup
+This is the only actively maintained landing implementation.  
+The old static page under `docs/landing/` is archived and should not receive feature updates.
+The site is intentionally maintained as a single-page landing (`/` only).
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+## v1.3.0 Highlights
 
-## Recommended Browser Setup
+- Single-page information architecture (removed legacy `/about` route and template residue).
+- Header navigation hardening across breakpoints (`md`/`lg`/`xl`), including compact `More` menu behavior.
+- Fixed narrow-width menu toggle mismatch causing "X only" state.
+- Reworked language switcher to stable select control with persisted locale and synchronized `<html lang>`.
+- Removed frontend-stack promo section from the landing page to keep product messaging focused.
 
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd) 
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
+## Development
 
-## Type Support for `.vue` Imports in TS
-
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
-
-## Customize configuration
-
-See [Vite Configuration Reference](https://vite.dev/config/).
-
-## Project Setup
-
-```sh
+```bash
 npm install
-```
-
-### Compile and Hot-Reload for Development
-
-```sh
 npm run dev
 ```
 
-### Type-Check, Compile and Minify for Production
+## Build
 
-```sh
+```bash
 npm run build
+npm run preview
 ```
 
-### Lint with [ESLint](https://eslint.org/)
+## Source of Truth
 
-```sh
-npm run lint
-```
+To avoid content drift across page and docs, keep these files aligned:
+
+- `src/config/project.ts`: repository links, SEO metadata, feature ordering, release tag.
+- `src/locales/*.json`: all user-facing copy (hero, feature cards, workflow, navigation labels).
+- `src/composables/useGitHubApi.ts`: runtime repository statistics source (GitHub API).
+- `src/i18n/locales.ts`: supported locales and initial locale resolution.
+
+Do not hardcode version strings, release text, or docs links directly inside components.
+
+## UI/UX Baseline
+
+- Unified container and spacing utilities in `src/assets/main.css`: `.site-container`, `.section-shell`.
+- Single page heading (`h1`) in hero; section headings use `h2`.
+- Keyboard and accessibility support: skip link, focus states, semantic landmarks.
+- Locale UX: user-selected language is persisted to `localStorage`, and `<html lang>` is synchronized.
+- Open source resource visibility: docs, issues, releases, license, contributing links.
+
+## Deployment
+
+See `DEPLOYMENT.md` for GitHub Pages setup and workflow details.

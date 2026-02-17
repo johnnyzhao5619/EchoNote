@@ -8,9 +8,9 @@ import Footer from './components/Footer.vue'
   <div class="min-h-screen flex flex-col">
     <Header />
     
-    <main class="flex-1">
+    <div class="flex-1">
       <RouterView />
-    </main>
+    </div>
     
     <Footer />
   </div>

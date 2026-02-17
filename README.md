@@ -79,6 +79,10 @@ EchoNote/
 | **Developers**   | API reference      | [`docs/DEVELOPER_GUIDE.md`](docs/DEVELOPER_GUIDE.md)       |
 | **Contributors** | Coding standards   | [`docs/CODE_STANDARDS.md`](docs/CODE_STANDARDS.md)         |
 | **Maintainers**  | CI/CD guide        | [`docs/CI_CD_GUIDE.md`](docs/CI_CD_GUIDE.md)               |
+| **Website**      | Landing page source| [`echonote-landing/README.md`](echonote-landing/README.md) |
+
+> Landing maintenance note: the Vue implementation in `echonote-landing/` is the active source.  
+> `docs/landing/` is archived for historical reference only.
 
 ### 🧪 Development & Testing
 
@@ -104,7 +108,7 @@ Released under the [Apache 2.0 License](LICENSE). PySide6 (LGPL v3) is used for 
 
 ## 📊 Project Status
 
-- **Version**: v1.2.0 (Latest maintenance release)
+- **Version**: v1.3.0 (Latest release)
 - **Test Suite**: unit / integration / UI / performance categories
 - **Code Quality**: Excellent (PEP 8 compliant, type-annotated)
 - **Documentation**: Complete and restructured
