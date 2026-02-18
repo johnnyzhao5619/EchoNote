@@ -265,13 +265,13 @@ class CalendarHubWidget(BaseWidget):
         accounts_layout.addWidget(self.sync_status_label)
 
         # Sync now button
-        self.sync_now_btn = create_button("🔄 " + self.i18n.t("calendar_hub.sync_now"))
+        self.sync_now_btn = create_button(self.i18n.t("calendar_hub.sync_now"))
         self.sync_now_btn.setToolTip(self.i18n.t("calendar_hub.sync_now_tooltip"))
         self.sync_now_btn.clicked.connect(self._on_sync_now_clicked)
         accounts_layout.addWidget(self.sync_now_btn)
 
         # Add account button
-        self.add_account_btn = create_button("+ " + self.i18n.t("calendar_hub.add_account"))
+        self.add_account_btn = create_button(self.i18n.t("calendar_hub.add_account"))
         self.add_account_btn.clicked.connect(self.show_add_account_dialog)
         accounts_layout.addWidget(self.add_account_btn)
 
@@ -1035,7 +1035,9 @@ class CalendarHubWidget(BaseWidget):
                     child = layout.itemAt(j).widget()
                     if child and child.objectName() == label_name:
                         child.setText(self._format_account_label(provider, email))
-                        return
+                    elif child and child.property("role") == "account-disconnect":
+                        child.setText(self.i18n.t("common.close"))
+                return
 
     def add_connected_account(self, provider: str, email: Optional[str]):
         """
@@ -1074,8 +1076,7 @@ class CalendarHubWidget(BaseWidget):
         badge_layout.addWidget(info_label)
 
         # Disconnect button
-        disconnect_btn = create_button("×")
-        disconnect_btn.setFixedSize(20, 20)
+        disconnect_btn = create_button(self.i18n.t("common.close"))
         disconnect_btn.setProperty("role", "account-disconnect")
         disconnect_btn.clicked.connect(lambda: self.disconnect_account(provider))
         badge_layout.addWidget(disconnect_btn)
@@ -1317,9 +1318,9 @@ class CalendarHubWidget(BaseWidget):
 
         # Update accounts section
         self.accounts_label.setText(self.i18n.t("calendar_hub.connected_accounts") + ":")
-        self.sync_now_btn.setText("🔄 " + self.i18n.t("calendar_hub.sync_now"))
+        self.sync_now_btn.setText(self.i18n.t("calendar_hub.sync_now"))
         self.sync_now_btn.setToolTip(self.i18n.t("calendar_hub.sync_now_tooltip"))
-        self.add_account_btn.setText("+ " + self.i18n.t("calendar_hub.add_account"))
+        self.add_account_btn.setText(self.i18n.t("calendar_hub.add_account"))
 
         # Refresh account labels with localized provider names.
         for provider, email in self.connected_accounts.items():

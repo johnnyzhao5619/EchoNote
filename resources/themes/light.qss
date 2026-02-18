@@ -1768,11 +1768,11 @@ QWidget[role="task-item"] QPushButton {
     color: #323130;
     border: 1px solid #8a8886;
     border-radius: 2px;
-    padding: 6px 12px;
-    min-width: 60px;
-    min-height: 28px;
+    padding: 8px 16px;
+    min-width: 88px;
+    min-height: 34px;
     font-weight: 400;
-    font-size: 13px;
+    font-size: 14px;
 }
 
 QWidget[role="task-item"] QPushButton:hover {

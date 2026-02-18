@@ -157,7 +157,7 @@ class SearchWidget(BaseWidget):
         layout.addWidget(self.case_sensitive_checkbox)
 
         # Previous button
-        self.prev_button = create_button("↑")
+        self.prev_button = create_button(self.i18n.t("search.previous"))
         self.prev_button.setObjectName("prev_button")
 
         self.prev_button.setFixedWidth(BUTTON_FIXED_WIDTH_LARGE)
@@ -166,7 +166,7 @@ class SearchWidget(BaseWidget):
         layout.addWidget(self.prev_button)
 
         # Next button
-        self.next_button = create_button("↓")
+        self.next_button = create_button(self.i18n.t("search.next"))
         self.next_button.setObjectName("next_button")
         self.next_button.setFixedWidth(BUTTON_FIXED_WIDTH_LARGE)
         self.next_button.setToolTip(self.i18n.t("search.next"))
@@ -179,7 +179,7 @@ class SearchWidget(BaseWidget):
         layout.addWidget(self.match_label)
 
         # Close button
-        self.close_button = create_button("×")
+        self.close_button = create_button(self.i18n.t("search.close"))
         self.close_button.setObjectName("close_button")
 
         self.close_button.setFixedWidth(BUTTON_FIXED_WIDTH_MEDIUM)
@@ -498,6 +498,9 @@ class SearchWidget(BaseWidget):
 
         # Case-sensitive checkbox
         self.case_sensitive_checkbox.setText(self.i18n.t("viewer.case_sensitive"))
+        self.prev_button.setText(self.i18n.t("search.previous"))
+        self.next_button.setText(self.i18n.t("search.next"))
+        self.close_button.setText(self.i18n.t("search.close"))
         self.prev_button.setToolTip(self.i18n.t("search.previous"))
         self.next_button.setToolTip(self.i18n.t("search.next"))
         self.close_button.setToolTip(self.i18n.t("search.close"))

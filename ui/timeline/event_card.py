@@ -253,9 +253,6 @@ class EventCard(QFrame):
         # Location
         if self.calendar_event.location:
             location_layout = create_hbox()
-            location_icon = QLabel("📍")
-            location_layout.addWidget(location_icon)
-
             location_label = QLabel(self.calendar_event.location)
             location_label.setObjectName("detail_label")
             location_layout.addWidget(location_label)
@@ -266,9 +263,6 @@ class EventCard(QFrame):
         # Attendees
         if self.calendar_event.attendees:
             attendees_layout = create_hbox()
-            attendees_icon = QLabel("👥")
-            attendees_layout.addWidget(attendees_icon)
-
             attendees_text = ", ".join(self.calendar_event.attendees[:3])
             if len(self.calendar_event.attendees) > 3:
                 attendees_text += f" +{len(self.calendar_event.attendees) - 3}"
@@ -367,7 +361,7 @@ class EventCard(QFrame):
         has_translation = bool(self.artifacts.get("translation"))
 
         if has_recording:
-            self.recording_btn = create_button("🎵 " + self.i18n.t("timeline.play_recording"))
+            self.recording_btn = create_button(self.i18n.t("timeline.play_recording"))
             self.recording_btn.clicked.connect(self._on_play_recording)
             self.recording_btn.setObjectName("recording_btn")
             # Styling is handled by theme files (dark.qss / light.qss)
@@ -375,14 +369,14 @@ class EventCard(QFrame):
 
         # Transcript button
         if has_transcript:
-            self.transcript_btn = create_button("📄 " + self.i18n.t("timeline.view_transcript"))
+            self.transcript_btn = create_button(self.i18n.t("timeline.view_transcript"))
             self.transcript_btn.clicked.connect(self._on_view_transcript)
             self.transcript_btn.setObjectName("transcript_btn")
             # Styling is handled by theme files (dark.qss / light.qss)
             actions_layout.addWidget(self.transcript_btn)
 
         if has_translation:
-            self.translation_btn = create_button("🌐 " + self.i18n.t("timeline.view_translation"))
+            self.translation_btn = create_button(self.i18n.t("timeline.view_translation"))
             self.translation_btn.clicked.connect(self._on_view_translation)
             self.translation_btn.setObjectName("translation_btn")
             actions_layout.addWidget(self.translation_btn)
@@ -557,11 +551,11 @@ class EventCard(QFrame):
         else:
             # Update buttons
             if hasattr(self, "recording_btn"):
-                self.recording_btn.setText("🎵 " + self.i18n.t("timeline.play_recording"))
+                self.recording_btn.setText(self.i18n.t("timeline.play_recording"))
             if hasattr(self, "transcript_btn"):
-                self.transcript_btn.setText("📄 " + self.i18n.t("timeline.view_transcript"))
+                self.transcript_btn.setText(self.i18n.t("timeline.view_transcript"))
             if getattr(self, "translation_btn", None):
-                self.translation_btn.setText("🌐 " + self.i18n.t("timeline.view_translation"))
+                self.translation_btn.setText(self.i18n.t("timeline.view_translation"))
 
             # Update no artifacts label
             for child in self.findChildren(QLabel):

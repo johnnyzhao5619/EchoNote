@@ -394,23 +394,19 @@ class RealtimeRecordWidget(BaseWidget):
 
         # Recording Tab
         recording_tab = self._create_recording_tab()
-        self.tab_widget.addTab(
-            recording_tab, "🎙 " + self.i18n.t("realtime_record.recording_control")
-        )
+        self.tab_widget.addTab(recording_tab, self.i18n.t("realtime_record.recording_control"))
 
         # Transcription Tab
         transcription_tab = self._create_transcription_tab()
-        self.tab_widget.addTab(
-            transcription_tab, "📝 " + self.i18n.t("realtime_record.transcription")
-        )
+        self.tab_widget.addTab(transcription_tab, self.i18n.t("realtime_record.transcription"))
 
         # Translation Tab
         translation_tab = self._create_translation_tab()
-        self.tab_widget.addTab(translation_tab, "🌐 " + self.i18n.t("realtime_record.translation"))
+        self.tab_widget.addTab(translation_tab, self.i18n.t("realtime_record.translation"))
 
         # Markers Tab
         markers_tab = self._create_markers_tab()
-        self.tab_widget.addTab(markers_tab, "📌 " + self.i18n.t("realtime_record.markers"))
+        self.tab_widget.addTab(markers_tab, self.i18n.t("realtime_record.markers"))
 
         main_layout.addWidget(self.tab_widget, stretch=1)
 
@@ -584,14 +580,16 @@ class RealtimeRecordWidget(BaseWidget):
         layout.addStretch()
 
         # Copy Button
-        copy_btn = create_button("📋 " + self.i18n.t("common.copy"))
-        copy_btn = create_secondary_button(copy_btn.text())
+        copy_btn = create_secondary_button(self.i18n.t("common.copy"))
         copy_btn.clicked.connect(lambda: self._copy_text(text_type))
         layout.addWidget(copy_btn)
+        if text_type == "transcription":
+            self.copy_transcription_button = copy_btn
+        else:
+            self.copy_translation_button = copy_btn
 
         # Export Button
-        export_btn = create_button("📥 " + self.i18n.t("realtime_record.export_" + text_type))
-        export_btn = create_secondary_button(export_btn.text())
+        export_btn = create_secondary_button(self.i18n.t("realtime_record.export_" + text_type))
         if text_type == "transcription":
             connect_button_with_callback(export_btn, self._export_transcription)
             self.export_transcription_button = export_btn
@@ -1276,8 +1274,9 @@ class RealtimeRecordWidget(BaseWidget):
         guide_widget.setFrameStyle(QFrame.Shape.StyledPanel)
         guide_layout = QHBoxLayout(guide_widget)
 
-        warning_label = QLabel("⚠️")
+        warning_label = QLabel(self.i18n.t("common.warning"))
         warning_label.setProperty("role", "warning-large")
+        self._download_warning_label = warning_label
         guide_layout.addWidget(warning_label)
 
         message_label = QLabel(self.i18n.t("realtime_record.no_models_message"))
@@ -1378,21 +1377,35 @@ class RealtimeRecordWidget(BaseWidget):
             label = getattr(self, attr, None)
             if label is not None:
                 label.setText(self.i18n.t(i18n_key))
+        if hasattr(self, "copy_transcription_button"):
+            self.copy_transcription_button.setText(self.i18n.t("common.copy"))
+        if hasattr(self, "copy_translation_button"):
+            self.copy_translation_button.setText(self.i18n.t("common.copy"))
+        if hasattr(self, "export_transcription_button"):
+            self.export_transcription_button.setText(
+                self.i18n.t("realtime_record.export_transcription")
+            )
         if hasattr(self, "export_transcription_button"):
             self.export_transcription_button.setToolTip(
                 self.i18n.t("realtime_record.export_transcription")
             )
         if hasattr(self, "export_translation_button"):
+            self.export_translation_button.setText(
+                self.i18n.t("realtime_record.export_translation")
+            )
+        if hasattr(self, "export_translation_button"):
             self.export_translation_button.setToolTip(
                 self.i18n.t("realtime_record.export_translation")
             )
+        if hasattr(self, "_download_warning_label"):
+            self._download_warning_label.setText(self.i18n.t("common.warning"))
 
     def _update_tab_titles(self):
         if hasattr(self, "tab_widget"):
-            self.tab_widget.setTabText(0, "🎙 " + self.i18n.t("realtime_record.recording_control"))
-            self.tab_widget.setTabText(1, "📝 " + self.i18n.t("realtime_record.transcription"))
-            self.tab_widget.setTabText(2, "🌐 " + self.i18n.t("realtime_record.translation"))
-            self.tab_widget.setTabText(3, "📌 " + self.i18n.t("realtime_record.markers"))
+            self.tab_widget.setTabText(0, self.i18n.t("realtime_record.recording_control"))
+            self.tab_widget.setTabText(1, self.i18n.t("realtime_record.transcription"))
+            self.tab_widget.setTabText(2, self.i18n.t("realtime_record.translation"))
+            self.tab_widget.setTabText(3, self.i18n.t("realtime_record.markers"))
 
     def _update_status_texts(self):
         if hasattr(self, "status_text_label"):

@@ -658,8 +658,8 @@ class OAuthResultDialog(QDialog):
         layout = QVBoxLayout(self)
 
         # Icon and message
-        icon = "✓" if self.success else "✗"
-        icon_label = QLabel(f"<h1>{icon}</h1>")
+        status_text = self.i18n.t("common.success") if self.success else self.i18n.t("common.error")
+        icon_label = QLabel(f"<h2>{status_text}</h2>")
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         icon_label.setProperty("role", "oauth-status")
         icon_label.setProperty("state", "success" if self.success else "error")

@@ -43,6 +43,7 @@ from ui.base_widgets import (
     create_hbox,
     create_vbox,
 )
+from ui.constants import BUTTON_FIXED_WIDTH_LARGE, CONTROL_BUTTON_MIN_HEIGHT
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.timeline.audio_player")
@@ -69,8 +70,6 @@ class AudioPlayer(BaseWidget):
     CONTROLS_WIDTH = 400  # Total width of control bar
     SIDE_CONTROL_WIDTH = 148  # Width of left/right control areas
     CENTER_CONTROL_WIDTH = 104  # Width of center play button area
-    PLAY_BUTTON_SIZE = 56  # Play button size
-    CONTROL_BUTTON_SIZE = 40  # Control button size
     VOLUME_SLIDER_WIDTH = 100  # 音量滑块宽度
 
     # Layout constants - 布局常量
@@ -266,9 +265,10 @@ class AudioPlayer(BaseWidget):
         controls_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
         # 左侧：音量控制
-        self.volume_button = create_button("🔊")
+        self.volume_button = create_button(self.i18n.t("timeline.audio_player.volume_icon"))
         self.volume_button.setObjectName("player_control_button")
-        self.volume_button.setFixedSize(self.CONTROL_BUTTON_SIZE, self.CONTROL_BUTTON_SIZE)
+        self.volume_button.setMinimumHeight(CONTROL_BUTTON_MIN_HEIGHT)
+        self.volume_button.setMinimumWidth(BUTTON_FIXED_WIDTH_LARGE)
         connect_button_with_callback(self.volume_button, self._toggle_mute)
         controls_layout.addWidget(self.volume_button, alignment=Qt.AlignmentFlag.AlignVCenter)
 
@@ -284,9 +284,10 @@ class AudioPlayer(BaseWidget):
         controls_layout.addStretch()
 
         # 中间：播放按钮
-        self.play_button = create_button("▶")
+        self.play_button = create_button(self.i18n.t("timeline.audio_player.play_button_label"))
         self.play_button.setObjectName("player_play_button")
-        self.play_button.setFixedSize(self.PLAY_BUTTON_SIZE, self.PLAY_BUTTON_SIZE)
+        self.play_button.setMinimumHeight(CONTROL_BUTTON_MIN_HEIGHT)
+        self.play_button.setMinimumWidth(BUTTON_FIXED_WIDTH_LARGE)
         connect_button_with_callback(self.play_button, self.toggle_playback)
         controls_layout.addWidget(self.play_button, alignment=Qt.AlignmentFlag.AlignVCenter)
 
@@ -294,9 +295,10 @@ class AudioPlayer(BaseWidget):
         controls_layout.addStretch()
 
         # 右侧：转录按钮
-        self.show_transcript_button = create_button("📝")
+        self.show_transcript_button = create_button(self.i18n.t("timeline.audio_player.transcript"))
         self.show_transcript_button.setObjectName("player_control_button")
-        self.show_transcript_button.setFixedSize(self.CONTROL_BUTTON_SIZE, self.CONTROL_BUTTON_SIZE)
+        self.show_transcript_button.setMinimumHeight(CONTROL_BUTTON_MIN_HEIGHT)
+        self.show_transcript_button.setMinimumWidth(BUTTON_FIXED_WIDTH_LARGE)
         self.show_transcript_button.setCheckable(True)
         connect_button_with_callback(
             self.show_transcript_button, self._toggle_transcript_visibility
@@ -452,9 +454,7 @@ class AudioPlayer(BaseWidget):
 
         # 格式切换按钮在转录区域显示时才可见，这里只设置文本
         if hasattr(self, "format_toggle_button"):
-            self.format_toggle_button.setText(
-                "📄 " + self.i18n.t("timeline.audio_player.hide_timestamps")
-            )
+            self.format_toggle_button.setText(self.i18n.t("timeline.audio_player.hide_timestamps"))
 
         lines = []
         for i, segment in enumerate(segments, 1):
@@ -483,17 +483,13 @@ class AudioPlayer(BaseWidget):
             )
             self.transcript_text.setPlainText(plain_text)
             self._transcript_view_mode = "plain"
-            self.format_toggle_button.setText(
-                "📝 " + self.i18n.t("timeline.audio_player.show_timestamps")
-            )
+            self.format_toggle_button.setText(self.i18n.t("timeline.audio_player.show_timestamps"))
         else:
             # 切换回带时间戳模式
             formatted_text = self._format_segments_transcript(self._transcript_segments)
             self.transcript_text.setPlainText(formatted_text)
             self._transcript_view_mode = "formatted"
-            self.format_toggle_button.setText(
-                "📄 " + self.i18n.t("timeline.audio_player.hide_timestamps")
-            )
+            self.format_toggle_button.setText(self.i18n.t("timeline.audio_player.hide_timestamps"))
 
     def _format_timestamp(self, seconds: float) -> str:
         """
@@ -686,10 +682,10 @@ class AudioPlayer(BaseWidget):
 
         # 更新播放按钮图标和提示
         if self._playback_state == QMediaPlayer.PlaybackState.PlayingState:
-            self.play_button.setText(self.i18n.t("ui_strings.timeline.audio_player.pause_icon"))
+            self.play_button.setText(self.i18n.t("timeline.audio_player.pause_button_label"))
             button_tooltip = self.i18n.t("timeline.audio_player.pause_tooltip")
         else:
-            self.play_button.setText(self.i18n.t("ui_strings.timeline.audio_player.play_icon"))
+            self.play_button.setText(self.i18n.t("timeline.audio_player.play_button_label"))
             button_tooltip = self.i18n.t("timeline.audio_player.play_tooltip")
 
         self.play_button.setToolTip(button_tooltip)

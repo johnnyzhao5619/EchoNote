@@ -23,7 +23,6 @@ import logging
 import platform
 from typing import Optional
 
-from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -36,7 +35,6 @@ from ui.base_widgets import connect_button_with_callback, create_button, create_
 from ui.constants import (
     FFMPEG_DIALOG_MIN_HEIGHT,
     FFMPEG_DIALOG_MIN_WIDTH,
-    INSTALL_DIALOG_WARNING_ICON_FONT_SIZE,
 )
 from utils.i18n import I18nQtManager
 
@@ -96,13 +94,6 @@ class FFmpegInstallDialog(QDialog):
 
         # Icon and title
         header_layout = create_hbox()
-
-        # Warning icon (using emoji for simplicity)
-        icon_label = QLabel("⚠️")
-        icon_font = QFont()
-        icon_font.setPointSize(INSTALL_DIALOG_WARNING_ICON_FONT_SIZE)
-        icon_label.setFont(icon_font)
-        header_layout.addWidget(icon_label)
 
         # Title with system info
         title_text = self.i18n.t("ffmpeg.not_installed_title", platform=self.platform_display)

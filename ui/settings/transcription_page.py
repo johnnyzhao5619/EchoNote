@@ -48,7 +48,6 @@ from config.constants import (
 )
 from core.models.registry import get_default_model_names
 from ui.base_widgets import create_button, create_hbox, create_vbox
-from ui.constants import ICON_BUTTON_MAX_WIDTH
 from ui.settings.base_page import BaseSettingsPage, PostSaveMessage
 from utils.i18n import I18nQtManager
 
@@ -349,8 +348,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         key_layout = create_hbox()
         key_layout.addWidget(self.openai_key_edit)
 
-        self.openai_show_button = create_button("👁")
-        self.openai_show_button.setMaximumWidth(ICON_BUTTON_MAX_WIDTH)
+        self.openai_show_button = create_button(self.i18n.t("settings.transcription.show_password"))
         self.openai_show_button.setCheckable(True)
         self.openai_show_button.clicked.connect(
             lambda: self._toggle_password_visibility(self.openai_key_edit, self.openai_show_button)
@@ -388,8 +386,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         google_key_layout = create_hbox()
         google_key_layout.addWidget(self.google_key_edit)
 
-        self.google_show_button = create_button("👁")
-        self.google_show_button.setMaximumWidth(ICON_BUTTON_MAX_WIDTH)
+        self.google_show_button = create_button(self.i18n.t("settings.transcription.show_password"))
         self.google_show_button.setCheckable(True)
         self.google_show_button.clicked.connect(
             lambda: self._toggle_password_visibility(self.google_key_edit, self.google_show_button)
@@ -426,8 +423,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         azure_key_layout = create_hbox()
         azure_key_layout.addWidget(self.azure_key_edit)
 
-        self.azure_show_button = create_button("👁")
-        self.azure_show_button.setMaximumWidth(ICON_BUTTON_MAX_WIDTH)
+        self.azure_show_button = create_button(self.i18n.t("settings.transcription.show_password"))
         self.azure_show_button.setCheckable(True)
         self.azure_show_button.clicked.connect(
             lambda: self._toggle_password_visibility(self.azure_key_edit, self.azure_show_button)
@@ -1117,6 +1113,12 @@ class TranscriptionSettingsPage(BaseSettingsPage):
             self.google_test_button.setText(self.i18n.t("settings.transcription.test_connection"))
         if hasattr(self, "azure_test_button"):
             self.azure_test_button.setText(self.i18n.t("settings.transcription.test_connection"))
+        if hasattr(self, "openai_show_button"):
+            self.openai_show_button.setText(self.i18n.t("settings.transcription.show_password"))
+        if hasattr(self, "google_show_button"):
+            self.google_show_button.setText(self.i18n.t("settings.transcription.show_password"))
+        if hasattr(self, "azure_show_button"):
+            self.azure_show_button.setText(self.i18n.t("settings.transcription.show_password"))
 
         # Update usage labels (only if showing "no usage data")
         if hasattr(self, "openai_usage_label"):

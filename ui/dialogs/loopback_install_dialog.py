@@ -19,12 +19,10 @@ import logging
 import platform
 from typing import Optional
 
-from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QCheckBox, QDialog, QLabel, QMessageBox, QTextEdit, QVBoxLayout
 
 from ui.base_widgets import connect_button_with_callback, create_button, create_hbox
 from ui.constants import (
-    INSTALL_DIALOG_HEADPHONE_ICON_FONT_SIZE,
     LOOPBACK_DIALOG_MIN_HEIGHT,
     LOOPBACK_DIALOG_MIN_WIDTH,
 )
@@ -64,12 +62,6 @@ class LoopbackInstallDialog(QDialog):
         layout = QVBoxLayout(self)
 
         header_layout = create_hbox()
-
-        icon_label = QLabel("🎧")
-        icon_font = QFont()
-        icon_font.setPointSize(INSTALL_DIALOG_HEADPHONE_ICON_FONT_SIZE)
-        icon_label.setFont(icon_font)
-        header_layout.addWidget(icon_label)
 
         title_text = self.i18n.t("loopback.not_installed_title", platform=self.platform_display)
         title_label = QLabel(title_text)

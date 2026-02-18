@@ -268,7 +268,7 @@ class ModelManagementPage(BaseSettingsPage):
 
         # 模型名称
         name_label = self._create_model_name_label(
-            f"✓ {model.full_name}",
+            model.full_name,
             role="model-name-downloaded",
         )
         header_layout.addWidget(name_label)

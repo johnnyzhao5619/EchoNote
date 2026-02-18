@@ -282,21 +282,16 @@ class TaskItem(BaseWidget):
 
         if status == "pending":
             self.status_label.setProperty("state", "pending")
-            icon = "⏳"
         elif status == "processing":
             self.status_label.setProperty("state", "processing")
-            icon = "⚙️"
         elif status == "completed":
             self.status_label.setProperty("state", "completed")
-            icon = "✓"
         elif status == "failed":
             self.status_label.setProperty("state", "failed")
-            icon = "✗"
         else:
             self.status_label.setProperty("state", "cancelled")
-            icon = ""
 
-        self.status_label.setText(f"{icon} {status_text}")
+        self.status_label.setText(status_text)
 
         # Force style refresh to apply new properties
         self.status_label.style().unpolish(self.status_label)
@@ -307,7 +302,7 @@ class TaskItem(BaseWidget):
         file_name = self.task_data.get("file_name")
         if not file_name:
             file_name = self.i18n.t("batch_transcribe.info.unknown")
-        self.filename_label.setText(f"📄 {file_name}")
+        self.filename_label.setText(file_name)
 
     def _update_info_label(self):
         """Update informational label with translated text."""
