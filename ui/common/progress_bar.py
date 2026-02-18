@@ -80,7 +80,6 @@ class ProgressBar(BaseWidget):
         """
         # Create layout
         layout = QVBoxLayout(self)
-        # # layout.setSpacing(5)
 
         # Create top row with label and percentage
         top_layout = create_hbox(margins=(0, 0, 0, 0))

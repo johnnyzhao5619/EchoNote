@@ -140,7 +140,7 @@ onUnmounted(() => {
             v-for="item in sectionNav"
             :key="item.href"
             :href="item.href"
-            class="whitespace-nowrap rounded-md px-2.5 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
+            class="ui-nav-link"
           >
             {{ item.label }}
           </a>
@@ -152,7 +152,7 @@ onUnmounted(() => {
             :href="primaryResourceNav.href"
             target="_blank"
             rel="noopener noreferrer"
-            class="whitespace-nowrap rounded-md px-2.5 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 xl:hidden"
+            class="ui-nav-link xl:hidden"
           >
             {{ primaryResourceNav.label }}
           </a>
@@ -163,7 +163,7 @@ onUnmounted(() => {
             :href="item.href"
             target="_blank"
             rel="noopener noreferrer"
-            class="hidden whitespace-nowrap rounded-md px-2.5 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 xl:inline-flex"
+            class="hidden ui-nav-link xl:inline-flex"
           >
             {{ item.label }}
           </a>
@@ -172,7 +172,7 @@ onUnmounted(() => {
             <button
               @click="toggleMoreMenu"
               type="button"
-              class="inline-flex items-center rounded-md px-2.5 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
+              class="inline-flex items-center ui-nav-link"
               :aria-expanded="isMoreMenuOpen"
               aria-controls="desktop-more-menu"
             >
@@ -199,7 +199,7 @@ onUnmounted(() => {
                 :href="item.href"
                 :target="item.external ? '_blank' : undefined"
                 :rel="item.external ? 'noopener noreferrer' : undefined"
-                class="block whitespace-nowrap px-3 py-2 text-sm text-slate-700 transition-colors hover:bg-slate-100"
+                class="block whitespace-nowrap ui-mobile-nav-link"
                 @click="closeMoreMenu"
               >
                 {{ item.label }}
@@ -252,7 +252,7 @@ onUnmounted(() => {
             v-for="item in sectionNav"
             :key="`mobile-${item.href}`"
             :href="item.href"
-            class="rounded-md px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100"
+            class="ui-mobile-nav-link"
             @click="closeMobileMenu"
           >
             {{ item.label }}
@@ -264,7 +264,7 @@ onUnmounted(() => {
             :href="item.href"
             target="_blank"
             rel="noopener noreferrer"
-            class="rounded-md px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100"
+            class="ui-mobile-nav-link"
             @click="closeMobileMenu"
           >
             {{ item.label }}
@@ -274,7 +274,7 @@ onUnmounted(() => {
             :href="projectConfig.githubUrl"
             target="_blank"
             rel="noopener noreferrer"
-            class="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-slate-800 transition-colors hover:bg-slate-100"
+            class="inline-flex items-center gap-2 ui-mobile-nav-link text-slate-800 font-semibold"
             @click="closeMobileMenu"
           >
             <GitHubIcon />

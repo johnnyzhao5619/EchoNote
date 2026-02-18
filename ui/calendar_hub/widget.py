@@ -48,6 +48,13 @@ from ui.base_widgets import (
     create_primary_button,
     create_vbox,
 )
+from ui.constants import (
+    PAGE_COMPACT_SPACING,
+    PAGE_CONTENT_MARGINS,
+    PAGE_DENSE_SPACING,
+    PAGE_LAYOUT_SPACING,
+    STATUS_INDICATOR_SYMBOL,
+)
 from utils.i18n import I18nQtManager
 from core.calendar.constants import CalendarSource
 from core.calendar.exceptions import SyncError
@@ -122,7 +129,8 @@ class CalendarHubWidget(BaseWidget):
         """Set up the calendar hub UI."""
         # Main layout
         layout = QVBoxLayout(self)
-        # # layout.setSpacing(15)
+        layout.setContentsMargins(*PAGE_CONTENT_MARGINS)
+        layout.setSpacing(PAGE_LAYOUT_SPACING)
 
         # Title
         self.title_label = QLabel(self.i18n.t("calendar_hub.title"))
@@ -150,7 +158,8 @@ class CalendarHubWidget(BaseWidget):
         """
         toolbar = QWidget()
         toolbar_layout = QHBoxLayout(toolbar)
-        # # toolbar_layout.setSpacing(10)
+        toolbar_layout.setContentsMargins(0, 0, 0, 0)
+        toolbar_layout.setSpacing(PAGE_COMPACT_SPACING)
 
         # View switching buttons
         view_group = QButtonGroup(self)
@@ -184,7 +193,7 @@ class CalendarHubWidget(BaseWidget):
         toolbar_layout.addWidget(self.week_btn)
         toolbar_layout.addWidget(self.day_btn)
 
-        toolbar_layout.addSpacing(20)
+        toolbar_layout.addSpacing(PAGE_COMPACT_SPACING)
 
         # Date navigation
         self.prev_btn = create_button("<")
@@ -233,7 +242,8 @@ class CalendarHubWidget(BaseWidget):
         """
         accounts_widget = QWidget()
         accounts_layout = QHBoxLayout(accounts_widget)
-        # # accounts_layout.setSpacing(10)
+        accounts_layout.setContentsMargins(0, 0, 0, 0)
+        accounts_layout.setSpacing(PAGE_COMPACT_SPACING)
 
         # Connected accounts label
         self.accounts_label = QLabel(self.i18n.t("calendar_hub.connected_accounts") + ":")
@@ -243,7 +253,7 @@ class CalendarHubWidget(BaseWidget):
         self.accounts_container = QWidget()
         self.accounts_container_layout = QHBoxLayout(self.accounts_container)
         self.accounts_container_layout.setContentsMargins(0, 0, 0, 0)
-        self.accounts_container_layout.setSpacing(5)
+        self.accounts_container_layout.setSpacing(PAGE_DENSE_SPACING)
         accounts_layout.addWidget(self.accounts_container)
 
         accounts_layout.addStretch()
@@ -1049,10 +1059,9 @@ class CalendarHubWidget(BaseWidget):
         badge.setObjectName(f"account_badge_{provider}")
         badge.setProperty("role", "account-badge")
         badge_layout = QHBoxLayout(badge)
-        # # badge_layout.setSpacing(5)
 
         # Status indicator
-        indicator = QLabel("●")
+        indicator = QLabel(STATUS_INDICATOR_SYMBOL)
         indicator.setObjectName(f"indicator_{provider}")
         indicator.setProperty("role", "calendar-indicator")
         indicator.setProperty("provider", provider)

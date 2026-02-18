@@ -33,6 +33,7 @@ from ui.base_widgets import (
     create_vbox,
 )
 from ui.batch_transcribe.task_item import TaskItem
+from ui.constants import PAGE_COMPACT_SPACING, PAGE_CONTENT_MARGINS, PAGE_LAYOUT_SPACING
 from ui.qt_imports import (
     QComboBox,
     QFileDialog,
@@ -137,7 +138,8 @@ class BatchTranscribeWidget(BaseWidget):
         """Set up the user interface."""
         # Main layout
         layout = QVBoxLayout(self)
-        # # layout.setSpacing(15)
+        layout.setContentsMargins(*PAGE_CONTENT_MARGINS)
+        layout.setSpacing(PAGE_LAYOUT_SPACING)
 
         # Title
         self.title_label = QLabel(self.i18n.t("batch_transcribe.title"))
@@ -145,7 +147,7 @@ class BatchTranscribeWidget(BaseWidget):
         layout.addWidget(self.title_label)
 
         # Toolbar
-        toolbar_layout = create_hbox(spacing=10)
+        toolbar_layout = create_hbox(spacing=PAGE_COMPACT_SPACING)
 
         # Import file button
         import_file_btn = QPushButton()

@@ -33,7 +33,6 @@ export interface GitHubStats {
   forks: number
   issues: number
   latestRelease?: string
-  contributors: number
   language?: string
 }
 

@@ -88,7 +88,6 @@ class FFmpegInstallDialog(QDialog):
             instructions: Installation instructions text
         """
         layout = QVBoxLayout(self)
-        # # layout.setContentsMargins(20, 20, 20, 20)
 
         # Icon and title
         header_layout = create_hbox()

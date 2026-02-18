@@ -38,7 +38,8 @@ python main.py
 1. **Storage Configuration**: Choose paths for recordings and transcripts
 2. **Model Download**: Download a Faster-Whisper model (recommend `base` for most users)
 3. **FFmpeg Check**: Verify FFmpeg installation for media format support
-4. **Optional**: Configure calendar sync (Google/Outlook OAuth)
+4. **Loopback Check (First Run)**: Detect loopback input and show setup guidance if missing (one-click setup supports macOS/Windows/Linux with system authorization where required)
+5. **Optional**: Configure calendar sync (Google/Outlook OAuth)
 
 ### 🎯 Key Features
 
@@ -57,6 +58,20 @@ python main.py
   - PyAudio (microphone capture)
   - FFmpeg (media format support)
   - CUDA GPU (Faster-Whisper acceleration)
+
+### 🎧 System Audio & Meeting Capture Plan
+
+- **Microphone-only capture**: Select a physical microphone input.
+- **System audio capture**: Use a loopback input device (e.g., BlackHole, Loopback, VB-CABLE).
+- **Online meeting capture**:
+  - Route meeting/video app output to loopback input.
+  - Keep meeting app microphone as your physical mic.
+  - In EchoNote, select the loopback input device for recording.
+  - If you need both local mic and remote playback in one track, use an aggregate/virtual mixer input.
+- **If no loopback device is installed**:
+  - macOS: install BlackHole/Loopback.
+  - Windows: enable Stereo Mix or install VB-CABLE.
+  - Linux: use PipeWire/PulseAudio monitor source.
 
 ### 🏗️ Architecture Overview
 

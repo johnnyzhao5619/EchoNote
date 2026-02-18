@@ -22,6 +22,8 @@ import os
 from datetime import datetime
 from typing import Dict, Optional
 
+from core.calendar.constants import CalendarSource, EventType
+
 logger = logging.getLogger(__name__)
 
 
@@ -65,9 +67,19 @@ def save_event_attachments(db_connection, event_id: str, recording_result: Dict)
 class CalendarIntegration:
     """Handles calendar event updates for recording sessions."""
 
-    def __init__(self, db_connection, i18n=None):
+    def __init__(self, db_connection, i18n=None, calendar_manager=None):
         self.db = db_connection
         self.i18n = i18n
+        self.calendar_manager = calendar_manager
+        self._last_error = ""
+
+    def set_calendar_manager(self, calendar_manager) -> None:
+        """Inject or replace calendar manager at runtime."""
+        self.calendar_manager = calendar_manager
+
+    def get_last_error(self) -> str:
+        """Return the latest event creation error message."""
+        return self._last_error
 
     def _translate(self, key: str, default: str, **kwargs) -> str:
         """Helper for translation."""
@@ -90,48 +102,116 @@ class CalendarIntegration:
         Returns:
             Event ID if successful, empty string otherwise.
         """
+        self._last_error = ""
         if not self.db:
-            logger.warning("No database connection for calendar integration")
+            self._last_error = "No database connection for calendar integration"
+            logger.warning(self._last_error)
             return ""
 
         try:
-            from data.database.models import CalendarEvent
-
             start_time_str = recording_result.get("start_time")
             if not start_time_str:
+                self._last_error = "Missing recording start_time"
                 return ""
-            
+
             start_time = datetime.fromisoformat(start_time_str)
             title_time = start_time.strftime("%Y-%m-%d %H:%M")
             duration_value = recording_result.get("duration", 0.0)
-            
+
             title = self._translate(
                 "realtime_record.calendar_event.title",
                 "Recording Session - {timestamp}",
                 timestamp=title_time,
             )
-            
-            description = self._translate(
+            description = self._build_event_description(recording_result, duration_value)
+
+            event_data = {
+                "title": title,
+                "event_type": EventType.EVENT,
+                "start_time": recording_result["start_time"],
+                "end_time": recording_result["end_time"],
+                "description": description,
+                "source": CalendarSource.LOCAL,
+            }
+
+            if self.calendar_manager is not None:
+                event_id = self.calendar_manager.create_event(event_data)
+            else:
+                from data.database.models import CalendarEvent
+
+                event = CalendarEvent(**event_data)
+                event.save(self.db)
+                event_id = event.id
+
+            save_event_attachments(self.db, event_id, recording_result)
+
+            logger.info(f"Calendar event created: {event_id}")
+            return event_id
+
+        except Exception as e:
+            self._last_error = str(e)
+            logger.error(f"Failed to create calendar event: {e}", exc_info=True)
+            return ""
+
+    def _build_event_description(self, recording_result: Dict, duration_value: float) -> str:
+        """Build a rich event description for recordings."""
+        start_time = recording_result.get("start_time", "")
+        end_time = recording_result.get("end_time", "")
+        recording_path = recording_result.get("recording_path", "")
+        transcript_path = recording_result.get("transcript_path", "")
+        translation_path = recording_result.get("translation_path", "")
+        input_device_name = recording_result.get("input_device_name", "")
+        input_device_is_loopback = bool(recording_result.get("input_device_is_loopback", False))
+        input_device_is_system_audio = bool(
+            recording_result.get("input_device_is_system_audio", False)
+        )
+        input_device_scoped_app = str(recording_result.get("input_device_scoped_app", "") or "")
+
+        capture_route = "Microphone/unknown"
+        if input_device_is_loopback:
+            capture_route = "Loopback/System audio capable"
+        elif input_device_is_system_audio:
+            capture_route = "Virtual meeting/system audio input"
+            if input_device_scoped_app:
+                capture_route = f"{capture_route} ({input_device_scoped_app})"
+
+        transcript_preview = recording_result.get("transcript_preview") or self._read_text_preview(
+            transcript_path
+        )
+        translation_preview = recording_result.get("translation_preview") or self._read_text_preview(
+            translation_path
+        )
+
+        lines = [
+            self._translate(
                 "realtime_record.calendar_event.description",
                 "Recording duration: {duration} seconds",
                 duration=f"{float(duration_value):.2f}",
-            )
+            ),
+            f"Start: {start_time}",
+            f"End: {end_time}",
+            f"Input device: {input_device_name or 'N/A'}",
+            f"Capture route: {capture_route}",
+            f"Recording file: {recording_path or 'N/A'}",
+            f"Transcript file: {transcript_path or 'N/A'}",
+            f"Translation file: {translation_path or 'N/A'}",
+        ]
 
-            event = CalendarEvent(
-                title=title,
-                event_type="Event",
-                start_time=recording_result["start_time"],
-                end_time=recording_result["end_time"],
-                description=description,
-                source="local",
-            )
-            event.save(self.db)
+        if transcript_preview:
+            lines.append(f"Transcript preview: {transcript_preview}")
+        if translation_preview:
+            lines.append(f"Translation preview: {translation_preview}")
 
-            save_event_attachments(self.db, event.id, recording_result)
+        return "\n".join(lines)
 
-            logger.info(f"Calendar event created: {event.id}")
-            return event.id
-
-        except Exception as e:
-            logger.error(f"Failed to create calendar event: {e}")
+    @staticmethod
+    def _read_text_preview(path: str, max_chars: int = 300) -> str:
+        """Read a short preview from a text file if available."""
+        if not path or not os.path.exists(path):
+            return ""
+        try:
+            with open(path, "r", encoding="utf-8") as handle:
+                text = handle.read(max_chars).strip()
+            return " ".join(text.split())
+        except Exception:
             return ""

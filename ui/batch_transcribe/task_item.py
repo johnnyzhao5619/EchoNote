@@ -89,7 +89,6 @@ class TaskItem(BaseWidget):
         """Set up the user interface."""
         # Main layout
         layout = QVBoxLayout(self)
-        # # layout.setSpacing(8)
 
         # Set semantic properties for theming
         self.setProperty("role", "task-item")
@@ -100,7 +99,6 @@ class TaskItem(BaseWidget):
         self.filename_label.setProperty("role", "task-filename")
 
         self.status_label = QLabel()
-        self.status_label.setObjectName("status_label")
 
         # Create task header
         from ui.layout_utils import create_horizontal_layout
@@ -126,7 +124,6 @@ class TaskItem(BaseWidget):
 
         # Progress bar (only shown when processing)
         progress_bar = QProgressBar()
-        progress_bar.setObjectName("progress_bar")
         progress_bar.setMinimum(0)
         progress_bar.setMaximum(100)
         progress_bar.setTextVisible(True)
@@ -136,7 +133,6 @@ class TaskItem(BaseWidget):
 
         # Error message (only shown when failed)
         error_label = QLabel()
-        error_label.setObjectName("error_label")
         error_label.setProperty("role", "task-error")
         error_label.setWordWrap(True)
         error_label.setVisible(False)

@@ -36,6 +36,10 @@ class MockAudioCapture:
         self.is_capturing = False
         self.callback = None
 
+    def get_input_devices(self):
+        """Return mock input devices."""
+        return []
+
     def simulate_audio_chunk(self, size=1600):
         """Simulate receiving an audio chunk."""
         if self.callback and self.is_capturing:
@@ -303,6 +307,40 @@ class TestRealtimeRecorderLifecycle:
         assert recorder.processing_task is None
         assert recorder.translation_task is None
         assert recorder.current_options["enable_translation"] is False
+
+        await recorder.stop_recording()
+
+    @pytest.mark.asyncio
+    async def test_start_recording_tracks_loopback_input_metadata(self, recorder, event_loop):
+        recorder.audio_capture.get_input_devices = Mock(
+            return_value=[{"index": 4, "name": "BlackHole 2ch", "default_sample_rate": 48000}]
+        )
+
+        await recorder.start_recording(input_source=4, event_loop=event_loop)
+
+        status = recorder.get_recording_status()
+        assert status["input_source"] == 4
+        assert status["input_device_name"] == "BlackHole 2ch"
+        assert status["input_device_is_loopback"] is True
+        assert status["input_device_is_system_audio"] is True
+        assert status["input_device_scoped_app"] == ""
+
+        await recorder.stop_recording()
+
+    @pytest.mark.asyncio
+    async def test_start_recording_tracks_meeting_audio_input_metadata(self, recorder, event_loop):
+        recorder.audio_capture.get_input_devices = Mock(
+            return_value=[{"index": 6, "name": "Microsoft Teams Audio", "default_sample_rate": 48000}]
+        )
+
+        await recorder.start_recording(input_source=6, event_loop=event_loop)
+
+        status = recorder.get_recording_status()
+        assert status["input_source"] == 6
+        assert status["input_device_name"] == "Microsoft Teams Audio"
+        assert status["input_device_is_loopback"] is False
+        assert status["input_device_is_system_audio"] is True
+        assert status["input_device_scoped_app"] == "Microsoft Teams"
 
         await recorder.stop_recording()
 

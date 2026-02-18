@@ -32,6 +32,11 @@ import numpy as np
 from core.realtime.audio_buffer import AudioBuffer
 from core.realtime.config import RealtimeConfig
 from core.realtime.archiver import SessionArchiver
+from core.realtime.audio_routing import (
+    detect_app_scoped_system_audio_device,
+    is_loopback_device_name,
+    is_system_audio_device_name,
+)
 from core.realtime.integration import CalendarIntegration
 from config.constants import RECORDING_FORMAT_WAV
 
@@ -50,6 +55,7 @@ class RealtimeRecorder:
         file_manager,
         i18n=None,
         config: Optional[RealtimeConfig] = None,
+        calendar_manager=None,
     ):
         """Initialize the real-time recorder.
 
@@ -94,7 +100,9 @@ class RealtimeRecorder:
 
         # Components
         self.session_archiver = SessionArchiver(file_manager)
-        self.calendar_integration = CalendarIntegration(db_connection, i18n)
+        self.calendar_integration = CalendarIntegration(
+            db_connection, i18n, calendar_manager=calendar_manager
+        )
 
         # Default sample rate used for newly created sessions.
         self.sample_rate = self.config.sample_rate
@@ -147,6 +155,17 @@ class RealtimeRecorder:
         # Flags that track model usage reporting.
         self._transcription_succeeded = False
         self._model_usage_recorded = False
+        self._capture_error_message: Optional[str] = None
+        self._audio_chunk_event = threading.Event()
+        self._audio_stats_lock = threading.Lock()
+        self._audio_chunks_received = 0
+        self._audio_max_abs_level = 0.0
+        self._audio_last_rms = 0.0
+        self._selected_input_source: Optional[int] = None
+        self._selected_input_device_name = ""
+        self._selected_input_device_is_loopback = False
+        self._selected_input_device_is_system_audio = False
+        self._selected_input_device_scoped_app = ""
 
         logger.info("RealtimeRecorder initialized")
 
@@ -255,6 +274,9 @@ class RealtimeRecorder:
             except Exception as exc:  # noqa: BLE001
                 logger.warning(f"Failed to apply sample rate to audio capture: {exc}")
 
+        # Prefer the selected input device native sample rate when available.
+        self._apply_input_device_native_sample_rate(input_source)
+
         # Rebuild queues for this session to ensure loop affinity.
         self._initialize_session_queues()
 
@@ -267,6 +289,31 @@ class RealtimeRecorder:
         self.accumulated_translation = []
         self._transcription_succeeded = False
         self._model_usage_recorded = False
+        self._capture_error_message = None
+        self._audio_chunk_event.clear()
+        with self._audio_stats_lock:
+            self._audio_chunks_received = 0
+            self._audio_max_abs_level = 0.0
+            self._audio_last_rms = 0.0
+        self._selected_input_source = input_source
+        self._selected_input_device_name = self._resolve_input_device_name(input_source)
+        self._selected_input_device_is_loopback = is_loopback_device_name(
+            self._selected_input_device_name
+        )
+        self._selected_input_device_is_system_audio = is_system_audio_device_name(
+            self._selected_input_device_name
+        )
+        self._selected_input_device_scoped_app = detect_app_scoped_system_audio_device(
+            self._selected_input_device_name
+        )
+        logger.info(
+            "Recording input route: index=%s, name='%s', loopback=%s, system_audio=%s, scoped_app='%s'",
+            input_source,
+            self._selected_input_device_name,
+            self._selected_input_device_is_loopback,
+            self._selected_input_device_is_system_audio,
+            self._selected_input_device_scoped_app or "none",
+        )
         self._stream_recording_active = False
         with self._marker_lock:
             self.markers = []
@@ -280,9 +327,8 @@ class RealtimeRecorder:
                     self._stream_recording_active = started if isinstance(started, bool) else False
 
             # Start audio acquisition.
-            self.audio_capture.start_capture(
-                device_index=input_source, callback=self._audio_callback
-            )
+            self._start_audio_capture(input_source)
+            await self._validate_audio_capture_startup()
 
             # Launch asynchronous processing tasks.
             if self._transcription_enabled:
@@ -315,6 +361,17 @@ class RealtimeRecorder:
         if not self.is_recording:
             return
 
+        chunk_array = np.asarray(audio_chunk, dtype=np.float32).reshape(-1)
+        if chunk_array.size > 0:
+            rms_value = float(np.sqrt(np.mean(chunk_array**2)))
+            with self._audio_stats_lock:
+                self._audio_chunks_received += 1
+                max_abs = float(np.max(np.abs(chunk_array)))
+                if max_abs > self._audio_max_abs_level:
+                    self._audio_max_abs_level = max_abs
+                self._audio_last_rms = rms_value
+            self._audio_chunk_event.set()
+
         # Stash audio data so the full session can be persisted.
         if self.current_options.get("save_recording", True):
             if self._stream_recording_active:
@@ -338,9 +395,9 @@ class RealtimeRecorder:
                         if callable(aborter):
                             aborter()
                     self._stream_recording_active = False
-                    self.recording_audio_buffer.append(audio_chunk.copy())
+                    self.recording_audio_buffer.append(chunk_array.copy())
             else:
-                self.recording_audio_buffer.append(audio_chunk.copy())
+                self.recording_audio_buffer.append(chunk_array.copy())
 
         # Push audio into the transcription queue in a thread-safe manner.
         try:
@@ -352,7 +409,7 @@ class RealtimeRecorder:
                 and self.transcription_queue is not None
             ):
                 self._event_loop.call_soon_threadsafe(
-                    self.transcription_queue.put_nowait, audio_chunk.copy()
+                    self.transcription_queue.put_nowait, chunk_array.copy()
                 )
             elif self._transcription_enabled:
                 logger.debug("Event loop or transcription queue not ready, audio chunk skipped")
@@ -362,7 +419,7 @@ class RealtimeRecorder:
         # Notify observers that fresh audio data is available.
         if self.on_audio_data:
             try:
-                self.on_audio_data(audio_chunk.copy())
+                self.on_audio_data(chunk_array.copy())
             except Exception as e:
                 logger.warning(f"Error in audio data callback: {e}")
 
@@ -376,10 +433,15 @@ class RealtimeRecorder:
         queue = self.transcription_queue
         stream_queue = self._transcription_stream_queue
         if queue is None or stream_queue is None:
-            logger.error(
-                "Transcription queues are not initialized; aborting audio stream processing"
-            )
-            return
+            await asyncio.sleep(0)
+            queue = self.transcription_queue
+            stream_queue = self._transcription_stream_queue
+            if queue is None or stream_queue is None:
+                logger.info(
+                    "Transcription queues are unavailable; skipping audio stream processing "
+                    "because the session is no longer active"
+                )
+                return
 
         # VAD Configuration
         vad = None
@@ -544,10 +606,15 @@ class RealtimeRecorder:
         queue = self.translation_queue
         stream_queue = self._translation_stream_queue
         if queue is None or stream_queue is None:
-            logger.error(
-                "Translation queues are not initialized; aborting translation stream processing"
-            )
-            return
+            await asyncio.sleep(0)
+            queue = self.translation_queue
+            stream_queue = self._translation_stream_queue
+            if queue is None or stream_queue is None:
+                logger.info(
+                    "Translation queues are unavailable; skipping translation stream processing "
+                    "because the session is no longer active"
+                )
+                return
 
         try:
             while self.is_recording or not queue.empty():
@@ -644,7 +711,35 @@ class RealtimeRecorder:
             "duration": duration,
             "start_time": self.recording_start_time.isoformat(),
             "end_time": recording_end_time.isoformat(),
+            "input_source": self._selected_input_source,
+            "input_device_name": self._selected_input_device_name,
+            "input_device_is_loopback": self._selected_input_device_is_loopback,
+            "input_device_is_system_audio": self._selected_input_device_is_system_audio,
+            "input_device_scoped_app": self._selected_input_device_scoped_app,
         }
+        with self._audio_stats_lock:
+            audio_chunks_received = int(self._audio_chunks_received)
+            audio_max_abs_level = float(self._audio_max_abs_level)
+            audio_last_rms = float(self._audio_last_rms)
+        result["audio_chunks_received"] = audio_chunks_received
+        result["audio_max_abs_level"] = audio_max_abs_level
+        result["audio_last_rms"] = audio_last_rms
+        result["audio_input_silent"] = (
+            audio_chunks_received > 0 and audio_max_abs_level <= 1e-8
+        )
+        transcript_preview = self._build_text_preview(self.accumulated_transcription)
+        if transcript_preview:
+            result["transcript_preview"] = transcript_preview
+        translation_preview = self._build_text_preview(self.accumulated_translation)
+        if translation_preview:
+            result["translation_preview"] = translation_preview
+        if result["audio_input_silent"]:
+            logger.warning(
+                "Recording session captured only silent samples (chunks=%s, max_abs=%.6f, last_rms=%.6f)",
+                audio_chunks_received,
+                audio_max_abs_level,
+                audio_last_rms,
+            )
 
         # Persist audio when requested.
         if self.current_options.get("save_recording", True):
@@ -707,6 +802,9 @@ class RealtimeRecorder:
         if create_event_requested:
             event_id = await self.calendar_integration.create_event(result)
             result["event_id"] = event_id
+            if not event_id:
+                result["calendar_event_error"] = self.calendar_integration.get_last_error()
+        result["create_calendar_event_requested"] = bool(create_event_requested)
 
         self._record_model_usage_if_needed()
 
@@ -994,11 +1092,20 @@ class RealtimeRecorder:
         start_time = None
         if self.recording_start_time:
             start_time = self.recording_start_time.isoformat()
+        with self._audio_stats_lock:
+            audio_chunks_received = int(self._audio_chunks_received)
+            audio_max_abs_level = float(self._audio_max_abs_level)
+            audio_last_rms = float(self._audio_last_rms)
 
         return {
             "is_recording": self.is_recording,
             "duration": self.get_recording_duration(),
             "start_time": start_time,
+            "input_source": self._selected_input_source,
+            "input_device_name": self._selected_input_device_name,
+            "input_device_is_loopback": self._selected_input_device_is_loopback,
+            "input_device_is_system_audio": self._selected_input_device_is_system_audio,
+            "input_device_scoped_app": self._selected_input_device_scoped_app,
             "buffer_size": len(self.recording_audio_buffer),
             "transcription_queue_size": (
                 self.transcription_queue.qsize() if self.transcription_queue is not None else 0
@@ -1008,6 +1115,12 @@ class RealtimeRecorder:
             ),
             "transcription_count": len(self.accumulated_transcription),
             "translation_count": len(self.accumulated_translation),
+            "audio_chunks_received": audio_chunks_received,
+            "audio_max_abs_level": audio_max_abs_level,
+            "audio_last_rms": audio_last_rms,
+            "audio_input_silent": (
+                audio_chunks_received > 0 and audio_max_abs_level <= 1e-8
+            ),
         }
 
     def get_accumulated_transcription(self) -> str:
@@ -1052,6 +1165,17 @@ class RealtimeRecorder:
         self.accumulated_transcription = []
         self.accumulated_translation = []
         self._stream_recording_active = False
+        self._capture_error_message = None
+        self._selected_input_source = None
+        self._selected_input_device_name = ""
+        self._selected_input_device_is_loopback = False
+        self._selected_input_device_is_system_audio = False
+        self._selected_input_device_scoped_app = ""
+        self._audio_chunk_event.clear()
+        with self._audio_stats_lock:
+            self._audio_chunks_received = 0
+            self._audio_max_abs_level = 0.0
+            self._audio_last_rms = 0.0
 
         with self._marker_lock:
             self.markers = []
@@ -1086,3 +1210,139 @@ class RealtimeRecorder:
                 return True
 
         return False
+
+    def _start_audio_capture(self, input_source: Optional[int]) -> None:
+        """Start audio capture with backward-compatible callback wiring."""
+        logger.info(
+            "Starting audio capture with config: input_source=%s sample_rate=%s channels=%s chunk_size=%s",
+            input_source,
+            getattr(self.audio_capture, "sample_rate", self.sample_rate),
+            getattr(self.audio_capture, "channels", "unknown"),
+            getattr(self.audio_capture, "chunk_size", "unknown"),
+        )
+        starter = getattr(self.audio_capture, "start_capture")
+        try:
+            starter(
+                device_index=input_source,
+                callback=self._audio_callback,
+                error_callback=self._on_capture_error,
+            )
+        except TypeError:
+            starter(device_index=input_source, callback=self._audio_callback)
+
+    async def _validate_audio_capture_startup(self, timeout_seconds: float = 1.5) -> None:
+        """
+        Validate that microphone capture produces non-empty audio shortly after start.
+        """
+        chunk_received = await asyncio.to_thread(self._audio_chunk_event.wait, timeout_seconds)
+        if self._capture_error_message:
+            raise RuntimeError(self._capture_error_message)
+        if not chunk_received:
+            capture_thread = getattr(self.audio_capture, "capture_thread", None)
+            has_stream_metadata = hasattr(self.audio_capture, "stream")
+            if capture_thread is None and not has_stream_metadata:
+                logger.debug(
+                    "Skipping strict audio startup preflight for capture backend "
+                    "without stream metadata"
+                )
+                return
+            raise RuntimeError(
+                "No audio data received from the selected input device. "
+                "Please verify microphone permission and device availability."
+            )
+
+        with self._audio_stats_lock:
+            max_abs = self._audio_max_abs_level
+
+        if max_abs <= 1e-8:
+            logger.warning(
+                "Audio startup preflight received near-zero samples. "
+                "Continuing recording because capture stream is active."
+            )
+
+    def _on_capture_error(self, message: str) -> None:
+        """Handle capture backend errors surfaced from the audio thread."""
+        self._capture_error_message = message or "Audio capture failed"
+        self._audio_chunk_event.set()
+        if self.on_error:
+            try:
+                self.on_error(self._capture_error_message)
+            except Exception as callback_exc:  # noqa: BLE001
+                logger.warning("Error callback failed while reporting capture error: %s", callback_exc)
+
+    def set_calendar_manager(self, calendar_manager) -> None:
+        """Inject calendar manager for event creation integration."""
+        if hasattr(self.calendar_integration, "set_calendar_manager"):
+            self.calendar_integration.set_calendar_manager(calendar_manager)
+
+    @staticmethod
+    def _build_text_preview(lines: List[str], max_chars: int = 500) -> str:
+        """Build a single-line text preview from accumulated transcription/translation."""
+        if not lines:
+            return ""
+        text = " ".join(str(line).strip() for line in lines if str(line).strip())
+        if not text:
+            return ""
+        if len(text) <= max_chars:
+            return text
+        return text[: max_chars - 3].rstrip() + "..."
+
+    def _resolve_input_device_name(self, input_source: Optional[int]) -> str:
+        """Resolve a human-readable input device name for diagnostics."""
+        if input_source is None:
+            return "Default input device"
+        if self.audio_capture is None:
+            return str(input_source)
+
+        lister = getattr(self.audio_capture, "get_input_devices", None)
+        if not callable(lister):
+            return str(input_source)
+
+        try:
+            devices = lister() or []
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Failed to resolve input device name: %s", exc)
+            return str(input_source)
+
+        selected = next((device for device in devices if device.get("index") == input_source), None)
+        if not selected:
+            return str(input_source)
+
+        name = selected.get("name")
+        return str(name) if name else str(input_source)
+
+    def _apply_input_device_native_sample_rate(self, input_source: Optional[int]) -> None:
+        """Align capture sample rate with selected device defaults when possible."""
+        if self.audio_capture is None or input_source is None:
+            return
+        lister = getattr(self.audio_capture, "get_input_devices", None)
+        if not callable(lister):
+            return
+        try:
+            devices = lister() or []
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to inspect audio input devices: %s", exc)
+            return
+
+        selected = next((device for device in devices if device.get("index") == input_source), None)
+        if not selected:
+            return
+        device_rate = selected.get("default_sample_rate")
+        if not isinstance(device_rate, (int, float)) or device_rate <= 0:
+            return
+        native_rate = int(device_rate)
+        if native_rate == self.sample_rate:
+            return
+
+        self.sample_rate = native_rate
+        if hasattr(self.audio_capture, "sample_rate"):
+            try:
+                self.audio_capture.sample_rate = native_rate
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Failed to set native sample rate %s: %s", native_rate, exc)
+                return
+        logger.info(
+            "Using native sample rate for selected device %s: %s Hz",
+            input_source,
+            native_rate,
+        )

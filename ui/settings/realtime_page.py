@@ -22,7 +22,7 @@ Provides UI for configuring real-time transcription and recording settings.
 import logging
 import shutil
 from pathlib import Path
-from typing import Tuple
+from typing import Any, Dict, Optional, Tuple
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -51,6 +51,7 @@ from config.constants import (
     TRANSLATION_ENGINE_GOOGLE,
 )
 from ui.base_widgets import create_button, create_hbox, create_vbox
+from ui.constants import format_gain_display
 from ui.settings.base_page import BaseSettingsPage
 from utils.i18n import I18nQtManager
 
@@ -70,15 +71,24 @@ MIN_AUDIO_DURATION_SEC_STEP = 0.1
 class RealtimeSettingsPage(BaseSettingsPage):
     """Settings page for real-time recording configuration."""
 
-    def __init__(self, settings_manager, i18n: I18nQtManager):
+    def __init__(
+        self,
+        settings_manager,
+        i18n: I18nQtManager,
+        managers: Optional[Dict[str, Any]] = None,
+    ):
         """
         Initialize realtime settings page.
 
         Args:
             settings_manager: SettingsManager instance
             i18n: Internationalization manager
+            managers: Runtime managers dictionary
         """
         super().__init__(settings_manager, i18n)
+        self.managers = managers or {}
+        self.audio_capture = self.managers.get("audio_capture")
+        self._loopback_checker = None
         self._mp3_supported = self._detect_mp3_support()
 
         # Setup UI
@@ -126,11 +136,11 @@ class RealtimeSettingsPage(BaseSettingsPage):
         self.gain_slider.setTickInterval(GAIN_SLIDER_TICK_INTERVAL)
         self.gain_slider.valueChanged.connect(self._on_gain_changed)
 
-        self.gain_value_label = QLabel("1.0x")
+        self.gain_value_label = QLabel(format_gain_display(GAIN_SLIDER_DEFAULT / GAIN_SLIDER_DIVISOR))
         self.gain_value_label.setMinimumWidth(50)
 
-        self.gain_min_label = QLabel("0.1x")
-        self.gain_max_label = QLabel("2.0x")
+        self.gain_min_label = QLabel(format_gain_display(GAIN_SLIDER_MIN / GAIN_SLIDER_DIVISOR))
+        self.gain_max_label = QLabel(format_gain_display(GAIN_SLIDER_MAX / GAIN_SLIDER_DIVISOR))
         gain_slider_layout.addWidget(self.gain_min_label)
         gain_slider_layout.addWidget(self.gain_slider, stretch=1)
         gain_slider_layout.addWidget(self.gain_max_label)
@@ -139,7 +149,31 @@ class RealtimeSettingsPage(BaseSettingsPage):
         gain_layout.addLayout(gain_slider_layout)
         self.content_layout.addLayout(gain_layout)
 
-        self.add_spacing(20)
+        # Loopback status and setup entry (for system audio / meeting capture).
+        loopback_status_layout = create_hbox()
+        self.loopback_status_label = QLabel(self.i18n.t("settings.realtime.loopback_status"))
+        self.loopback_status_label.setMinimumWidth(STANDARD_LABEL_WIDTH)
+
+        self.loopback_status_text = QLabel()
+        self.loopback_status_text.setProperty("role", "ffmpeg-status")
+        self.loopback_status_text.setProperty("state", "missing")
+
+        self.loopback_setup_btn = create_button(self.i18n.t("settings.realtime.loopback_view_guide"))
+        self.loopback_setup_btn.clicked.connect(self._on_show_loopback_guide)
+
+        loopback_status_layout.addWidget(self.loopback_status_label)
+        loopback_status_layout.addWidget(self.loopback_status_text)
+        loopback_status_layout.addWidget(self.loopback_setup_btn)
+        loopback_status_layout.addStretch()
+        self.content_layout.addLayout(loopback_status_layout)
+
+        self.loopback_info_label = QLabel()
+        self.loopback_info_label.setWordWrap(True)
+        self.loopback_info_label.setProperty("role", "device-info")
+        self.content_layout.addWidget(self.loopback_info_label)
+        self._refresh_loopback_status()
+
+        self.add_section_spacing()
 
         # Recording settings section
         self.recording_title = QLabel(self.i18n.t("settings.realtime.recording"))
@@ -191,7 +225,7 @@ class RealtimeSettingsPage(BaseSettingsPage):
         self.auto_save_check.stateChanged.connect(self._emit_changed)
         self.content_layout.addWidget(self.auto_save_check)
 
-        self.add_spacing(20)
+        self.add_section_spacing()
 
         # Translation settings section
         self.translation_title = QLabel(self.i18n.t("settings.realtime.translation"))
@@ -210,7 +244,7 @@ class RealtimeSettingsPage(BaseSettingsPage):
         translation_layout.addStretch()
         self.content_layout.addLayout(translation_layout)
 
-        self.add_spacing(20)
+        self.add_section_spacing()
 
         # Processing settings section
         self.processing_title = QLabel(self.i18n.t("settings.realtime.processing"))
@@ -284,7 +318,7 @@ class RealtimeSettingsPage(BaseSettingsPage):
             value: Slider value (10-200)
         """
         gain = value / GAIN_SLIDER_DIVISOR
-        self.gain_value_label.setText(f"{gain:.1f}x")
+        self.gain_value_label.setText(format_gain_display(gain))
         self._emit_changed()
 
     def _on_browse_clicked(self):
@@ -299,6 +333,68 @@ class RealtimeSettingsPage(BaseSettingsPage):
 
         if directory:
             self.path_edit.setText(directory)
+
+    def _get_loopback_checker(self):
+        """Return cached loopback checker bound to current audio backend."""
+        from utils.loopback_checker import get_loopback_checker
+
+        if self._loopback_checker is None:
+            self._loopback_checker = get_loopback_checker(self.audio_capture)
+        else:
+            self._loopback_checker.set_audio_capture(self.audio_capture)
+        return self._loopback_checker
+
+    def _set_status_state(self, state: str) -> None:
+        """Apply semantic status state for theme-aware label colors."""
+        self.loopback_status_text.setProperty("state", state)
+        style = self.loopback_status_text.style()
+        if style is not None:
+            style.unpolish(self.loopback_status_text)
+            style.polish(self.loopback_status_text)
+        self.loopback_status_text.update()
+
+    def _refresh_loopback_status(self) -> None:
+        """Refresh loopback availability status and details."""
+        if not hasattr(self, "loopback_status_text") or not hasattr(self, "loopback_info_label"):
+            return
+
+        checker = self._get_loopback_checker()
+        loopback_devices = checker.get_loopback_devices()
+        if loopback_devices:
+            device_names = ", ".join(
+                str(device.get("name", "")).strip() for device in loopback_devices if device
+            )
+            self.loopback_status_text.setText(self.i18n.t("settings.realtime.loopback_installed"))
+            self._set_status_state("available")
+            self.loopback_info_label.setText(
+                self.i18n.t(
+                    "settings.realtime.loopback_detected_devices",
+                    devices=device_names or self.i18n.t("settings.realtime.default_device"),
+                )
+            )
+            return
+
+        if checker.is_loopback_available():
+            self.loopback_status_text.setText(self.i18n.t("settings.realtime.loopback_not_ready"))
+            self._set_status_state("missing")
+            self.loopback_info_label.setText(
+                self.i18n.t("settings.realtime.loopback_restart_required_hint")
+            )
+            return
+
+        self.loopback_status_text.setText(self.i18n.t("settings.realtime.loopback_not_installed"))
+        self._set_status_state("missing")
+        self.loopback_info_label.setText(self.i18n.t("settings.realtime.loopback_missing_hint"))
+
+    def _on_show_loopback_guide(self) -> None:
+        """Show loopback setup dialog and refresh status after closing."""
+        from ui.dialogs.loopback_install_dialog import LoopbackInstallDialog
+
+        checker = self._get_loopback_checker()
+        title, instructions = checker.get_installation_instructions(self.i18n)
+        dialog = LoopbackInstallDialog(title, instructions, self.i18n, self)
+        dialog.exec()
+        self._refresh_loopback_status()
 
     def load_settings(self):
         """Load realtime settings into UI."""
@@ -366,6 +462,7 @@ class RealtimeSettingsPage(BaseSettingsPage):
             if isinstance(min_audio_duration, (int, float)):
                 self.min_audio_duration_spin.setValue(float(min_audio_duration))
 
+            self._refresh_loopback_status()
             logger.debug("Realtime settings loaded")
 
         except Exception as e:
@@ -460,6 +557,8 @@ class RealtimeSettingsPage(BaseSettingsPage):
             self.path_label.setText(self.i18n.t("settings.realtime.recording_path"))
         if hasattr(self, "translation_label"):
             self.translation_label.setText(self.i18n.t("settings.realtime.translation_engine"))
+        if hasattr(self, "loopback_status_label"):
+            self.loopback_status_label.setText(self.i18n.t("settings.realtime.loopback_status"))
         if hasattr(self, "vad_threshold_label"):
             self.vad_threshold_label.setText(self.i18n.t("settings.realtime.vad_threshold"))
         if hasattr(self, "silence_duration_label"):
@@ -474,6 +573,8 @@ class RealtimeSettingsPage(BaseSettingsPage):
         # Update buttons
         if hasattr(self, "browse_button"):
             self.browse_button.setText(self.i18n.t("settings.realtime.browse"))
+        if hasattr(self, "loopback_setup_btn"):
+            self.loopback_setup_btn.setText(self.i18n.t("settings.realtime.loopback_view_guide"))
 
         # Update checkbox
         if hasattr(self, "auto_save_check"):
@@ -487,6 +588,7 @@ class RealtimeSettingsPage(BaseSettingsPage):
 
         if hasattr(self, "format_hint_label"):
             self._update_format_hint_text()
+        self._refresh_loopback_status()
         self._update_spinbox_suffixes()
 
         if hasattr(self, "format_combo"):

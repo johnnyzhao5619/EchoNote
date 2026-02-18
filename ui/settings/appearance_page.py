@@ -25,6 +25,9 @@ from typing import Any, Dict, Tuple
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QComboBox, QFrame, QLabel, QVBoxLayout
 
+from ui.constants import LABEL_MIN_WIDTH
+from ui.common.theme import ThemeManager
+from ui.layout_utils import create_horizontal_layout
 from ui.settings.base_page import BaseSettingsPage
 from utils.i18n import I18nQtManager
 
@@ -64,7 +67,7 @@ class AppearanceSettingsPage(BaseSettingsPage):
         self.theme_title.setFont(font)
         self.content_layout.addWidget(self.theme_title)
 
-        # Theme selection using mixin helper
+        # Theme selection
         self.theme_combo = QComboBox()
         self.theme_combo.addItems(
             [
@@ -74,20 +77,16 @@ class AppearanceSettingsPage(BaseSettingsPage):
             ]
         )
         self.theme_combo.currentIndexChanged.connect(self._on_theme_changed)
-
-        from ui.layout_utils import create_horizontal_layout
-
         theme_layout = create_horizontal_layout()
-
         self.theme_label = QLabel(self.i18n.t("settings.appearance.theme_select"))
-        self.theme_label.setMinimumWidth(120)
+        self.theme_label.setMinimumWidth(LABEL_MIN_WIDTH)
         theme_layout.addWidget(self.theme_label)
         theme_layout.addWidget(self.theme_combo)
         theme_layout.addStretch()
 
         self.content_layout.addLayout(theme_layout)
 
-        self.add_spacing(10)
+        self.add_spacing()
 
         # Theme preview
         self.preview_label = QLabel(self.i18n.t("settings.appearance.preview"))
@@ -104,7 +103,7 @@ class AppearanceSettingsPage(BaseSettingsPage):
 
         self.content_layout.addWidget(self.preview_frame)
 
-        self.add_spacing(10)
+        self.add_spacing()
 
         # Theme info
         self.info_label = QLabel(self.i18n.t("settings.appearance.theme_info"))
@@ -130,11 +129,8 @@ class AppearanceSettingsPage(BaseSettingsPage):
         try:
             # Theme
             theme = self.settings_manager.get_setting("ui.theme")
-            if theme:
-                # Map theme name to index
-                theme_map = {"light": 0, "dark": 1, "system": 2}
-                index = theme_map.get(theme, 0)
-                self.theme_combo.setCurrentIndex(index)
+            index = ThemeManager.theme_to_index(theme)
+            self.theme_combo.setCurrentIndex(index)
 
             logger.debug("Appearance settings loaded")
 
@@ -145,8 +141,7 @@ class AppearanceSettingsPage(BaseSettingsPage):
         """Save appearance settings from UI."""
         try:
             # Theme
-            theme_map = {0: "light", 1: "dark", 2: "system"}
-            theme = theme_map.get(self.theme_combo.currentIndex(), "light")
+            theme = ThemeManager.index_to_theme(self.theme_combo.currentIndex(), default="light")
             self._set_setting_or_raise("ui.theme", theme)
 
             logger.debug("Appearance settings saved")

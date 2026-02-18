@@ -76,7 +76,7 @@ class CalendarSettingsPage(BaseSettingsPage):
         self.desc_label.setProperty("role", "description")
         self.content_layout.addWidget(self.desc_label)
 
-        self.add_spacing(10)
+        self.add_spacing()
 
         # Accounts list
         self.accounts_list = QListWidget()
@@ -106,7 +106,7 @@ class CalendarSettingsPage(BaseSettingsPage):
         # Connect list selection change
         self.accounts_list.itemSelectionChanged.connect(self._on_selection_changed)
 
-        self.add_spacing(20)
+        self.add_section_spacing()
 
         # Sync settings section
         self.sync_title = QLabel(self.i18n.t("settings.calendar.sync_settings"))

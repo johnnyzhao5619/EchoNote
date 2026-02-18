@@ -38,6 +38,7 @@ from ui.qt_imports import (
     QWidget,
 )
 from utils.i18n import I18nQtManager
+from ui.common.theme import ThemeManager
 
 logger = logging.getLogger("echonote.ui.main_window")
 
@@ -67,6 +68,7 @@ class MainWindow(QMainWindow):
 
         self.managers = managers
         self.i18n = i18n
+        self.theme_manager = ThemeManager()
 
         # Settings for window state persistence
         self.settings = QSettings("EchoNote", "EchoNote")
@@ -116,7 +118,8 @@ class MainWindow(QMainWindow):
 
         # Create main layout (horizontal: sidebar + content)
         main_layout = QHBoxLayout(central_widget)
-        # # main_layout.setSpacing(0)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
 
         # Create sidebar
         self.sidebar = self.create_sidebar()
@@ -320,6 +323,17 @@ class MainWindow(QMainWindow):
         self.content_area.setCurrentWidget(page_widget)
         self.current_page = page_name
 
+        if page_name == "timeline" and hasattr(page_widget, "load_timeline_events"):
+            try:
+                page_widget.load_timeline_events(reset=True)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Failed to refresh timeline on page switch: %s", exc)
+        elif page_name == "calendar_hub" and hasattr(page_widget, "_refresh_current_view"):
+            try:
+                page_widget._refresh_current_view()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Failed to refresh calendar on page switch: %s", exc)
+
         logger.debug(f"Switched to page: {page_name}")
 
     def apply_theme(self, theme: str):
@@ -344,6 +358,17 @@ class MainWindow(QMainWindow):
 
                 # Apply stylesheet to application
                 QApplication.instance().setStyleSheet(stylesheet)
+
+                # Update ThemeManager state
+                self.theme_manager.set_theme(theme)
+
+                # Notify all pages to update their theme-dependent elements
+                for page_name, page_widget in self.pages.items():
+                    if hasattr(page_widget, "update_theme"):
+                        try:
+                            page_widget.update_theme()
+                        except Exception as e:
+                            logger.error(f"Error updating theme for page {page_name}: {e}")
 
                 logger.info(f"Applied theme: {theme}")
 

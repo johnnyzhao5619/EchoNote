@@ -119,6 +119,26 @@ body {
   @apply bg-clip-text text-transparent bg-gradient-to-r from-sky-600 to-indigo-600;
 }
 
+.ui-nav-link {
+  @apply whitespace-nowrap rounded-md px-2.5 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900;
+}
+
+.ui-mobile-nav-link {
+  @apply rounded-md px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100;
+}
+
+.ui-chip-link {
+  @apply rounded-full border border-slate-200 bg-white px-3 py-1.5 font-medium transition-colors hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900;
+}
+
+.ui-inline-link {
+  @apply text-blue-600 underline transition-colors hover:text-blue-800;
+}
+
+.ui-primary-action {
+  @apply inline-flex items-center justify-center rounded-lg bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg transition-all duration-200 hover:scale-[1.02] hover:bg-slate-800 hover:shadow-xl sm:px-8 sm:py-4 sm:text-base;
+}
+
 .site-container {
   width: min(100% - 2rem, var(--content-max-width));
   margin-inline: auto;

@@ -51,6 +51,7 @@ if TYPE_CHECKING:
 
 from core.timeline.manager import to_local_naive
 from ui.base_widgets import BaseWidget, create_button, create_hbox, create_vbox
+from ui.constants import PAGE_COMPACT_SPACING, PAGE_CONTENT_MARGINS, PAGE_LAYOUT_SPACING
 from utils.i18n import I18nQtManager
 from core.calendar.constants import EventType, CalendarSource
 
@@ -130,7 +131,8 @@ class TimelineWidget(BaseWidget):
         """Set up the timeline UI."""
         # Main layout
         layout = QVBoxLayout(self)
-        # # layout.setSpacing(10)
+        layout.setContentsMargins(*PAGE_CONTENT_MARGINS)
+        layout.setSpacing(PAGE_LAYOUT_SPACING)
 
         # Title
         self.title_label = QLabel(self.i18n.t("timeline.title"))
@@ -151,7 +153,7 @@ class TimelineWidget(BaseWidget):
         self.timeline_container = QWidget()
         self.timeline_layout = QVBoxLayout(self.timeline_container)
         self.timeline_layout.setContentsMargins(0, 0, 0, 0)
-        self.timeline_layout.setSpacing(15)
+        self.timeline_layout.setSpacing(PAGE_LAYOUT_SPACING)
 
         # Add stretch at the end
         self.timeline_layout.addStretch()
@@ -171,10 +173,10 @@ class TimelineWidget(BaseWidget):
         Returns:
             Header layout (VBoxLayout with search and filter rows)
         """
-        header_layout = create_vbox(spacing=10)
+        header_layout = create_vbox(spacing=PAGE_COMPACT_SPACING)
 
         # First row: Search
-        search_row = create_hbox(spacing=10)
+        search_row = create_hbox(spacing=PAGE_COMPACT_SPACING)
 
         # Search box
         self.search_input = QLineEdit()
@@ -191,7 +193,7 @@ class TimelineWidget(BaseWidget):
         header_layout.addLayout(search_row)
 
         # Second row: Filters
-        filter_row = create_hbox(spacing=10)
+        filter_row = create_hbox(spacing=PAGE_COMPACT_SPACING)
 
         # Date range filter
         self.date_range_label = QLabel(self.i18n.t("timeline.filter_date_range_label"))

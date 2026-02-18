@@ -167,7 +167,6 @@ class EventCard(QFrame):
 
         # Main layout
         layout = QVBoxLayout(self)
-        # # layout.setSpacing(10)
 
         # Header with title and time
         header_layout = self.create_header()
@@ -229,7 +228,6 @@ class EventCard(QFrame):
 
         # Event type badge
         type_badge = QLabel(self._get_event_type_badge_text())
-        type_badge.setObjectName("type_badge")
         type_badge.setProperty("role", "event-type-badge")
         self.type_badge_label = type_badge
         time_layout.addWidget(type_badge)

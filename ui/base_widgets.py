@@ -16,207 +16,24 @@
 """
 基础UI组件
 
-提供可重用的基础组件和混入类，减少重复代码并统一UI行为。
+提供可重用的基础组件和工具函数，减少重复代码并统一UI行为。
 """
 
 import logging
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Optional
 
 from ui.qt_imports import (
-    QApplication,
     QHBoxLayout,
     QLabel,
     QMessageBox,
-    QObject,
     QPushButton,
-    QTimer,
     QVBoxLayout,
     QWidget,
-    Signal,
 )
+from ui.constants import DEFAULT_LAYOUT_SPACING
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger(__name__)
-
-
-class I18nMixin:
-    """国际化混入类
-
-    为UI组件提供统一的国际化支持，包括语言切换和翻译更新。
-    """
-
-    def __init__(self, i18n: I18nQtManager):
-        """初始化国际化混入
-
-        Args:
-            i18n: 国际化管理器实例
-        """
-        self.i18n = i18n
-
-        # 连接语言变更信号
-        if hasattr(self.i18n, "language_changed"):
-            self.i18n.language_changed.connect(self.update_translations)
-
-    def update_translations(self):
-        """更新翻译文本
-
-        子类应该重写此方法来更新所有UI文本。
-        """
-        pass
-
-    def tr(self, key: str, **kwargs) -> str:
-        """翻译快捷方法
-
-        Args:
-            key: 翻译键
-            **kwargs: 翻译参数
-
-        Returns:
-            翻译后的文本
-        """
-        return self.i18n.t(key, **kwargs)
-
-
-class ThemeMixin:
-    """主题混入类
-
-    为UI组件提供统一的主题支持。
-    """
-
-    def __init__(self):
-        """初始化主题混入"""
-        self._theme_properties = {}
-
-    def set_theme_property(self, property_name: str, value: Any):
-        """设置主题属性
-
-        Args:
-            property_name: 属性名
-            value: 属性值
-        """
-        self._theme_properties[property_name] = value
-        if hasattr(self, "setProperty"):
-            self.setProperty(property_name, value)
-
-    def get_theme_property(self, property_name: str, default: Any = None) -> Any:
-        """获取主题属性
-
-        Args:
-            property_name: 属性名
-            default: 默认值
-
-        Returns:
-            属性值
-        """
-        return self._theme_properties.get(property_name, default)
-
-    def apply_theme_properties(self, properties: Dict[str, Any]):
-        """批量应用主题属性
-
-        Args:
-            properties: 属性字典
-        """
-        for name, value in properties.items():
-            self.set_theme_property(name, value)
-
-
-class ErrorHandlerMixin:
-    """错误处理混入类
-
-    为UI组件提供统一的错误处理和用户反馈。
-    """
-
-    def __init__(self, i18n: Optional[I18nQtManager] = None):
-        """初始化错误处理混入
-
-        Args:
-            i18n: 国际化管理器（可选）
-        """
-        self._i18n = i18n
-
-    def show_error(self, title: str, message: str, details: str = None):
-        """显示错误对话框
-
-        Args:
-            title: 错误标题
-            message: 错误消息
-            details: 详细信息（可选）
-        """
-        msg_box = QMessageBox(self if isinstance(self, QWidget) else None)
-        msg_box.setIcon(QMessageBox.Icon.Critical)
-        msg_box.setWindowTitle(title)
-        msg_box.setText(message)
-
-        if details:
-            msg_box.setDetailedText(details)
-
-        msg_box.exec()
-
-    def show_warning(self, title: str, message: str) -> bool:
-        """显示警告对话框
-
-        Args:
-            title: 警告标题
-            message: 警告消息
-
-        Returns:
-            用户是否点击了确定
-        """
-        reply = QMessageBox.warning(
-            self if isinstance(self, QWidget) else None,
-            title,
-            message,
-            QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel,
-        )
-        return reply == QMessageBox.StandardButton.Ok
-
-    def show_info(self, title: str, message: str):
-        """显示信息对话框
-
-        Args:
-            title: 信息标题
-            message: 信息消息
-        """
-        QMessageBox.information(self if isinstance(self, QWidget) else None, title, message)
-
-    def show_success(self, title: str, message: str):
-        """显示成功消息
-
-        Args:
-            title: 成功标题
-            message: 成功消息
-        """
-        msg_box = QMessageBox(self if isinstance(self, QWidget) else None)
-        msg_box.setIcon(QMessageBox.Icon.Information)
-        msg_box.setWindowTitle(title)
-        msg_box.setText(message)
-        msg_box.exec()
-
-    def handle_exception(self, exception: Exception, context: str = ""):
-        """处理异常并显示用户友好的错误消息
-
-        Args:
-            exception: 异常对象
-            context: 上下文信息
-        """
-        logger.error(f"Exception in {context}: {exception}", exc_info=True)
-
-        # 生成用户友好的错误消息
-        if self._i18n:
-            title = self._i18n.t("common.error")
-            if isinstance(exception, FileNotFoundError):
-                message = self._i18n.t("errors.file_not_found")
-            elif isinstance(exception, PermissionError):
-                message = self._i18n.t("errors.permission_denied")
-            elif isinstance(exception, ConnectionError):
-                message = self._i18n.t("errors.connection_failed")
-            else:
-                message = self._i18n.t("errors.unexpected_error")
-        else:
-            title = "Error"
-            message = f"An error occurred: {str(exception)}"
-
-        self.show_error(title, message, str(exception))
 
 
 class BaseWidget(QWidget):
@@ -246,9 +63,6 @@ class BaseWidget(QWidget):
 
         # 初始化错误处理
         self._i18n = i18n
-
-        # 设置默认属性
-        self.setObjectName(self.__class__.__name__)
 
         # 注意：不在这里调用 setup_ui()，让子类在自己的 __init__ 中调用
         # 这样可以确保子类的属性已经被正确设置
@@ -424,7 +238,9 @@ class LayoutHelper:
     """
 
     @staticmethod
-    def create_vbox(spacing: int = 10, margins: tuple = (10, 10, 10, 10)) -> QVBoxLayout:
+    def create_vbox(
+        spacing: int = DEFAULT_LAYOUT_SPACING, margins: tuple = (0, 0, 0, 0)
+    ) -> QVBoxLayout:
         """创建垂直布局
 
         Args:
@@ -440,7 +256,9 @@ class LayoutHelper:
         return layout
 
     @staticmethod
-    def create_hbox(spacing: int = 10, margins: tuple = (10, 10, 10, 10)) -> QHBoxLayout:
+    def create_hbox(
+        spacing: int = DEFAULT_LAYOUT_SPACING, margins: tuple = (0, 0, 0, 0)
+    ) -> QHBoxLayout:
         """创建水平布局
 
         Args:
@@ -598,12 +416,16 @@ def create_secondary_button(text: str, callback: Callable = None) -> QPushButton
     return ButtonHelper.create_secondary_button(text, callback)
 
 
-def create_vbox(spacing: int = 10, margins: tuple = (10, 10, 10, 10)) -> QVBoxLayout:
+def create_vbox(
+    spacing: int = DEFAULT_LAYOUT_SPACING, margins: tuple = (0, 0, 0, 0)
+) -> QVBoxLayout:
     """创建垂直布局的便捷函数"""
     return LayoutHelper.create_vbox(spacing, margins)
 
 
-def create_hbox(spacing: int = 10, margins: tuple = (10, 10, 10, 10)) -> QHBoxLayout:
+def create_hbox(
+    spacing: int = DEFAULT_LAYOUT_SPACING, margins: tuple = (0, 0, 0, 0)
+) -> QHBoxLayout:
     """创建水平布局的便捷函数"""
     return LayoutHelper.create_hbox(spacing, margins)
 
@@ -611,9 +433,3 @@ def create_hbox(spacing: int = 10, margins: tuple = (10, 10, 10, 10)) -> QHBoxLa
 def connect_button_with_callback(button: QPushButton, callback: Callable, *args, **kwargs):
     """连接按钮回调的便捷函数"""
     SignalHelper.connect_button_with_callback(button, callback, *args, **kwargs)
-
-
-# 为了向后兼容，保留混入类的别名
-I18nMixin = BaseWidget  # 已集成到BaseWidget中
-ThemeMixin = BaseWidget  # 已集成到BaseWidget中
-ErrorHandlerMixin = BaseWidget  # 已集成到BaseWidget中

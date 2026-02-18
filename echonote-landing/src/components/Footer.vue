@@ -83,7 +83,7 @@ const openSourceLinks = computed(() => {
               :href="projectConfig.links.license || licenseInfo.url"
               target="_blank"
               rel="noopener noreferrer"
-              class="text-blue-600 underline transition-colors hover:text-blue-800"
+              class="ui-inline-link"
             >
               {{ licenseInfo.name }}
             </a>
@@ -94,7 +94,7 @@ const openSourceLinks = computed(() => {
               :href="`https://github.com/${githubConfig.owner}`"
               target="_blank"
               rel="noopener noreferrer"
-              class="text-blue-600 underline transition-colors hover:text-blue-800"
+              class="ui-inline-link"
             >
               {{ githubConfig.owner }}
             </a>

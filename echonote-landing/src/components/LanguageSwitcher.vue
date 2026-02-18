@@ -1,5 +1,5 @@
 <template>
-  <div class="language-switcher">
+  <div class="inline-flex items-center">
     <label class="sr-only" for="locale-switcher">{{ t('header.languageSwitcher') }}</label>
     <select
       id="locale-switcher"
@@ -29,10 +29,3 @@ const currentLocale = computed({
   },
 })
 </script>
-
-<style scoped>
-.language-switcher {
-  display: flex;
-  align-items: center;
-}
-</style>

@@ -40,6 +40,7 @@ from config.constants import (
     SUPPORTED_TRANSCRIPTION_FORMATS,
     SUPPORTED_TRANSCRIPTION_ENGINES,
     SUPPORTED_COMPUTE_TYPES,
+    STANDARD_LABEL_WIDTH,
     ENGINE_FASTER_WHISPER,
     ENGINE_OPENAI,
     ENGINE_GOOGLE,
@@ -96,7 +97,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         # Default output format
         format_layout = create_hbox()
         self.format_label = QLabel(self.i18n.t("settings.transcription.output_format"))
-        self.format_label.setMinimumWidth(200)
+        self.format_label.setMinimumWidth(STANDARD_LABEL_WIDTH)
         self.format_combo = QComboBox()
         self.format_combo.addItems(SUPPORTED_TRANSCRIPTION_FORMATS)
         self.format_combo.currentTextChanged.connect(self._emit_changed)
@@ -108,7 +109,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         # Concurrent tasks
         concurrent_layout = create_hbox()
         self.concurrent_label = QLabel(self.i18n.t("settings.transcription.concurrent_tasks"))
-        self.concurrent_label.setMinimumWidth(200)
+        self.concurrent_label.setMinimumWidth(STANDARD_LABEL_WIDTH)
         self.concurrent_spin = QSpinBox()
         self.concurrent_spin.setMinimum(1)
         self.concurrent_spin.setMaximum(5)
@@ -119,7 +120,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         concurrent_layout.addStretch()
         self.content_layout.addLayout(concurrent_layout)
 
-        self.add_spacing(20)
+        self.add_section_spacing()
 
         # FFmpeg status section
         self.ffmpeg_title = QLabel(self.i18n.t("settings.transcription.ffmpeg_status"))
@@ -129,7 +130,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         # FFmpeg status display
         ffmpeg_status_layout = create_hbox()
         self.ffmpeg_status_label = QLabel(self.i18n.t("ffmpeg.ffmpeg_label"))
-        self.ffmpeg_status_label.setMinimumWidth(200)
+        self.ffmpeg_status_label.setMinimumWidth(STANDARD_LABEL_WIDTH)
 
         # Check FFmpeg availability
         from utils.ffmpeg_checker import get_ffmpeg_checker
@@ -167,12 +168,12 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         self.ffmpeg_info.setProperty("role", "device-info")
         self.content_layout.addWidget(self.ffmpeg_info)
 
-        self.add_spacing(20)
+        self.add_section_spacing()
 
         # Default save path
         path_layout = create_hbox()
         self.path_label = QLabel(self.i18n.t("settings.transcription.save_path"))
-        self.path_label.setMinimumWidth(200)
+        self.path_label.setMinimumWidth(STANDARD_LABEL_WIDTH)
         self.path_edit = QLineEdit()
         self.path_edit.textChanged.connect(self._emit_changed)
         self.browse_button = create_button(self.i18n.t("settings.transcription.browse"))
@@ -182,7 +183,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         path_layout.addWidget(self.browse_button)
         self.content_layout.addLayout(path_layout)
 
-        self.add_spacing(20)
+        self.add_section_spacing()
 
         # Engine settings section
         self.engine_title = QLabel(self.i18n.t("settings.transcription.engine"))
@@ -192,7 +193,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         # Engine selection
         engine_layout = create_hbox()
         self.engine_label = QLabel(self.i18n.t("settings.transcription.engine_select"))
-        self.engine_label.setMinimumWidth(200)
+        self.engine_label.setMinimumWidth(STANDARD_LABEL_WIDTH)
         self.engine_combo = QComboBox()
         self.engine_combo.addItems(SUPPORTED_TRANSCRIPTION_ENGINES)
         self.engine_combo.currentTextChanged.connect(self._on_engine_changed)

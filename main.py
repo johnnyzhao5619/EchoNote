@@ -71,6 +71,9 @@ def main():
         app.setApplicationName("EchoNote")
         app.setOrganizationName("EchoNote")
         app.setOrganizationDomain("echonote.app")
+        # Use Fusion style to ensure QSS consistency across platforms
+        # (especially for macOS native controls like QComboBox/QSpinBox/QListWidget).
+        app.setStyle("Fusion")
 
         # Set application icon
         from PySide6.QtGui import QIcon
@@ -360,6 +363,8 @@ def main():
             file_manager=file_manager,
         )
         managers["calendar_manager"] = calendar_manager
+        if hasattr(realtime_recorder, "set_calendar_manager"):
+            realtime_recorder.set_calendar_manager(calendar_manager)
         logger.info("Calendar manager initialized")
 
         # Initialize timeline manager
@@ -461,10 +466,21 @@ def main():
         bg_init.start()
         logger.info("Background initialization started")
 
-        # Check FFmpeg availability and show installation dialog if needed
-        from utils.post_init_tasks import check_ffmpeg_availability, check_model_availability
+        # Check dependency availability and show setup guidance if needed.
+        from utils.post_init_tasks import (
+            check_ffmpeg_availability,
+            check_loopback_availability,
+            check_model_availability,
+        )
 
         check_ffmpeg_availability(config, i18n, main_window)
+        check_loopback_availability(
+            config,
+            i18n,
+            main_window,
+            audio_capture=audio_capture,
+            is_first_run=is_first_run,
+        )
 
         # Validate local models before prompting download recommendations.
         logger.info("Starting model validation...")

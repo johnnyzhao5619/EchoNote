@@ -399,14 +399,16 @@ class ConfigManager:
         return True
 
     def _validate_timeline_setting(self, setting: str, value: Any) -> bool:
+        from config.constants import TIMELINE_REMINDER_MINUTES_OPTIONS
+
         if setting in ["past_days", "future_days"]:
             return isinstance(value, int) and value >= 1
         elif setting == "reminder_minutes":
-             return value in [5, 10, 15, 30]
+            return value in TIMELINE_REMINDER_MINUTES_OPTIONS
         elif setting == "page_size":
-             return isinstance(value, int) and value >= 1
+            return isinstance(value, int) and value >= 1
         elif setting == "auto_start_enabled":
-             return isinstance(value, bool)
+            return isinstance(value, bool)
         return True
 
     def _validate_resource_monitor_setting(self, setting: str, value: Any) -> bool:

@@ -24,7 +24,8 @@ from typing import Tuple
 
 from PySide6.QtWidgets import QComboBox, QLabel
 
-# Removed over-engineered mixins
+from ui.constants import LABEL_MIN_WIDTH
+from ui.layout_utils import create_horizontal_layout
 from ui.settings.base_page import BaseSettingsPage
 from utils.i18n import I18nQtManager, get_language_display_name, get_translation_codes
 
@@ -62,25 +63,21 @@ class LanguageSettingsPage(BaseSettingsPage):
         self.language_title.setFont(font)
         self.content_layout.addWidget(self.language_title)
 
-        # Language selection using mixin helper
+        # Language selection
         self.language_combo = QComboBox()
         self._populate_language_options()
 
         self.language_combo.currentIndexChanged.connect(self._on_language_changed)
-
-        from ui.layout_utils import create_horizontal_layout
-
         language_layout = create_horizontal_layout()
-
         self.language_label = QLabel(self.i18n.t("settings.language.select"))
-        self.language_label.setMinimumWidth(120)
+        self.language_label.setMinimumWidth(LABEL_MIN_WIDTH)
         language_layout.addWidget(self.language_label)
         language_layout.addWidget(self.language_combo)
         language_layout.addStretch()
 
         self.content_layout.addLayout(language_layout)
 
-        self.add_spacing(10)
+        self.add_spacing()
 
         # Language info
         self.info_label = QLabel(self.i18n.t("settings.language.change_info"))

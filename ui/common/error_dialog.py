@@ -24,18 +24,10 @@ from typing import Optional
 
 from PySide6.QtCore import QTimer
 
-from ui.base_widgets import (
-    BaseWidget,
-    ErrorHandlerMixin,
-    I18nMixin,
-    ThemeMixin,
-    connect_button_with_callback,
-    create_hbox,
-)
+from ui.base_widgets import connect_button_with_callback, create_hbox
 from ui.qt_imports import (
     QApplication,
     QDialog,
-    QHBoxLayout,
     QLabel,
     QPushButton,
     QTextEdit,

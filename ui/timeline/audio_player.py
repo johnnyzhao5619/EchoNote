@@ -151,7 +151,6 @@ class AudioPlayer(BaseWidget):
         """Set up the player UI - 简洁居中设计."""
         self.setObjectName("audio_player")
         layout = QVBoxLayout(self)
-        # # layout.setSpacing(0)
 
         # 转录文本显示区域 - 顶部，默认隐藏
         self.transcript_area = self._create_transcript_area()

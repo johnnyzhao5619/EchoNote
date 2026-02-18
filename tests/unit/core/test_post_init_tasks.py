@@ -3,7 +3,7 @@
 
 from unittest.mock import Mock, patch
 
-from utils.post_init_tasks import check_model_availability
+from utils.post_init_tasks import check_loopback_availability, check_model_availability
 from config.constants import ENGINE_FASTER_WHISPER
 
 
@@ -46,3 +46,78 @@ def test_check_model_availability_shows_dialog_when_no_model_and_no_download():
         check_model_availability(config, model_manager, Mock(), Mock())
 
     show_dialog.assert_called_once()
+
+
+def test_check_loopback_availability_skips_when_not_first_run():
+    config = Mock()
+
+    check_loopback_availability(
+        config,
+        Mock(),
+        Mock(),
+        audio_capture=Mock(),
+        is_first_run=False,
+    )
+
+    config.get.assert_not_called()
+
+
+def test_check_loopback_availability_shows_dialog_on_first_run_when_missing():
+    config = Mock()
+
+    def _get(key, default=None):
+        if key == "ui.show_loopback_install_dialog":
+            return True
+        return default
+
+    config.get.side_effect = _get
+    checker = Mock()
+    checker.check_and_log.return_value = False
+    checker.get_installation_instructions.return_value = ("title", "instructions")
+
+    dialog = Mock()
+    dialog.should_show_again.return_value = False
+
+    with (
+        patch("utils.loopback_checker.get_loopback_checker", return_value=checker),
+        patch("ui.dialogs.loopback_install_dialog.LoopbackInstallDialog", return_value=dialog),
+    ):
+        check_loopback_availability(
+            config,
+            Mock(),
+            Mock(),
+            audio_capture=Mock(),
+            is_first_run=True,
+        )
+
+    checker.check_and_log.assert_called_once()
+    dialog.exec.assert_called_once()
+    config.set.assert_called_once_with("ui.show_loopback_install_dialog", False)
+    config.save.assert_called_once()
+
+
+def test_check_loopback_availability_skips_dialog_when_loopback_present():
+    config = Mock()
+
+    def _get(key, default=None):
+        if key == "ui.show_loopback_install_dialog":
+            return True
+        return default
+
+    config.get.side_effect = _get
+    checker = Mock()
+    checker.check_and_log.return_value = True
+
+    with (
+        patch("utils.loopback_checker.get_loopback_checker", return_value=checker),
+        patch("ui.dialogs.loopback_install_dialog.LoopbackInstallDialog") as dialog_cls,
+    ):
+        check_loopback_availability(
+            config,
+            Mock(),
+            Mock(),
+            audio_capture=Mock(),
+            is_first_run=True,
+        )
+
+    dialog_cls.assert_not_called()

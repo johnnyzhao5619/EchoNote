@@ -35,6 +35,7 @@ from PySide6.QtWidgets import (
 )
 
 from ui.base_widgets import BaseWidget
+from ui.constants import PAGE_COMPACT_SPACING, PAGE_DENSE_SPACING, STATUS_INDICATOR_SYMBOL
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.calendar_view")
@@ -153,7 +154,10 @@ class EventCard(QFrame):
         self.setProperty("source", self.calendar_event.source)
 
         layout = QVBoxLayout(self)
-        # # layout.setSpacing(2)
+        layout.setContentsMargins(
+            PAGE_COMPACT_SPACING, PAGE_DENSE_SPACING, PAGE_COMPACT_SPACING, PAGE_DENSE_SPACING
+        )
+        layout.setSpacing(PAGE_DENSE_SPACING)
 
         # Event title
         title_label = QLabel(self.calendar_event.title)
@@ -210,7 +214,8 @@ class MonthView(BaseWidget):
     def setup_ui(self):
         """Set up month view UI."""
         layout = QVBoxLayout(self)
-        # # layout.setSpacing(10)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(PAGE_COMPACT_SPACING)
 
         # Month/year header
         self.header_label = QLabel()
@@ -221,6 +226,7 @@ class MonthView(BaseWidget):
         # Calendar grid
         self.calendar_grid = QGridLayout()
         self.calendar_grid.setSpacing(1)
+        self.calendar_grid.setContentsMargins(0, 0, 0, 0)
 
         # Add day headers
         day_names = _get_weekday_labels(self.i18n)
@@ -318,18 +324,21 @@ class MonthView(BaseWidget):
         cell = QFrame()
         cell.setFrameStyle(QFrame.Shape.Box)
         cell.setMinimumHeight(80)
+        cell.setProperty("role", "calendar-day-cell")
 
         layout = QVBoxLayout(cell)
-        # # layout.setSpacing(2)
+        layout.setContentsMargins(PAGE_DENSE_SPACING, PAGE_DENSE_SPACING, PAGE_DENSE_SPACING, PAGE_DENSE_SPACING)
+        layout.setSpacing(PAGE_DENSE_SPACING)
 
         # Day number
         day_label = QLabel(str(day))
         day_label.setAlignment(Qt.AlignmentFlag.AlignRight)
+        day_label.setProperty("role", "calendar-day-number")
         layout.addWidget(day_label)
 
         # Event indicators (show up to 3 events)
         for calendar_event in events[:3]:
-            indicator = QPushButton("●")
+            indicator = QPushButton(STATUS_INDICATOR_SYMBOL)
             indicator.setFlat(True)
             indicator.setCursor(Qt.CursorShape.PointingHandCursor)
             indicator.setToolTip(getattr(calendar_event, "title", ""))
@@ -424,7 +433,8 @@ class WeekView(BaseWidget):
     def setup_ui(self):
         """Set up week view UI."""
         layout = QVBoxLayout(self)
-        # # layout.setSpacing(10)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(PAGE_COMPACT_SPACING)
 
         # Week header
         self.header_label = QLabel()
@@ -441,6 +451,7 @@ class WeekView(BaseWidget):
         week_container = QWidget()
         self.week_grid = QGridLayout(week_container)
         self.week_grid.setSpacing(1)
+        self.week_grid.setContentsMargins(0, 0, 0, 0)
 
         scroll.setWidget(week_container)
         layout.addWidget(scroll)
@@ -522,8 +533,10 @@ class WeekView(BaseWidget):
             Day column widget
         """
         column = QWidget()
+        column.setProperty("role", "calendar-day-column")
         layout = QVBoxLayout(column)
-        # # layout.setSpacing(4)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(PAGE_DENSE_SPACING)
 
         sorted_events = sorted(events, key=_event_sort_key)
 
@@ -605,7 +618,8 @@ class DayView(BaseWidget):
     def setup_ui(self):
         """Set up day view UI."""
         layout = QVBoxLayout(self)
-        # # layout.setSpacing(10)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(PAGE_COMPACT_SPACING)
 
         # Day header
         self.header_label = QLabel()
@@ -619,9 +633,15 @@ class DayView(BaseWidget):
 
         # Events container
         self.events_container = QWidget()
+        self.events_container.setProperty("role", "calendar-events-container")
         self.events_layout = QVBoxLayout(self.events_container)
-        self.events_layout.setContentsMargins(10, 10, 10, 10)
-        self.events_layout.setSpacing(10)
+        self.events_layout.setContentsMargins(
+            PAGE_COMPACT_SPACING,
+            PAGE_COMPACT_SPACING,
+            PAGE_COMPACT_SPACING,
+            PAGE_COMPACT_SPACING,
+        )
+        self.events_layout.setSpacing(PAGE_COMPACT_SPACING)
 
         scroll.setWidget(self.events_container)
         layout.addWidget(scroll)

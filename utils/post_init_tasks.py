@@ -54,6 +54,40 @@ def check_ffmpeg_availability(config, i18n, main_window):
         logger.info("FFmpeg is available")
 
 
+def check_loopback_availability(
+    config, i18n, main_window, audio_capture=None, is_first_run: bool = False
+):
+    """Check loopback input availability and show setup guide on first run."""
+    if not is_first_run:
+        logger.info("Skipping loopback setup prompt because this is not first run")
+        return
+
+    show_loopback_dialog = config.get("ui.show_loopback_install_dialog", True)
+    if not show_loopback_dialog:
+        logger.info("Loopback setup dialog disabled by user preference")
+        return
+
+    logger.info("Checking loopback input availability...")
+    from utils.loopback_checker import get_loopback_checker
+
+    loopback_checker = get_loopback_checker(audio_capture)
+    if loopback_checker.check_and_log():
+        logger.info("Loopback input is available")
+        return
+
+    logger.info("Showing loopback setup dialog...")
+    from ui.dialogs.loopback_install_dialog import LoopbackInstallDialog
+
+    title, instructions = loopback_checker.get_installation_instructions(i18n)
+    dialog = LoopbackInstallDialog(title, instructions, i18n, main_window)
+    dialog.exec()
+
+    if not dialog.should_show_again():
+        config.set("ui.show_loopback_install_dialog", False)
+        config.save()
+        logger.info("User chose not to show loopback setup dialog again")
+
+
 def check_model_availability(config, model_manager, i18n, main_window):
     """Check model availability and show recommendation dialog if needed."""
     logger.info("Checking if model recommendation is needed...")

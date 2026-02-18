@@ -41,6 +41,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from config.constants import (
+    DEFAULT_COMPUTE_TYPE,
+    DEVICE_CPU,
+    DEVICE_CUDA,
+    SUPPORTED_COMPUTE_TYPES,
+    SUPPORTED_TRANSCRIPTION_DEVICES,
+)
 from core.models.registry import ModelInfo
 from ui.base_widgets import (
     connect_button_with_callback,
@@ -107,7 +114,7 @@ class ModelManagementPage(BaseSettingsPage):
         self.desc_label.setObjectName("description_label")
         self.content_layout.addWidget(self.desc_label)
 
-        self.add_spacing(10)
+        self.add_spacing()
 
         # 推荐模型卡片区域（条件显示）
         self.recommendation_container = QWidget()
@@ -130,7 +137,7 @@ class ModelManagementPage(BaseSettingsPage):
         self.downloaded_models_layout.setSpacing(10)
         self.content_layout.addWidget(self.downloaded_models_container)
 
-        self.add_spacing(20)
+        self.add_section_spacing()
 
         # 可下载模型区域
         self.available_title = QLabel(self.i18n.t("settings.model_management.available_models"))
@@ -1084,7 +1091,6 @@ class ModelDetailsDialog(QDialog):
         self.setMinimumHeight(400)
 
         layout = QVBoxLayout(self)
-        # # layout.setContentsMargins(20, 20, 20, 20)
 
         # 标题
         title_label = QLabel(model.full_name)
@@ -1272,12 +1278,12 @@ class ModelConfigDialog(QDialog):
         self.model = model
         self.settings_manager = settings_manager
         self.i18n = i18n
+        self.setObjectName("model_config_dialog")
 
         self.setWindowTitle(i18n.t("settings.model_management.config_title", model=model.full_name))
         self.setMinimumWidth(450)
 
         layout = QVBoxLayout(self)
-        # # layout.setContentsMargins(20, 20, 20, 20)
 
         # 标题
         title_label = QLabel(i18n.t("settings.model_management.config_description"))
@@ -1290,7 +1296,7 @@ class ModelConfigDialog(QDialog):
         # 计算设备选择
         device_label = QLabel(i18n.t("settings.model_management.compute_device") + ":")
         device_combo = QComboBox()
-        device_combo.addItems(["cpu", "cuda", "auto"])
+        device_combo.addItems(SUPPORTED_TRANSCRIPTION_DEVICES)
 
         # 检查 CUDA 是否可用
         cuda_available = False
@@ -1303,7 +1309,7 @@ class ModelConfigDialog(QDialog):
 
         if not cuda_available:
             # 禁用 CUDA 选项
-            cuda_index = device_combo.findText("cuda")
+            cuda_index = device_combo.findText(DEVICE_CUDA)
             if cuda_index >= 0:
                 device_combo.model().item(cuda_index).setEnabled(False)
 
@@ -1312,7 +1318,7 @@ class ModelConfigDialog(QDialog):
         # 计算精度选择
         compute_type_label = QLabel(i18n.t("settings.model_management.compute_precision") + ":")
         compute_type_combo = QComboBox()
-        compute_type_combo.addItems(["int8", "float16", "float32"])
+        compute_type_combo.addItems(SUPPORTED_COMPUTE_TYPES)
         form_layout.addRow(compute_type_label, compute_type_combo)
 
         # VAD 过滤（批量转录）
@@ -1345,13 +1351,15 @@ class ModelConfigDialog(QDialog):
         config_key = f"transcription.model_configs.{model.name}"
 
         # 设备
-        current_device = settings_manager.get_setting(f"{config_key}.device") or "cpu"
+        current_device = settings_manager.get_setting(f"{config_key}.device") or DEVICE_CPU
         device_index = device_combo.findText(current_device)
         if device_index >= 0:
             device_combo.setCurrentIndex(device_index)
 
         # 计算精度
-        current_compute_type = settings_manager.get_setting(f"{config_key}.compute_type") or "int8"
+        current_compute_type = (
+            settings_manager.get_setting(f"{config_key}.compute_type") or DEFAULT_COMPUTE_TYPE
+        )
         compute_type_index = compute_type_combo.findText(current_compute_type)
         if compute_type_index >= 0:
             compute_type_combo.setCurrentIndex(compute_type_index)
@@ -1394,7 +1402,7 @@ class ModelConfigDialog(QDialog):
             # 验证配置
             selected_device = device_combo.currentText()
 
-            if selected_device == "cuda" and not cuda_available:
+            if selected_device == DEVICE_CUDA and not cuda_available:
                 self.show_warning(
                     i18n.t("settings.model_management.validation_error"),
                     i18n.t("settings.model_management.cuda_not_available"),

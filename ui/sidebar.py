@@ -67,7 +67,7 @@ class Sidebar(BaseWidget):
     def setup_ui(self):
         """Set up the sidebar UI."""
         # Set fixed width for sidebar
-        from ui.constants import SIDEBAR_WIDTH
+        from ui.constants import DEFAULT_LAYOUT_SPACING, SIDEBAR_WIDTH
 
         self.setFixedWidth(SIDEBAR_WIDTH)
 
@@ -76,11 +76,11 @@ class Sidebar(BaseWidget):
 
         # Create layout
         layout = QVBoxLayout(self)
-
-        from ui.constants import DEFAULT_LAYOUT_SPACING
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(DEFAULT_LAYOUT_SPACING)
 
         # Add spacing at top
-        layout.addSpacing(DEFAULT_LAYOUT_SPACING * 2)
+        layout.addSpacing(DEFAULT_LAYOUT_SPACING)
 
         # Create navigation buttons
         self._create_nav_buttons(layout)

@@ -70,7 +70,8 @@
   },
   "ui": {
     "theme": "light",
-    "language": "en_US"
+    "language": "en_US",
+    "show_loopback_install_dialog": true
   },
   "security": {
     "encryption_algorithm": "AES-256-GCM"

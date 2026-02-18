@@ -264,7 +264,6 @@ class TranscriptViewerDialog(QDialog):
 
         # Main layout
         main_layout = QVBoxLayout(self)
-        # # main_layout.setSpacing(0)
 
         # Metadata section
         metadata_frame = self._create_metadata_section()
@@ -302,7 +301,6 @@ class TranscriptViewerDialog(QDialog):
         frame.setFrameShape(QFrame.Shape.StyledPanel)
 
         layout = QVBoxLayout(frame)
-        # # layout.setSpacing(8)
 
         # File name (larger font)
         self.file_name_label = QLabel()
@@ -353,7 +351,6 @@ class TranscriptViewerDialog(QDialog):
         frame.setFrameShape(QFrame.Shape.NoFrame)
 
         layout = QHBoxLayout(frame)
-        # # layout.setSpacing(12)
 
         # Edit/Save button
         self.edit_button = QPushButton()
@@ -378,7 +375,6 @@ class TranscriptViewerDialog(QDialog):
 
         # Search button
         self.search_button = QPushButton()
-        self.search_button.setObjectName("search_button")
         self.search_button.setMinimumHeight(36)
         connect_button_with_callback(self.search_button, self._toggle_search)
         layout.addWidget(self.search_button)
@@ -425,7 +421,6 @@ class TranscriptViewerDialog(QDialog):
         frame.setObjectName("text_frame")
 
         layout = QVBoxLayout(frame)
-        # # layout.setSpacing(0)
 
         # Text editor
         self.text_edit = QTextEdit()

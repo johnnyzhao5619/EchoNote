@@ -28,6 +28,25 @@ Main widget for real-time recording interface.
 - Marker capture button with timestamp list
 - Respects global realtime preferences (`realtime.recording_format` /
   `realtime.auto_save`) provided by `SettingsManager`
+- Loopback input detection and routing guidance for system audio capture
+- Online meeting capture hints (speaker output routing + microphone routing)
+
+### System Audio / Meeting Routing
+
+- The device list marks likely loopback inputs with a `(Loopback)` suffix.
+- When no loopback device is detected, the widget shows setup guidance instead of silently failing.
+- For online meetings, recommended routing:
+  - meeting/video app output -> loopback input device
+  - meeting app microphone -> physical mic
+  - EchoNote input device -> loopback input
+- For mixed local-mic + remote-audio recording in one track, use an aggregate/virtual mixer input.
+- App-scoped virtual inputs (for example `Microsoft Teams Audio`) are treated as meeting/system-audio candidates, and the UI warns that they may capture only that app's playback.
+- If audio samples remain all-zero during recording, UI surfaces actionable hints and includes selected input device details.
+- On first app run, EchoNote performs a loopback availability check and shows setup guidance when loopback input is missing.
+- Setup dialog supports one-click loopback setup:
+  - macOS: installs BlackHole via system authorization prompt.
+  - Windows: downloads and launches VB-CABLE installer with UAC authorization.
+  - Linux: configures PipeWire/PulseAudio virtual sink, and can request system authorization when dependency install is needed.
 
 **Usage:**
 

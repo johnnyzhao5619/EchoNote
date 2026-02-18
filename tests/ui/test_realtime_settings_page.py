@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 """Tests for realtime settings page behavior."""
 
+from unittest.mock import Mock, patch
+
 from ui.settings.realtime_page import RealtimeSettingsPage
 
 
@@ -62,3 +64,55 @@ def test_save_settings_persists_translation_engine(qapp, mock_i18n):
     assert settings_manager.get_setting("realtime.vad_threshold") == 0.6
     assert settings_manager.get_setting("realtime.silence_duration_ms") == 2500
     assert settings_manager.get_setting("realtime.min_audio_duration") == 4.2
+
+
+def test_loopback_status_updates_from_checker(qapp, mock_i18n):
+    settings_manager = _FakeSettingsManager()
+    page = RealtimeSettingsPage(settings_manager, mock_i18n)
+    checker = Mock()
+    checker.get_loopback_devices.return_value = [{"name": "BlackHole 2ch"}]
+
+    with patch.object(page, "_get_loopback_checker", return_value=checker):
+        page._refresh_loopback_status()
+
+    assert page.loopback_status_text.text() == "settings.realtime.loopback_installed"
+    assert page.loopback_status_text.property("state") == "available"
+    assert page.loopback_info_label.text() == "settings.realtime.loopback_detected_devices"
+
+
+def test_loopback_guide_opens_dialog_and_refreshes_status(qapp, mock_i18n):
+    settings_manager = _FakeSettingsManager()
+    page = RealtimeSettingsPage(settings_manager, mock_i18n)
+    checker = Mock()
+    checker.get_installation_instructions.return_value = ("title", "instructions")
+    checker.get_loopback_devices.return_value = []
+    checker.is_loopback_available.return_value = False
+
+    dialog = Mock()
+    with (
+        patch.object(page, "_get_loopback_checker", return_value=checker),
+        patch(
+            "ui.dialogs.loopback_install_dialog.LoopbackInstallDialog",
+            return_value=dialog,
+        ) as dialog_cls,
+    ):
+        page._on_show_loopback_guide()
+
+    dialog_cls.assert_called_once()
+    dialog.exec.assert_called_once()
+    assert page.loopback_status_text.text() == "settings.realtime.loopback_not_installed"
+
+
+def test_loopback_status_marks_driver_without_endpoint_as_not_ready(qapp, mock_i18n):
+    settings_manager = _FakeSettingsManager()
+    page = RealtimeSettingsPage(settings_manager, mock_i18n)
+    checker = Mock()
+    checker.get_loopback_devices.return_value = []
+    checker.is_loopback_available.return_value = True
+
+    with patch.object(page, "_get_loopback_checker", return_value=checker):
+        page._refresh_loopback_status()
+
+    assert page.loopback_status_text.text() == "settings.realtime.loopback_not_ready"
+    assert page.loopback_status_text.property("state") == "missing"
+    assert page.loopback_info_label.text() == "settings.realtime.loopback_restart_required_hint"

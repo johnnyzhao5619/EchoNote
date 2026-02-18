@@ -22,8 +22,10 @@ Displays a splash screen with progress updates during initialization.
 import logging
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QColor, QFont, QPainter, QPixmap
+from PySide6.QtGui import QFont, QPainter, QPixmap
 from PySide6.QtWidgets import QSplashScreen
+
+from ui.common.theme import ThemeManager
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +48,14 @@ class SplashScreen(QSplashScreen):
         """
         # Create a simple pixmap for the splash screen
         pixmap = QPixmap(width, height)
-        pixmap.fill(QColor(33, 150, 243))  # Material Blue
+
+        # Use theme semantic colors for splash rendering.
+        self._theme = ThemeManager()
+        primary_color = self._theme.get_color("primary")
+        self._text_color = self._theme.get_color("splash_text")
+        self._progress_track_color = self._theme.get_color("splash_progress_track")
+        self._progress_fill_color = self._theme.get_color("splash_progress_fill")
+        pixmap.fill(primary_color)
 
         super().__init__(pixmap)
 
@@ -100,21 +109,25 @@ class SplashScreen(QSplashScreen):
         Args:
             painter: QPainter instance
         """
-        painter.setPen(QColor(255, 255, 255))
+        painter.setPen(self._text_color)
 
         # Draw application name
-        title_font = QFont("Arial", 24, QFont.Weight.Bold)
+        title_font = QFont()
+        title_font.setPointSize(24)
+        title_font.setWeight(QFont.Weight.Bold)
         painter.setFont(title_font)
         painter.drawText(20, 80, "EchoNote")
 
         # Draw version (if available)
         if self._version:
-            version_font = QFont("Arial", 12)
+            version_font = QFont()
+            version_font.setPointSize(12)
             painter.setFont(version_font)
             painter.drawText(20, 110, self._version)
 
         # Draw progress text
-        progress_font = QFont("Arial", 11)
+        progress_font = QFont()
+        progress_font.setPointSize(11)
         painter.setFont(progress_font)
         painter.drawText(20, self.height - 60, self._progress_text)
 
@@ -126,15 +139,17 @@ class SplashScreen(QSplashScreen):
         bar_y = self.height - 40
 
         # Background
-        painter.fillRect(bar_x, bar_y, bar_width, bar_height, QColor(255, 255, 255, 50))
+        painter.fillRect(bar_x, bar_y, bar_width, bar_height, self._progress_track_color)
 
         # Progress
         progress_width = int(bar_width * (self._progress_percent / 100))
-        painter.fillRect(bar_x, bar_y, progress_width, bar_height, QColor(255, 255, 255))
+        painter.fillRect(bar_x, bar_y, progress_width, bar_height, self._progress_fill_color)
 
         # Progress percentage (right-aligned)
         percent_text = f"{self._progress_percent}%"
-        percent_font = QFont("Arial", 11, QFont.Weight.Bold)
+        percent_font = QFont()
+        percent_font.setPointSize(11)
+        percent_font.setWeight(QFont.Weight.Bold)
         painter.setFont(percent_font)
 
         # Calculate text width for right alignment

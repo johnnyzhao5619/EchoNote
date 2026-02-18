@@ -24,6 +24,7 @@ from typing import Tuple
 
 from PySide6.QtWidgets import QCheckBox, QComboBox, QLabel, QSpinBox
 
+from config.constants import TIMELINE_REMINDER_MINUTES_OPTIONS, STANDARD_LABEL_WIDTH
 from ui.base_widgets import create_hbox
 from ui.settings.base_page import BaseSettingsPage
 from utils.i18n import I18nQtManager
@@ -65,7 +66,7 @@ class TimelineSettingsPage(BaseSettingsPage):
         # Past days
         past_layout = create_hbox()
         self.past_label = QLabel(self.i18n.t("settings.timeline.past_days"))
-        self.past_label.setMinimumWidth(200)
+        self.past_label.setMinimumWidth(STANDARD_LABEL_WIDTH)
         self.past_days_spin = QSpinBox()
         self.past_days_spin.setMinimum(1)
         self.past_days_spin.setMaximum(365)
@@ -80,7 +81,7 @@ class TimelineSettingsPage(BaseSettingsPage):
         # Future days
         future_layout = create_hbox()
         self.future_label = QLabel(self.i18n.t("settings.timeline.future_days"))
-        self.future_label.setMinimumWidth(200)
+        self.future_label.setMinimumWidth(STANDARD_LABEL_WIDTH)
         self.future_days_spin = QSpinBox()
         self.future_days_spin.setMinimum(1)
         self.future_days_spin.setMaximum(365)
@@ -95,7 +96,7 @@ class TimelineSettingsPage(BaseSettingsPage):
         # Page size
         page_size_layout = create_hbox()
         self.page_size_label = QLabel(self.i18n.t("settings.timeline.page_size"))
-        self.page_size_label.setMinimumWidth(200)
+        self.page_size_label.setMinimumWidth(STANDARD_LABEL_WIDTH)
         self.page_size_spin = QSpinBox()
         self.page_size_spin.setMinimum(1)
         self.page_size_spin.setMaximum(500)
@@ -106,7 +107,7 @@ class TimelineSettingsPage(BaseSettingsPage):
         page_size_layout.addStretch()
         self.content_layout.addLayout(page_size_layout)
 
-        self.add_spacing(20)
+        self.add_section_spacing()
 
         # Notification settings section
         self.notifications_title = QLabel(self.i18n.t("settings.timeline.notifications"))
@@ -116,9 +117,9 @@ class TimelineSettingsPage(BaseSettingsPage):
         # Reminder time
         reminder_layout = create_hbox()
         self.reminder_label = QLabel(self.i18n.t("settings.timeline.reminder_time"))
-        self.reminder_label.setMinimumWidth(200)
+        self.reminder_label.setMinimumWidth(STANDARD_LABEL_WIDTH)
         self.reminder_combo = QComboBox()
-        self.reminder_combo.addItems(["5", "10", "15", "30"])
+        self.reminder_combo.addItems([str(minutes) for minutes in TIMELINE_REMINDER_MINUTES_OPTIONS])
         self.reminder_combo.currentTextChanged.connect(self._emit_changed)
         self.reminder_suffix = QLabel(self.i18n.t("settings.timeline.minutes"))
         reminder_layout.addWidget(self.reminder_label)
@@ -127,7 +128,7 @@ class TimelineSettingsPage(BaseSettingsPage):
         reminder_layout.addStretch()
         self.content_layout.addLayout(reminder_layout)
 
-        self.add_spacing(20)
+        self.add_section_spacing()
 
         # Auto-start settings section
         self.auto_start_title = QLabel(self.i18n.t("settings.timeline.auto_start"))

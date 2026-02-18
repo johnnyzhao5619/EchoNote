@@ -1,7 +1,11 @@
 import { ref, computed, readonly } from 'vue'
 import type { GitHubRepository, GitHubRelease, GitHubStats, GitHubApiError } from '../types/github'
+import { githubConfig } from '../config/project'
 
 export function useGitHubApi(owner: string, repo: string) {
+  const apiBase = githubConfig.apiUrl.replace(/\/+$/, '')
+  const repoEndpoint = `${apiBase}/repos/${owner}/${repo}`
+
   const repository = ref<GitHubRepository | null>(null)
   const latestRelease = ref<GitHubRelease | null>(null)
   const loading = ref(false)
@@ -15,7 +19,6 @@ export function useGitHubApi(owner: string, repo: string) {
       forks: repository.value.forks_count,
       issues: repository.value.open_issues_count,
       latestRelease: latestRelease.value?.tag_name,
-      contributors: 0, // Will be fetched separately if needed
       language: repository.value.language,
     }
   })
@@ -25,7 +28,7 @@ export function useGitHubApi(owner: string, repo: string) {
       loading.value = true
       error.value = null
 
-      const response = await fetch(`https://api.github.com/repos/${owner}/${repo}`)
+      const response = await fetch(repoEndpoint)
 
       if (!response.ok) {
         const errorData: GitHubApiError = await response.json()
@@ -43,7 +46,7 @@ export function useGitHubApi(owner: string, repo: string) {
 
   const fetchLatestRelease = async (): Promise<void> => {
     try {
-      const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/releases/latest`)
+      const response = await fetch(`${repoEndpoint}/releases/latest`)
 
       if (response.ok) {
         latestRelease.value = await response.json()

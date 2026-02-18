@@ -38,6 +38,7 @@ from PySide6.QtWidgets import (
 )
 
 from ui.base_widgets import BaseWidget, create_button, create_hbox, create_vbox
+from ui.constants import PAGE_COMPACT_SPACING, PAGE_CONTENT_MARGINS, PAGE_LAYOUT_SPACING
 from ui.settings.base_page import PostSaveMessage
 from utils.i18n import I18nQtManager
 
@@ -96,7 +97,8 @@ class SettingsWidget(BaseWidget):
         """Set up the settings UI layout."""
         # Main layout
         main_layout = QVBoxLayout(self)
-        # # main_layout.setSpacing(10)
+        main_layout.setContentsMargins(*PAGE_CONTENT_MARGINS)
+        main_layout.setSpacing(PAGE_LAYOUT_SPACING)
 
         # Title
         self.title_label = QLabel(self.i18n.t("settings.title"))
@@ -104,7 +106,7 @@ class SettingsWidget(BaseWidget):
         main_layout.addWidget(self.title_label)
 
         # Content layout (category list + pages)
-        content_layout = create_hbox(spacing=20)
+        content_layout = create_hbox(spacing=PAGE_LAYOUT_SPACING)
 
         # Category list
         self.category_list = self._create_category_list()
@@ -128,7 +130,7 @@ class SettingsWidget(BaseWidget):
         main_layout.addWidget(separator)
 
         # Button layout
-        button_layout = create_hbox()
+        button_layout = create_hbox(spacing=PAGE_COMPACT_SPACING)
         button_layout.addStretch()
 
         # Reset button
@@ -160,6 +162,7 @@ class SettingsWidget(BaseWidget):
         """
         category_list = QListWidget()
         category_list.setFixedWidth(200)
+        category_list.setProperty("role", "settings-nav")
 
         # Define categories based on available pages/managers
         categories = [
@@ -199,7 +202,10 @@ class SettingsWidget(BaseWidget):
                     "transcription",
                     TranscriptionSettingsPage(self.settings_manager, self.i18n, self.managers),
                 ),
-                ("realtime", RealtimeSettingsPage(self.settings_manager, self.i18n)),
+                (
+                    "realtime",
+                    RealtimeSettingsPage(self.settings_manager, self.i18n, self.managers),
+                ),
                 ("calendar", CalendarSettingsPage(self.settings_manager, self.i18n, self.managers)),
                 ("timeline", TimelineSettingsPage(self.settings_manager, self.i18n)),
                 (

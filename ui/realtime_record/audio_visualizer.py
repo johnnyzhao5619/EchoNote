@@ -27,6 +27,7 @@ from PySide6.QtCore import QRect, QTimer
 from PySide6.QtGui import QColor, QPainter, QPen
 
 from ui.base_widgets import BaseWidget
+from ui.common.theme import ThemeManager
 
 logger = logging.getLogger(__name__)
 
@@ -61,12 +62,7 @@ class AudioVisualizer(BaseWidget):
         self.refresh_timer.start(33)  # 约 30 FPS
 
         # 颜色配置
-        self.waveform_color = QColor(33, 150, 243)  # 蓝色
-        self.volume_bar_color = QColor(76, 175, 80)  # 绿色
-        self.volume_bar_high_color = QColor(255, 152, 0)  # 橙色
-        self.volume_bar_peak_color = QColor(244, 67, 54)  # 红色
-        self.background_color = QColor(250, 250, 250)
-        self.grid_color = QColor(220, 220, 220)
+        self.update_theme_colors()
 
         if self.i18n:
             logger.info(self.i18n.t("logging.audio_visualizer.initialized"))
@@ -228,6 +224,17 @@ class AudioVisualizer(BaseWidget):
             self.volume_bar_color = volume_bar_color
         if background_color:
             self.background_color = background_color
+
+    def update_theme_colors(self):
+        """Update colors based on current theme."""
+        tm = ThemeManager()
+        self.waveform_color = tm.get_color("primary")
+        self.volume_bar_color = tm.get_color("success")
+        self.volume_bar_high_color = tm.get_color("warning")
+        self.volume_bar_peak_color = tm.get_color("error")
+        self.background_color = tm.get_color("surface") # Or background? Surface is better for cards/areas
+        self.grid_color = tm.get_color("border")
+        self.update()
 
     def stop(self):
         """停止刷新"""

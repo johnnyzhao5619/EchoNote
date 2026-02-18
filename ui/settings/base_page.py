@@ -27,6 +27,7 @@ from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QLabel, QScrollArea, QVBoxLayout, QWidget
 
 from ui.base_widgets import BaseWidget
+from ui.constants import PAGE_COMPACT_SPACING, PAGE_CONTENT_MARGINS, PAGE_LAYOUT_SPACING
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.settings.base")
@@ -49,6 +50,8 @@ class BaseSettingsPage(BaseWidget):
 
     # Signal emitted when settings change
     settings_changed = Signal()
+    COMPACT_SPACING = PAGE_COMPACT_SPACING
+    SECTION_SPACING = PAGE_LAYOUT_SPACING
 
     def __init__(self, settings_manager, i18n: I18nQtManager, parent=None):
         """
@@ -66,8 +69,8 @@ class BaseSettingsPage(BaseWidget):
 
         # Main layout
         self.main_layout = QVBoxLayout(self)
-        self.main_layout.setContentsMargins(20, 20, 20, 20)
-        self.main_layout.setSpacing(15)
+        self.main_layout.setContentsMargins(*PAGE_CONTENT_MARGINS)
+        self.main_layout.setSpacing(PAGE_LAYOUT_SPACING)
 
         # Create scroll area for content
         scroll_area = QScrollArea()
@@ -77,7 +80,8 @@ class BaseSettingsPage(BaseWidget):
         # Content widget
         self.content_widget = QWidget()
         self.content_layout = QVBoxLayout(self.content_widget)
-        self.content_layout.setSpacing(15)
+        self.content_layout.setContentsMargins(0, 0, 0, 0)
+        self.content_layout.setSpacing(PAGE_LAYOUT_SPACING)
 
         scroll_area.setWidget(self.content_widget)
         self.main_layout.addWidget(scroll_area)
@@ -96,14 +100,20 @@ class BaseSettingsPage(BaseWidget):
         label.setFont(font)
         self.content_layout.addWidget(label)
 
-    def add_spacing(self, height: int = 10):
+    def add_spacing(self, height: int | None = None):
         """
         Add vertical spacing.
 
         Args:
             height: Spacing height in pixels
         """
+        if height is None:
+            height = self.COMPACT_SPACING
         self.content_layout.addSpacing(height)
+
+    def add_section_spacing(self):
+        """Add standard spacing between major settings sections."""
+        self.content_layout.addSpacing(self.SECTION_SPACING)
 
     def load_settings(self):
         """

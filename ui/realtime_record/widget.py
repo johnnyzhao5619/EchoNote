@@ -22,6 +22,7 @@ gain adjustment, language selection, and transcription/translation display.
 
 import asyncio
 import logging
+import platform
 import threading
 from concurrent.futures import Future, TimeoutError
 from typing import Any, Dict, Optional
@@ -40,6 +41,17 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from config.constants import (
+    GAIN_SLIDER_DEFAULT,
+    GAIN_SLIDER_DIVISOR,
+    GAIN_SLIDER_MAX,
+    GAIN_SLIDER_MIN,
+)
+from core.realtime.audio_routing import (
+    detect_app_scoped_system_audio_device,
+    is_loopback_input_device,
+    is_system_audio_input_device,
+)
 from ui.base_widgets import (
     BaseWidget,
     connect_button_with_callback,
@@ -48,6 +60,26 @@ from ui.base_widgets import (
     create_secondary_button,
 )
 from ui.common.notification import get_notification_manager
+from ui.constants import (
+    DEFAULT_DURATION_DISPLAY,
+    PAGE_COMPACT_SPACING,
+    PAGE_CONTENT_MARGINS,
+    PAGE_DENSE_SPACING,
+    PAGE_LAYOUT_SPACING,
+    REALTIME_BUTTON_MIN_WIDTH,
+    REALTIME_COMBO_MIN_WIDTH,
+    REALTIME_FORM_HORIZONTAL_SPACING,
+    REALTIME_FORM_MARGINS,
+    REALTIME_GAIN_SLIDER_MAX_WIDTH,
+    REALTIME_GAIN_SLIDER_MIN_WIDTH,
+    REALTIME_GAIN_VALUE_MIN_WIDTH,
+    REALTIME_LABEL_WIDTH_LARGE,
+    REALTIME_LABEL_WIDTH_MEDIUM,
+    REALTIME_LANGUAGE_COMBO_MIN_WIDTH,
+    REALTIME_RECORD_BUTTON_MIN_WIDTH,
+    STATUS_INDICATOR_SYMBOL,
+    format_gain_display,
+)
 from utils.i18n import LANGUAGE_OPTION_KEYS
 
 logger = logging.getLogger(__name__)
@@ -120,6 +152,10 @@ class RealtimeRecordWidget(BaseWidget):
         self._audio_available = audio_capture is not None
         self.settings_manager = settings_manager
         self.model_manager = model_manager
+        self._input_devices_by_index: Dict[int, Dict[str, Any]] = {}
+        self._loopback_input_indices = set()
+        self._system_audio_input_indices = set()
+        self._form_labels: Dict[str, QLabel] = {}
 
         # Signals
         self.signals = RealtimeRecorderSignals()
@@ -135,6 +171,8 @@ class RealtimeRecordWidget(BaseWidget):
         self._future_lock = threading.Lock()
         self._cleanup_in_progress = False
         self._cleanup_done = False
+        self._recording_transition_in_progress = False
+        self._silent_input_warning_shown = False
 
         # Buffers
         self._transcription_buffer = []
@@ -217,6 +255,11 @@ class RealtimeRecordWidget(BaseWidget):
 
         logger.info(self.i18n.t("logging.realtime_record.widget_initialized"))
 
+    def update_theme(self):
+        """Update theme-dependent UI elements."""
+        if hasattr(self, "audio_visualizer"):
+            self.audio_visualizer.update_theme_colors()
+
     def _refresh_recording_preferences(self) -> None:
         """Load recording preferences from settings."""
         if self.settings_manager and hasattr(self.settings_manager, "get_realtime_preferences"):
@@ -224,11 +267,18 @@ class RealtimeRecordWidget(BaseWidget):
                 preferences = self.settings_manager.get_realtime_preferences()
                 self._recording_format = preferences.get("recording_format", "wav")
                 self._auto_save_enabled = bool(preferences.get("auto_save", True))
-                self._default_input_source = str(
-                    preferences.get("default_input_source", "default")
-                ).lower()
-                if self._default_input_source != "default":
+                default_input_source = preferences.get("default_input_source", "default")
+                if default_input_source in (None, "", "default"):
                     self._default_input_source = "default"
+                else:
+                    try:
+                        self._default_input_source = int(default_input_source)
+                    except (TypeError, ValueError):
+                        logger.warning(
+                            "Invalid default_input_source '%s'; falling back to system default",
+                            default_input_source,
+                        )
+                        self._default_input_source = "default"
 
                 gain = preferences.get("default_gain", 1.0)
                 try:
@@ -298,7 +348,13 @@ class RealtimeRecordWidget(BaseWidget):
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Failed to apply default gain: %s", exc)
 
-        if self._default_input_source == "default" and hasattr(self, "input_combo"):
+        if not hasattr(self, "input_combo"):
+            return
+
+        preferred_index = None
+        if isinstance(self._default_input_source, int):
+            preferred_index = self._default_input_source
+        else:
             default_device = None
             if self.audio_capture is not None and hasattr(
                 self.audio_capture, "get_default_input_device"
@@ -309,17 +365,22 @@ class RealtimeRecordWidget(BaseWidget):
                     logger.warning("Failed to get default input device: %s", exc)
 
             if isinstance(default_device, dict):
-                default_index = default_device.get("index")
-                if default_index is not None:
-                    combo_index = self.input_combo.findData(default_index)
-                    if combo_index >= 0:
-                        self.input_combo.setCurrentIndex(combo_index)
+                preferred_index = default_device.get("index")
+
+        if preferred_index is None:
+            return
+
+        combo_index = self.input_combo.findData(preferred_index)
+        if combo_index >= 0:
+            self.input_combo.setCurrentIndex(combo_index)
 
     def setup_ui(self):
         """Initialize the UI layout."""
         from PySide6.QtWidgets import QTabWidget
 
         main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(*PAGE_CONTENT_MARGINS)
+        main_layout.setSpacing(PAGE_LAYOUT_SPACING)
 
         # Header
         header = self._create_header_section()
@@ -364,6 +425,13 @@ class RealtimeRecordWidget(BaseWidget):
         tab = QWidget()
         tab.setObjectName("recording_tab")
         layout = QVBoxLayout(tab)
+        layout.setContentsMargins(
+            PAGE_COMPACT_SPACING,
+            PAGE_COMPACT_SPACING,
+            PAGE_COMPACT_SPACING,
+            PAGE_COMPACT_SPACING,
+        )
+        layout.setSpacing(PAGE_COMPACT_SPACING)
 
         # Settings
         settings = self._create_settings_section()
@@ -385,6 +453,13 @@ class RealtimeRecordWidget(BaseWidget):
         tab = QWidget()
         tab.setObjectName("transcription_tab")
         layout = QVBoxLayout(tab)
+        layout.setContentsMargins(
+            PAGE_COMPACT_SPACING,
+            PAGE_COMPACT_SPACING,
+            PAGE_COMPACT_SPACING,
+            PAGE_COMPACT_SPACING,
+        )
+        layout.setSpacing(PAGE_COMPACT_SPACING)
 
         # Toolbar
         toolbar = self._create_text_toolbar("transcription")
@@ -404,6 +479,13 @@ class RealtimeRecordWidget(BaseWidget):
         tab = QWidget()
         tab.setObjectName("translation_tab")
         layout = QVBoxLayout(tab)
+        layout.setContentsMargins(
+            PAGE_COMPACT_SPACING,
+            PAGE_COMPACT_SPACING,
+            PAGE_COMPACT_SPACING,
+            PAGE_COMPACT_SPACING,
+        )
+        layout.setSpacing(PAGE_COMPACT_SPACING)
 
         # Toolbar
         toolbar = self._create_text_toolbar("translation")
@@ -428,11 +510,24 @@ class RealtimeRecordWidget(BaseWidget):
         tab = QWidget()
         tab.setObjectName("markers_tab")
         layout = QVBoxLayout(tab)
+        layout.setContentsMargins(
+            PAGE_COMPACT_SPACING,
+            PAGE_COMPACT_SPACING,
+            PAGE_COMPACT_SPACING,
+            PAGE_COMPACT_SPACING,
+        )
+        layout.setSpacing(PAGE_COMPACT_SPACING)
 
         # Toolbar
         toolbar = QWidget()
         toolbar.setObjectName("markers_toolbar")
         toolbar_layout = QHBoxLayout(toolbar)
+        toolbar_layout.setContentsMargins(PAGE_COMPACT_SPACING, PAGE_DENSE_SPACING, PAGE_COMPACT_SPACING, PAGE_DENSE_SPACING)
+        toolbar_layout.setSpacing(PAGE_COMPACT_SPACING)
+
+        self.markers_panel_title = QLabel(self.i18n.t("realtime_record.markers"))
+        self.markers_panel_title.setObjectName("panel_title")
+        toolbar_layout.addWidget(self.markers_panel_title)
         toolbar_layout.addStretch()
 
         # Clear Button
@@ -459,6 +554,18 @@ class RealtimeRecordWidget(BaseWidget):
         toolbar = QWidget()
         toolbar.setObjectName("text_toolbar")
         layout = QHBoxLayout(toolbar)
+        layout.setContentsMargins(PAGE_COMPACT_SPACING, PAGE_DENSE_SPACING, PAGE_COMPACT_SPACING, PAGE_DENSE_SPACING)
+        layout.setSpacing(PAGE_COMPACT_SPACING)
+
+        title_key = (
+            "realtime_record.transcription_text"
+            if text_type == "transcription"
+            else "realtime_record.translation_text"
+        )
+        panel_title = QLabel(self.i18n.t(title_key))
+        panel_title.setObjectName("panel_title")
+        layout.addWidget(panel_title)
+        layout.addSpacing(8)
 
         # Word Count
         word_count_label = QLabel("0 " + self.i18n.t("common.words"))
@@ -467,8 +574,10 @@ class RealtimeRecordWidget(BaseWidget):
 
         if text_type == "transcription":
             self.transcription_word_count = word_count_label
+            self.transcription_panel_title = panel_title
         else:
             self.translation_word_count = word_count_label
+            self.translation_panel_title = panel_title
 
         layout.addStretch()
 
@@ -496,6 +605,8 @@ class RealtimeRecordWidget(BaseWidget):
         section = QWidget()
         section.setObjectName("status_section")
         layout = QVBoxLayout(section)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(PAGE_DENSE_SPACING)
 
         # Feedback Label
         self.feedback_label = QLabel()
@@ -508,8 +619,10 @@ class RealtimeRecordWidget(BaseWidget):
         status_bar = QWidget()
         status_bar.setObjectName("status_bar")
         status_layout = QHBoxLayout(status_bar)
+        status_layout.setContentsMargins(PAGE_COMPACT_SPACING, PAGE_DENSE_SPACING, PAGE_COMPACT_SPACING, PAGE_DENSE_SPACING)
+        status_layout.setSpacing(PAGE_DENSE_SPACING)
 
-        self.status_indicator = QLabel("●")
+        self.status_indicator = QLabel(STATUS_INDICATOR_SYMBOL)
         self.status_indicator.setObjectName("status_indicator")
         status_layout.addWidget(self.status_indicator)
 
@@ -547,19 +660,21 @@ class RealtimeRecordWidget(BaseWidget):
         container = QWidget()
         container.setObjectName("header_section")
         layout = QHBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(PAGE_COMPACT_SPACING)
 
         self.title_label = QLabel(self.i18n.t("realtime_record.title"))
         self.title_label.setObjectName("page_title")
         layout.addWidget(self.title_label)
         layout.addStretch()
 
-        self.duration_value_label = QLabel("00:00:00")
+        self.duration_value_label = QLabel(DEFAULT_DURATION_DISPLAY)
         self.duration_value_label.setObjectName("duration_display")
         layout.addWidget(self.duration_value_label)
 
         self.add_marker_button = create_secondary_button(self.i18n.t("realtime_record.add_marker"))
         self.add_marker_button.setMinimumHeight(36)
-        self.add_marker_button.setMinimumWidth(100)
+        self.add_marker_button.setMinimumWidth(REALTIME_BUTTON_MIN_WIDTH)
         self.add_marker_button.setEnabled(False)
         self.add_marker_button.clicked.connect(self._add_marker)
         layout.addWidget(self.add_marker_button)
@@ -567,7 +682,7 @@ class RealtimeRecordWidget(BaseWidget):
         self.record_button = QPushButton()
         self.record_button.setObjectName("record_button")
         self.record_button.setMinimumHeight(36)
-        self.record_button.setMinimumWidth(120)
+        self.record_button.setMinimumWidth(REALTIME_RECORD_BUTTON_MIN_WIDTH)
         connect_button_with_callback(self.record_button, self._toggle_recording)
         layout.addWidget(self.record_button)
 
@@ -582,69 +697,85 @@ class RealtimeRecordWidget(BaseWidget):
         form = QFormLayout(container)
         form.setLabelAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
+        form.setContentsMargins(*REALTIME_FORM_MARGINS)
+        form.setHorizontalSpacing(REALTIME_FORM_HORIZONTAL_SPACING)
+        form.setVerticalSpacing(PAGE_COMPACT_SPACING)
+        self._form_labels.clear()
+
+        def create_inline_container() -> tuple[QWidget, QHBoxLayout]:
+            inline_container = QWidget()
+            inline_container.setProperty("role", "settings-inline")
+            inline_layout = QHBoxLayout(inline_container)
+            inline_layout.setContentsMargins(0, 0, 0, 0)
+            inline_layout.setSpacing(PAGE_DENSE_SPACING)
+            return inline_container, inline_layout
 
         # Row 1: Device and Gain
-        row1 = create_hbox(spacing=24)
-        device_container = QWidget()
-        device_layout = QHBoxLayout(device_container)
+        row1 = create_hbox(spacing=PAGE_COMPACT_SPACING)
+        device_container, device_layout = create_inline_container()
         device_label = QLabel(self.i18n.t("realtime_record.audio_input") + ":")
-        device_label.setObjectName("form_label")
-        device_label.setMinimumWidth(100)
+        device_label.setObjectName("input_label")
+        self._form_labels["audio_input"] = device_label
+        device_label.setMinimumWidth(REALTIME_LABEL_WIDTH_LARGE)
         device_layout.addWidget(device_label)
         self.input_combo = QComboBox()
-        self.input_combo.setObjectName("form_combo")
-        self.input_combo.setMinimumWidth(200)
+        self.input_combo.setMinimumWidth(REALTIME_COMBO_MIN_WIDTH)
         self._populate_input_devices()
+        self.input_combo.currentIndexChanged.connect(self._on_input_device_changed)
         device_layout.addWidget(self.input_combo)
         row1.addWidget(device_container)
 
-        gain_container = QWidget()
-        gain_layout = QHBoxLayout(gain_container)
+        gain_container, gain_layout = create_inline_container()
         gain_label = QLabel(self.i18n.t("realtime_record.gain") + ":")
-        gain_label.setObjectName("form_label")
-        gain_label.setMinimumWidth(80)
+        gain_label.setObjectName("gain_label")
+        self._form_labels["gain"] = gain_label
+        gain_label.setMinimumWidth(REALTIME_LABEL_WIDTH_MEDIUM)
         gain_layout.addWidget(gain_label)
         self.gain_slider = QSlider(Qt.Orientation.Horizontal)
         self.gain_slider.setObjectName("form_slider")
-        self.gain_slider.setMinimum(10)
-        self.gain_slider.setMaximum(200)
-        self.gain_slider.setValue(100)
-        self.gain_slider.setMinimumWidth(150)
-        self.gain_slider.setMaximumWidth(200)
+        self.gain_slider.setMinimum(GAIN_SLIDER_MIN)
+        self.gain_slider.setMaximum(GAIN_SLIDER_MAX)
+        self.gain_slider.setValue(GAIN_SLIDER_DEFAULT)
+        self.gain_slider.setMinimumWidth(REALTIME_GAIN_SLIDER_MIN_WIDTH)
+        self.gain_slider.setMaximumWidth(REALTIME_GAIN_SLIDER_MAX_WIDTH)
         self.gain_slider.valueChanged.connect(self._on_gain_changed)
         gain_layout.addWidget(self.gain_slider)
-        self.gain_value_label = QLabel("1.0x")
-        self.gain_value_label.setObjectName("form_value")
-        self.gain_value_label.setMinimumWidth(40)
+        self.gain_value_label = QLabel(format_gain_display(GAIN_SLIDER_DEFAULT / GAIN_SLIDER_DIVISOR))
+        self.gain_value_label.setObjectName("gain_value_label")
+        self.gain_value_label.setMinimumWidth(REALTIME_GAIN_VALUE_MIN_WIDTH)
         gain_layout.addWidget(self.gain_value_label)
         row1.addWidget(gain_container)
         row1.addStretch()
         form.addRow(row1)
 
+        self.capture_plan_label = QLabel()
+        self.capture_plan_label.setObjectName("capture_plan_label")
+        self.capture_plan_label.setProperty("role", "device-info")
+        self.capture_plan_label.setWordWrap(True)
+        form.addRow(self.capture_plan_label)
+
         # Row 2: Model and Language
-        row2 = create_hbox(spacing=24)
+        row2 = create_hbox(spacing=PAGE_COMPACT_SPACING)
         if self.model_manager:
-            model_container = QWidget()
-            model_layout = QHBoxLayout(model_container)
+            model_container, model_layout = create_inline_container()
             model_label = QLabel(self.i18n.t("realtime_record.model") + ":")
-            model_label.setObjectName("form_label")
-            model_label.setMinimumWidth(100)
+            model_label.setObjectName("engine_label")
+            self._form_labels["model"] = model_label
+            model_label.setMinimumWidth(REALTIME_LABEL_WIDTH_LARGE)
             model_layout.addWidget(model_label)
             self.model_combo = QComboBox()
-            self.model_combo.setObjectName("form_combo")
-            self.model_combo.setMinimumWidth(200)
+            self.model_combo.setMinimumWidth(REALTIME_COMBO_MIN_WIDTH)
             model_layout.addWidget(self.model_combo)
             row2.addWidget(model_container)
 
-        source_container = QWidget()
-        source_layout = QHBoxLayout(source_container)
+        source_container, source_layout = create_inline_container()
         source_label = QLabel(self.i18n.t("realtime_record.source_language") + ":")
-        source_label.setObjectName("form_label")
-        source_label.setMinimumWidth(80)
+        source_label.setObjectName("source_lang_label")
+        self._form_labels["source_language"] = source_label
+        source_label.setMinimumWidth(REALTIME_LABEL_WIDTH_MEDIUM)
         source_layout.addWidget(source_label)
         self.source_lang_combo = QComboBox()
-        self.source_lang_combo.setObjectName("form_combo")
-        self.source_lang_combo.setMinimumWidth(150)
+        self.source_lang_combo.setMinimumWidth(REALTIME_LANGUAGE_COMBO_MIN_WIDTH)
         for code, label_key in self.LANGUAGE_OPTIONS:
             self.source_lang_combo.addItem(self.i18n.t(label_key), code)
         source_layout.addWidget(self.source_lang_combo)
@@ -653,11 +784,11 @@ class RealtimeRecordWidget(BaseWidget):
         form.addRow(row2)
 
         # Row 3: Translation
-        row3 = create_hbox(spacing=24)
+        row3 = create_hbox(spacing=PAGE_COMPACT_SPACING)
         self.enable_translation_checkbox = QCheckBox(
             self.i18n.t("realtime_record.enable_translation")
         )
-        self.enable_translation_checkbox.setObjectName("enable_translation_checkbox")
+        self.enable_translation_checkbox.setObjectName("form_checkbox")
         self.enable_translation_checkbox.stateChanged.connect(self._on_translation_toggled)
 
         if not self.recorder.translation_engine:
@@ -666,17 +797,16 @@ class RealtimeRecordWidget(BaseWidget):
             self.enable_translation_checkbox.setToolTip(tooltip)
 
         row3.addWidget(self.enable_translation_checkbox)
-        row3.addSpacing(16)
+        row3.addSpacing(PAGE_DENSE_SPACING)
 
-        target_container = QWidget()
-        target_layout = QHBoxLayout(target_container)
+        target_container, target_layout = create_inline_container()
         target_label = QLabel(self.i18n.t("realtime_record.target_language") + ":")
-        target_label.setObjectName("form_label")
-        target_label.setMinimumWidth(80)
+        target_label.setObjectName("target_lang_label")
+        self._form_labels["target_language"] = target_label
+        target_label.setMinimumWidth(REALTIME_LABEL_WIDTH_MEDIUM)
         target_layout.addWidget(target_label)
         self.target_lang_combo = QComboBox()
-        self.target_lang_combo.setObjectName("form_combo")
-        self.target_lang_combo.setMinimumWidth(150)
+        self.target_lang_combo.setMinimumWidth(REALTIME_LANGUAGE_COMBO_MIN_WIDTH)
         self.target_lang_combo.setEnabled(False)
         for code, label_key in self.LANGUAGE_OPTIONS:
             self.target_lang_combo.addItem(self.i18n.t(label_key), code)
@@ -699,6 +829,8 @@ class RealtimeRecordWidget(BaseWidget):
         container = QWidget()
         container.setObjectName("visualizer_section")
         layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(PAGE_DENSE_SPACING)
 
         self.audio_visualizer = AudioVisualizer(parent=self, i18n=self.i18n)
         self.audio_visualizer.setMinimumHeight(60)
@@ -718,28 +850,318 @@ class RealtimeRecordWidget(BaseWidget):
 
     def _populate_input_devices(self):
         """Populate audio input devices combo box."""
+        self._input_devices_by_index = {}
+        self._loopback_input_indices = set()
+        self._system_audio_input_indices = set()
         if self.audio_capture is None:
             self.input_combo.clear()
             self.input_combo.addItem(self.i18n.t("realtime_record.audio_unavailable_short"), None)
+            self._update_capture_plan_message()
             return
 
         try:
             devices = self.audio_capture.get_input_devices()
+            if not isinstance(devices, list):
+                devices = []
             self.input_combo.clear()
 
             if not devices:
                 self.input_combo.addItem(self.i18n.t("realtime_record.no_input_devices"), None)
+                self._update_capture_plan_message()
                 return
 
             for device in devices:
-                self.input_combo.addItem(device["name"], device["index"])
+                index = device.get("index")
+                if index is None:
+                    continue
+                try:
+                    device_index = int(index)
+                except (TypeError, ValueError):
+                    continue
+
+                self._input_devices_by_index[device_index] = dict(device)
+                is_loopback = is_loopback_input_device(device)
+                is_system_audio = is_system_audio_input_device(device)
+                if is_loopback:
+                    self._loopback_input_indices.add(device_index)
+                if is_system_audio:
+                    self._system_audio_input_indices.add(device_index)
+
+                display_name = str(device.get("name", "Unknown"))
+                app_scoped_source = detect_app_scoped_system_audio_device(display_name)
+                if is_loopback:
+                    display_name = f"{display_name} (Loopback)"
+                elif is_system_audio:
+                    display_name = f"{display_name} (System Audio)"
+
+                self.input_combo.addItem(display_name, device_index)
+                logger.info(
+                    "Input device classified: index=%s, name='%s', loopback=%s, system_audio=%s, scoped_app='%s'",
+                    device_index,
+                    device.get("name", "Unknown"),
+                    is_loopback,
+                    is_system_audio,
+                    app_scoped_source or "none",
+                )
 
             logger.info(f"Populated {len(devices)} input devices")
+            self._update_capture_plan_message()
         except Exception as e:
             logger.error(f"Failed to populate input devices: {e}")
             self.input_combo.addItem(
                 self.i18n.t("ui_strings.realtime_record.error_loading_devices"), None
             )
+            self._update_capture_plan_message()
+
+    def _on_input_device_changed(self) -> None:
+        """Refresh route guidance when input device selection changes."""
+        self._update_capture_plan_message()
+
+    def _tr(self, key: str, default: str, **kwargs) -> str:
+        """Translate with fallback when locale key is missing."""
+        try:
+            translated = self.i18n.t(key, **kwargs)
+            if translated and translated != key:
+                return translated
+        except Exception:
+            pass
+        try:
+            return default.format(**kwargs)
+        except Exception:
+            return default
+
+    def _get_selected_input_device_info(self) -> Optional[Dict[str, Any]]:
+        """Return selected input device metadata when available."""
+        if not hasattr(self, "input_combo"):
+            return None
+        selected_index = self.input_combo.currentData()
+        if selected_index is None:
+            return None
+        try:
+            lookup_index = int(selected_index)
+        except (TypeError, ValueError):
+            return None
+        return self._input_devices_by_index.get(lookup_index)
+
+    def _get_selected_input_device_name(self) -> str:
+        """Return selected input device name with safe fallback."""
+        selected = self._get_selected_input_device_info()
+        if selected:
+            name = selected.get("name")
+            if isinstance(name, str) and name.strip():
+                return name.strip()
+        if hasattr(self, "input_combo"):
+            label = self.input_combo.currentText().strip()
+            if label:
+                return label.replace(" (Loopback)", "").replace(" (System Audio)", "")
+        return "Unknown input device"
+
+    def _selected_input_is_loopback(self) -> bool:
+        """Return whether current selected input appears to be a loopback route."""
+        if not hasattr(self, "input_combo"):
+            return False
+        selected_index = self.input_combo.currentData()
+        try:
+            lookup_index = int(selected_index)
+        except (TypeError, ValueError):
+            return False
+        return lookup_index in self._loopback_input_indices
+
+    def _selected_input_is_system_audio(self) -> bool:
+        """Return whether current selected input appears to capture system/meeting audio."""
+        if not hasattr(self, "input_combo"):
+            return False
+        selected_index = self.input_combo.currentData()
+        try:
+            lookup_index = int(selected_index)
+        except (TypeError, ValueError):
+            return False
+        return lookup_index in self._system_audio_input_indices
+
+    def _loopback_install_hint(self) -> str:
+        """Return platform-specific hint for setting up loopback capture."""
+        system_name = platform.system().lower()
+        if system_name == "darwin":
+            return self._tr(
+                "realtime_record.routing.install_hint_macos",
+                "Install BlackHole/Loopback and route app output to that virtual input.",
+            )
+        if system_name == "windows":
+            return self._tr(
+                "realtime_record.routing.install_hint_windows",
+                "Enable Stereo Mix or install VB-CABLE and use it as recording input.",
+            )
+        return self._tr(
+            "realtime_record.routing.install_hint_linux",
+            "Use PipeWire/PulseAudio monitor source or a virtual loopback input device.",
+        )
+
+    def _get_loopback_device_names(self) -> str:
+        """Return a comma-separated loopback device name summary."""
+        names = []
+        for index in sorted(self._loopback_input_indices):
+            device = self._input_devices_by_index.get(index, {})
+            name = str(device.get("name", "")).strip()
+            if name:
+                names.append(name)
+        return ", ".join(names)
+
+    def _get_system_audio_device_names(self) -> str:
+        """Return a comma-separated system-audio candidate device summary."""
+        names = []
+        for index in sorted(self._system_audio_input_indices):
+            device = self._input_devices_by_index.get(index, {})
+            name = str(device.get("name", "")).strip()
+            if name:
+                names.append(name)
+        return ", ".join(names)
+
+    def _build_silent_input_guidance(
+        self,
+        input_device_name: str,
+        input_device_is_loopback: bool,
+        input_device_is_system_audio: bool,
+    ) -> str:
+        """Build actionable guidance for silent recordings."""
+        device_hint = f" Current device: {input_device_name}." if input_device_name else ""
+        if input_device_is_loopback:
+            return self._tr(
+                "realtime_record.routing.silent_loopback",
+                "No audible input was captured from the selected loopback route. "
+                "Check the system output routing and the meeting/video app output device."
+                "{device_hint}",
+                device_hint=device_hint,
+            )
+
+        if input_device_is_system_audio:
+            app_scope = detect_app_scoped_system_audio_device(input_device_name)
+            if app_scope:
+                return self._tr(
+                    "realtime_record.routing.silent_system_audio_scoped",
+                    "No audible input was captured from the selected {app_name} system-audio input. "
+                    "This route usually only carries {app_name} playback, not browser/local video output. "
+                    "Verify {app_name} output routing and ensure {app_name} audio is currently playing."
+                    "{device_hint}",
+                    app_name=app_scope,
+                    device_hint=device_hint,
+                )
+            return self._tr(
+                "realtime_record.routing.silent_system_audio",
+                "No audible input was captured from the selected system-audio input. "
+                "Verify meeting/video app output routing and ensure audio is being played to this input route."
+                "{device_hint}",
+                device_hint=device_hint,
+            )
+
+        if self._loopback_input_indices:
+            loopback_names = self._get_loopback_device_names()
+            return self._tr(
+                "realtime_record.routing.silent_with_loopback_options",
+                "No audible input was captured. For system audio or online meeting capture, "
+                "switch to a loopback input ({loopback_names}) and route meeting/video output to it."
+                "{device_hint}",
+                loopback_names=loopback_names,
+                device_hint=device_hint,
+            )
+
+        if self._system_audio_input_indices:
+            system_names = self._get_system_audio_device_names()
+            return self._tr(
+                "realtime_record.routing.silent_with_system_audio_options",
+                "No audible input was captured. System-audio candidates were detected "
+                "({system_names}). These routes are often app-scoped and may not capture "
+                "browser/local video playback. For browser/local playback capture, use a loopback "
+                "input (e.g., BlackHole/Loopback). If you just installed a loopback driver, restart "
+                "macOS and reopen EchoNote before retrying."
+                "{device_hint}",
+                system_names=system_names,
+                device_hint=device_hint,
+            )
+
+        return self._tr(
+            "realtime_record.routing.silent_no_system_audio",
+            "No audible input was captured. Microphone inputs usually do not capture system playback. "
+            "No loopback input is currently available. {install_hint} "
+            "For online meetings, route meeting output to loopback and keep mic as meeting input."
+            "{device_hint}",
+            install_hint=self._loopback_install_hint(),
+            device_hint=device_hint,
+        )
+
+    def _update_capture_plan_message(self) -> None:
+        """Render a concise capture plan covering system audio and online meetings."""
+        label = getattr(self, "capture_plan_label", None)
+        if label is None:
+            return
+
+        if not self._audio_available:
+            label.clear()
+            label.setVisible(False)
+            return
+
+        selected_name = self._get_selected_input_device_name()
+        selected_is_loopback = self._selected_input_is_loopback()
+        selected_is_system_audio = self._selected_input_is_system_audio()
+
+        if self._loopback_input_indices:
+            if selected_is_loopback:
+                message = self._tr(
+                    "realtime_record.routing.plan_loopback_selected",
+                    "Loopback route ready. For online meetings, route speaker output to this loopback "
+                    "device and keep your microphone selected in the meeting app. "
+                    "If you need both local mic and remote audio in one recording track, use an "
+                    "aggregate/virtual mixer input.",
+                )
+            else:
+                loopback_names = self._get_loopback_device_names()
+                message = self._tr(
+                    "realtime_record.routing.plan_loopback_available",
+                    "Loopback input detected ({loopback_names}). Current input is '{selected_name}'. "
+                    "If you need system audio or online meeting playback capture, switch input to loopback.",
+                    loopback_names=loopback_names,
+                    selected_name=selected_name,
+                )
+        elif self._system_audio_input_indices:
+            system_names = self._get_system_audio_device_names()
+            if selected_is_system_audio:
+                app_scope = detect_app_scoped_system_audio_device(selected_name)
+                if app_scope:
+                    message = self._tr(
+                        "realtime_record.routing.plan_system_audio_selected_scoped",
+                        "{app_name} system-audio route selected. This input usually captures {app_name} playback only. "
+                        "For browser/local video playback capture, use a loopback virtual input "
+                        "(e.g., BlackHole/Loopback). If loopback was just installed, restart macOS "
+                        "and reopen EchoNote so the endpoint appears in device list.",
+                        app_name=app_scope,
+                    )
+                else:
+                    message = self._tr(
+                        "realtime_record.routing.plan_system_audio_selected",
+                        "System-audio input route selected. For online meetings, verify that meeting app output "
+                        "is routed to this device; keep meeting microphone as your physical mic.",
+                    )
+            else:
+                message = self._tr(
+                    "realtime_record.routing.plan_system_audio_available",
+                    "System-audio candidates detected ({system_names}). Current input is '{selected_name}'. "
+                    "If you need online meeting playback capture, select one of these system-audio inputs. "
+                    "For browser/local video playback capture, use a loopback input (e.g., BlackHole/Loopback); "
+                    "if loopback was just installed, restart macOS and reopen EchoNote.",
+                    system_names=system_names,
+                    selected_name=selected_name,
+                )
+        else:
+            message = self._tr(
+                "realtime_record.routing.plan_no_system_audio",
+                "No loopback input detected. {install_hint} "
+                "For online meetings, recommended route: meeting output -> loopback input, "
+                "meeting microphone -> physical mic. For mixed local+remote capture, use an "
+                "aggregate/virtual mixer input.",
+                install_hint=self._loopback_install_hint(),
+            )
+
+        label.setText(message)
+        label.setVisible(True)
 
     def _update_audio_availability(self):
         """Update UI based on audio availability."""
@@ -764,7 +1186,9 @@ class RealtimeRecordWidget(BaseWidget):
         short_text = self.i18n.t("realtime_record.audio_unavailable_short")
 
         if getattr(self, "record_button", None):
-            self.record_button.setEnabled(self._audio_available)
+            self.record_button.setEnabled(
+                self._audio_available and not self._recording_transition_in_progress
+            )
             self.record_button.setToolTip("" if self._audio_available else tooltip)
 
         if getattr(self, "add_marker_button", None):
@@ -787,8 +1211,14 @@ class RealtimeRecordWidget(BaseWidget):
         if not self._audio_available and hasattr(self, "input_combo"):
             self.input_combo.clear()
             self.input_combo.addItem(short_text, None)
+            self._input_devices_by_index = {}
+            self._loopback_input_indices = set()
+            self._system_audio_input_indices = set()
+            self._update_capture_plan_message()
         elif self._audio_available and not previous_state:
             self._populate_input_devices()
+        else:
+            self._update_capture_plan_message()
 
     def _update_model_list(self):
         """Update model combo box."""
@@ -908,23 +1338,17 @@ class RealtimeRecordWidget(BaseWidget):
             self.add_marker_button.setText(self.i18n.t("realtime_record.add_marker"))
 
     def _update_form_labels(self):
-        label_map = {
-            "form_label": {
-                "audio": "realtime_record.audio_input",
-                "gain": "realtime_record.gain",
-                "model": "realtime_record.model",
-                "source": "realtime_record.source_language",
-                "target": "realtime_record.target_language",
-            }
+        text_map = {
+            "audio_input": "realtime_record.audio_input",
+            "gain": "realtime_record.gain",
+            "model": "realtime_record.model",
+            "source_language": "realtime_record.source_language",
+            "target_language": "realtime_record.target_language",
         }
-        for object_name, keywords in label_map.items():
-            labels = self.findChildren(QLabel, object_name)
-            for label in labels:
-                text = label.text().lower().replace(":", "")
-                for keyword, i18n_key in keywords.items():
-                    if keyword in text:
-                        label.setText(self.i18n.t(i18n_key) + ":")
-                        break
+        for key, i18n_key in text_map.items():
+            label = self._form_labels.get(key)
+            if label is not None:
+                label.setText(self.i18n.t(i18n_key) + ":")
         if hasattr(self, "enable_translation_checkbox"):
             self.enable_translation_checkbox.setText(
                 self.i18n.t("realtime_record.enable_translation")
@@ -943,18 +1367,15 @@ class RealtimeRecordWidget(BaseWidget):
                         combo.setItemText(index, self.i18n.t(label_key))
 
     def _update_panel_titles(self):
-        panel_titles = self.findChildren(QLabel, "panel_title")
-        title_map = {
-            "transcription": "realtime_record.transcription_text",
-            "translation": "realtime_record.translation_text",
-            "marker": "realtime_record.markers",
-        }
-        for label in panel_titles:
-            text = label.text().lower()
-            for keyword, i18n_key in title_map.items():
-                if keyword in text:
-                    label.setText(self.i18n.t(i18n_key))
-                    break
+        title_refs = (
+            ("transcription_panel_title", "realtime_record.transcription_text"),
+            ("translation_panel_title", "realtime_record.translation_text"),
+            ("markers_panel_title", "realtime_record.markers"),
+        )
+        for attr, i18n_key in title_refs:
+            label = getattr(self, attr, None)
+            if label is not None:
+                label.setText(self.i18n.t(i18n_key))
         if hasattr(self, "export_transcription_button"):
             self.export_transcription_button.setToolTip(
                 self.i18n.t("realtime_record.export_transcription")
@@ -1129,6 +1550,7 @@ class RealtimeRecordWidget(BaseWidget):
     def _show_error(self, error: str):
         error_detail = error or self.i18n.t("errors.unknown_error")
         logger.error("Recording error: %s", error_detail)
+        self._set_recording_transition(False)
 
         prefix = self.i18n.t("realtime_record.feedback.error_prefix")
         label_message = f"{prefix}: {error_detail}"
@@ -1148,6 +1570,8 @@ class RealtimeRecordWidget(BaseWidget):
     @Slot()
     def _on_recording_started(self):
         logger.info(self.i18n.t("logging.realtime_record.updating_ui_recording_started"))
+        self._set_recording_transition(False)
+        self._silent_input_warning_shown = False
         self.record_button.setText(self.i18n.t("realtime_record.stop_recording"))
         self.record_button.setProperty("recording", True)
         self.record_button.style().unpolish(self.record_button)
@@ -1166,6 +1590,7 @@ class RealtimeRecordWidget(BaseWidget):
     @Slot()
     def _on_recording_stopped(self):
         logger.info(self.i18n.t("logging.realtime_record.updating_ui_recording_stopped"))
+        self._set_recording_transition(False)
         self.record_button.setText(self.i18n.t("realtime_record.start_recording"))
         self.record_button.setProperty("recording", False)
         self.record_button.style().unpolish(self.record_button)
@@ -1188,6 +1613,7 @@ class RealtimeRecordWidget(BaseWidget):
         self.signals.status_changed.emit(
             status.get("is_recording", False), status.get("duration", 0.0)
         )
+        self._maybe_show_live_silent_input_warning(status)
 
     def _reset_markers_ui(self):
         self._markers.clear()
@@ -1200,8 +1626,8 @@ class RealtimeRecordWidget(BaseWidget):
                 logger.warning("Failed to clear recorder markers: %s", exc)
 
     def _on_gain_changed(self, value: int):
-        gain = value / 100.0
-        self.gain_value_label.setText(f"{gain:.1f}x")
+        gain = value / GAIN_SLIDER_DIVISOR
+        self.gain_value_label.setText(format_gain_display(gain))
         if self.audio_capture is not None:
             self.audio_capture.set_gain(gain)
 
@@ -1266,6 +1692,44 @@ class RealtimeRecordWidget(BaseWidget):
             logger.error("Recorder rejected marker: %s", warning)
             self.signals.error_occurred.emit(warning)
 
+    def _set_recording_transition(self, active: bool) -> None:
+        """Toggle UI interactivity while start/stop is in progress."""
+        self._recording_transition_in_progress = bool(active)
+        if hasattr(self, "record_button"):
+            self.record_button.setEnabled(self._audio_available and not active)
+        if hasattr(self, "add_marker_button"):
+            self.add_marker_button.setEnabled(
+                self._audio_available and self.recorder.is_recording and not active
+            )
+
+    def _has_pending_worker_tasks(self) -> bool:
+        with self._future_lock:
+            return any(not future.done() for future in self._pending_futures)
+
+    def _maybe_show_live_silent_input_warning(self, status: Dict[str, Any]) -> None:
+        """Warn once when recording receives only silent samples for a while."""
+        if self._silent_input_warning_shown:
+            return
+        if not status.get("audio_input_silent"):
+            return
+        if status.get("duration", 0.0) < 2.0:
+            return
+        if int(status.get("audio_chunks_received", 0)) <= 0:
+            return
+
+        input_device_name = str(status.get("input_device_name") or "").strip()
+        input_device_is_loopback = bool(status.get("input_device_is_loopback", False))
+        input_device_is_system_audio = bool(status.get("input_device_is_system_audio", False))
+        self._silent_input_warning_shown = True
+        self._update_status_message(
+            self._build_silent_input_guidance(
+                input_device_name,
+                input_device_is_loopback,
+                input_device_is_system_audio,
+            ),
+            "warning",
+        )
+
     def _toggle_recording(self):
         if not self._audio_available:
             warning = self.i18n.t("realtime_record.audio_unavailable_tooltip")
@@ -1273,13 +1737,19 @@ class RealtimeRecordWidget(BaseWidget):
             self.signals.error_occurred.emit(warning)
             return
 
+        if self._recording_transition_in_progress or self._has_pending_worker_tasks():
+            logger.info("Recording transition in progress; ignoring repeated toggle request")
+            return
+
         if not self.recorder.is_recording:
             start_request = self._prepare_start_request()
             if start_request is None:
                 return
             self._clear_session_ui()
+            self._set_recording_transition(True)
             self._submit_worker_task(self._start_recording(start_request))
         else:
+            self._set_recording_transition(True)
             self._submit_worker_task(self._stop_recording())
 
     def _prepare_start_request(self) -> Optional[Dict[str, Any]]:
@@ -1328,6 +1798,7 @@ class RealtimeRecordWidget(BaseWidget):
 
     def _clear_session_ui(self) -> None:
         """Reset visual state before starting a new recording session."""
+        self._silent_input_warning_shown = False
         with self._buffer_lock:
             self._transcription_buffer.clear()
             self._translation_buffer.clear()
@@ -1418,15 +1889,69 @@ class RealtimeRecordWidget(BaseWidget):
         else:
             detail = self.i18n.t("realtime_record.feedback.success_detail", duration=duration_text)
 
-        label_message = f"{success_prefix}: {detail}"
-        self._update_status_message(label_message, "success")
+        create_event_requested = bool(result.get("create_calendar_event_requested", False))
+        event_id = result.get("event_id") or ""
+        event_error = result.get("calendar_event_error") or ""
+        event_creation_failed = create_event_requested and not event_id
+        audio_input_silent = bool(result.get("audio_input_silent", False))
+        input_device_name = str(result.get("input_device_name") or "").strip()
+        input_device_is_loopback = bool(result.get("input_device_is_loopback", False))
+        input_device_is_system_audio = bool(result.get("input_device_is_system_audio", False))
+        silent_audio_detail = self._build_silent_input_guidance(
+            input_device_name,
+            input_device_is_loopback,
+            input_device_is_system_audio,
+        )
+
+        if event_creation_failed or audio_input_silent:
+            warning_parts = [detail]
+            if event_creation_failed:
+                warning_parts.append(
+                    f"Calendar event creation failed: {event_error or 'Unknown error'}"
+                )
+            if audio_input_silent:
+                warning_parts.append(silent_audio_detail)
+            warning_detail = " | ".join(warning_parts)
+            label_message = f"{success_prefix}: {warning_detail}"
+            self._update_status_message(label_message, "warning")
+            logger.warning(warning_detail)
+        else:
+            label_message = f"{success_prefix}: {detail}"
+            self._update_status_message(label_message, "success")
+
+        if event_id:
+            self._refresh_event_views()
 
         if self._notification_manager is not None:
             try:
                 title = self.i18n.t("notifications.recording_saved")
-                self._notification_manager.send_success(title, detail)
+                if event_creation_failed or audio_input_silent:
+                    self._notification_manager.send_warning(title, label_message)
+                else:
+                    self._notification_manager.send_success(title, detail)
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Failed to send success notification: %s", exc, exc_info=True)
+
+    def _refresh_event_views(self) -> None:
+        """Refresh timeline and calendar views after recording event creation."""
+        main_window = self.window()
+        if main_window is None:
+            return
+
+        pages = getattr(main_window, "pages", {})
+        timeline_widget = pages.get("timeline") if isinstance(pages, dict) else None
+        if timeline_widget and hasattr(timeline_widget, "load_timeline_events"):
+            try:
+                timeline_widget.load_timeline_events(reset=True)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Failed to refresh timeline after recording: %s", exc)
+
+        calendar_widget = pages.get("calendar_hub") if isinstance(pages, dict) else None
+        if calendar_widget and hasattr(calendar_widget, "_refresh_current_view"):
+            try:
+                calendar_widget._refresh_current_view()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Failed to refresh calendar after recording: %s", exc)
 
     def _export_transcription(self):
         from PySide6.QtWidgets import QFileDialog

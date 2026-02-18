@@ -36,6 +36,7 @@ from PySide6.QtWidgets import (
 )
 
 from ui.base_widgets import BaseWidget, connect_button_with_callback, create_button, create_hbox
+from ui.common.theme import ThemeManager
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.timeline.transcript_viewer")
@@ -93,7 +94,6 @@ class TranscriptViewer(BaseWidget):
     def setup_ui(self):
         """Set up the viewer UI."""
         layout = QVBoxLayout(self)
-        # # layout.setSpacing(10)
 
         # File name label
         file_name = Path(self.file_path).name
@@ -278,9 +278,7 @@ class TranscriptViewer(BaseWidget):
 
     def _get_theme_highlight_color(self) -> QColor:
         """Get theme-appropriate highlight color for search results."""
-        # Use yellow for light theme, orange for dark theme
-        # This provides good contrast in both cases
-        return QColor("#FFD700")  # Gold color works well in both themes
+        return ThemeManager().get_color("highlight")
 
     def _clear_highlights(self):
         """Clear all search highlights."""

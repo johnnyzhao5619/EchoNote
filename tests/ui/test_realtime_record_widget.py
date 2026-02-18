@@ -192,6 +192,65 @@ class TestRealtimeRecordWidgetCallbacks:
         assert widget.markers_list.count() == 0
         mock_realtime_recorder.clear_markers.assert_called_once()
 
+    def test_populate_input_devices_marks_loopback_candidates(self, widget):
+        """Loopback devices should be tagged and tracked for routing hints."""
+        widget.audio_capture.get_input_devices.return_value = [
+            {"index": 1, "name": "MacBook Pro Microphone"},
+            {"index": 2, "name": "BlackHole 2ch"},
+        ]
+
+        widget._populate_input_devices()
+
+        assert widget.input_combo.count() == 2
+        assert widget.input_combo.itemText(1).endswith("(Loopback)")
+        assert 2 in widget._loopback_input_indices
+
+    def test_populate_input_devices_marks_meeting_audio_candidates(self, widget):
+        """Meeting virtual inputs should be tagged as system-audio routes."""
+        widget.audio_capture.get_input_devices.return_value = [
+            {"index": 1, "name": "MacBook Pro Microphone"},
+            {"index": 3, "name": "Microsoft Teams Audio"},
+        ]
+
+        widget._populate_input_devices()
+
+        assert widget.input_combo.count() == 2
+        assert widget.input_combo.itemText(1).endswith("(System Audio)")
+        assert 3 in widget._system_audio_input_indices
+
+    def test_capture_plan_message_without_loopback(self, widget):
+        """When no loopback device exists, guidance should include setup planning."""
+        widget._loopback_input_indices = set()
+        widget._input_devices_by_index = {
+            1: {"index": 1, "name": "MacBook Pro Microphone"},
+        }
+        widget.input_combo.clear()
+        widget.input_combo.addItem("MacBook Pro Microphone", 1)
+        widget.input_combo.setCurrentIndex(0)
+
+        widget._update_capture_plan_message()
+
+        assert widget.capture_plan_label.text()
+        assert "No loopback input detected" in widget.capture_plan_label.text()
+
+    def test_capture_plan_message_for_scoped_system_audio(self, widget):
+        """App-scoped system audio should explain capture scope clearly."""
+        widget._loopback_input_indices = set()
+        widget._system_audio_input_indices = {3}
+        widget._input_devices_by_index = {
+            3: {"index": 3, "name": "Microsoft Teams Audio"},
+        }
+        widget.input_combo.clear()
+        widget.input_combo.addItem("Microsoft Teams Audio (System Audio)", 3)
+        widget.input_combo.setCurrentIndex(0)
+
+        widget._update_capture_plan_message()
+
+        text = widget.capture_plan_label.text()
+        assert text
+        assert "Microsoft Teams" in text
+        assert "playback only" in text
+
     @pytest.mark.asyncio
     async def test_start_recording_uses_selected_input_device(self, widget, mock_realtime_recorder):
         """Start recording should use the currently selected device index."""

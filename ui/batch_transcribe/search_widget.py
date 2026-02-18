@@ -25,6 +25,7 @@ import re
 from typing import List, Optional
 
 from ui.base_widgets import BaseWidget, create_button
+from ui.constants import SEARCH_DEBOUNCE_DELAY_MS
 from ui.qt_imports import (
     QCheckBox,
     QColor,
@@ -44,6 +45,7 @@ from ui.signal_helpers import (
     connect_text_changed,
 )
 from utils.i18n import I18nQtManager
+from ui.common.theme import ThemeManager
 
 logger = logging.getLogger("echonote.ui.search_widget")
 
@@ -76,7 +78,7 @@ class SearchWidget(BaseWidget):
         Args:
             text_edit: The QTextEdit to search in
             i18n: Internationalization manager
-            settings_manager: Settings manager for theme detection
+            settings_manager: Settings manager for search behavior preferences
             parent: Parent widget
         """
         super().__init__(parent)
@@ -99,9 +101,6 @@ class SearchWidget(BaseWidget):
         self._search_timer = QTimer()
         self._search_timer.setSingleShot(True)
         self._search_timer.timeout.connect(self._perform_search)
-        # Get debounce delay from constants or settings
-        from ui.constants import SEARCH_DEBOUNCE_DELAY_MS
-
         # Get debounce delay from settings or use default
         if self.settings_manager:
             self._search_delay_ms = (
@@ -132,11 +131,9 @@ class SearchWidget(BaseWidget):
 
         # Main layout
         layout = QHBoxLayout(self)
-        # # layout.setSpacing(10)
 
         # Search input
         self.search_input = QLineEdit()
-        self.search_input.setObjectName("search_input")
         self.search_input.setPlaceholderText(self.i18n.t("search.placeholder"))
         self.search_input.setClearButtonEnabled(True)
         from ui.constants import SEARCH_INPUT_MIN_WIDTH
@@ -151,7 +148,6 @@ class SearchWidget(BaseWidget):
 
         # Case-sensitive checkbox
         self.case_sensitive_checkbox = QCheckBox()
-        self.case_sensitive_checkbox.setObjectName("case_sensitive_checkbox")
         self.case_sensitive_checkbox.stateChanged.connect(self._on_case_sensitive_changed)
         layout.addWidget(self.case_sensitive_checkbox)
 
@@ -175,7 +171,6 @@ class SearchWidget(BaseWidget):
 
         # Match count label
         self.match_label = QLabel()
-        self.match_label.setObjectName("match_label")
         self.match_label.setMinimumWidth(100)
         layout.addWidget(self.match_label)
 
@@ -414,75 +409,12 @@ class SearchWidget(BaseWidget):
 
     def _get_highlight_color(self) -> QColor:
         """
-        Get highlight color based on current theme.
+        Get highlight color from ThemeManager.
 
         Returns:
             QColor for highlighting matches
         """
-        # Default to yellow for light theme
-        default_color = self._get_theme_highlight_color()
-
-        # Try to get theme from settings manager
-        if self.settings_manager:
-            try:
-                theme = self.settings_manager.get_setting("ui.theme")
-                if theme == "dark":
-                    # Orange for dark theme (better contrast)
-                    return self._get_theme_highlight_color()
-                elif theme == "system":
-                    # Detect system theme
-                    return self._get_system_theme_color()
-                else:
-                    # Light theme or default
-                    return default_color
-            except Exception as e:
-                logger.debug(f"Could not get theme from settings: {e}, " f"using default")
-
-        return default_color
-
-    def _get_system_theme_color(self) -> QColor:
-        """
-        Get highlight color based on system theme.
-
-        Returns:
-            QColor for highlighting matches
-        """
-        try:
-            import platform
-
-            system = platform.system()
-
-            if system == "Darwin":  # macOS
-                import subprocess
-
-                result = subprocess.run(
-                    ["defaults", "read", "-g", "AppleInterfaceStyle"],
-                    capture_output=True,
-                    text=True,
-                )
-                if result.returncode == 0 and "Dark" in result.stdout:
-                    return self._get_theme_highlight_color()  # Orange for dark
-                return self._get_theme_highlight_color()  # Yellow for light
-
-            elif system == "Windows":
-                try:
-                    import winreg
-
-                    key_path = r"Software\Microsoft\Windows\CurrentVersion" r"\Themes\Personalize"
-                    key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path)
-                    value, _ = winreg.QueryValueEx(key, "AppsUseLightTheme")
-                    winreg.CloseKey(key)
-                    if value == 0:
-                        return self._get_theme_highlight_color()  # Orange for dark
-                    return self._get_theme_highlight_color()  # Yellow for light
-                except Exception:
-                    pass
-
-        except Exception as e:
-            logger.debug(f"Could not detect system theme: {e}")
-
-        # Default to light theme color
-        return self._get_theme_highlight_color()
+        return ThemeManager().get_color("highlight")
 
     def update_highlight_color(self):
         """
@@ -568,20 +500,3 @@ class SearchWidget(BaseWidget):
         self._update_match_label()
 
         logger.debug("SearchWidget language updated")
-
-    def _get_theme_highlight_color(self) -> QColor:
-        """Get theme-appropriate highlight color."""
-        # Use theme-aware colors from QSS
-        # Colors are now defined in theme files and applied via semantic properties
-        if self.settings_manager:
-            try:
-                theme = self.settings_manager.get_setting("ui.theme")
-                if theme == "dark":
-                    return QColor("#FF9800")  # Orange for dark theme
-                else:
-                    return QColor("#FFEB3B")  # Yellow for light theme
-            except Exception:
-                pass
-
-        # Default fallback
-        return QColor("#FFEB3B")

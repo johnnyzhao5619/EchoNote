@@ -64,6 +64,7 @@ class AudioCapture:
         self.is_capturing = False
         self.capture_thread = None
         self.audio_queue = queue.Queue()
+        self.error_callback: Optional[Callable[[str], None]] = None
 
         self._pyaudio_module = None
         self._pyaudio_error: Optional[Exception] = None
@@ -177,6 +178,7 @@ class AudioCapture:
         self,
         device_index: Optional[int] = None,
         callback: Optional[Callable[[np.ndarray], None]] = None,
+        error_callback: Optional[Callable[[str], None]] = None,
     ):
         """Start streaming audio from the selected input device.
 
@@ -192,6 +194,7 @@ class AudioCapture:
 
         pyaudio_instance = self._ensure_pyaudio_instance()
         pyaudio_module = self._ensure_module_available()
+        self.error_callback = error_callback
 
         try:
             # Open the input stream in blocking mode.
@@ -251,7 +254,17 @@ class AudioCapture:
 
             except Exception as e:
                 if self.is_capturing:
-                    logger.error(f"Error in capture loop: {e}")
+                    error_message = f"Audio capture error: {e}"
+                    logger.error(error_message)
+                    if self.error_callback:
+                        try:
+                            self.error_callback(error_message)
+                        except Exception as callback_exc:  # noqa: BLE001
+                            logger.warning(
+                                "Audio capture error callback failed: %s", callback_exc
+                            )
+                    self.is_capturing = False
+                    break
 
         logger.info("Audio capture loop stopped")
 
