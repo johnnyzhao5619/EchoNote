@@ -67,6 +67,14 @@ logger = logging.getLogger("echonote.ui.settings.model_management")
 class ModelManagementPage(BaseSettingsPage):
     """模型管理页面"""
 
+    PAGE_TITLE_OBJECT_NAME = "page_title"
+    MODEL_LIST_SPACING = 10
+    SECTION_TITLE_FONT_SIZE = 12
+    MODEL_NAME_FONT_SIZE = 11
+    ACTION_BUTTON_MAX_WIDTH_SMALL = 80
+    ACTION_BUTTON_MAX_WIDTH_MEDIUM = 100
+    RECOMMENDED_BUTTON_MAX_WIDTH = 200
+
     def __init__(self, settings_manager, i18n: I18nQtManager, model_manager):
         """
         初始化模型管理页面
@@ -102,10 +110,7 @@ class ModelManagementPage(BaseSettingsPage):
         """设置 UI 布局"""
         # 页面标题
         self.title_label = QLabel(self.i18n.t("settings.model_management.title"))
-        title_font = QFont()
-        title_font.setPointSize(14)
-        title_font.setBold(True)
-        self.title_label.setFont(title_font)
+        self.title_label.setObjectName(self.PAGE_TITLE_OBJECT_NAME)
         self.content_layout.addWidget(self.title_label)
 
         # 页面描述
@@ -118,36 +123,39 @@ class ModelManagementPage(BaseSettingsPage):
 
         # 推荐模型卡片区域（条件显示）
         self.recommendation_container = QWidget()
-        self.recommendation_layout = QVBoxLayout(self.recommendation_container)
-        self.recommendation_layout.setContentsMargins(0, 0, 0, 0)
+        self.recommendation_layout = create_vbox(
+            spacing=self.MODEL_LIST_SPACING,
+            margins=(0, 0, 0, 0),
+        )
+        self.recommendation_container.setLayout(self.recommendation_layout)
         self.content_layout.addWidget(self.recommendation_container)
 
         # 已下载模型区域
-        section_font = QFont()
-        section_font.setPointSize(12)
-        section_font.setBold(True)
-
-        self.downloaded_title = QLabel(self.i18n.t("settings.model_management.downloaded_models"))
-        self.downloaded_title.setFont(section_font)
-        self.content_layout.addWidget(self.downloaded_title)
+        self.downloaded_title = self.add_section_title(
+            self.i18n.t("settings.model_management.downloaded_models")
+        )
 
         self.downloaded_models_container = QWidget()
-        self.downloaded_models_layout = QVBoxLayout(self.downloaded_models_container)
-        self.downloaded_models_layout.setContentsMargins(0, 0, 0, 0)
-        self.downloaded_models_layout.setSpacing(10)
+        self.downloaded_models_layout = create_vbox(
+            spacing=self.MODEL_LIST_SPACING,
+            margins=(0, 0, 0, 0),
+        )
+        self.downloaded_models_container.setLayout(self.downloaded_models_layout)
         self.content_layout.addWidget(self.downloaded_models_container)
 
         self.add_section_spacing()
 
         # 可下载模型区域
-        self.available_title = QLabel(self.i18n.t("settings.model_management.available_models"))
-        self.available_title.setFont(section_font)
-        self.content_layout.addWidget(self.available_title)
+        self.available_title = self.add_section_title(
+            self.i18n.t("settings.model_management.available_models")
+        )
 
         self.available_models_container = QWidget()
-        self.available_models_layout = QVBoxLayout(self.available_models_container)
-        self.available_models_layout.setContentsMargins(0, 0, 0, 0)
-        self.available_models_layout.setSpacing(10)
+        self.available_models_layout = create_vbox(
+            spacing=self.MODEL_LIST_SPACING,
+            margins=(0, 0, 0, 0),
+        )
+        self.available_models_container.setLayout(self.available_models_layout)
         self.content_layout.addWidget(self.available_models_container)
 
         # 添加弹性空间
@@ -221,6 +229,24 @@ class ModelManagementPage(BaseSettingsPage):
             f"{len(all_models) - len(downloaded_models)} available"
         )
 
+    @staticmethod
+    def _build_bold_font(point_size: int) -> QFont:
+        """Create a bold font with a specific point size."""
+        font = QFont()
+        font.setPointSize(point_size)
+        font.setBold(True)
+        return font
+
+    def _create_model_name_label(
+        self, text: str, *, point_size: int | None = None, role: str | None = None
+    ) -> QLabel:
+        """Create a bold model title label used in model cards."""
+        label = QLabel(text)
+        label.setFont(self._build_bold_font(point_size or self.MODEL_NAME_FONT_SIZE))
+        if role:
+            label.setProperty("role", role)
+        return label
+
     def _create_downloaded_model_card(self, model: ModelInfo) -> QWidget:
         """
         创建已下载模型卡片
@@ -241,25 +267,23 @@ class ModelManagementPage(BaseSettingsPage):
         header_layout = create_hbox()
 
         # 模型名称
-        name_label = QLabel(f"✓ {model.full_name}")
-        name_font = QFont()
-        name_font.setPointSize(11)
-        name_font.setBold(True)
-        name_label.setFont(name_font)
-        name_label.setProperty("role", "model-name-downloaded")
+        name_label = self._create_model_name_label(
+            f"✓ {model.full_name}",
+            role="model-name-downloaded",
+        )
         header_layout.addWidget(name_label)
 
         header_layout.addStretch()
 
         # 配置按钮
         config_btn = create_button(self.i18n.t("settings.model_management.configure"))
-        config_btn.setMaximumWidth(80)
+        config_btn.setMaximumWidth(self.ACTION_BUTTON_MAX_WIDTH_SMALL)
         config_btn.clicked.connect(lambda: self._on_config_clicked(model.name))
         header_layout.addWidget(config_btn)
 
         # 删除按钮
         delete_btn = create_button(self.i18n.t("settings.model_management.delete"))
-        delete_btn.setMaximumWidth(80)
+        delete_btn.setMaximumWidth(self.ACTION_BUTTON_MAX_WIDTH_SMALL)
         delete_btn.setProperty("role", "model-delete")
         delete_btn.clicked.connect(lambda: self._on_delete_clicked(model.name))
 
@@ -273,7 +297,7 @@ class ModelManagementPage(BaseSettingsPage):
 
         # 查看详情按钮
         details_btn = create_button(self.i18n.t("settings.model_management.view_details"))
-        details_btn.setMaximumWidth(80)
+        details_btn.setMaximumWidth(self.ACTION_BUTTON_MAX_WIDTH_SMALL)
         details_btn.clicked.connect(lambda: self._on_view_details_clicked(model.name))
         header_layout.addWidget(details_btn)
 
@@ -355,11 +379,7 @@ class ModelManagementPage(BaseSettingsPage):
         header_layout = create_hbox()
 
         # 模型名称
-        name_label = QLabel(model.full_name)
-        name_font = QFont()
-        name_font.setPointSize(11)
-        name_font.setBold(True)
-        name_label.setFont(name_font)
+        name_label = self._create_model_name_label(model.full_name)
         header_layout.addWidget(name_label)
 
         header_layout.addStretch()
@@ -367,7 +387,7 @@ class ModelManagementPage(BaseSettingsPage):
         # 下载按钮
         download_btn = create_button(self.i18n.t("settings.model_management.download"))
         download_btn.setObjectName(f"download_btn_{model.name}")
-        download_btn.setMaximumWidth(100)
+        download_btn.setMaximumWidth(self.ACTION_BUTTON_MAX_WIDTH_MEDIUM)
         download_btn.clicked.connect(lambda: self._on_download_clicked(model.name))
         header_layout.addWidget(download_btn)
 
@@ -428,7 +448,7 @@ class ModelManagementPage(BaseSettingsPage):
         cancel_btn = create_button(self.i18n.t("settings.model_management.cancel_download"))
         cancel_btn.setObjectName(f"cancel_btn_{model.name}")
         cancel_btn.setVisible(False)
-        cancel_btn.setMaximumWidth(100)
+        cancel_btn.setMaximumWidth(self.ACTION_BUTTON_MAX_WIDTH_MEDIUM)
         cancel_btn.clicked.connect(lambda: self._on_cancel_download_clicked(model.name))
         layout.addWidget(cancel_btn)
 
@@ -823,16 +843,13 @@ class ModelManagementPage(BaseSettingsPage):
         layout = QVBoxLayout(card)
 
         # 推荐标题
-        title_label = QLabel(
+        title_label = self._create_model_name_label(
             self.i18n.t(
                 "settings.model_management.recommendation_title", model=recommended_model.full_name
-            )
+            ),
+            point_size=self.SECTION_TITLE_FONT_SIZE,
+            role="model-title-recommendation",
         )
-        title_font = QFont()
-        title_font.setPointSize(12)
-        title_font.setBold(True)
-        title_label.setFont(title_font)
-        title_label.setProperty("role", "model-title-recommendation")
         layout.addWidget(title_label)
 
         # 推荐理由
@@ -877,7 +894,7 @@ class ModelManagementPage(BaseSettingsPage):
 
         # 一键下载按钮
         download_btn = create_button(self.i18n.t("settings.model_management.download_recommended"))
-        download_btn.setMaximumWidth(200)
+        download_btn.setMaximumWidth(self.RECOMMENDED_BUTTON_MAX_WIDTH)
         download_btn.clicked.connect(lambda: self._on_download_recommended(recommended_model_name))
         layout.addWidget(download_btn)
 
@@ -1069,6 +1086,9 @@ class ModelManagementPage(BaseSettingsPage):
 class ModelDetailsDialog(QDialog):
     """模型详情对话框"""
 
+    MIN_WIDTH = 500
+    MIN_HEIGHT = 400
+
     def __init__(self, model: ModelInfo, i18n: I18nQtManager, parent=None):
         """
         初始化模型详情对话框
@@ -1087,17 +1107,14 @@ class ModelDetailsDialog(QDialog):
         self.i18n = i18n
 
         self.setWindowTitle(i18n.t("settings.model_management.details_title"))
-        self.setMinimumWidth(500)
-        self.setMinimumHeight(400)
+        self.setMinimumWidth(self.MIN_WIDTH)
+        self.setMinimumHeight(self.MIN_HEIGHT)
 
         layout = QVBoxLayout(self)
 
         # 标题
         title_label = QLabel(model.full_name)
-        title_font = QFont()
-        title_font.setPointSize(14)
-        title_font.setBold(True)
-        title_label.setFont(title_font)
+        title_label.setObjectName("section_title")
         layout.addWidget(title_label)
 
         # 分隔线
@@ -1264,6 +1281,8 @@ class ModelDetailsDialog(QDialog):
 class ModelConfigDialog(QDialog):
     """模型配置对话框"""
 
+    MIN_WIDTH = 450
+
     def __init__(self, model: ModelInfo, settings_manager, i18n: I18nQtManager, parent=None):
         """
         初始化模型配置对话框
@@ -1281,7 +1300,7 @@ class ModelConfigDialog(QDialog):
         self.setObjectName("model_config_dialog")
 
         self.setWindowTitle(i18n.t("settings.model_management.config_title", model=model.full_name))
-        self.setMinimumWidth(450)
+        self.setMinimumWidth(self.MIN_WIDTH)
 
         layout = QVBoxLayout(self)
 
@@ -1337,11 +1356,7 @@ class ModelConfigDialog(QDialog):
         vad_threshold_spin.setEnabled(False)  # 初始禁用
 
         # VAD 复选框状态改变时启用/禁用阈值设置
-        vad_checkbox.stateChanged.connect(
-            lambda state: vad_threshold_spin.setEnabled(
-                state == vad_checkbox.checkState().Checked.value
-            )
-        )
+        vad_checkbox.stateChanged.connect(lambda state: vad_threshold_spin.setEnabled(bool(state)))
 
         form_layout.addRow(vad_threshold_label, vad_threshold_spin)
 

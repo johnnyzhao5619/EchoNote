@@ -35,7 +35,12 @@ from PySide6.QtWidgets import (
 )
 
 from ui.base_widgets import BaseWidget
-from ui.constants import PAGE_COMPACT_SPACING, PAGE_DENSE_SPACING, STATUS_INDICATOR_SYMBOL
+from ui.constants import (
+    CALENDAR_DAY_CELL_MIN_HEIGHT,
+    PAGE_COMPACT_SPACING,
+    PAGE_DENSE_SPACING,
+    STATUS_INDICATOR_SYMBOL,
+)
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.calendar_view")
@@ -323,7 +328,7 @@ class MonthView(BaseWidget):
         """
         cell = QFrame()
         cell.setFrameStyle(QFrame.Shape.Box)
-        cell.setMinimumHeight(80)
+        cell.setMinimumHeight(CALENDAR_DAY_CELL_MIN_HEIGHT)
         cell.setProperty("role", "calendar-day-cell")
 
         layout = QVBoxLayout(cell)

@@ -23,11 +23,15 @@ import logging
 from typing import TypedDict, Tuple
 
 from PySide6.QtCore import Signal
-from PySide6.QtGui import QFont
-from PySide6.QtWidgets import QLabel, QScrollArea, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QLabel, QScrollArea, QWidget
 
-from ui.base_widgets import BaseWidget
-from ui.constants import PAGE_COMPACT_SPACING, PAGE_CONTENT_MARGINS, PAGE_LAYOUT_SPACING
+from ui.base_widgets import BaseWidget, create_hbox, create_vbox
+from ui.constants import (
+    LABEL_MIN_WIDTH,
+    PAGE_COMPACT_SPACING,
+    PAGE_CONTENT_MARGINS,
+    PAGE_LAYOUT_SPACING,
+)
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.settings.base")
@@ -68,9 +72,8 @@ class BaseSettingsPage(BaseWidget):
         self.i18n = i18n
 
         # Main layout
-        self.main_layout = QVBoxLayout(self)
-        self.main_layout.setContentsMargins(*PAGE_CONTENT_MARGINS)
-        self.main_layout.setSpacing(PAGE_LAYOUT_SPACING)
+        self.main_layout = create_vbox(spacing=PAGE_LAYOUT_SPACING, margins=PAGE_CONTENT_MARGINS)
+        self.setLayout(self.main_layout)
 
         # Create scroll area for content
         scroll_area = QScrollArea()
@@ -79,14 +82,13 @@ class BaseSettingsPage(BaseWidget):
 
         # Content widget
         self.content_widget = QWidget()
-        self.content_layout = QVBoxLayout(self.content_widget)
-        self.content_layout.setContentsMargins(0, 0, 0, 0)
-        self.content_layout.setSpacing(PAGE_LAYOUT_SPACING)
+        self.content_layout = create_vbox(spacing=PAGE_LAYOUT_SPACING, margins=(0, 0, 0, 0))
+        self.content_widget.setLayout(self.content_layout)
 
         scroll_area.setWidget(self.content_widget)
         self.main_layout.addWidget(scroll_area)
 
-    def add_section_title(self, title: str):
+    def add_section_title(self, title: str) -> QLabel:
         """
         Add a section title to the page.
 
@@ -94,11 +96,26 @@ class BaseSettingsPage(BaseWidget):
             title: Section title text
         """
         label = QLabel(title)
-        font = QFont()
-        font.setPointSize(12)
-        font.setBold(True)
-        label.setFont(font)
+        label.setObjectName("section_title")
         self.content_layout.addWidget(label)
+        return label
+
+    def add_labeled_row(
+        self,
+        label_text: str,
+        control_widget: QWidget,
+        *,
+        label_width: int = LABEL_MIN_WIDTH,
+    ) -> tuple:
+        """Add a standard label-control row and return (layout, label)."""
+        row_layout = create_hbox()
+        label = QLabel(label_text)
+        label.setMinimumWidth(label_width)
+        row_layout.addWidget(label)
+        row_layout.addWidget(control_widget)
+        row_layout.addStretch()
+        self.content_layout.addLayout(row_layout)
+        return row_layout, label
 
     def add_spacing(self, height: int | None = None):
         """

@@ -49,6 +49,7 @@ from ui.base_widgets import (
     create_vbox,
 )
 from ui.constants import (
+    CALENDAR_ADD_ACCOUNT_DIALOG_MIN_WIDTH,
     PAGE_COMPACT_SPACING,
     PAGE_CONTENT_MARGINS,
     PAGE_DENSE_SPACING,
@@ -564,7 +565,7 @@ class CalendarHubWidget(BaseWidget):
         # Create simple provider selection dialog
         dialog = QDialog(self)
         dialog.setWindowTitle(self.i18n.t("calendar_hub.widget.add_calendar_account"))
-        dialog.setMinimumWidth(300)
+        dialog.setMinimumWidth(CALENDAR_ADD_ACCOUNT_DIALOG_MIN_WIDTH)
 
         layout = QVBoxLayout(dialog)
 

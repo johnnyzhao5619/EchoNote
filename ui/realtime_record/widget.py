@@ -61,6 +61,7 @@ from ui.base_widgets import (
 )
 from ui.common.notification import get_notification_manager
 from ui.constants import (
+    CONTROL_BUTTON_MIN_HEIGHT,
     DEFAULT_DURATION_DISPLAY,
     PAGE_COMPACT_SPACING,
     PAGE_CONTENT_MARGINS,
@@ -77,6 +78,7 @@ from ui.constants import (
     REALTIME_LABEL_WIDTH_MEDIUM,
     REALTIME_LANGUAGE_COMBO_MIN_WIDTH,
     REALTIME_RECORD_BUTTON_MIN_WIDTH,
+    REALTIME_VISUALIZER_MIN_HEIGHT,
     STATUS_INDICATOR_SYMBOL,
     format_gain_display,
 )
@@ -673,7 +675,7 @@ class RealtimeRecordWidget(BaseWidget):
         layout.addWidget(self.duration_value_label)
 
         self.add_marker_button = create_secondary_button(self.i18n.t("realtime_record.add_marker"))
-        self.add_marker_button.setMinimumHeight(36)
+        self.add_marker_button.setMinimumHeight(CONTROL_BUTTON_MIN_HEIGHT)
         self.add_marker_button.setMinimumWidth(REALTIME_BUTTON_MIN_WIDTH)
         self.add_marker_button.setEnabled(False)
         self.add_marker_button.clicked.connect(self._add_marker)
@@ -681,7 +683,7 @@ class RealtimeRecordWidget(BaseWidget):
 
         self.record_button = QPushButton()
         self.record_button.setObjectName("record_button")
-        self.record_button.setMinimumHeight(36)
+        self.record_button.setMinimumHeight(CONTROL_BUTTON_MIN_HEIGHT)
         self.record_button.setMinimumWidth(REALTIME_RECORD_BUTTON_MIN_WIDTH)
         connect_button_with_callback(self.record_button, self._toggle_recording)
         layout.addWidget(self.record_button)
@@ -833,7 +835,7 @@ class RealtimeRecordWidget(BaseWidget):
         layout.setSpacing(PAGE_DENSE_SPACING)
 
         self.audio_visualizer = AudioVisualizer(parent=self, i18n=self.i18n)
-        self.audio_visualizer.setMinimumHeight(60)
+        self.audio_visualizer.setMinimumHeight(REALTIME_VISUALIZER_MIN_HEIGHT)
         self.audio_visualizer.setMaximumHeight(80)
         self.signals.audio_data_available.connect(
             self.audio_visualizer.update_audio_data, Qt.ConnectionType.QueuedConnection

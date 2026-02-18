@@ -25,9 +25,8 @@ from typing import Any, Dict, Tuple
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QComboBox, QFrame, QLabel, QVBoxLayout
 
-from ui.constants import LABEL_MIN_WIDTH
 from ui.common.theme import ThemeManager
-from ui.layout_utils import create_horizontal_layout
+from ui.constants import SETTINGS_PREVIEW_MIN_HEIGHT
 from ui.settings.base_page import BaseSettingsPage
 from utils.i18n import I18nQtManager
 
@@ -57,15 +56,7 @@ class AppearanceSettingsPage(BaseSettingsPage):
     def setup_ui(self):
         """Set up the appearance settings UI."""
         # Theme section
-        from PySide6.QtGui import QFont
-
-        font = QFont()
-        font.setPointSize(12)
-        font.setBold(True)
-
-        self.theme_title = QLabel(self.i18n.t("settings.appearance.theme"))
-        self.theme_title.setFont(font)
-        self.content_layout.addWidget(self.theme_title)
+        self.theme_title = self.add_section_title(self.i18n.t("settings.appearance.theme"))
 
         # Theme selection
         self.theme_combo = QComboBox()
@@ -77,14 +68,9 @@ class AppearanceSettingsPage(BaseSettingsPage):
             ]
         )
         self.theme_combo.currentIndexChanged.connect(self._on_theme_changed)
-        theme_layout = create_horizontal_layout()
-        self.theme_label = QLabel(self.i18n.t("settings.appearance.theme_select"))
-        self.theme_label.setMinimumWidth(LABEL_MIN_WIDTH)
-        theme_layout.addWidget(self.theme_label)
-        theme_layout.addWidget(self.theme_combo)
-        theme_layout.addStretch()
-
-        self.content_layout.addLayout(theme_layout)
+        _, self.theme_label = self.add_labeled_row(
+            self.i18n.t("settings.appearance.theme_select"), self.theme_combo
+        )
 
         self.add_spacing()
 
@@ -94,7 +80,7 @@ class AppearanceSettingsPage(BaseSettingsPage):
 
         self.preview_frame = QFrame()
         self.preview_frame.setFrameShape(QFrame.Shape.StyledPanel)
-        self.preview_frame.setMinimumHeight(150)
+        self.preview_frame.setMinimumHeight(SETTINGS_PREVIEW_MIN_HEIGHT)
 
         preview_layout = QVBoxLayout(self.preview_frame)
         self.preview_text = QLabel(self.i18n.t("settings.appearance.preview_text"))

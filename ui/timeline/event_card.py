@@ -23,7 +23,6 @@ import logging
 from typing import Any, Dict, Optional
 
 from PySide6.QtCore import Signal
-from PySide6.QtGui import QFont
 
 # QColor, QPalette imports removed - using semantic styling instead
 from PySide6.QtWidgets import (
@@ -39,6 +38,7 @@ from PySide6.QtWidgets import (
 
 from core.timeline.manager import to_local_naive
 from ui.base_widgets import create_button, create_hbox, create_vbox
+from ui.constants import TIMELINE_CURRENT_TIME_LINE_HEIGHT, TIMELINE_TRANSLATION_COMBO_MIN_WIDTH
 from utils.i18n import LANGUAGE_OPTION_KEYS, I18nQtManager
 
 logger = logging.getLogger("echonote.ui.timeline.event_card")
@@ -68,7 +68,7 @@ class CurrentTimeIndicator(QFrame):
         left_line.setFrameShape(QFrame.Shape.HLine)
         left_line.setFrameShadow(QFrame.Shadow.Plain)
         left_line.setProperty("role", "current-time-line")
-        left_line.setFixedHeight(2)
+        left_line.setFixedHeight(TIMELINE_CURRENT_TIME_LINE_HEIGHT)
         layout.addWidget(left_line, stretch=1)
 
         # Label
@@ -81,7 +81,7 @@ class CurrentTimeIndicator(QFrame):
         right_line.setFrameShape(QFrame.Shape.HLine)
         right_line.setFrameShadow(QFrame.Shadow.Plain)
         right_line.setProperty("role", "current-time-line")
-        right_line.setFixedHeight(2)
+        right_line.setFixedHeight(TIMELINE_CURRENT_TIME_LINE_HEIGHT)
         layout.addWidget(right_line, stretch=1)
 
     def update_translations(self):
@@ -195,10 +195,7 @@ class EventCard(QFrame):
 
         # Title
         title_label = QLabel(self.calendar_event.title)
-        title_font = QFont()
-        title_font.setPointSize(12)
-        title_font.setBold(True)
-        title_label.setFont(title_font)
+        title_label.setProperty("role", "event-title")
         title_label.setWordWrap(True)
         header_layout.addWidget(title_label)
 
@@ -331,7 +328,7 @@ class EventCard(QFrame):
         actions_layout.addWidget(self.translation_language_label)
 
         self.translation_language_combo = QComboBox()
-        self.translation_language_combo.setMinimumWidth(120)
+        self.translation_language_combo.setMinimumWidth(TIMELINE_TRANSLATION_COMBO_MIN_WIDTH)
         self.translation_language_combo.setSizeAdjustPolicy(
             QComboBox.SizeAdjustPolicy.AdjustToContents
         )

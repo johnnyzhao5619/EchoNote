@@ -27,13 +27,17 @@ from core.transcription.manager import TranscriptionManager
 from ui.base_widgets import (
     BaseWidget,
     connect_button_with_callback,
-    create_button,
     create_hbox,
     create_primary_button,
     create_vbox,
 )
 from ui.batch_transcribe.task_item import TaskItem
-from ui.constants import PAGE_COMPACT_SPACING, PAGE_CONTENT_MARGINS, PAGE_LAYOUT_SPACING
+from ui.constants import (
+    BATCH_SELECTOR_MIN_WIDTH,
+    PAGE_COMPACT_SPACING,
+    PAGE_CONTENT_MARGINS,
+    PAGE_LAYOUT_SPACING,
+)
 from ui.qt_imports import (
     QComboBox,
     QFileDialog,
@@ -182,7 +186,7 @@ class BatchTranscribeWidget(BaseWidget):
 
             model_combo = QComboBox()
             model_combo.setObjectName("model_combo")
-            model_combo.setMinimumWidth(150)
+            model_combo.setMinimumWidth(BATCH_SELECTOR_MIN_WIDTH)
             toolbar_layout.addWidget(model_combo)
             self.model_combo = model_combo
 
@@ -197,7 +201,7 @@ class BatchTranscribeWidget(BaseWidget):
 
             engine_combo = QComboBox()
             engine_combo.setObjectName("engine_combo")
-            engine_combo.setMinimumWidth(150)
+            engine_combo.setMinimumWidth(BATCH_SELECTOR_MIN_WIDTH)
             # Populate with available engines
             self._populate_engines(engine_combo)
             toolbar_layout.addWidget(engine_combo)
@@ -332,8 +336,7 @@ class BatchTranscribeWidget(BaseWidget):
             guide_layout.addWidget(message_label)
 
             # Download button
-            download_btn = create_button(self.i18n.t("batch_transcribe.go_to_download"))
-            download_btn = create_primary_button(download_btn.text())
+            download_btn = create_primary_button(self.i18n.t("batch_transcribe.go_to_download"))
             connect_button_with_callback(download_btn, self._on_go_to_download)
             guide_layout.addWidget(download_btn, alignment=Qt.AlignmentFlag.AlignCenter)
 
@@ -360,11 +363,9 @@ class BatchTranscribeWidget(BaseWidget):
 
                 # Try to switch to model management page in settings
                 settings_widget = main_window.pages.get("settings")
-                if settings_widget and hasattr(settings_widget, "switch_to_page"):
+                if settings_widget and hasattr(settings_widget, "show_page"):
                     # Give it a moment to switch pages
-                    QTimer.singleShot(
-                        100, lambda: settings_widget.switch_to_page("model_management")
-                    )
+                    QTimer.singleShot(100, lambda: settings_widget.show_page("model_management"))
 
                 logger.info(self.i18n.t("logging.batch_transcribe.navigating_to_model_management"))
             else:

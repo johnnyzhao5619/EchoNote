@@ -48,6 +48,7 @@ from config.constants import (
 )
 from core.models.registry import get_default_model_names
 from ui.base_widgets import create_button, create_hbox, create_vbox
+from ui.constants import ICON_BUTTON_MAX_WIDTH
 from ui.settings.base_page import BaseSettingsPage, PostSaveMessage
 from utils.i18n import I18nQtManager
 
@@ -85,14 +86,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
     def setup_ui(self):
         """Set up the transcription settings UI."""
         # General settings section
-        self.general_title = QLabel(self.i18n.t("settings.transcription.general"))
-        from PySide6.QtGui import QFont
-
-        font = QFont()
-        font.setPointSize(12)
-        font.setBold(True)
-        self.general_title.setFont(font)
-        self.content_layout.addWidget(self.general_title)
+        self.general_title = self.add_section_title(self.i18n.t("settings.transcription.general"))
 
         # Default output format
         format_layout = create_hbox()
@@ -123,9 +117,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         self.add_section_spacing()
 
         # FFmpeg status section
-        self.ffmpeg_title = QLabel(self.i18n.t("settings.transcription.ffmpeg_status"))
-        self.ffmpeg_title.setFont(font)
-        self.content_layout.addWidget(self.ffmpeg_title)
+        self.ffmpeg_title = self.add_section_title(self.i18n.t("settings.transcription.ffmpeg_status"))
 
         # FFmpeg status display
         ffmpeg_status_layout = create_hbox()
@@ -186,9 +178,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         self.add_section_spacing()
 
         # Engine settings section
-        self.engine_title = QLabel(self.i18n.t("settings.transcription.engine"))
-        self.engine_title.setFont(font)
-        self.content_layout.addWidget(self.engine_title)
+        self.engine_title = self.add_section_title(self.i18n.t("settings.transcription.engine"))
 
         # Engine selection
         engine_layout = create_hbox()
@@ -360,7 +350,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         key_layout.addWidget(self.openai_key_edit)
 
         self.openai_show_button = create_button("👁")
-        self.openai_show_button.setMaximumWidth(40)
+        self.openai_show_button.setMaximumWidth(ICON_BUTTON_MAX_WIDTH)
         self.openai_show_button.setCheckable(True)
         self.openai_show_button.clicked.connect(
             lambda: self._toggle_password_visibility(self.openai_key_edit, self.openai_show_button)
@@ -399,7 +389,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         google_key_layout.addWidget(self.google_key_edit)
 
         self.google_show_button = create_button("👁")
-        self.google_show_button.setMaximumWidth(40)
+        self.google_show_button.setMaximumWidth(ICON_BUTTON_MAX_WIDTH)
         self.google_show_button.setCheckable(True)
         self.google_show_button.clicked.connect(
             lambda: self._toggle_password_visibility(self.google_key_edit, self.google_show_button)
@@ -437,7 +427,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         azure_key_layout.addWidget(self.azure_key_edit)
 
         self.azure_show_button = create_button("👁")
-        self.azure_show_button.setMaximumWidth(40)
+        self.azure_show_button.setMaximumWidth(ICON_BUTTON_MAX_WIDTH)
         self.azure_show_button.setCheckable(True)
         self.azure_show_button.clicked.connect(
             lambda: self._toggle_password_visibility(self.azure_key_edit, self.azure_show_button)

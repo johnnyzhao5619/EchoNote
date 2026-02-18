@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (
 )
 
 from ui.base_widgets import create_button, create_hbox
+from ui.constants import CALENDAR_ACCOUNTS_LIST_MIN_HEIGHT
 from ui.settings.base_page import BaseSettingsPage
 from utils.i18n import I18nQtManager
 
@@ -60,15 +61,7 @@ class CalendarSettingsPage(BaseSettingsPage):
     def setup_ui(self):
         """Set up the calendar settings UI."""
         # Connected accounts section
-        from PySide6.QtGui import QFont
-
-        font = QFont()
-        font.setPointSize(12)
-        font.setBold(True)
-
-        self.accounts_title = QLabel(self.i18n.t("settings.calendar.connected_accounts"))
-        self.accounts_title.setFont(font)
-        self.content_layout.addWidget(self.accounts_title)
+        self.accounts_title = self.add_section_title(self.i18n.t("settings.calendar.connected_accounts"))
 
         # Description
         self.desc_label = QLabel(self.i18n.t("settings.calendar.accounts_description"))
@@ -80,7 +73,7 @@ class CalendarSettingsPage(BaseSettingsPage):
 
         # Accounts list
         self.accounts_list = QListWidget()
-        self.accounts_list.setMinimumHeight(200)
+        self.accounts_list.setMinimumHeight(CALENDAR_ACCOUNTS_LIST_MIN_HEIGHT)
         self.content_layout.addWidget(self.accounts_list)
 
         # Buttons layout
@@ -109,9 +102,7 @@ class CalendarSettingsPage(BaseSettingsPage):
         self.add_section_spacing()
 
         # Sync settings section
-        self.sync_title = QLabel(self.i18n.t("settings.calendar.sync_settings"))
-        self.sync_title.setFont(font)
-        self.content_layout.addWidget(self.sync_title)
+        self.sync_title = self.add_section_title(self.i18n.t("settings.calendar.sync_settings"))
 
         # Sync interval (this would be implemented if needed)
         self.sync_info = QLabel(self.i18n.t("settings.calendar.sync_info"))

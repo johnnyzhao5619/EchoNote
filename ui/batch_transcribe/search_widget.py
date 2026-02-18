@@ -25,7 +25,13 @@ import re
 from typing import List, Optional
 
 from ui.base_widgets import BaseWidget, create_button
-from ui.constants import SEARCH_DEBOUNCE_DELAY_MS
+from ui.constants import (
+    BUTTON_FIXED_WIDTH_LARGE,
+    BUTTON_FIXED_WIDTH_MEDIUM,
+    SEARCH_DEBOUNCE_DELAY_MS,
+    SEARCH_INPUT_MIN_WIDTH,
+    SEARCH_MATCH_LABEL_MIN_WIDTH,
+)
 from ui.qt_imports import (
     QCheckBox,
     QColor,
@@ -81,7 +87,7 @@ class SearchWidget(BaseWidget):
             settings_manager: Settings manager for search behavior preferences
             parent: Parent widget
         """
-        super().__init__(parent)
+        super().__init__(i18n, parent)
 
         self.text_edit = text_edit
         self.i18n = i18n
@@ -134,9 +140,8 @@ class SearchWidget(BaseWidget):
 
         # Search input
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText(self.i18n.t("search.placeholder"))
+        self.search_input.setPlaceholderText(self.i18n.t("viewer.search_placeholder"))
         self.search_input.setClearButtonEnabled(True)
-        from ui.constants import SEARCH_INPUT_MIN_WIDTH
 
         self.search_input.setMinimumWidth(SEARCH_INPUT_MIN_WIDTH)
 
@@ -154,7 +159,6 @@ class SearchWidget(BaseWidget):
         # Previous button
         self.prev_button = create_button("↑")
         self.prev_button.setObjectName("prev_button")
-        from ui.constants import BUTTON_FIXED_WIDTH_LARGE
 
         self.prev_button.setFixedWidth(BUTTON_FIXED_WIDTH_LARGE)
         self.prev_button.setToolTip(self.i18n.t("search.previous"))
@@ -171,13 +175,12 @@ class SearchWidget(BaseWidget):
 
         # Match count label
         self.match_label = QLabel()
-        self.match_label.setMinimumWidth(100)
+        self.match_label.setMinimumWidth(SEARCH_MATCH_LABEL_MIN_WIDTH)
         layout.addWidget(self.match_label)
 
         # Close button
         self.close_button = create_button("×")
         self.close_button.setObjectName("close_button")
-        from ui.constants import BUTTON_FIXED_WIDTH_MEDIUM
 
         self.close_button.setFixedWidth(BUTTON_FIXED_WIDTH_MEDIUM)
         self.close_button.setToolTip(self.i18n.t("search.close"))
@@ -495,6 +498,9 @@ class SearchWidget(BaseWidget):
 
         # Case-sensitive checkbox
         self.case_sensitive_checkbox.setText(self.i18n.t("viewer.case_sensitive"))
+        self.prev_button.setToolTip(self.i18n.t("search.previous"))
+        self.next_button.setToolTip(self.i18n.t("search.next"))
+        self.close_button.setToolTip(self.i18n.t("search.close"))
 
         # Update match label
         self._update_match_label()

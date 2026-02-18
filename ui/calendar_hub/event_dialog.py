@@ -44,6 +44,7 @@ from ui.base_widgets import (
     create_primary_button,
 )
 from core.calendar.constants import EventType
+from ui.constants import CALENDAR_EVENT_DIALOG_MIN_WIDTH
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.event_dialog")
@@ -102,7 +103,7 @@ class EventDialog(QDialog):
             else self.i18n.t("calendar_hub.create_event")
         )
         self.setWindowTitle(title)
-        self.setMinimumWidth(500)
+        self.setMinimumWidth(CALENDAR_EVENT_DIALOG_MIN_WIDTH)
 
         # Main layout
         layout = QVBoxLayout(self)

@@ -169,15 +169,13 @@ class MainWindow(QMainWindow):
         """
         content_area = QStackedWidget()
 
-        # Create placeholder pages
-        # These will be replaced with actual implementations in subsequent tasks
-        self._create_placeholder_pages(content_area)
+        self._create_pages(content_area)
 
         return content_area
 
-    def _create_placeholder_pages(self, content_area: QStackedWidget):
+    def _create_pages(self, content_area: QStackedWidget):
         """
-        Create actual page widgets.
+        Create and register all main feature pages.
 
         Args:
             content_area: Stacked widget to add pages to

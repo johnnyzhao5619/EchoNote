@@ -38,7 +38,12 @@ from PySide6.QtWidgets import (
 )
 
 from ui.base_widgets import BaseWidget, create_button, create_hbox, create_vbox
-from ui.constants import PAGE_COMPACT_SPACING, PAGE_CONTENT_MARGINS, PAGE_LAYOUT_SPACING
+from ui.constants import (
+    PAGE_COMPACT_SPACING,
+    PAGE_CONTENT_MARGINS,
+    PAGE_LAYOUT_SPACING,
+    SETTINGS_NAV_WIDTH,
+)
 from ui.settings.base_page import PostSaveMessage
 from utils.i18n import I18nQtManager
 
@@ -161,7 +166,7 @@ class SettingsWidget(BaseWidget):
             Category list widget
         """
         category_list = QListWidget()
-        category_list.setFixedWidth(200)
+        category_list.setFixedWidth(SETTINGS_NAV_WIDTH)
         category_list.setProperty("role", "settings-nav")
 
         # Define categories based on available pages/managers

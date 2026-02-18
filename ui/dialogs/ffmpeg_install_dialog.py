@@ -33,6 +33,11 @@ from PySide6.QtWidgets import (
 )
 
 from ui.base_widgets import connect_button_with_callback, create_button, create_hbox
+from ui.constants import (
+    FFMPEG_DIALOG_MIN_HEIGHT,
+    FFMPEG_DIALOG_MIN_WIDTH,
+    INSTALL_DIALOG_WARNING_ICON_FONT_SIZE,
+)
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.dialogs.ffmpeg_install")
@@ -72,8 +77,8 @@ class FFmpegInstallDialog(QDialog):
         # Setup dialog
         dialog_title = self.i18n.t("ffmpeg.dialog_title", platform=self.platform_display)
         self.setWindowTitle(dialog_title)
-        self.setMinimumWidth(600)
-        self.setMinimumHeight(400)
+        self.setMinimumWidth(FFMPEG_DIALOG_MIN_WIDTH)
+        self.setMinimumHeight(FFMPEG_DIALOG_MIN_HEIGHT)
 
         # Setup UI
         self.setup_ui(instructions)
@@ -95,17 +100,14 @@ class FFmpegInstallDialog(QDialog):
         # Warning icon (using emoji for simplicity)
         icon_label = QLabel("⚠️")
         icon_font = QFont()
-        icon_font.setPointSize(32)
+        icon_font.setPointSize(INSTALL_DIALOG_WARNING_ICON_FONT_SIZE)
         icon_label.setFont(icon_font)
         header_layout.addWidget(icon_label)
 
         # Title with system info
         title_text = self.i18n.t("ffmpeg.not_installed_title", platform=self.platform_display)
         title_label = QLabel(title_text)
-        title_font = QFont()
-        title_font.setPointSize(16)
-        title_font.setBold(True)
-        title_label.setFont(title_font)
+        title_label.setObjectName("section_title")
         header_layout.addWidget(title_label)
 
         header_layout.addStretch()

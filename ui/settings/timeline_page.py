@@ -53,66 +53,50 @@ class TimelineSettingsPage(BaseSettingsPage):
     def setup_ui(self):
         """Set up the timeline settings UI."""
         # View range section
-        from PySide6.QtGui import QFont
-
-        font = QFont()
-        font.setPointSize(12)
-        font.setBold(True)
-
-        self.view_range_title = QLabel(self.i18n.t("settings.timeline.view_range"))
-        self.view_range_title.setFont(font)
-        self.content_layout.addWidget(self.view_range_title)
+        self.view_range_title = self.add_section_title(self.i18n.t("settings.timeline.view_range"))
 
         # Past days
-        past_layout = create_hbox()
-        self.past_label = QLabel(self.i18n.t("settings.timeline.past_days"))
-        self.past_label.setMinimumWidth(STANDARD_LABEL_WIDTH)
         self.past_days_spin = QSpinBox()
         self.past_days_spin.setMinimum(1)
         self.past_days_spin.setMaximum(365)
         self.past_days_spin.setValue(30)
         self.past_days_spin.setSuffix(" " + self.i18n.t("settings.timeline.days"))
         self.past_days_spin.valueChanged.connect(self._emit_changed)
-        past_layout.addWidget(self.past_label)
-        past_layout.addWidget(self.past_days_spin)
-        past_layout.addStretch()
-        self.content_layout.addLayout(past_layout)
+        _, self.past_label = self.add_labeled_row(
+            self.i18n.t("settings.timeline.past_days"),
+            self.past_days_spin,
+            label_width=STANDARD_LABEL_WIDTH,
+        )
 
         # Future days
-        future_layout = create_hbox()
-        self.future_label = QLabel(self.i18n.t("settings.timeline.future_days"))
-        self.future_label.setMinimumWidth(STANDARD_LABEL_WIDTH)
         self.future_days_spin = QSpinBox()
         self.future_days_spin.setMinimum(1)
         self.future_days_spin.setMaximum(365)
         self.future_days_spin.setValue(30)
         self.future_days_spin.setSuffix(" " + self.i18n.t("settings.timeline.days"))
         self.future_days_spin.valueChanged.connect(self._emit_changed)
-        future_layout.addWidget(self.future_label)
-        future_layout.addWidget(self.future_days_spin)
-        future_layout.addStretch()
-        self.content_layout.addLayout(future_layout)
+        _, self.future_label = self.add_labeled_row(
+            self.i18n.t("settings.timeline.future_days"),
+            self.future_days_spin,
+            label_width=STANDARD_LABEL_WIDTH,
+        )
 
         # Page size
-        page_size_layout = create_hbox()
-        self.page_size_label = QLabel(self.i18n.t("settings.timeline.page_size"))
-        self.page_size_label.setMinimumWidth(STANDARD_LABEL_WIDTH)
         self.page_size_spin = QSpinBox()
         self.page_size_spin.setMinimum(1)
         self.page_size_spin.setMaximum(500)
         self.page_size_spin.setValue(50)
         self.page_size_spin.valueChanged.connect(self._emit_changed)
-        page_size_layout.addWidget(self.page_size_label)
-        page_size_layout.addWidget(self.page_size_spin)
-        page_size_layout.addStretch()
-        self.content_layout.addLayout(page_size_layout)
+        _, self.page_size_label = self.add_labeled_row(
+            self.i18n.t("settings.timeline.page_size"),
+            self.page_size_spin,
+            label_width=STANDARD_LABEL_WIDTH,
+        )
 
         self.add_section_spacing()
 
         # Notification settings section
-        self.notifications_title = QLabel(self.i18n.t("settings.timeline.notifications"))
-        self.notifications_title.setFont(font)
-        self.content_layout.addWidget(self.notifications_title)
+        self.notifications_title = self.add_section_title(self.i18n.t("settings.timeline.notifications"))
 
         # Reminder time
         reminder_layout = create_hbox()
@@ -131,9 +115,7 @@ class TimelineSettingsPage(BaseSettingsPage):
         self.add_section_spacing()
 
         # Auto-start settings section
-        self.auto_start_title = QLabel(self.i18n.t("settings.timeline.auto_start"))
-        self.auto_start_title.setFont(font)
-        self.content_layout.addWidget(self.auto_start_title)
+        self.auto_start_title = self.add_section_title(self.i18n.t("settings.timeline.auto_start"))
 
         # Enable auto-start
         self.auto_start_check = QCheckBox(self.i18n.t("settings.timeline.enable_auto_start"))

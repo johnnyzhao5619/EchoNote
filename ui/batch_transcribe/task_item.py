@@ -23,7 +23,8 @@ import logging
 from typing import Any, Dict, Optional
 
 # Import base widget
-from ui.base_widgets import BaseWidget, create_button, create_hbox
+from ui.base_widgets import BaseWidget, create_hbox
+from ui.constants import TASK_ITEM_MIN_HEIGHT
 from ui.qt_imports import (
     QAction,
     QHBoxLayout,
@@ -67,7 +68,7 @@ class TaskItem(BaseWidget):
             i18n: Internationalization manager
             parent: Parent widget
         """
-        super().__init__(parent)
+        super().__init__(i18n, parent)
 
         self.task_data = task_data
         self.task_id = task_data["id"]
@@ -101,9 +102,7 @@ class TaskItem(BaseWidget):
         self.status_label = QLabel()
 
         # Create task header
-        from ui.layout_utils import create_horizontal_layout
-
-        top_layout = create_horizontal_layout(spacing=10)
+        top_layout = create_hbox(spacing=10)
         top_layout.addWidget(self.filename_label)
         top_layout.addStretch()
         top_layout.addWidget(self.status_label)
@@ -114,10 +113,8 @@ class TaskItem(BaseWidget):
         self.info_label.setObjectName("info_label")
         self.info_label.setProperty("role", "task-info")
 
-        info_layout = create_horizontal_layout(spacing=15)
+        info_layout = create_hbox(spacing=15)
         info_layout.addWidget(self.info_label)
-        info_layout.addStretch()
-
         info_layout.addStretch()
 
         layout.addLayout(info_layout)
@@ -204,7 +201,7 @@ class TaskItem(BaseWidget):
         self.update_translations()
 
         # Set minimum height to ensure all content is visible
-        self.setMinimumHeight(150)
+        self.setMinimumHeight(TASK_ITEM_MIN_HEIGHT)
 
         logger.debug("Task item UI setup complete")
 

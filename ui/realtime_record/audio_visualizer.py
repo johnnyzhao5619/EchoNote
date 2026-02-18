@@ -28,6 +28,7 @@ from PySide6.QtGui import QColor, QPainter, QPen
 
 from ui.base_widgets import BaseWidget
 from ui.common.theme import ThemeManager
+from ui.constants import AUDIO_VISUALIZER_MIN_HEIGHT, AUDIO_VISUALIZER_MIN_WIDTH
 
 logger = logging.getLogger(__name__)
 
@@ -53,8 +54,8 @@ class AudioVisualizer(BaseWidget):
         self.volume_level = 0.0
 
         # 设置最小尺寸
-        self.setMinimumHeight(100)
-        self.setMinimumWidth(400)
+        self.setMinimumHeight(AUDIO_VISUALIZER_MIN_HEIGHT)
+        self.setMinimumWidth(AUDIO_VISUALIZER_MIN_WIDTH)
 
         # 刷新定时器（30 FPS）
         self.refresh_timer = QTimer()

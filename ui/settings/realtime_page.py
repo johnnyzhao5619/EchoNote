@@ -51,7 +51,7 @@ from config.constants import (
     TRANSLATION_ENGINE_GOOGLE,
 )
 from ui.base_widgets import create_button, create_hbox, create_vbox
-from ui.constants import format_gain_display
+from ui.constants import SETTINGS_GAIN_VALUE_LABEL_MIN_WIDTH, format_gain_display
 from ui.settings.base_page import BaseSettingsPage
 from utils.i18n import I18nQtManager
 
@@ -99,15 +99,7 @@ class RealtimeSettingsPage(BaseSettingsPage):
     def setup_ui(self):
         """Set up the realtime settings UI."""
         # Audio input section
-        from PySide6.QtGui import QFont
-
-        font = QFont()
-        font.setPointSize(12)
-        font.setBold(True)
-
-        self.audio_input_title = QLabel(self.i18n.t("settings.realtime.audio_input"))
-        self.audio_input_title.setFont(font)
-        self.content_layout.addWidget(self.audio_input_title)
+        self.audio_input_title = self.add_section_title(self.i18n.t("settings.realtime.audio_input"))
 
         # Default input source
         source_layout = create_hbox()
@@ -137,7 +129,7 @@ class RealtimeSettingsPage(BaseSettingsPage):
         self.gain_slider.valueChanged.connect(self._on_gain_changed)
 
         self.gain_value_label = QLabel(format_gain_display(GAIN_SLIDER_DEFAULT / GAIN_SLIDER_DIVISOR))
-        self.gain_value_label.setMinimumWidth(50)
+        self.gain_value_label.setMinimumWidth(SETTINGS_GAIN_VALUE_LABEL_MIN_WIDTH)
 
         self.gain_min_label = QLabel(format_gain_display(GAIN_SLIDER_MIN / GAIN_SLIDER_DIVISOR))
         self.gain_max_label = QLabel(format_gain_display(GAIN_SLIDER_MAX / GAIN_SLIDER_DIVISOR))
@@ -176,9 +168,7 @@ class RealtimeSettingsPage(BaseSettingsPage):
         self.add_section_spacing()
 
         # Recording settings section
-        self.recording_title = QLabel(self.i18n.t("settings.realtime.recording"))
-        self.recording_title.setFont(font)
-        self.content_layout.addWidget(self.recording_title)
+        self.recording_title = self.add_section_title(self.i18n.t("settings.realtime.recording"))
 
         # Recording format
         format_layout = create_hbox()
@@ -228,9 +218,7 @@ class RealtimeSettingsPage(BaseSettingsPage):
         self.add_section_spacing()
 
         # Translation settings section
-        self.translation_title = QLabel(self.i18n.t("settings.realtime.translation"))
-        self.translation_title.setFont(font)
-        self.content_layout.addWidget(self.translation_title)
+        self.translation_title = self.add_section_title(self.i18n.t("settings.realtime.translation"))
 
         # Translation engine
         translation_layout = create_hbox()
@@ -247,9 +235,7 @@ class RealtimeSettingsPage(BaseSettingsPage):
         self.add_section_spacing()
 
         # Processing settings section
-        self.processing_title = QLabel(self.i18n.t("settings.realtime.processing"))
-        self.processing_title.setFont(font)
-        self.content_layout.addWidget(self.processing_title)
+        self.processing_title = self.add_section_title(self.i18n.t("settings.realtime.processing"))
 
         self.save_transcript_check = QCheckBox(self.i18n.t("settings.realtime.save_transcript"))
         self.save_transcript_check.stateChanged.connect(self._emit_changed)

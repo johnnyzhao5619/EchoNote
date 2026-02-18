@@ -26,7 +26,7 @@ import shutil
 from typing import Optional, Any
 
 from PySide6.QtCore import QSize, Qt, QTimer
-from PySide6.QtGui import QAction, QFont, QKeySequence, QShortcut
+from PySide6.QtGui import QAction, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
@@ -46,6 +46,7 @@ from data.database.models import TranscriptionTask
 from ui.base_widgets import connect_button_with_callback, create_hbox
 from ui.batch_transcribe.search_widget import SearchWidget
 from ui.batch_transcribe.window_state_manager import WindowStateManager
+from ui.constants import CONTROL_BUTTON_MIN_HEIGHT
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.transcript_viewer")
@@ -304,10 +305,7 @@ class TranscriptViewerDialog(QDialog):
 
         # File name (larger font)
         self.file_name_label = QLabel()
-        file_font = QFont()
-        file_font.setPointSize(12)
-        file_font.setBold(True)
-        self.file_name_label.setFont(file_font)
+        self.file_name_label.setProperty("role", "transcript-file")
         layout.addWidget(self.file_name_label)
 
         # Metadata row 1: Duration, Language
@@ -355,27 +353,27 @@ class TranscriptViewerDialog(QDialog):
         # Edit/Save button
         self.edit_button = QPushButton()
         self.edit_button.setObjectName("edit_button")
-        self.edit_button.setMinimumHeight(36)
+        self.edit_button.setMinimumHeight(CONTROL_BUTTON_MIN_HEIGHT)
         connect_button_with_callback(self.edit_button, self.toggle_edit_mode)
         layout.addWidget(self.edit_button)
 
         # Export button with dropdown menu
         self.export_button = QPushButton()
         self.export_button.setObjectName("export_button")
-        self.export_button.setMinimumHeight(36)
+        self.export_button.setMinimumHeight(CONTROL_BUTTON_MIN_HEIGHT)
         self._create_export_menu()
         layout.addWidget(self.export_button)
 
         # Copy all button
         self.copy_button = QPushButton()
         self.copy_button.setObjectName("copy_button")
-        self.copy_button.setMinimumHeight(36)
+        self.copy_button.setMinimumHeight(CONTROL_BUTTON_MIN_HEIGHT)
         connect_button_with_callback(self.copy_button, self.copy_all)
         layout.addWidget(self.copy_button)
 
         # Search button
         self.search_button = QPushButton()
-        self.search_button.setMinimumHeight(36)
+        self.search_button.setMinimumHeight(CONTROL_BUTTON_MIN_HEIGHT)
         connect_button_with_callback(self.search_button, self._toggle_search)
         layout.addWidget(self.search_button)
 

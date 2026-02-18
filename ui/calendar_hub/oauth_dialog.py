@@ -46,6 +46,7 @@ from ui.base_widgets import (
     create_hbox,
     create_primary_button,
 )
+from ui.constants import CALENDAR_OAUTH_DIALOG_MIN_WIDTH, CALENDAR_OAUTH_RESULT_DIALOG_MIN_WIDTH
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.oauth_dialog")
@@ -184,7 +185,7 @@ class OAuthDialog(QDialog):
                 "calendar_hub.oauth_dialog.connect_title", provider=self.provider.capitalize()
             )
         )
-        self.setMinimumWidth(500)
+        self.setMinimumWidth(CALENDAR_OAUTH_DIALOG_MIN_WIDTH)
         self.setModal(True)
 
         # Main layout
@@ -651,7 +652,7 @@ class OAuthResultDialog(QDialog):
             else self.i18n.t("calendar_hub.oauth_dialog.auth_failed_title")
         )
         self.setWindowTitle(title)
-        self.setMinimumWidth(400)
+        self.setMinimumWidth(CALENDAR_OAUTH_RESULT_DIALOG_MIN_WIDTH)
 
         # Main layout
         layout = QVBoxLayout(self)

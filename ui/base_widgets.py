@@ -31,6 +31,10 @@ from ui.qt_imports import (
     QWidget,
 )
 from ui.constants import DEFAULT_LAYOUT_SPACING
+from ui.signal_helpers import (
+    connect_button_with_callback as connect_button_signal,
+    safe_disconnect as safe_disconnect_signal,
+)
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger(__name__)
@@ -363,8 +367,8 @@ class SignalHelper:
         """
         if args or kwargs:
             button.clicked.connect(lambda: callback(*args, **kwargs))
-        else:
-            button.clicked.connect(callback)
+            return
+        connect_button_signal(button, callback)
 
     @staticmethod
     def safe_connect(signal, slot, connection_type=None):
@@ -391,13 +395,9 @@ class SignalHelper:
             signal: 信号对象
             slot: 槽函数（可选，如果不提供则断开所有连接）
         """
-        try:
-            if slot:
-                signal.disconnect(slot)
-            else:
-                signal.disconnect()
-        except Exception as e:
-            logger.warning(f"Failed to disconnect signal: {e}")
+        if safe_disconnect_signal(signal, slot):
+            return
+        logger.warning("Failed to disconnect signal")
 
 
 # 导出常用的辅助函数，方便其他模块使用

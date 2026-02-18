@@ -25,6 +25,7 @@ from typing import Optional
 from PySide6.QtCore import QTimer
 
 from ui.base_widgets import connect_button_with_callback, create_hbox
+from ui.constants import ERROR_DIALOG_MIN_WIDTH
 from ui.qt_imports import (
     QApplication,
     QDialog,
@@ -83,7 +84,7 @@ class ErrorDialog(QDialog):
         """Set up the error dialog UI."""
         # Set dialog properties
         self.setWindowTitle(self.error_title)
-        self.setMinimumWidth(500)
+        self.setMinimumWidth(ERROR_DIALOG_MIN_WIDTH)
         self.setModal(True)
 
         # Create layout
@@ -159,7 +160,7 @@ class ErrorDialog(QDialog):
         if self.i18n:
             self.copy_button.setText(self.i18n.t("common.copied"))
         else:
-            self.copy_button.setText(self.i18n.t("ui_strings.common.error_dialog.copied"))
+            self.copy_button.setText("Copied!")
 
         # Reset button text after 2 seconds
         QTimer.singleShot(2000, self._update_copy_button_text)
@@ -179,11 +180,7 @@ class ErrorDialog(QDialog):
             else:
                 text = self.i18n.t("common.show_details")
         else:
-            text = (
-                self.i18n.t("common.hide_details")
-                if showing
-                else self.i18n.t("common.show_details")
-            )
+            text = "Hide Details" if showing else "Show Details"
 
         self.details_button.setText(text)
 

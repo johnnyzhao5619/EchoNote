@@ -24,8 +24,6 @@ from typing import Tuple
 
 from PySide6.QtWidgets import QComboBox, QLabel
 
-from ui.constants import LABEL_MIN_WIDTH
-from ui.layout_utils import create_horizontal_layout
 from ui.settings.base_page import BaseSettingsPage
 from utils.i18n import I18nQtManager, get_language_display_name, get_translation_codes
 
@@ -53,29 +51,16 @@ class LanguageSettingsPage(BaseSettingsPage):
     def setup_ui(self):
         """Set up the language settings UI."""
         # Language section
-        from PySide6.QtGui import QFont
-
-        font = QFont()
-        font.setPointSize(12)
-        font.setBold(True)
-
-        self.language_title = QLabel(self.i18n.t("settings.language.title"))
-        self.language_title.setFont(font)
-        self.content_layout.addWidget(self.language_title)
+        self.language_title = self.add_section_title(self.i18n.t("settings.language.title"))
 
         # Language selection
         self.language_combo = QComboBox()
         self._populate_language_options()
 
         self.language_combo.currentIndexChanged.connect(self._on_language_changed)
-        language_layout = create_horizontal_layout()
-        self.language_label = QLabel(self.i18n.t("settings.language.select"))
-        self.language_label.setMinimumWidth(LABEL_MIN_WIDTH)
-        language_layout.addWidget(self.language_label)
-        language_layout.addWidget(self.language_combo)
-        language_layout.addStretch()
-
-        self.content_layout.addLayout(language_layout)
+        _, self.language_label = self.add_labeled_row(
+            self.i18n.t("settings.language.select"), self.language_combo
+        )
 
         self.add_spacing()
 

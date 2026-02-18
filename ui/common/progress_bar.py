@@ -58,7 +58,7 @@ class ProgressBar(BaseWidget):
             parent: Parent widget
             i18n: Internationalization manager for text translation
         """
-        super().__init__(parent)
+        super().__init__(i18n, parent)
 
         self.show_percentage = show_percentage
         self.show_estimated_time = show_estimated_time

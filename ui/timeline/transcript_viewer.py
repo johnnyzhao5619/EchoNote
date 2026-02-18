@@ -37,6 +37,7 @@ from PySide6.QtWidgets import (
 
 from ui.base_widgets import BaseWidget, connect_button_with_callback, create_button, create_hbox
 from ui.common.theme import ThemeManager
+from ui.constants import TIMELINE_SEARCH_NAV_BUTTON_MAX_WIDTH
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.timeline.transcript_viewer")
@@ -116,14 +117,14 @@ class TranscriptViewer(BaseWidget):
         # Previous/Next match buttons
         self.prev_button = create_button(self.i18n.t("transcript.previous_match_button"))
         self.prev_button.setToolTip(self.i18n.t("transcript.previous_match_tooltip"))
-        self.prev_button.setMaximumWidth(40)
+        self.prev_button.setMaximumWidth(TIMELINE_SEARCH_NAV_BUTTON_MAX_WIDTH)
         connect_button_with_callback(self.prev_button, self._on_previous_match)
         self.prev_button.setEnabled(False)
         search_layout.addWidget(self.prev_button)
 
         self.next_button = create_button(self.i18n.t("transcript.next_match_button"))
         self.next_button.setToolTip(self.i18n.t("transcript.next_match_tooltip"))
-        self.next_button.setMaximumWidth(40)
+        self.next_button.setMaximumWidth(TIMELINE_SEARCH_NAV_BUTTON_MAX_WIDTH)
         connect_button_with_callback(self.next_button, self._on_next_match)
         self.next_button.setEnabled(False)
         search_layout.addWidget(self.next_button)

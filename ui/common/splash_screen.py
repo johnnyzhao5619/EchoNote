@@ -25,7 +25,16 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QFont, QPainter, QPixmap
 from PySide6.QtWidgets import QSplashScreen
 
+from config.constants import SPLASH_SCREEN_DELAY_MS
 from ui.common.theme import ThemeManager
+from ui.constants import (
+    SPLASH_BAR_HEIGHT,
+    SPLASH_HORIZONTAL_MARGIN,
+    SPLASH_PERCENT_RESERVED_WIDTH,
+    SPLASH_PROGRESS_FONT_SIZE,
+    SPLASH_TITLE_FONT_SIZE,
+    SPLASH_VERSION_FONT_SIZE,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -113,29 +122,31 @@ class SplashScreen(QSplashScreen):
 
         # Draw application name
         title_font = QFont()
-        title_font.setPointSize(24)
+        title_font.setPointSize(SPLASH_TITLE_FONT_SIZE)
         title_font.setWeight(QFont.Weight.Bold)
         painter.setFont(title_font)
-        painter.drawText(20, 80, "EchoNote")
+        painter.drawText(SPLASH_HORIZONTAL_MARGIN, 80, "EchoNote")
 
         # Draw version (if available)
         if self._version:
             version_font = QFont()
-            version_font.setPointSize(12)
+            version_font.setPointSize(SPLASH_VERSION_FONT_SIZE)
             painter.setFont(version_font)
-            painter.drawText(20, 110, self._version)
+            painter.drawText(SPLASH_HORIZONTAL_MARGIN, 110, self._version)
 
         # Draw progress text
         progress_font = QFont()
-        progress_font.setPointSize(11)
+        progress_font.setPointSize(SPLASH_PROGRESS_FONT_SIZE)
         painter.setFont(progress_font)
-        painter.drawText(20, self.height - 60, self._progress_text)
+        painter.drawText(SPLASH_HORIZONTAL_MARGIN, self.height - 60, self._progress_text)
 
         # Draw progress bar
         # Reserve space for percentage text (60px)
-        bar_width = self.width - 100
-        bar_height = 20
-        bar_x = 20
+        bar_width = (
+            self.width - (2 * SPLASH_HORIZONTAL_MARGIN) - SPLASH_PERCENT_RESERVED_WIDTH
+        )
+        bar_height = SPLASH_BAR_HEIGHT
+        bar_x = SPLASH_HORIZONTAL_MARGIN
         bar_y = self.height - 40
 
         # Background
@@ -148,7 +159,7 @@ class SplashScreen(QSplashScreen):
         # Progress percentage (right-aligned)
         percent_text = f"{self._progress_percent}%"
         percent_font = QFont()
-        percent_font.setPointSize(11)
+        percent_font.setPointSize(SPLASH_PROGRESS_FONT_SIZE)
         percent_font.setWeight(QFont.Weight.Bold)
         painter.setFont(percent_font)
 
@@ -159,7 +170,7 @@ class SplashScreen(QSplashScreen):
         text_width = metrics.horizontalAdvance(percent_text)
 
         # Draw percentage at the right edge
-        painter.drawText(self.width - text_width - 20, bar_y + 15, percent_text)
+        painter.drawText(self.width - text_width - SPLASH_HORIZONTAL_MARGIN, bar_y + 15, percent_text)
 
     def show_progress(self, message: str, percent: int = None):
         """
@@ -183,7 +194,7 @@ class SplashScreen(QSplashScreen):
 
         logger.debug(f"Splash progress: {message} ({self._progress_percent}%)")
 
-    def finish_with_delay(self, main_window, delay_ms: int = 500):
+    def finish_with_delay(self, main_window, delay_ms: int = SPLASH_SCREEN_DELAY_MS):
         """
         Finish splash screen with a delay.
 
