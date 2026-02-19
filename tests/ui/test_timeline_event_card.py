@@ -4,9 +4,8 @@
 from datetime import datetime
 from types import SimpleNamespace
 
-from PySide6.QtWidgets import QLabel
-
 import pytest
+from PySide6.QtWidgets import QLabel
 
 from ui.timeline.event_card import EventCard
 

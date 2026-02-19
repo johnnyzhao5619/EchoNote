@@ -5,10 +5,9 @@ Tests for batch transcribe widget.
 
 from unittest.mock import MagicMock, Mock, patch
 
+import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFileDialog, QMessageBox
-
-import pytest
 
 from config.constants import (
     TASK_STATUS_CANCELLED,
