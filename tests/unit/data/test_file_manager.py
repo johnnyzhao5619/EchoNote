@@ -125,7 +125,7 @@ class TestFileSaveOperations:
         content = "Hello 世界 🌍"
         file_path = fm.save_text_file(content, "test.txt")
 
-        assert Path(file_path).read_text() == content
+        assert Path(file_path).read_text(encoding="utf-8") == content
 
     def test_save_text_file_custom_encoding(self, tmp_path):
         """Test saving text file with custom encoding."""

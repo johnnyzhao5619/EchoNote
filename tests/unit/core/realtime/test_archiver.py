@@ -45,14 +45,19 @@ class TestSessionArchiver:
         """Test saving audio as WAV."""
         audio_buffer = [np.zeros(1000, dtype=np.float32)]
         start_time = datetime(2023, 1, 1, 12, 0, 0)
-        
-        with patch("builtins.open", new_callable=MagicMock) as mock_open, \
+
+        with patch("core.realtime.archiver.tempfile.NamedTemporaryFile") as mock_temp, \
+             patch("builtins.open", new_callable=MagicMock) as mock_open, \
              patch("os.unlink") as mock_unlink:
             
+            mock_temp.return_value.__enter__.return_value.name = "/tmp/recording.wav"
+            mock_file_manager.ensure_directory.return_value = "/final/path"
+            mock_file_manager.save_file.return_value = "/final/path/file.wav"
+
             path = await archiver.save_recording(
                 audio_buffer, start_time, 16000, format="wav"
             )
-            
+
             assert path == "/final/path/file.wav"
             mock_file_manager.save_file.assert_called_once()
             mock_unlink.assert_called_with("/tmp/recording_20230101_120000.wav")
@@ -94,18 +99,23 @@ class TestSessionArchiver:
         """Test saving as MP3 with conversion."""
         audio_buffer = [np.zeros(1000, dtype=np.float32)]
         start_time = datetime(2023, 1, 1, 12, 0, 0)
-        
-        with patch("soundfile.write"), \
+
+        with patch("core.realtime.archiver.tempfile.NamedTemporaryFile") as mock_temp, \
+             patch("soundfile.write"), \
              patch("shutil.which", return_value="/usr/bin/ffmpeg"), \
              patch("subprocess.run") as mock_run, \
              patch("builtins.open", new_callable=MagicMock), \
              patch("os.unlink"):
             
+            mock_temp.return_value.__enter__.return_value.name = "/tmp/recording.wav"
+            mock_file_manager.ensure_directory.return_value = "/final/path"
+            mock_file_manager.save_file.return_value = "/final/path/file.wav"
+
             path = await archiver.save_recording(
                 audio_buffer, start_time, 16000, format="mp3"
             )
-            
-            assert path == "/final/path/file.wav"  # Mock returns same path, practically
+
+            assert path == "/final/path/file.wav"
             mock_run.assert_called_once()
             # Verify ffmpeg command args
             cmd = mock_run.call_args[0][0]
