@@ -244,6 +244,14 @@ test/*.mp4
 
 # Local Codex skills
 skills/
+
+# Test artifacts (keep test source tracked)
+tests/output/
+tests/tmp/
+
+# Script artifacts (keep script source tracked)
+scripts/*.log
+scripts/.cache/
 RELEASE_NOTES_*.md
 REVIEW_SUMMARY.md
 *_SUMMARY.md
