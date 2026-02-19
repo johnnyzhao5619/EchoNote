@@ -21,8 +21,9 @@ import asyncio
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 import numpy as np
+import pytest
+
 from core.realtime.archiver import SessionArchiver
 
 
