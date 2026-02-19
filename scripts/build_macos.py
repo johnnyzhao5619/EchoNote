@@ -77,7 +77,7 @@ def main():
     create_dmg()
     create_tarball()
 
-    print(f"✅ macOS build completed: {DIST_DIR}")
+    print(f"[OK] macOS build completed: {DIST_DIR}")
 
 
 if __name__ == "__main__":

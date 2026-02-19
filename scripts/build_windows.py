@@ -71,7 +71,7 @@ def main():
     build_executable()
     create_zip()
 
-    print(f"✅ Windows build completed: {DIST_DIR}")
+    print(f"[OK] Windows build completed: {DIST_DIR}")
 
 
 if __name__ == "__main__":

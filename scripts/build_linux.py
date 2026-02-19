@@ -39,7 +39,7 @@ def main():
     build_executable()
     create_tarball()
 
-    print(f"✅ Linux build completed: {DIST_DIR}")
+    print(f"[OK] Linux build completed: {DIST_DIR}")
 
 
 if __name__ == "__main__":
