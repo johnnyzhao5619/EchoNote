@@ -5,8 +5,6 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main, develop]
-  release:
-    types: [published]
 
 jobs:
   test:
@@ -19,20 +17,15 @@ jobs:
       CI: "true"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
-
-      - name: Cache PySide6
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+          cache: "pip"
 
       - name: Install system dependencies (Ubuntu)
         if: matrix.os == 'ubuntu-latest'
@@ -109,46 +102,3 @@ jobs:
       - name: Run tests (Windows/macOS)
         if: matrix.os != 'ubuntu-latest'
         run: pytest tests/ --cov=core --cov=engines --cov=data --cov=utils --cov=ui
-
-  build:
-    needs: test
-    runs-on: ${{ matrix.os }}
-    if: github.event_name == 'release'
-    env:
-      PYTHONUTF8: "1"
-      PYTHONIOENCODING: "utf-8"
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
-
-      - name: Build (Linux)
-        if: matrix.os == 'ubuntu-latest'
-        run: python scripts/build_linux.py --clean
-
-      - name: Build (Windows)
-        if: matrix.os == 'windows-latest'
-        run: python scripts/build_windows.py --clean
-
-      - name: Build (macOS)
-        if: matrix.os == 'macos-latest'
-        run: python scripts/build_macos.py --clean --dmg
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: echonote-${{ matrix.os }}
-          path: dist/

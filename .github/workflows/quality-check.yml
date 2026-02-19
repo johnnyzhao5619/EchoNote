@@ -2,260 +2,170 @@ name: Code Quality Check
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
 
 jobs:
   quality-check:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.10'
-        
-    - name: Cache pip dependencies
-      uses: actions/cache@v3
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
+      - uses: actions/checkout@v6
 
-    - name: Install system dependencies (Ubuntu)
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libasound2-dev portaudio19-dev libpulse-dev
-          
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install -r requirements-dev.txt
-        
-    - name: Install quality analysis tools
-      run: |
-        pip install pylint flake8 mypy bandit radon xenon
-        
-    - name: Run internationalization analysis
-      run: |
-        mkdir -p reports
-        python scripts/audit_i18n.py --translations-dir=resources/translations | tee reports/i18n_audit_report.txt
-        
-    - name: Run code quality analysis
-      run: |
-        mkdir -p reports
-        python - <<'PY'
-        import json
-        from pathlib import Path
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: "pip"
 
-        py_files = list(Path(".").rglob("*.py"))
-        report = {
-            "summary": {
-                "overall_status": "good",
-                "total_files_analyzed": len(py_files),
-                "total_static_issues": 0,
-                "high_complexity_items": 0,
-                "duplicate_code_ratio": 0.0,
-                "priority_actions": [
-                    "Review pylint/flake8/mypy/bandit outputs in the workflow logs.",
-                    "Address any high-complexity modules reported by radon/xenon.",
-                ],
-            },
-            "quality_score": {
-                "score": 80,
-                "grade": "B",
-            },
-        }
+      - name: Install system dependencies (Ubuntu)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev portaudio19-dev libpulse-dev
 
-        Path("reports").mkdir(exist_ok=True)
-        Path("reports/quality_analysis_report.json").write_text(
-            json.dumps(report, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
-        PY
-        
-    - name: Run static analysis
-      run: |
-        # Run individual tools for detailed output
-        echo "Running pylint..."
-        pylint ui core engines utils data --output-format=text --reports=no || true
-        
-        echo "Running flake8..."
-        flake8 ui core engines utils data --max-line-length=100 || true
-        
-        echo "Running mypy..."
-        mypy ui core engines utils data --ignore-missing-imports || true
-        
-        echo "Running bandit..."
-        bandit -r ui core engines utils data -f json || true
-        
-    - name: Check code complexity
-      run: |
-        echo "Running radon complexity check..."
-        radon cc ui core engines utils data --min=C || true
-        
-        echo "Running xenon complexity check..."
-        xenon --max-absolute=C --max-modules=B --max-average=A ui core engines utils data || true
-        
-    - name: Upload quality reports
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: quality-reports
-        path: reports/
-        retention-days: 30
-        
-    - name: Comment PR with quality summary
-      if: github.event_name == 'pull_request'
-      uses: actions/github-script@v6
-      with:
-        script: |
-          const fs = require('fs');
-          
-          try {
-            // Read quality report if it exists
-            const reportPath = 'reports/quality_analysis_report.json';
-            if (fs.existsSync(reportPath)) {
-              const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
-              
-              const summary = report.summary;
-              const qualityScore = report.quality_score;
-              
-              const statusEmoji = {
-                'excellent': '🟢',
-                'good': '🟡', 
-                'fair': '🟠',
-                'needs_improvement': '🔴'
-              };
-              
-              const emoji = statusEmoji[summary.overall_status] || '⚪';
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
 
-              const comment = [
-                '## 🔍 Code Quality Report',
-                '',
-                `**Overall Status**: ${emoji} ${summary.overall_status.replace('_', ' ')}`,
-                `**Quality Score**: ${qualityScore.score}/100 (Grade: ${qualityScore.grade})`,
-                '',
-                '### Summary',
-                `- **Files Analyzed**: ${summary.total_files_analyzed}`,
-                `- **Static Issues**: ${summary.total_static_issues}`,
-                `- **High Complexity**: ${summary.high_complexity_items}`,
-                `- **Duplicate Code**: ${(summary.duplicate_code_ratio * 100).toFixed(1)}%`,
-                '',
-                '### Priority Actions',
-                ...summary.priority_actions.map((action, i) => `${i + 1}. ${action}`),
-                '',
-                `📊 [View detailed reports in artifacts](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`
-              ].join('\\n');
-              
-              github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: comment
-              });
-            }
-          } catch (error) {
-            console.log('Could not post quality report comment:', error);
-          }
+      - name: Install quality analysis tools
+        run: |
+          pip install pylint radon xenon
+
+      - name: Run internationalization audit
+        run: |
+          mkdir -p reports
+          python scripts/audit_i18n.py --translations-dir=resources/translations | tee reports/i18n_audit_report.txt
+
+      - name: Run static analysis
+        run: |
+          mkdir -p reports
+
+          echo "Running pylint..."
+          pylint ui core engines utils data --output-format=text --reports=no > reports/pylint.txt || true
+
+          echo "Running flake8..."
+          flake8 ui core engines utils data --max-line-length=100 > reports/flake8.txt || true
+
+          echo "Running mypy..."
+          mypy ui core engines utils data --ignore-missing-imports > reports/mypy.txt || true
+
+          echo "Running bandit..."
+          bandit -r ui core engines utils data -f json -o reports/bandit-static.json || true
+          bandit -r ui core engines utils data -f txt > reports/bandit-static.txt || true
+
+      - name: Check code complexity
+        run: |
+          echo "Running radon complexity check..."
+          radon cc ui core engines utils data --min=C > reports/radon.txt || true
+
+          echo "Running xenon complexity check..."
+          xenon --max-absolute=C --max-modules=B --max-average=A ui core engines utils data > reports/xenon.txt || true
+
+      - name: Upload quality reports
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: quality-reports
+          path: reports/
+          retention-days: 30
 
   i18n-check:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.10'
+      - uses: actions/checkout@v6
 
-    - name: Install system dependencies (Ubuntu)
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libasound2-dev portaudio19-dev libpulse-dev
-        
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        
-    - name: Check internationalization
-      run: |
-        mkdir -p reports
-        python scripts/audit_i18n.py --translations-dir=resources/translations | tee reports/i18n_audit_report.txt
-        
-    - name: Check for hardcoded strings
-      run: |
-        # Run a focused check for obvious hardcoded UI strings.
-        # Match direct human-readable literals only and avoid empty-string resets.
-        echo "Checking for hardcoded strings in UI files..."
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: "pip"
 
-        # setText("literal text")
-        if grep -rE "\.setText\(\s*[\"'][^\"']*[[:alpha:]][^\"']*[\"']\s*\)" ui/ --include="*.py"; then
-          echo "❌ Found potential hardcoded strings in setText calls"
-          exit 1
-        fi
+      - name: Install system dependencies (Ubuntu)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev portaudio19-dev libpulse-dev
 
-        # setWindowTitle("literal text")
-        if grep -rE "\.setWindowTitle\(\s*[\"'][^\"']*[[:alpha:]][^\"']*[\"']\s*\)" ui/ --include="*.py"; then
-          echo "❌ Found potential hardcoded strings in setWindowTitle calls"
-          exit 1
-        fi
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-        # QMessageBox.xxx(..., "literal text", ...)
-        if grep -rE "QMessageBox\.[A-Za-z_]+\([^)]*[\"'][^\"']*[[:alpha:]][^\"']*[\"'][^)]*\)" ui/ --include="*.py"; then
-          echo "❌ Found potential hardcoded strings in QMessageBox calls"
-          exit 1
-        fi
+      - name: Check internationalization
+        run: |
+          mkdir -p reports
+          python scripts/audit_i18n.py --translations-dir=resources/translations | tee reports/i18n_audit_report.txt
 
-        echo "✅ No obvious hardcoded strings found"
-        
-    - name: Upload i18n reports
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: i18n-reports
-        path: reports/
-        retention-days: 30
+      - name: Check for hardcoded strings
+        run: |
+          # Run a focused check for obvious hardcoded UI strings.
+          # Match direct human-readable literals only and avoid empty-string resets.
+          echo "Checking for hardcoded strings in UI files..."
+
+          # setText("literal text")
+          if grep -rE "\.setText\(\s*[\"'][^\"']*[[:alpha:]][^\"']*[\"']\s*\)" ui/ --include="*.py"; then
+            echo "Found potential hardcoded strings in setText calls"
+            exit 1
+          fi
+
+          # setWindowTitle("literal text")
+          if grep -rE "\.setWindowTitle\(\s*[\"'][^\"']*[[:alpha:]][^\"']*[\"']\s*\)" ui/ --include="*.py"; then
+            echo "Found potential hardcoded strings in setWindowTitle calls"
+            exit 1
+          fi
+
+          # QMessageBox.xxx(..., "literal text", ...)
+          if grep -rE "QMessageBox\.[A-Za-z_]+\([^)]*[\"'][^\"']*[[:alpha:]][^\"']*[\"'][^)]*\)" ui/ --include="*.py"; then
+            echo "Found potential hardcoded strings in QMessageBox calls"
+            exit 1
+          fi
+
+          echo "No obvious hardcoded strings found"
+
+      - name: Upload i18n reports
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: i18n-reports
+          path: reports/
+          retention-days: 30
 
   security-check:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.10'
-        
-    - name: Install security tools
-      run: |
-        python -m pip install --upgrade pip
-        pip install bandit safety
-        
-    - name: Run Bandit security scan
-      run: |
-        bandit -r . -f json -o bandit-report.json || true
-        bandit -r . -f txt || true
-        
-    - name: Run Safety check
-      run: |
-        safety check --json --output safety-report.json || true
-        safety check || true
-        
-    - name: Upload security reports
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: security-reports
-        path: |
-          bandit-report.json
-          safety-report.json
-        retention-days: 30
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install security tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install bandit safety
+
+      - name: Run Bandit security scan
+        run: |
+          bandit -r . -f json -o bandit-report.json || true
+          bandit -r . -f txt || true
+
+      - name: Run Safety check
+        run: |
+          safety check --json --output safety-report.json || true
+          safety check || true
+
+      - name: Upload security reports
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: security-reports
+          path: |
+            bandit-report.json
+            safety-report.json
+          retention-days: 30

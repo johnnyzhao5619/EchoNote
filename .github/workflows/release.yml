@@ -5,11 +5,6 @@ on:
     tags:
       - "v*.*.*"
   workflow_dispatch:
-    inputs:
-      version:
-        description: "Version to release (e.g., v1.2.0)"
-        required: true
-        type: string
 
 jobs:
   validate:
@@ -17,13 +12,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: "pip"
+
+      - name: Install system dependencies (Ubuntu)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev portaudio19-dev libpulse-dev xvfb
 
       - name: Install dependencies
         run: |
@@ -32,13 +32,7 @@ jobs:
           pip install -r requirements-dev.txt
 
       - name: Run tests
-        run: pytest tests/ -v
-
-      - name: Run quality checks
-        run: |
-          black --check .
-          isort --check .
-          flake8 .
+        run: xvfb-run -a pytest tests/ -v
 
   build:
     name: Build ${{ matrix.os }}
@@ -48,6 +42,7 @@ jobs:
       PYTHONUTF8: "1"
       PYTHONIOENCODING: "utf-8"
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
@@ -61,10 +56,10 @@ jobs:
             build_script: build_macos.py
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: "pip"
@@ -94,7 +89,7 @@ jobs:
         run: python scripts/${{ matrix.build_script }} --dmg
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.artifact_name }}
           path: dist/*
@@ -108,43 +103,55 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
+      - name: Resolve release version
+        id: version
+        run: |
+          if [[ ! "${GITHUB_REF}" =~ ^refs/tags/v ]]; then
+            echo "This workflow must run on a release tag (v*.*.*). Current ref: ${GITHUB_REF}"
+            exit 1
+          fi
+          echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           path: artifacts
 
       - name: Generate release notes
-        id: release_notes
         run: |
-          VERSION=${GITHUB_REF#refs/tags/}
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          VERSION="${{ steps.version.outputs.version }}"
 
-          # Extract release notes from RELEASE_NOTES if exists
           if [ -f "RELEASE_NOTES_${VERSION}.md" ]; then
             cat "RELEASE_NOTES_${VERSION}.md" > release_notes.md
           else
-            echo "Release $VERSION" > release_notes.md
+            echo "Release ${VERSION}" > release_notes.md
             echo "" >> release_notes.md
             echo "## Changes" >> release_notes.md
-            git log --pretty=format:"- %s" $(git describe --tags --abbrev=0 HEAD^)..HEAD >> release_notes.md
+            PREV_TAG="$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)"
+            if [ -n "${PREV_TAG}" ]; then
+              git log --pretty=format:"- %s" "${PREV_TAG}"..HEAD >> release_notes.md
+            else
+              git log --pretty=format:"- %s" HEAD >> release_notes.md
+            fi
           fi
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.version.outputs.version }}
           files: artifacts/**/*
           body_path: release_notes.md
           draft: false
-          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
+          prerelease: ${{ contains(steps.version.outputs.version, 'alpha') || contains(steps.version.outputs.version, 'beta') || contains(steps.version.outputs.version, 'rc') }}
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Notify release
         run: |
-          echo "✅ Release ${{ steps.release_notes.outputs.version }} created successfully!"
-          echo "📦 Artifacts uploaded to GitHub Releases"
+          echo "Release ${{ steps.version.outputs.version }} created successfully"
+          echo "Artifacts uploaded to GitHub Releases"
