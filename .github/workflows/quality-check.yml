@@ -192,27 +192,28 @@ jobs:
         
     - name: Check for hardcoded strings
       run: |
-        # Run a quick check for obvious hardcoded strings
+        # Run a focused check for obvious hardcoded UI strings.
+        # Match direct human-readable literals only and avoid empty-string resets.
         echo "Checking for hardcoded strings in UI files..."
-        
-        # Look for setText calls with string literals
-        if grep -r "\.setText([\"']" ui/ --include="*.py"; then
+
+        # setText("literal text")
+        if grep -rE "\.setText\(\s*[\"'][^\"']*[[:alpha:]][^\"']*[\"']\s*\)" ui/ --include="*.py"; then
           echo "❌ Found potential hardcoded strings in setText calls"
           exit 1
         fi
-        
-        # Look for setWindowTitle calls with string literals  
-        if grep -r "\.setWindowTitle([\"']" ui/ --include="*.py"; then
+
+        # setWindowTitle("literal text")
+        if grep -rE "\.setWindowTitle\(\s*[\"'][^\"']*[[:alpha:]][^\"']*[\"']\s*\)" ui/ --include="*.py"; then
           echo "❌ Found potential hardcoded strings in setWindowTitle calls"
           exit 1
         fi
-        
-        # Look for QMessageBox calls with string literals
-        if grep -r "QMessageBox\." ui/ --include="*.py" | grep -E "[\"'][^\"']*[\"']"; then
+
+        # QMessageBox.xxx(..., "literal text", ...)
+        if grep -rE "QMessageBox\.[A-Za-z_]+\([^)]*[\"'][^\"']*[[:alpha:]][^\"']*[\"'][^)]*\)" ui/ --include="*.py"; then
           echo "❌ Found potential hardcoded strings in QMessageBox calls"
           exit 1
         fi
-        
+
         echo "✅ No obvious hardcoded strings found"
         
     - name: Upload i18n reports

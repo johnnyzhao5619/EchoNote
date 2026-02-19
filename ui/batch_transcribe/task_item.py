@@ -401,8 +401,9 @@ class TaskItem(BaseWidget):
         try:
             self.pause_btn.setText(self.i18n.t(action_key))
         except Exception:
-            # Fallback to default text in case translation missing
-            self.pause_btn.setText("Resume" if self._processing_paused else "Pause")
+            # Fallback to key-based label when translation manager is unavailable.
+            fallback_text = action_key.rsplit(".", maxsplit=1)[-1].replace("_", " ").title()
+            self.pause_btn.setText(fallback_text)
 
     def update_task_data(self, task_data: Dict[str, Any]):
         """

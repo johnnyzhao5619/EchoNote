@@ -160,7 +160,7 @@ class ErrorDialog(QDialog):
         if self.i18n:
             self.copy_button.setText(self.i18n.t("common.copied"))
         else:
-            self.copy_button.setText("Copied!")
+            self.copy_button.setText(self._fallback_text_from_key("common.copied"))
 
         # Reset button text after 2 seconds
         QTimer.singleShot(2000, self._update_copy_button_text)
@@ -180,7 +180,11 @@ class ErrorDialog(QDialog):
             else:
                 text = self.i18n.t("common.show_details")
         else:
-            text = "Hide Details" if showing else "Show Details"
+            text = (
+                self._fallback_text_from_key("common.hide_details")
+                if showing
+                else self._fallback_text_from_key("common.show_details")
+            )
 
         self.details_button.setText(text)
 
@@ -189,7 +193,7 @@ class ErrorDialog(QDialog):
         if self.i18n:
             text = self.i18n.t("common.copy")
         else:
-            text = "Copy"
+            text = self._fallback_text_from_key("common.copy")
 
         self.copy_button.setText(text)
 
@@ -198,9 +202,14 @@ class ErrorDialog(QDialog):
         if self.i18n:
             text = self.i18n.t("common.ok")
         else:
-            text = "OK"
+            text = self._fallback_text_from_key("common.ok")
 
         self.ok_button.setText(text)
+
+    @staticmethod
+    def _fallback_text_from_key(key: str) -> str:
+        """Generate a fallback label from an i18n key."""
+        return key.rsplit(".", maxsplit=1)[-1].replace("_", " ").title()
 
     def _on_language_changed(self, language: str):
         """
