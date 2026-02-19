@@ -462,7 +462,9 @@ class CalendarHubWidget(BaseWidget):
 
             if data:
                 try:
-                    if event:
+                    if event and dialog.is_delete_requested():
+                        self._delete_event(str(data.get("id", "")))
+                    elif event:
                         # Update existing event
                         self._update_event(data)
                     else:
@@ -544,6 +546,33 @@ class CalendarHubWidget(BaseWidget):
         except Exception as e:
             logger.error(f"Error updating event: {e}")
             raise
+
+    def _delete_event(self, event_id: str):
+        """Delete an event with confirmation and optional export."""
+        if not event_id:
+            self.show_warning(
+                self.i18n.t("common.warning"),
+                self.i18n.t("calendar.error.event_not_found"),
+            )
+            return
+
+        event = self.calendar_manager.get_event(event_id)
+        if not event:
+            self.show_warning(
+                self.i18n.t("common.warning"),
+                self.i18n.t("calendar.error.event_not_found"),
+            )
+            return
+
+        from ui.calendar_event_actions import confirm_and_delete_event
+
+        confirm_and_delete_event(
+            parent=self,
+            i18n=self.i18n,
+            calendar_manager=self.calendar_manager,
+            event=event,
+            on_deleted=self._refresh_current_view,
+        )
 
     def _refresh_current_view(self):
         """Refresh the current calendar view."""

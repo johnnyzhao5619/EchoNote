@@ -45,6 +45,7 @@ class FasterWhisperEngine(SpeechEngine):
 
     # 支持的模型大小及其特性（来自模型注册表）
     MODEL_SIZES = dict(get_model_size_metadata())
+    _VIDEO_CONTAINER_SUFFIXES = frozenset({".mp4", ".avi", ".mkv", ".mov", ".webm", ".mpeg"})
 
     def __init__(
         self,
@@ -356,6 +357,97 @@ class FasterWhisperEngine(SpeechEngine):
         # Whisper 支持的基础语言
         return combine_languages(BASE_LANGUAGE_CODES)
 
+    def _probe_duration_with_soundfile(self, audio_path: str) -> Optional[float]:
+        """Probe media duration using soundfile when supported."""
+        try:
+            import soundfile as sf
+
+            info = sf.info(audio_path)
+            duration = float(getattr(info, "duration", 0.0) or 0.0)
+            if duration > 0:
+                logger.debug("Audio duration: %.2fs (via soundfile)", duration)
+                return duration
+        except Exception as exc:
+            logger.debug("Duration probe via soundfile skipped/failed for %s: %s", audio_path, exc)
+        return None
+
+    def _probe_duration_with_ffprobe(self, audio_path: str) -> Optional[float]:
+        """Probe media duration using ffprobe."""
+        try:
+            import json
+            import subprocess
+
+            result = subprocess.run(
+                [
+                    "ffprobe",
+                    "-v",
+                    "quiet",
+                    "-print_format",
+                    "json",
+                    "-show_format",
+                    audio_path,
+                ],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if result.returncode != 0:
+                logger.debug(
+                    "Duration probe via ffprobe failed for %s: returncode=%s stderr=%s",
+                    audio_path,
+                    result.returncode,
+                    (result.stderr or "").strip(),
+                )
+                return None
+
+            probe_data = json.loads(result.stdout or "{}")
+            raw_duration = probe_data.get("format", {}).get("duration")
+            duration = float(raw_duration) if raw_duration is not None else 0.0
+            if duration > 0:
+                logger.debug("Audio duration: %.2fs (via ffprobe)", duration)
+                return duration
+        except Exception as exc:
+            logger.debug("Duration probe via ffprobe skipped/failed for %s: %s", audio_path, exc)
+        return None
+
+    def _estimate_duration_from_file_size(self, audio_path: str) -> Optional[float]:
+        """Estimate duration from file size as a last resort."""
+        try:
+            file_size = os.path.getsize(audio_path)
+            # Rough estimate with assumed 128kbps average bitrate.
+            duration = file_size / (128 * 1024 / 8)
+            if duration > 0:
+                logger.debug("Audio duration: %.2fs (estimated from file size)", duration)
+                return duration
+        except Exception as exc:
+            logger.debug("Duration estimation from file size failed for %s: %s", audio_path, exc)
+        return None
+
+    def _detect_audio_duration(self, audio_path: str) -> Optional[float]:
+        """
+        Detect media duration with format-aware probing order.
+
+        Video containers usually fail with soundfile; prefer ffprobe first to avoid noisy logs.
+        """
+        suffix = Path(audio_path).suffix.lower()
+        if suffix in self._VIDEO_CONTAINER_SUFFIXES:
+            audio_duration = self._probe_duration_with_ffprobe(audio_path)
+            if audio_duration is None:
+                audio_duration = self._probe_duration_with_soundfile(audio_path)
+        else:
+            audio_duration = self._probe_duration_with_soundfile(audio_path)
+            if audio_duration is None:
+                audio_duration = self._probe_duration_with_ffprobe(audio_path)
+
+        if audio_duration is None:
+            audio_duration = self._estimate_duration_from_file_size(audio_path)
+        if audio_duration is None:
+            logger.warning(
+                "Could not determine media duration for %s; progress updates may be limited",
+                audio_path,
+            )
+        return audio_duration
+
     async def transcribe_file(
         self, audio_path: str, language: Optional[str] = None, **kwargs
     ) -> Dict:
@@ -387,52 +479,7 @@ class FasterWhisperEngine(SpeechEngine):
 
         try:
             # 首先获取音频时长以计算进度
-            audio_duration = None
-            try:
-                import soundfile as sf
-
-                info = sf.info(audio_path)
-                audio_duration = info.duration
-                logger.debug(f"Audio duration: {audio_duration:.2f}s (via soundfile)")
-            except Exception as e:
-                logger.warning(f"Could not get audio duration via soundfile: {e}")
-                # 尝试使用 ffprobe 获取时长
-                try:
-                    import json
-                    import subprocess
-
-                    result = subprocess.run(
-                        [
-                            "ffprobe",
-                            "-v",
-                            "quiet",
-                            "-print_format",
-                            "json",
-                            "-show_format",
-                            audio_path,
-                        ],
-                        capture_output=True,
-                        text=True,
-                        timeout=10,
-                    )
-                    if result.returncode == 0:
-                        probe_data = json.loads(result.stdout)
-                        audio_duration = float(probe_data["format"]["duration"])
-                        logger.debug(f"Audio duration: {audio_duration:.2f}s (via ffprobe)")
-                except Exception as ffprobe_error:
-                    logger.warning(f"Could not get audio duration via ffprobe: {ffprobe_error}")
-                    # 如果都失败了，使用估算值（基于文件大小）
-                    try:
-                        file_size = os.path.getsize(audio_path)
-                        # 粗略估算：假设平均比特率为 128kbps
-                        audio_duration = file_size / (128 * 1024 / 8)
-                        logger.debug(
-                            f"Audio duration: {audio_duration:.2f}s (estimated from file size)"
-                        )
-                    except Exception:
-                        logger.warning(
-                            "Could not estimate audio duration, progress updates may be limited"
-                        )
+            audio_duration = self._detect_audio_duration(audio_path)
 
             # 定义一个同步函数来执行完整的转录过程
             def do_transcription():

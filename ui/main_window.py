@@ -268,10 +268,6 @@ class MainWindow(QMainWindow):
         self.record_status_label.setObjectName("shell_status_item")
         layout.addWidget(self.record_status_label)
 
-        self.theme_status_label = QLabel()
-        self.theme_status_label.setObjectName("shell_status_item")
-        layout.addWidget(self.theme_status_label)
-
         layout.addStretch()
 
         self.shell_message_label = QLabel()
@@ -595,9 +591,6 @@ class MainWindow(QMainWindow):
         recording_key = "app_shell.recording_on" if is_recording else "app_shell.recording_off"
         self.record_status_label.setText(self.i18n.t(recording_key))
 
-        theme_name = self.theme_manager.get_current_theme()
-        self.theme_status_label.setText(self.i18n.t("app_shell.theme_status", theme=theme_name))
-
     def apply_theme(self, theme: str):
         """
         Apply a theme to the application.
@@ -856,32 +849,39 @@ class MainWindow(QMainWindow):
     def _has_active_transcription_tasks(self) -> bool:
         """Return whether transcription manager currently has active tasks."""
         transcription_manager = self.managers.get("transcription_manager")
-        if transcription_manager is None or not hasattr(transcription_manager, "has_running_tasks"):
+        if transcription_manager is None:
             return False
-        has_running = bool(transcription_manager.has_running_tasks())
+
+        if hasattr(transcription_manager, "get_active_task_count"):
+            has_running = bool(max(int(transcription_manager.get_active_task_count()), 0) > 0)
+        elif hasattr(transcription_manager, "has_running_tasks"):
+            has_running = bool(transcription_manager.has_running_tasks())
+        else:
+            has_running = False
+
         if has_running:
             logger.debug("Found running transcription tasks")
         return has_running
 
     def _get_active_transcription_task_count(self) -> int:
         """Return exact active transcription task count when possible."""
-        if not self._has_active_transcription_tasks():
+        transcription_manager = self.managers.get("transcription_manager")
+        if transcription_manager is None:
             return 0
 
-        db_connection = self.managers.get("db_connection")
-        if db_connection is not None and hasattr(db_connection, "execute"):
+        if hasattr(transcription_manager, "get_active_task_count"):
             try:
-                result = db_connection.execute(
-                    "SELECT COUNT(*) as count FROM transcription_tasks "
-                    "WHERE status = 'processing'"
-                )
-                if result and len(result) > 0:
-                    return int(result[0]["count"])
+                return max(int(transcription_manager.get_active_task_count()), 0)
             except Exception as exc:  # noqa: BLE001
-                logger.debug("Failed to query active transcription task count: %s", exc)
+                logger.debug("Failed to get active count from manager runtime: %s", exc)
 
-        # Fallback when manager reports running tasks but exact count is unavailable.
-        return 1
+        if hasattr(transcription_manager, "has_running_tasks"):
+            try:
+                return 1 if transcription_manager.has_running_tasks() else 0
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("Failed to get active task state from manager: %s", exc)
+
+        return 0
 
     def _is_realtime_recording_active(self) -> bool:
         """Return whether realtime recorder is currently recording."""

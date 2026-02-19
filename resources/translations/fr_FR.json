@@ -300,14 +300,31 @@
     "success": {
       "event_created": "Événement créé avec succès.",
       "event_updated": "Événement mis à jour avec succès.",
+      "event_deleted": "Événement supprimé avec succès.",
+      "event_exported": "Événement exporté vers : {path}",
       "connected": "Calendrier {provider} connecté avec succès.",
       "disconnected": "Calendrier {provider} déconnecté avec succès."
+    },
+    "delete": {
+      "confirm_title": "Supprimer l'événement",
+      "confirm_message": "Vous allez supprimer : {title}",
+      "confirm_hint": "La suppression retire l'événement et ses pièces jointes (enregistrement/transcription). Vous pouvez exporter avant suppression.",
+      "export_then_delete": "Exporter puis supprimer",
+      "delete_now": "Supprimer seulement",
+      "second_confirm_title": "Deuxième confirmation",
+      "second_confirm_message": "Veuillez confirmer à nouveau la suppression de \"{title}\".\\n\\nCette action est irréversible.",
+      "export_dialog_title": "Exporter l'événement",
+      "export_file_filter": "Fichiers JSON (*.json)"
     },
     "warning": {
       "sync_failed": "Échec de synchronisation du calendrier : {error}"
     },
     "error": {
       "save_failed": "Échec de l'enregistrement de l'événement : {error}",
+      "delete_failed": "Échec de la suppression de l'événement : {error}",
+      "delete_readonly_external": "Cet événement est géré par un calendrier externe. Supprimez-le là-bas puis relancez la synchronisation.",
+      "event_not_found": "Événement introuvable. Il a peut-être déjà été supprimé.",
+      "export_failed": "Échec de l'export de l'événement : {error}",
       "sync_not_configured": "La synchronisation du calendrier {provider} n'est pas configurée.",
       "auth_failed": "Échec de l'autorisation : {error}",
       "disconnect_failed": "Échec de la déconnexion du compte calendrier : {error}"

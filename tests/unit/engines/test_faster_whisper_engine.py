@@ -323,6 +323,45 @@ class TestTranscribeFile:
         assert len(result["segments"]) > 0
 
     @pytest.mark.asyncio
+    @patch("faster_whisper.WhisperModel")
+    @patch("subprocess.run")
+    @patch("soundfile.info")
+    async def test_transcribe_file_mp4_prefers_ffprobe_duration_probe(
+        self,
+        mock_sf_info,
+        mock_subprocess_run,
+        mock_whisper_class,
+        mock_model_manager,
+    ):
+        """MP4 should prefer ffprobe duration probing and avoid noisy soundfile probe errors."""
+        mock_sf_info.side_effect = RuntimeError("Format not recognised")
+        mock_subprocess_run.return_value = Mock(
+            returncode=0,
+            stdout='{"format": {"duration": "12.5"}}',
+            stderr="",
+        )
+
+        segment = Mock()
+        segment.text = "Test transcription"
+        segment.start = 0.0
+        segment.end = 10.0
+
+        transcribe_info = Mock()
+        transcribe_info.language = "en"
+        transcribe_info.duration = 10.0
+
+        mock_model = Mock()
+        mock_model.transcribe = Mock(return_value=([segment], transcribe_info))
+        mock_whisper_class.return_value = mock_model
+
+        engine = FasterWhisperEngine(model_size="base", model_manager=mock_model_manager)
+        result = await engine.transcribe_file("/tmp/test.mp4", language="en")
+
+        assert result["duration"] == pytest.approx(12.5)
+        mock_subprocess_run.assert_called_once()
+        mock_sf_info.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_transcribe_file_model_unavailable(self, mock_model_manager):
         """Test transcription when model is unavailable."""
         model_info = Mock()

@@ -15,7 +15,6 @@ def _build_i18n():
             "app_shell.tasks_running": "Tasks: {count} running",
             "app_shell.recording_on": "Recording: active",
             "app_shell.recording_off": "Recording: idle",
-            "app_shell.theme_status": "Theme: {theme}",
             "logging.main_window.keyboard_shortcuts_configured": "shortcuts configured",
         }
         template = mapping.get(key, key)
@@ -32,7 +31,6 @@ def test_update_shell_status_sets_runtime_labels():
     fake_window = Mock()
     fake_window.task_status_label = Mock()
     fake_window.record_status_label = Mock()
-    fake_window.theme_status_label = Mock()
     fake_window.i18n = _build_i18n()
     fake_window.managers = {"realtime_recorder": Mock(is_recording=True)}
     fake_window.theme_manager = Mock()
@@ -43,14 +41,12 @@ def test_update_shell_status_sets_runtime_labels():
 
     fake_window.task_status_label.setText.assert_called_once_with("Tasks: 3 running")
     fake_window.record_status_label.setText.assert_called_once_with("Recording: active")
-    fake_window.theme_status_label.setText.assert_called_once_with("Theme: dark")
 
 
 def test_update_shell_status_handles_idle_recording_state():
     fake_window = Mock()
     fake_window.task_status_label = Mock()
     fake_window.record_status_label = Mock()
-    fake_window.theme_status_label = Mock()
     fake_window.i18n = _build_i18n()
     fake_window.managers = {"realtime_recorder": Mock(is_recording=False)}
     fake_window.theme_manager = Mock()
@@ -60,6 +56,21 @@ def test_update_shell_status_handles_idle_recording_state():
     MainWindow._update_shell_status(fake_window)
 
     fake_window.record_status_label.setText.assert_called_once_with("Recording: idle")
+
+
+def test_get_active_transcription_task_count_prefers_manager_runtime_count():
+    fake_window = Mock()
+    manager = Mock()
+    manager.get_active_task_count.return_value = 2
+    fake_window.managers = {
+        "transcription_manager": manager,
+        "db_connection": Mock(),
+    }
+
+    result = MainWindow._get_active_transcription_task_count(fake_window)
+
+    assert result == 2
+    manager.get_active_task_count.assert_called_once()
 
 
 def test_setup_keyboard_shortcuts_registers_expected_sequences(monkeypatch):

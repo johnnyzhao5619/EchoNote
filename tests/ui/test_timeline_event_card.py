@@ -82,3 +82,25 @@ def test_event_card_meta_labels_use_semantic_role(qapp, mock_i18n):
 
     meta_labels = [label for label in card.findChildren(QLabel) if label.property("role") == "event-meta"]
     assert len(meta_labels) >= 2
+
+
+def test_event_card_delete_button_emits_event_id(qapp, mock_i18n):
+    event = SimpleNamespace(
+        id="evt-delete",
+        title="Delete Me",
+        start_time=datetime(2026, 1, 2, 9, 0, 0),
+        end_time=datetime(2026, 1, 2, 10, 0, 0),
+        source="local",
+        event_type="event",
+        location="",
+        attendees=[],
+        description="",
+    )
+    card = EventCard({"event": event, "artifacts": {}}, is_future=False, i18n=mock_i18n)
+
+    captured = []
+    card.delete_requested.connect(captured.append)
+    card.delete_btn.click()
+
+    assert card.delete_btn.property("variant") == "danger"
+    assert captured == ["evt-delete"]

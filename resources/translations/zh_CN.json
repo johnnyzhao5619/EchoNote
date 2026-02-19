@@ -317,14 +317,31 @@
     "success": {
       "event_created": "事件创建成功。",
       "event_updated": "事件更新成功。",
+      "event_deleted": "事件已删除。",
+      "event_exported": "事件已导出到：{path}",
       "connected": "{provider} 日历连接成功。",
       "disconnected": "{provider} 日历断开成功。"
+    },
+    "delete": {
+      "confirm_title": "删除事件",
+      "confirm_message": "即将删除事件：{title}",
+      "confirm_hint": "删除会同时移除该事件及其关联的录音/转写附件。你也可以先导出后再删除。",
+      "export_then_delete": "导出后删除",
+      "delete_now": "仅删除",
+      "second_confirm_title": "二次确认",
+      "second_confirm_message": "请再次确认删除事件：{title}\\n\\n此操作不可恢复。",
+      "export_dialog_title": "导出事件",
+      "export_file_filter": "JSON 文件 (*.json)"
     },
     "warning": {
       "sync_failed": "日历同步失败：{error}"
     },
     "error": {
       "save_failed": "保存事件失败：{error}",
+      "delete_failed": "删除事件失败：{error}",
+      "delete_readonly_external": "该事件来自外部日历，无法在 EchoNote 中删除。请在外部日历删除后同步。",
+      "event_not_found": "未找到该事件，可能已被删除或同步移除。",
+      "export_failed": "导出事件失败：{error}",
       "sync_not_configured": "{provider} 日历同步未配置。",
       "auth_failed": "授权流程失败：{error}",
       "disconnect_failed": "断开日历账号失败：{error}"

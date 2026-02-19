@@ -32,7 +32,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from config.app_config import get_app_dir
 from core.transcription.format_converter import FormatConverter
-from core.transcription.task_queue import TaskQueue
+from core.transcription.task_queue import TaskQueue, TaskStatus
 from data.database.connection import DatabaseConnection
 from data.database.models import TranscriptionTask
 from engines.speech.base import AUDIO_VIDEO_SUFFIXES, SpeechEngine
@@ -609,6 +609,54 @@ class TranscriptionManager:
         """Check if task processing is paused."""
         return self.task_queue.is_paused() if self._running else False
 
+    def _get_runtime_processing_task_count(self) -> Optional[int]:
+        """
+        Return processing task count from in-memory queue state.
+
+        Returns:
+            Processing task count when runtime state is available, otherwise None.
+        """
+        if not self._running or not hasattr(self.task_queue, "tasks"):
+            return None
+
+        try:
+            count = 0
+            for task_info in self.task_queue.tasks.values():
+                status = task_info.get("status")
+                status_value = status.value if isinstance(status, TaskStatus) else str(status)
+                if status_value == TaskStatus.PROCESSING.value:
+                    count += 1
+            return count
+        except Exception as exc:
+            logger.debug("Failed to read runtime task state: %s", exc)
+            return None
+
+    def _get_persisted_processing_task_count(self) -> int:
+        """Return processing task count from persistent storage."""
+        result = self.db.execute(
+            "SELECT COUNT(*) as count FROM transcription_tasks WHERE status = 'processing'"
+        )
+        if result and len(result) > 0:
+            return int(result[0]["count"])
+        return 0
+
+    def get_active_task_count(self) -> int:
+        """
+        Get active transcription task count.
+
+        Returns:
+            Number of tasks currently processing.
+        """
+        runtime_count = self._get_runtime_processing_task_count()
+        if runtime_count is not None:
+            return max(runtime_count, 0)
+
+        try:
+            return max(self._get_persisted_processing_task_count(), 0)
+        except Exception as e:
+            logger.error(f"Error getting active task count: {e}")
+            return 0
+
     def has_running_tasks(self) -> bool:
         """
         Check if there are any running tasks.
@@ -616,21 +664,7 @@ class TranscriptionManager:
         Returns:
             True if there are tasks in processing status
         """
-        try:
-            # Query database for tasks in processing status
-            result = self.db.execute(
-                "SELECT COUNT(*) as count FROM transcription_tasks " "WHERE status = 'processing'"
-            )
-
-            if result and len(result) > 0:
-                count = result[0]["count"]
-                return count > 0
-
-            return False
-
-        except Exception as e:
-            logger.error(f"Error checking running tasks: {e}")
-            return False
+        return self.get_active_task_count() > 0
 
     def stop_all_tasks(self):
         """

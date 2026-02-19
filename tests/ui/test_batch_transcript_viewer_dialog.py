@@ -43,3 +43,32 @@ def test_transcript_viewer_toolbar_uses_semantic_roles(qapp, mock_i18n, monkeypa
     dialog.toggle_edit_mode()
     assert dialog.edit_button.property("state") == "default"
 
+
+def test_transcript_viewer_update_language_uses_viewer_keys(qapp, mock_i18n, monkeypatch, tmp_path):
+    """Toolbar labels should use viewer.* translation keys."""
+    task_data = {
+        "id": "task-1",
+        "file_name": "demo.wav",
+        "file_path": str(tmp_path / "demo.wav"),
+        "audio_duration": 65,
+        "language": "en",
+        "engine": "whisper",
+        "output_path": str(tmp_path / "demo.txt"),
+        "completed_at": "2026-01-01T10:00:00",
+        "status": "completed",
+    }
+    monkeypatch.setattr(TranscriptViewerDialog, "_load_task_data", lambda self: task_data.copy())
+    monkeypatch.setattr(TranscriptViewerDialog, "_load_content", lambda self: None)
+
+    dialog = TranscriptViewerDialog(
+        task_id="task-1",
+        transcription_manager=Mock(),
+        db_connection=Mock(),
+        i18n=mock_i18n,
+    )
+
+    dialog.update_language()
+
+    assert dialog.copy_button.text() == "viewer.copy_all"
+    assert dialog.export_button.text() == "viewer.export"
+    assert dialog.search_button.text() == "viewer.search"

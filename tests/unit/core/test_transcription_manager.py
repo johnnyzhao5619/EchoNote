@@ -15,6 +15,7 @@ from unittest.mock import AsyncMock, MagicMock, Mock, patch
 import pytest
 
 from core.transcription.manager import TaskNotFoundError, TranscriptionManager
+from core.transcription.task_queue import TaskStatus
 from data.database.models import TranscriptionTask
 from config.constants import (
     TASK_STATUS_PENDING,
@@ -486,6 +487,21 @@ class TestTranscriptionManager:
         # Should have running tasks
         result = manager.has_running_tasks()
         assert result is True
+
+    def test_get_active_task_count_prefers_runtime_queue_state(self, manager, temp_audio_file):
+        """Runtime queue processing count should override persisted task state when running."""
+        task_id = manager.add_task(str(temp_audio_file))
+        manager.db.tasks[task_id]["status"] = TASK_STATUS_COMPLETED
+
+        manager._running = True
+        manager.task_queue.tasks = {
+            task_id: {
+                "status": TaskStatus.PROCESSING,
+            }
+        }
+
+        assert manager.get_active_task_count() == 1
+        assert manager.has_running_tasks() is True
 
     # Configuration Tests
     def test_update_max_concurrent(self, manager):

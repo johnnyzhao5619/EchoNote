@@ -647,16 +647,26 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         """Populate device combo box with available options."""
         from utils.gpu_detector import GPUDetector
 
+        current_device = self.device_combo.currentData()
+
         # Get available device options
-        device_options = GPUDetector.get_available_device_options()
+        device_options = GPUDetector.get_available_device_options(self.i18n)
 
         # Clear existing items
+        self.device_combo.blockSignals(True)
         self.device_combo.clear()
 
         # Add options
         for device_id, display_name in device_options:
             self.device_combo.addItem(display_name, device_id)
 
+        if current_device is not None:
+            for index in range(self.device_combo.count()):
+                if self.device_combo.itemData(index) == current_device:
+                    self.device_combo.setCurrentIndex(index)
+                    break
+
+        self.device_combo.blockSignals(False)
         logger.debug(f"Populated device options: {device_options}")
 
     def _update_device_info(self):
@@ -1172,3 +1182,8 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         # Update refresh button
         if hasattr(self, "refresh_usage_button"):
             self.refresh_usage_button.setText(self.i18n.t("settings.transcription.refresh_usage"))
+
+        if hasattr(self, "device_combo"):
+            self._populate_device_options()
+        if hasattr(self, "device_info_label"):
+            self._update_device_info()

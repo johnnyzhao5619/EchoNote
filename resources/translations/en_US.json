@@ -317,14 +317,31 @@
     "success": {
       "event_created": "Event created successfully.",
       "event_updated": "Event updated successfully.",
+      "event_deleted": "Event deleted successfully.",
+      "event_exported": "Event exported to: {path}",
       "connected": "{provider} calendar connected successfully.",
       "disconnected": "{provider} calendar disconnected successfully."
+    },
+    "delete": {
+      "confirm_title": "Delete Event",
+      "confirm_message": "You are about to delete: {title}",
+      "confirm_hint": "Deleting will remove this event and all related recording/transcript attachments. You can export first.",
+      "export_then_delete": "Export then Delete",
+      "delete_now": "Delete Only",
+      "second_confirm_title": "Confirm Again",
+      "second_confirm_message": "Please confirm deleting \"{title}\" again.\\n\\nThis action cannot be undone.",
+      "export_dialog_title": "Export Event",
+      "export_file_filter": "JSON Files (*.json)"
     },
     "warning": {
       "sync_failed": "Calendar sync failed: {error}"
     },
     "error": {
       "save_failed": "Failed to save event: {error}",
+      "delete_failed": "Failed to delete event: {error}",
+      "delete_readonly_external": "This event is managed by an external calendar. Please delete it there and sync again.",
+      "event_not_found": "Event not found. It may already have been removed.",
+      "export_failed": "Failed to export event: {error}",
       "sync_not_configured": "{provider} calendar sync is not configured.",
       "auth_failed": "Failed to complete authorization: {error}",
       "disconnect_failed": "Failed to disconnect calendar account: {error}"

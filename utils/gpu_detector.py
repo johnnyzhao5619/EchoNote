@@ -184,18 +184,21 @@ class GPUDetector:
         return (device, compute_type, warning)
 
     @staticmethod
-    def get_available_device_options() -> List[Tuple[str, str]]:
+    def get_available_device_options(i18n=None) -> List[Tuple[str, str]]:
         """
         Get list of available device options for UI.
+
+        Args:
+            i18n: Optional internationalization manager.
 
         Returns:
             List of (device_id, display_name) tuples
         """
         devices = GPUDetector.detect_available_devices()
-        options = [("auto", "Auto (Recommended)")]
+        options = [("auto", GPUDetector.get_device_display_name("auto", i18n))]
 
         # CPU is always available
-        options.append(("cpu", "CPU"))
+        options.append(("cpu", GPUDetector.get_device_display_name("cpu", i18n)))
 
         # Add CUDA if available
         if devices["cuda"]:
@@ -205,6 +208,6 @@ class GPUDetector:
                 gpu_name = torch.cuda.get_device_name(0)
                 options.append(("cuda", f"CUDA ({gpu_name})"))
             except Exception:
-                options.append(("cuda", "CUDA (NVIDIA GPU)"))
+                options.append(("cuda", GPUDetector.get_device_display_name("cuda", i18n)))
 
         return options

@@ -636,6 +636,7 @@ class TimelineWidget(BaseWidget):
         card.view_recording.connect(self._on_view_recording)
         card.view_transcript.connect(self._on_view_transcript)
         card.view_translation.connect(self._on_view_translation)
+        card.delete_requested.connect(self._on_delete_event_requested)
 
         # Insert card at appropriate position
         if is_future:
@@ -853,6 +854,31 @@ class TimelineWidget(BaseWidget):
             title = self.i18n.t("timeline.auto_task_save_failed_title")
             message = self.i18n.t("timeline.auto_task_save_failed_message").format(error=str(exc))
             self.show_warning(title, message)
+
+    def _on_delete_event_requested(self, event_id: str):
+        """Handle delete requests from timeline event cards."""
+        calendar_manager = getattr(self.timeline_manager, "calendar_manager", None)
+        if calendar_manager is None:
+            self.show_error(self.i18n.t("common.error"), self.i18n.t("errors.unknown_error"))
+            return
+
+        event = calendar_manager.get_event(event_id)
+        if not event:
+            self.show_warning(
+                self.i18n.t("common.warning"),
+                self.i18n.t("calendar.error.event_not_found"),
+            )
+            return
+
+        from ui.calendar_event_actions import confirm_and_delete_event
+
+        confirm_and_delete_event(
+            parent=self,
+            i18n=self.i18n,
+            calendar_manager=calendar_manager,
+            event=event,
+            on_deleted=lambda: self._refresh_timeline(reset=True),
+        )
 
     def _on_view_recording(self, file_path: str):
         """

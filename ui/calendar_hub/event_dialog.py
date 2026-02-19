@@ -83,6 +83,7 @@ class EventDialog(QDialog):
 
         # Result data
         self.result_data: Optional[Dict[str, Any]] = None
+        self._delete_requested = False
 
         self.setup_ui()
 
@@ -240,6 +241,14 @@ class EventDialog(QDialog):
             Buttons layout
         """
         buttons_layout = create_hbox()
+
+        if self.is_edit_mode:
+            delete_btn = create_button(self.i18n.t("common.delete"))
+            delete_btn.setProperty("variant", "danger")
+            delete_btn.setProperty("role", "danger")
+            connect_button_with_callback(delete_btn, self._on_delete_clicked)
+            buttons_layout.addWidget(delete_btn)
+
         buttons_layout.addStretch()
 
         # Cancel button
@@ -253,8 +262,7 @@ class EventDialog(QDialog):
             if self.is_edit_mode
             else self.i18n.t("calendar_hub.create_event")
         )
-        save_btn = create_button(save_text)
-        save_btn = create_primary_button(save_btn.text())
+        save_btn = create_primary_button(save_text)
         connect_button_with_callback(save_btn, self._on_save_clicked)
         buttons_layout.addWidget(save_btn)
 
@@ -319,12 +327,30 @@ class EventDialog(QDialog):
             return
 
         # Collect form data
+        self._delete_requested = False
         self.result_data = self._collect_form_data()
 
         # Accept dialog
         self.accept()
 
         logger.debug("Event data saved")
+
+    def _on_delete_clicked(self):
+        """Mark dialog result as delete request and close."""
+        if not self.is_edit_mode or not self.event_data:
+            return
+
+        event_id = self.event_data.get("id")
+        if not event_id:
+            return
+
+        self._delete_requested = True
+        self.result_data = {"id": event_id}
+        self.accept()
+
+    def is_delete_requested(self) -> bool:
+        """Return whether user requested deleting the current event."""
+        return bool(self._delete_requested)
 
     def _validate_form(self) -> bool:
         """

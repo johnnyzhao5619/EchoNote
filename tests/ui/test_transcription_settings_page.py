@@ -150,3 +150,51 @@ def test_transcription_settings_uses_semantic_roles_for_groups_and_inline_action
     assert page.google_test_button.property("role") == "settings-inline-action"
     assert page.azure_show_button.property("role") == "settings-inline-action"
     assert page.azure_test_button.property("role") == "settings-inline-action"
+
+
+def test_update_translations_refreshes_device_info_label(qapp, mock_i18n, monkeypatch):
+    language = {"code": "zh"}
+
+    def _t(key, **kwargs):
+        if key == "settings.transcription.will_automatically_use":
+            template = (
+                "将自动使用：{device_name}（{compute_type}）"
+                if language["code"] == "zh"
+                else "Will automatically use: {device_name} ({compute_type})"
+            )
+            return template.format(**kwargs)
+        if key == "ui_strings.gpu_detector.device_names.cpu":
+            return "CPU"
+        if key == "ui_strings.gpu_detector.device_names.auto":
+            return "Auto (Recommended)"
+        if key == "ui_strings.gpu_detector.device_names.cuda":
+            return "CUDA (NVIDIA GPU)"
+        return key
+
+    mock_i18n.t.side_effect = _t
+
+    from utils.gpu_detector import GPUDetector
+
+    monkeypatch.setattr(
+        GPUDetector,
+        "get_available_device_options",
+        staticmethod(lambda _i18n=None: [("auto", "Auto (Recommended)"), ("cpu", "CPU")]),
+    )
+    monkeypatch.setattr(
+        GPUDetector,
+        "get_recommended_device",
+        staticmethod(lambda: ("cpu", "int8")),
+    )
+    monkeypatch.setattr(
+        GPUDetector,
+        "get_device_display_name",
+        staticmethod(lambda device, _i18n=None: "CPU" if device == "cpu" else device),
+    )
+
+    page, _, _ = _create_page(mock_i18n)
+    page._update_device_info()
+    assert page.device_info_label.text() == "将自动使用：CPU（int8）"
+
+    language["code"] = "en"
+    page.update_translations()
+    assert page.device_info_label.text() == "Will automatically use: CPU (int8)"

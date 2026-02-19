@@ -110,6 +110,7 @@ class EventCard(QFrame):
     view_recording = Signal(str)  # file_path
     view_transcript = Signal(str)  # file_path
     view_translation = Signal(str)  # file_path
+    delete_requested = Signal(str)  # event_id
 
     EVENT_TYPE_TRANSLATION_MAP = {
         "event": "timeline.filter_event",
@@ -156,6 +157,7 @@ class EventCard(QFrame):
         self.translation_checkbox = None
         self.translation_language_label = None
         self.translation_language_combo = None
+        self.delete_btn = None
 
         # Setup UI
         self.setup_ui()
@@ -352,6 +354,7 @@ class EventCard(QFrame):
 
         self._apply_translation_dependency()
 
+        self._add_delete_action(actions_layout)
         actions_layout.addStretch()
 
         return actions_layout
@@ -398,9 +401,18 @@ class EventCard(QFrame):
             no_artifacts_label.setProperty("role", "no-artifacts")
             actions_layout.addWidget(no_artifacts_label)
 
+        self._add_delete_action(actions_layout)
         actions_layout.addStretch()
 
         return actions_layout
+
+    def _add_delete_action(self, actions_layout: QHBoxLayout) -> None:
+        """Append a delete action button to the card action row."""
+        self.delete_btn = create_button(self.i18n.t("common.delete"))
+        self.delete_btn.setProperty("variant", "danger")
+        self.delete_btn.setProperty("role", "danger")
+        self.delete_btn.clicked.connect(self._on_delete_clicked)
+        actions_layout.addWidget(self.delete_btn)
 
     def apply_auto_task_config(self, config: Optional[Dict[str, Any]]):
         """Apply an auto-task configuration to the current card."""
@@ -528,6 +540,10 @@ class EventCard(QFrame):
             logger.info(f"Viewing translation: {translation_path}")
             self.view_translation.emit(translation_path)
 
+    def _on_delete_clicked(self):
+        """Handle delete action click."""
+        self.delete_requested.emit(self.calendar_event.id)
+
     def update_translations(self):
         """Update UI text when language changes."""
         if getattr(self, "type_badge_label", None):
@@ -572,6 +588,9 @@ class EventCard(QFrame):
                 if child.objectName() == "no_artifacts_label":
                     child.setText(self.i18n.t("timeline.no_artifacts"))
                     break
+
+        if getattr(self, "delete_btn", None):
+            self.delete_btn.setText(self.i18n.t("common.delete"))
 
     def _get_event_type_badge_text(self) -> str:
         """Return translated text for the event type badge."""

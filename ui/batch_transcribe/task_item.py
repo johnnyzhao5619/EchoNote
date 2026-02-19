@@ -412,7 +412,14 @@ class TaskItem(BaseWidget):
         Args:
             task_data: New task data
         """
-        self.task_data = task_data
+        if not task_data:
+            return
+
+        # Manager events can be partial (e.g. progress-only updates).
+        # Merge payload to avoid dropping stable metadata like file_name.
+        merged = dict(self.task_data)
+        merged.update(task_data)
+        self.task_data = merged
         self.update_display()
 
     def contextMenuEvent(self, event):

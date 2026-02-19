@@ -748,11 +748,11 @@ class TranscriptViewerDialog(QDialog):
                 self.i18n.t("common.save") if self.is_edit_mode else self.i18n.t("common.edit")
             )
         if self.copy_button:
-            self.copy_button.setText(self.i18n.t("common.copy_all"))
+            self.copy_button.setText(self.i18n.t("viewer.copy_all"))
         if self.export_button:
-            self.export_button.setText(self.i18n.t("common.export"))
+            self.export_button.setText(self.i18n.t("viewer.export"))
         if self.search_button:
-            self.search_button.setText(self.i18n.t("common.search"))
+            self.search_button.setText(self.i18n.t("viewer.search"))
             
         # Export menu actions
         if hasattr(self, "export_txt_action"):
