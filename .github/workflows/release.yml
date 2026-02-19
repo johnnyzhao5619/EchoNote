@@ -23,7 +23,7 @@ jobs:
       - name: Install system dependencies (Ubuntu)
         run: |
           sudo apt-get update
-          sudo apt-get install -y libasound2-dev portaudio19-dev libpulse-dev xvfb
+          sudo apt-get install -y libasound2-dev portaudio19-dev libpulse-dev xvfb libegl1 libgl1
 
       - name: Install dependencies
         run: |
@@ -68,7 +68,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libasound2-dev portaudio19-dev libpulse-dev
+          sudo apt-get install -y libasound2-dev portaudio19-dev libpulse-dev libegl1 libgl1
 
       - name: Install system dependencies (macOS)
         if: matrix.os == 'macos-latest'
