@@ -37,7 +37,14 @@ from PySide6.QtWidgets import (
 
 from ui.base_widgets import BaseWidget, connect_button_with_callback, create_button, create_hbox
 from ui.common.theme import ThemeManager
-from ui.constants import TIMELINE_SEARCH_NAV_BUTTON_MAX_WIDTH
+from ui.constants import (
+    TIMELINE_DIALOG_BUTTON_MARGINS,
+    TIMELINE_SEARCH_NAV_BUTTON_MAX_WIDTH,
+    TIMELINE_TRANSCRIPT_DIALOG_MIN_HEIGHT,
+    TIMELINE_TRANSCRIPT_DIALOG_MIN_WIDTH,
+    TIMELINE_VIEWER_ACTION_ROW_SPACING,
+    TIMELINE_VIEWER_SEARCH_ROW_SPACING,
+)
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.timeline.transcript_viewer")
@@ -103,7 +110,7 @@ class TranscriptViewer(BaseWidget):
         layout.addWidget(self.file_label)
 
         # Search bar
-        search_layout = create_hbox(spacing=5)
+        search_layout = create_hbox(spacing=TIMELINE_VIEWER_SEARCH_ROW_SPACING)
 
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText(self.i18n.t("transcript.search_placeholder"))
@@ -111,11 +118,13 @@ class TranscriptViewer(BaseWidget):
         search_layout.addWidget(self.search_input, stretch=1)
 
         self.search_button = create_button(self.i18n.t("transcript.search"))
+        self.search_button.setProperty("role", "dialog-secondary-action")
         connect_button_with_callback(self.search_button, self._on_search)
         search_layout.addWidget(self.search_button)
 
         # Previous/Next match buttons
         self.prev_button = create_button(self.i18n.t("transcript.previous_match_button"))
+        self.prev_button.setProperty("role", "dialog-nav-action")
         self.prev_button.setToolTip(self.i18n.t("transcript.previous_match_tooltip"))
         self.prev_button.setMaximumWidth(TIMELINE_SEARCH_NAV_BUTTON_MAX_WIDTH)
         connect_button_with_callback(self.prev_button, self._on_previous_match)
@@ -123,6 +132,7 @@ class TranscriptViewer(BaseWidget):
         search_layout.addWidget(self.prev_button)
 
         self.next_button = create_button(self.i18n.t("transcript.next_match_button"))
+        self.next_button.setProperty("role", "dialog-nav-action")
         self.next_button.setToolTip(self.i18n.t("transcript.next_match_tooltip"))
         self.next_button.setMaximumWidth(TIMELINE_SEARCH_NAV_BUTTON_MAX_WIDTH)
         connect_button_with_callback(self.next_button, self._on_next_match)
@@ -130,6 +140,7 @@ class TranscriptViewer(BaseWidget):
         search_layout.addWidget(self.next_button)
 
         self.clear_search_button = create_button(self.i18n.t("transcript.clear_search"))
+        self.clear_search_button.setProperty("role", "dialog-secondary-action")
         connect_button_with_callback(self.clear_search_button, self._on_clear_search)
         search_layout.addWidget(self.clear_search_button)
 
@@ -143,17 +154,17 @@ class TranscriptViewer(BaseWidget):
         layout.addWidget(self.text_edit)
 
         # Action buttons
-        button_layout = create_hbox(spacing=10)
+        button_layout = create_hbox(spacing=TIMELINE_VIEWER_ACTION_ROW_SPACING)
 
         self.copy_button = create_button(self.i18n.t("transcript.copy_all"))
         connect_button_with_callback(self.copy_button, self._on_copy_all)
-        self.copy_button.setObjectName("timeline_copy_btn")
+        self.copy_button.setProperty("role", "timeline-copy-action")
         # Styling is handled by theme files (dark.qss / light.qss)
         button_layout.addWidget(self.copy_button)
 
         self.export_button = create_button(self.i18n.t("transcript.export"))
         connect_button_with_callback(self.export_button, self._on_export)
-        self.export_button.setObjectName("timeline_export_btn")
+        self.export_button.setProperty("role", "timeline-export-action")
         # Styling is handled by theme files (dark.qss / light.qss)
         button_layout.addWidget(self.export_button)
 
@@ -397,7 +408,10 @@ class TranscriptViewerDialog(QDialog):
 
         # Setup dialog
         self.setWindowTitle(i18n.t(self._title_key))
-        self.setMinimumSize(600, 500)
+        self.setMinimumSize(
+            TIMELINE_TRANSCRIPT_DIALOG_MIN_WIDTH,
+            TIMELINE_TRANSCRIPT_DIALOG_MIN_HEIGHT,
+        )
         self.setWindowModality(Qt.WindowModality.NonModal)
         self.setModal(False)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
@@ -410,12 +424,12 @@ class TranscriptViewerDialog(QDialog):
         layout.addWidget(self.viewer)
 
         # Close button
-        button_layout = create_hbox(margins=(10, 0, 10, 10))
+        button_layout = create_hbox(margins=TIMELINE_DIALOG_BUTTON_MARGINS)
         button_layout.addStretch()
 
         self.close_button = create_button(i18n.t("common.close"))
         connect_button_with_callback(self.close_button, self.close)
-        self.close_button.setObjectName("timeline_close_btn")
+        self.close_button.setProperty("role", "dialog-primary-action")
         button_layout.addWidget(self.close_button)
 
         layout.addLayout(button_layout)

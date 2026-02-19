@@ -94,6 +94,16 @@ class TestRealtimeRecordWidget:
         assert hasattr(widget, "status_timer")
         assert widget.status_timer is not None
 
+    def test_header_buttons_expose_semantic_roles(self, widget):
+        """Header action buttons should expose semantic style roles."""
+        assert widget.add_marker_button.property("role") == "realtime-marker-action"
+        assert widget.record_button.property("role") == "realtime-record-action"
+        assert widget.record_button.property("recording") is False
+        assert widget.duration_value_label.property("role") == "realtime-duration"
+        assert widget.input_combo.property("role") == "realtime-field-control"
+        assert widget.source_lang_combo.property("role") == "realtime-field-control"
+        assert widget.target_lang_combo.property("role") == "realtime-field-control"
+
     def test_widget_has_async_loop(self, widget):
         """Test widget has async event loop."""
         assert hasattr(widget, "_async_loop")

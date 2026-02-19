@@ -64,9 +64,7 @@ from ui.constants import (
     CONTROL_BUTTON_MIN_HEIGHT,
     DEFAULT_DURATION_DISPLAY,
     PAGE_COMPACT_SPACING,
-    PAGE_CONTENT_MARGINS,
     PAGE_DENSE_SPACING,
-    PAGE_LAYOUT_SPACING,
     REALTIME_BUTTON_MIN_WIDTH,
     REALTIME_COMBO_MIN_WIDTH,
     REALTIME_FORM_HORIZONTAL_SPACING,
@@ -78,8 +76,11 @@ from ui.constants import (
     REALTIME_LABEL_WIDTH_MEDIUM,
     REALTIME_LANGUAGE_COMBO_MIN_WIDTH,
     REALTIME_RECORD_BUTTON_MIN_WIDTH,
+    REALTIME_TEXT_TOOLBAR_META_SPACING,
     REALTIME_VISUALIZER_MIN_HEIGHT,
+    REALTIME_VISUALIZER_MAX_HEIGHT,
     STATUS_INDICATOR_SYMBOL,
+    ZERO_MARGINS,
     format_gain_display,
 )
 from utils.i18n import LANGUAGE_OPTION_KEYS
@@ -380,9 +381,7 @@ class RealtimeRecordWidget(BaseWidget):
         """Initialize the UI layout."""
         from PySide6.QtWidgets import QTabWidget
 
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(*PAGE_CONTENT_MARGINS)
-        main_layout.setSpacing(PAGE_LAYOUT_SPACING)
+        main_layout = self.create_page_layout()
 
         # Header
         header = self._create_header_section()
@@ -422,14 +421,7 @@ class RealtimeRecordWidget(BaseWidget):
         """Create recording control tab."""
         tab = QWidget()
         tab.setObjectName("recording_tab")
-        layout = QVBoxLayout(tab)
-        layout.setContentsMargins(
-            PAGE_COMPACT_SPACING,
-            PAGE_COMPACT_SPACING,
-            PAGE_COMPACT_SPACING,
-            PAGE_COMPACT_SPACING,
-        )
-        layout.setSpacing(PAGE_COMPACT_SPACING)
+        layout = self._create_tab_layout(tab)
 
         # Settings
         settings = self._create_settings_section()
@@ -450,14 +442,7 @@ class RealtimeRecordWidget(BaseWidget):
         """Create transcription results tab."""
         tab = QWidget()
         tab.setObjectName("transcription_tab")
-        layout = QVBoxLayout(tab)
-        layout.setContentsMargins(
-            PAGE_COMPACT_SPACING,
-            PAGE_COMPACT_SPACING,
-            PAGE_COMPACT_SPACING,
-            PAGE_COMPACT_SPACING,
-        )
-        layout.setSpacing(PAGE_COMPACT_SPACING)
+        layout = self._create_tab_layout(tab)
 
         # Toolbar
         toolbar = self._create_text_toolbar("transcription")
@@ -476,14 +461,7 @@ class RealtimeRecordWidget(BaseWidget):
         """Create translation results tab."""
         tab = QWidget()
         tab.setObjectName("translation_tab")
-        layout = QVBoxLayout(tab)
-        layout.setContentsMargins(
-            PAGE_COMPACT_SPACING,
-            PAGE_COMPACT_SPACING,
-            PAGE_COMPACT_SPACING,
-            PAGE_COMPACT_SPACING,
-        )
-        layout.setSpacing(PAGE_COMPACT_SPACING)
+        layout = self._create_tab_layout(tab)
 
         # Toolbar
         toolbar = self._create_text_toolbar("translation")
@@ -507,21 +485,19 @@ class RealtimeRecordWidget(BaseWidget):
         """Create time markers tab."""
         tab = QWidget()
         tab.setObjectName("markers_tab")
-        layout = QVBoxLayout(tab)
-        layout.setContentsMargins(
-            PAGE_COMPACT_SPACING,
-            PAGE_COMPACT_SPACING,
-            PAGE_COMPACT_SPACING,
-            PAGE_COMPACT_SPACING,
-        )
-        layout.setSpacing(PAGE_COMPACT_SPACING)
+        layout = self._create_tab_layout(tab)
 
         # Toolbar
-        toolbar = QWidget()
-        toolbar.setObjectName("markers_toolbar")
-        toolbar_layout = QHBoxLayout(toolbar)
-        toolbar_layout.setContentsMargins(PAGE_COMPACT_SPACING, PAGE_DENSE_SPACING, PAGE_COMPACT_SPACING, PAGE_DENSE_SPACING)
-        toolbar_layout.setSpacing(PAGE_COMPACT_SPACING)
+        toolbar, toolbar_layout = self.create_row_container(
+            object_name="markers_toolbar",
+            margins=(
+                PAGE_COMPACT_SPACING,
+                PAGE_DENSE_SPACING,
+                PAGE_COMPACT_SPACING,
+                PAGE_DENSE_SPACING,
+            ),
+            spacing=PAGE_COMPACT_SPACING,
+        )
 
         self.markers_panel_title = QLabel(self.i18n.t("realtime_record.markers"))
         self.markers_panel_title.setObjectName("panel_title")
@@ -547,13 +523,30 @@ class RealtimeRecordWidget(BaseWidget):
 
         return tab
 
+    def _create_tab_layout(self, tab: QWidget) -> QVBoxLayout:
+        """Create a standardized tab page layout."""
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(
+            PAGE_COMPACT_SPACING,
+            PAGE_COMPACT_SPACING,
+            PAGE_COMPACT_SPACING,
+            PAGE_COMPACT_SPACING,
+        )
+        layout.setSpacing(PAGE_COMPACT_SPACING)
+        return layout
+
     def _create_text_toolbar(self, text_type: str) -> QWidget:
         """Create text toolbar."""
-        toolbar = QWidget()
-        toolbar.setObjectName("text_toolbar")
-        layout = QHBoxLayout(toolbar)
-        layout.setContentsMargins(PAGE_COMPACT_SPACING, PAGE_DENSE_SPACING, PAGE_COMPACT_SPACING, PAGE_DENSE_SPACING)
-        layout.setSpacing(PAGE_COMPACT_SPACING)
+        toolbar, layout = self.create_row_container(
+            object_name="text_toolbar",
+            margins=(
+                PAGE_COMPACT_SPACING,
+                PAGE_DENSE_SPACING,
+                PAGE_COMPACT_SPACING,
+                PAGE_DENSE_SPACING,
+            ),
+            spacing=PAGE_COMPACT_SPACING,
+        )
 
         title_key = (
             "realtime_record.transcription_text"
@@ -563,7 +556,7 @@ class RealtimeRecordWidget(BaseWidget):
         panel_title = QLabel(self.i18n.t(title_key))
         panel_title.setObjectName("panel_title")
         layout.addWidget(panel_title)
-        layout.addSpacing(8)
+        layout.addSpacing(REALTIME_TEXT_TOOLBAR_META_SPACING)
 
         # Word Count
         word_count_label = QLabel("0 " + self.i18n.t("common.words"))
@@ -605,7 +598,7 @@ class RealtimeRecordWidget(BaseWidget):
         section = QWidget()
         section.setObjectName("status_section")
         layout = QVBoxLayout(section)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(*ZERO_MARGINS)
         layout.setSpacing(PAGE_DENSE_SPACING)
 
         # Feedback Label
@@ -657,22 +650,24 @@ class RealtimeRecordWidget(BaseWidget):
 
     def _create_header_section(self) -> QWidget:
         """Create header section with title and controls."""
-        container = QWidget()
-        container.setObjectName("header_section")
-        layout = QHBoxLayout(container)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(PAGE_COMPACT_SPACING)
+        container, layout = self.create_row_container(
+            object_name="header_section",
+            margins=ZERO_MARGINS,
+            spacing=PAGE_COMPACT_SPACING,
+        )
 
-        self.title_label = QLabel(self.i18n.t("realtime_record.title"))
-        self.title_label.setObjectName("page_title")
-        layout.addWidget(self.title_label)
+        self.title_label = self.create_page_title("realtime_record.title", layout)
         layout.addStretch()
 
         self.duration_value_label = QLabel(DEFAULT_DURATION_DISPLAY)
         self.duration_value_label.setObjectName("duration_display")
+        self.duration_value_label.setProperty("role", "realtime-duration")
+        self.duration_value_label.setMinimumHeight(CONTROL_BUTTON_MIN_HEIGHT)
+        self.duration_value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.duration_value_label)
 
         self.add_marker_button = create_secondary_button(self.i18n.t("realtime_record.add_marker"))
+        self.add_marker_button.setProperty("role", "realtime-marker-action")
         self.add_marker_button.setMinimumHeight(CONTROL_BUTTON_MIN_HEIGHT)
         self.add_marker_button.setMinimumWidth(REALTIME_BUTTON_MIN_WIDTH)
         self.add_marker_button.setEnabled(False)
@@ -680,7 +675,8 @@ class RealtimeRecordWidget(BaseWidget):
         layout.addWidget(self.add_marker_button)
 
         self.record_button = QPushButton()
-        self.record_button.setObjectName("record_button")
+        self.record_button.setProperty("role", "realtime-record-action")
+        self.record_button.setProperty("recording", False)
         self.record_button.setMinimumHeight(CONTROL_BUTTON_MIN_HEIGHT)
         self.record_button.setMinimumWidth(REALTIME_RECORD_BUTTON_MIN_WIDTH)
         connect_button_with_callback(self.record_button, self._toggle_recording)
@@ -706,7 +702,7 @@ class RealtimeRecordWidget(BaseWidget):
             inline_container = QWidget()
             inline_container.setProperty("role", "settings-inline")
             inline_layout = QHBoxLayout(inline_container)
-            inline_layout.setContentsMargins(0, 0, 0, 0)
+            inline_layout.setContentsMargins(*ZERO_MARGINS)
             inline_layout.setSpacing(PAGE_DENSE_SPACING)
             return inline_container, inline_layout
 
@@ -719,6 +715,7 @@ class RealtimeRecordWidget(BaseWidget):
         device_label.setMinimumWidth(REALTIME_LABEL_WIDTH_LARGE)
         device_layout.addWidget(device_label)
         self.input_combo = QComboBox()
+        self.input_combo.setProperty("role", "realtime-field-control")
         self.input_combo.setMinimumWidth(REALTIME_COMBO_MIN_WIDTH)
         self._populate_input_devices()
         self.input_combo.currentIndexChanged.connect(self._on_input_device_changed)
@@ -764,6 +761,7 @@ class RealtimeRecordWidget(BaseWidget):
             model_label.setMinimumWidth(REALTIME_LABEL_WIDTH_LARGE)
             model_layout.addWidget(model_label)
             self.model_combo = QComboBox()
+            self.model_combo.setProperty("role", "realtime-field-control")
             self.model_combo.setMinimumWidth(REALTIME_COMBO_MIN_WIDTH)
             model_layout.addWidget(self.model_combo)
             row2.addWidget(model_container)
@@ -775,6 +773,7 @@ class RealtimeRecordWidget(BaseWidget):
         source_label.setMinimumWidth(REALTIME_LABEL_WIDTH_MEDIUM)
         source_layout.addWidget(source_label)
         self.source_lang_combo = QComboBox()
+        self.source_lang_combo.setProperty("role", "realtime-field-control")
         self.source_lang_combo.setMinimumWidth(REALTIME_LANGUAGE_COMBO_MIN_WIDTH)
         for code, label_key in self.LANGUAGE_OPTIONS:
             self.source_lang_combo.addItem(self.i18n.t(label_key), code)
@@ -806,6 +805,7 @@ class RealtimeRecordWidget(BaseWidget):
         target_label.setMinimumWidth(REALTIME_LABEL_WIDTH_MEDIUM)
         target_layout.addWidget(target_label)
         self.target_lang_combo = QComboBox()
+        self.target_lang_combo.setProperty("role", "realtime-field-control")
         self.target_lang_combo.setMinimumWidth(REALTIME_LANGUAGE_COMBO_MIN_WIDTH)
         self.target_lang_combo.setEnabled(False)
         for code, label_key in self.LANGUAGE_OPTIONS:
@@ -829,12 +829,12 @@ class RealtimeRecordWidget(BaseWidget):
         container = QWidget()
         container.setObjectName("visualizer_section")
         layout = QVBoxLayout(container)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(*ZERO_MARGINS)
         layout.setSpacing(PAGE_DENSE_SPACING)
 
         self.audio_visualizer = AudioVisualizer(parent=self, i18n=self.i18n)
         self.audio_visualizer.setMinimumHeight(REALTIME_VISUALIZER_MIN_HEIGHT)
-        self.audio_visualizer.setMaximumHeight(80)
+        self.audio_visualizer.setMaximumHeight(REALTIME_VISUALIZER_MAX_HEIGHT)
         self.signals.audio_data_available.connect(
             self.audio_visualizer.update_audio_data, Qt.ConnectionType.QueuedConnection
         )

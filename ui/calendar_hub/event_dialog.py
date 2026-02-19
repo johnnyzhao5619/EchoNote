@@ -44,7 +44,7 @@ from ui.base_widgets import (
     create_primary_button,
 )
 from core.calendar.constants import EventType
-from ui.constants import CALENDAR_EVENT_DIALOG_MIN_WIDTH
+from ui.constants import CALENDAR_EVENT_DESCRIPTION_MAX_HEIGHT, CALENDAR_EVENT_DIALOG_MIN_WIDTH
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.event_dialog")
@@ -185,7 +185,7 @@ class EventDialog(QDialog):
         self.description_input.setPlaceholderText(
             self.i18n.t("calendar_hub.event_dialog.description_placeholder")
         )
-        self.description_input.setMaximumHeight(100)
+        self.description_input.setMaximumHeight(CALENDAR_EVENT_DESCRIPTION_MAX_HEIGHT)
         form.addRow(
             self.i18n.t("calendar_hub.event_dialog.description_label"), self.description_input
         )
@@ -343,8 +343,8 @@ class EventDialog(QDialog):
             return False
 
         # Check start time < end time
-        start_time = self.start_time_input.dateTime().toPyDateTime()
-        end_time = self.end_time_input.dateTime().toPyDateTime()
+        start_time = self._qdatetime_to_python_datetime(self.start_time_input.dateTime())
+        end_time = self._qdatetime_to_python_datetime(self.end_time_input.dateTime())
 
         if start_time >= end_time:
             self.show_warning(
@@ -400,8 +400,8 @@ class EventDialog(QDialog):
         data = {
             "title": self.title_input.text().strip(),
             "event_type": event_type,
-            "start_time": self.start_time_input.dateTime().toPyDateTime(),
-            "end_time": self.end_time_input.dateTime().toPyDateTime(),
+            "start_time": self._qdatetime_to_python_datetime(self.start_time_input.dateTime()),
+            "end_time": self._qdatetime_to_python_datetime(self.end_time_input.dateTime()),
             "location": self.location_input.text().strip() or None,
             "attendees": attendees if attendees else None,
             "description": self.description_input.toPlainText().strip() or None,
@@ -414,6 +414,36 @@ class EventDialog(QDialog):
             data["id"] = self.event_data["id"]
 
         return data
+
+    @staticmethod
+    def _qdatetime_to_python_datetime(value: QDateTime) -> datetime:
+        """Convert QDateTime to Python datetime across Qt binding variants."""
+        if not value.isValid():
+            raise ValueError("Invalid datetime input")
+
+        to_python = getattr(value, "toPython", None)
+        if callable(to_python):
+            result = to_python()
+            if isinstance(result, datetime):
+                return result
+
+        to_py_datetime = getattr(value, "toPyDateTime", None)
+        if callable(to_py_datetime):
+            result = to_py_datetime()
+            if isinstance(result, datetime):
+                return result
+
+        date_part = value.date()
+        time_part = value.time()
+        return datetime(
+            date_part.year(),
+            date_part.month(),
+            date_part.day(),
+            time_part.hour(),
+            time_part.minute(),
+            time_part.second(),
+            time_part.msec() * 1000,
+        )
 
     def get_event_data(self) -> Optional[Dict[str, Any]]:
         """

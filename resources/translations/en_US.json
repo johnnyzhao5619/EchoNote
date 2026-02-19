@@ -7,6 +7,16 @@
     "exit_confirmation_message": "There are tasks in progress. Are you sure you want to exit?\n\nUnfinished tasks will be stopped.",
     "exit_confirmation_message_with_count": "There are {count} task(s) in progress. Are you sure you want to exit?\n\nUnfinished tasks will be stopped."
   },
+  "app_shell": {
+    "search_placeholder": "Search pages (Batch, Record, Calendar...)",
+    "search_hint": "Ctrl+K",
+    "search_no_match": "No page matched \"{query}\"",
+    "search_result": "Opened {page}",
+    "tasks_running": "Tasks: {count} running",
+    "recording_on": "Recording: active",
+    "recording_off": "Recording: idle",
+    "theme_status": "Theme: {theme}"
+  },
   "common": {
     "ok": "OK",
     "cancel": "Cancel",
@@ -355,11 +365,15 @@
       "initial_time": "00:00",
       "play_button_label": "Play",
       "pause_button_label": "Pause",
+      "stop_button_label": "Stop",
       "play_tooltip": "Play",
       "pause_tooltip": "Pause",
+      "stop_tooltip": "Stop",
       "progress_tooltip": "Seek within the recording",
       "volume_tooltip": "Adjust volume",
-      "volume_icon": "Volume",
+      "mute_icon": "Mute",
+      "low_volume_icon": "Volume Low",
+      "high_volume_icon": "Volume High",
       "load_failed": "Failed to load audio file: {error}",
       "playback_error": "Playback error: {error}",
       "invalid_media": "Media format is not supported or the file is corrupted",
@@ -936,15 +950,6 @@
       },
       "progress_bar": {
         "zero_percent": "0%"
-      }
-    },
-    "timeline": {
-      "audio_player": {
-        "mute_icon": "Mute",
-        "low_volume_icon": "Volume Low",
-        "high_volume_icon": "Volume High",
-        "pause_icon": "Pause",
-        "play_icon": "Play"
       }
     },
     "gpu_detector": {

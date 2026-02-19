@@ -30,7 +30,12 @@ from ui.qt_imports import (
     QVBoxLayout,
     QWidget,
 )
-from ui.constants import DEFAULT_LAYOUT_SPACING
+from ui.constants import (
+    DEFAULT_LAYOUT_SPACING,
+    PAGE_CONTENT_MARGINS,
+    PAGE_LAYOUT_SPACING,
+    ZERO_MARGINS,
+)
 from ui.signal_helpers import (
     connect_button_with_callback as connect_button_signal,
     safe_disconnect as safe_disconnect_signal,
@@ -162,6 +167,69 @@ class BaseWidget(QWidget):
         """
         QMessageBox.information(self, title, message)
 
+    def create_page_title(self, text_key: str, layout=None) -> QLabel:
+        """
+        Create a standardized page title label.
+
+        Args:
+            text_key: i18n key for the title text
+            layout: Optional layout to immediately add the label to
+
+        Returns:
+            Configured title label
+        """
+        label = QLabel(self.i18n.t(text_key))
+        label.setObjectName("page_title")
+        if layout is not None:
+            layout.addWidget(label)
+        return label
+
+    def create_page_layout(
+        self,
+        margins: tuple = PAGE_CONTENT_MARGINS,
+        spacing: int = PAGE_LAYOUT_SPACING,
+    ) -> QVBoxLayout:
+        """
+        Create a standard root page layout bound to this widget.
+
+        Args:
+            margins: Content margins for the page
+            spacing: Vertical spacing between page sections
+
+        Returns:
+            Configured QVBoxLayout attached to this widget
+        """
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(*margins)
+        layout.setSpacing(spacing)
+        return layout
+
+    def create_row_container(
+        self,
+        *,
+        object_name: Optional[str] = None,
+        margins: tuple = ZERO_MARGINS,
+        spacing: int = DEFAULT_LAYOUT_SPACING,
+    ) -> tuple[QWidget, QHBoxLayout]:
+        """
+        Create a QWidget with a configured horizontal layout.
+
+        Args:
+            object_name: Optional object name for styling
+            margins: Layout margins (left, top, right, bottom)
+            spacing: Layout spacing
+
+        Returns:
+            Tuple of (container widget, horizontal layout)
+        """
+        container = QWidget()
+        if object_name:
+            container.setObjectName(object_name)
+        layout = QHBoxLayout(container)
+        layout.setContentsMargins(*margins)
+        layout.setSpacing(spacing)
+        return container, layout
+
 
 class ButtonHelper:
     """按钮辅助工具类
@@ -190,6 +258,7 @@ class ButtonHelper:
             配置好的按钮
         """
         button = QPushButton(text)
+        button.setProperty("variant", "default")
 
         if callback:
             button.clicked.connect(callback)
@@ -217,6 +286,7 @@ class ButtonHelper:
         """
         button = ButtonHelper.create_button(text, callback)
         button.setObjectName("primary_button")
+        button.setProperty("variant", "primary")
         return button
 
     @staticmethod
@@ -232,6 +302,7 @@ class ButtonHelper:
         """
         button = ButtonHelper.create_button(text, callback)
         button.setObjectName("secondary_button")
+        button.setProperty("variant", "secondary")
         return button
 
 
@@ -243,7 +314,7 @@ class LayoutHelper:
 
     @staticmethod
     def create_vbox(
-        spacing: int = DEFAULT_LAYOUT_SPACING, margins: tuple = (0, 0, 0, 0)
+        spacing: int = DEFAULT_LAYOUT_SPACING, margins: tuple = ZERO_MARGINS
     ) -> QVBoxLayout:
         """创建垂直布局
 
@@ -261,7 +332,7 @@ class LayoutHelper:
 
     @staticmethod
     def create_hbox(
-        spacing: int = DEFAULT_LAYOUT_SPACING, margins: tuple = (0, 0, 0, 0)
+        spacing: int = DEFAULT_LAYOUT_SPACING, margins: tuple = ZERO_MARGINS
     ) -> QHBoxLayout:
         """创建水平布局
 
@@ -276,78 +347,6 @@ class LayoutHelper:
         layout.setSpacing(spacing)
         layout.setContentsMargins(*margins)
         return layout
-
-    @staticmethod
-    def add_stretch_and_widgets(
-        layout, widgets: list, stretch_before: bool = False, stretch_after: bool = True
-    ):
-        """向布局添加组件和弹性空间
-
-        Args:
-            layout: 目标布局
-            widgets: 要添加的组件列表
-            stretch_before: 是否在组件前添加弹性空间
-            stretch_after: 是否在组件后添加弹性空间
-        """
-        if stretch_before:
-            layout.addStretch()
-
-        for widget in widgets:
-            layout.addWidget(widget)
-
-        if stretch_after:
-            layout.addStretch()
-
-
-class LabelHelper:
-    """标签辅助工具类
-
-    提供创建和配置标签的便捷方法。
-    """
-
-    @staticmethod
-    def create_title_label(text: str) -> QLabel:
-        """创建标题标签
-
-        Args:
-            text: 标签文本
-
-        Returns:
-            标题样式的标签
-        """
-        label = QLabel(text)
-        label.setObjectName("title_label")
-        return label
-
-    @staticmethod
-    def create_subtitle_label(text: str) -> QLabel:
-        """创建副标题标签
-
-        Args:
-            text: 标签文本
-
-        Returns:
-            副标题样式的标签
-        """
-        label = QLabel(text)
-        label.setObjectName("subtitle_label")
-        return label
-
-    @staticmethod
-    def create_info_label(text: str) -> QLabel:
-        """创建信息标签
-
-        Args:
-            text: 标签文本
-
-        Returns:
-            信息样式的标签
-        """
-        label = QLabel(text)
-        label.setObjectName("info_label")
-        label.setWordWrap(True)
-        return label
-
 
 class SignalHelper:
     """信号辅助工具类
@@ -417,14 +416,14 @@ def create_secondary_button(text: str, callback: Callable = None) -> QPushButton
 
 
 def create_vbox(
-    spacing: int = DEFAULT_LAYOUT_SPACING, margins: tuple = (0, 0, 0, 0)
+    spacing: int = DEFAULT_LAYOUT_SPACING, margins: tuple = ZERO_MARGINS
 ) -> QVBoxLayout:
     """创建垂直布局的便捷函数"""
     return LayoutHelper.create_vbox(spacing, margins)
 
 
 def create_hbox(
-    spacing: int = DEFAULT_LAYOUT_SPACING, margins: tuple = (0, 0, 0, 0)
+    spacing: int = DEFAULT_LAYOUT_SPACING, margins: tuple = ZERO_MARGINS
 ) -> QHBoxLayout:
     """创建水平布局的便捷函数"""
     return LayoutHelper.create_hbox(spacing, margins)

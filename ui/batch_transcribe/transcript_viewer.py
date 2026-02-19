@@ -51,6 +51,12 @@ from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.transcript_viewer")
 
+BATCH_VIEWER_ROLE_TOOLBAR = "batch-viewer-toolbar"
+BATCH_VIEWER_ROLE_EDIT = "batch-viewer-edit-action"
+BATCH_VIEWER_ROLE_EXPORT = "batch-viewer-export-action"
+BATCH_VIEWER_ROLE_COPY = "batch-viewer-copy-action"
+BATCH_VIEWER_ROLE_SEARCH = "batch-viewer-search-action"
+
 
 class TranscriptViewerDialog(QDialog):
     """
@@ -346,33 +352,36 @@ class TranscriptViewerDialog(QDialog):
         """
         frame = QFrame()
         frame.setObjectName("toolbar_frame")
+        frame.setProperty("role", BATCH_VIEWER_ROLE_TOOLBAR)
         frame.setFrameShape(QFrame.Shape.NoFrame)
 
         layout = QHBoxLayout(frame)
 
         # Edit/Save button
         self.edit_button = QPushButton()
-        self.edit_button.setObjectName("edit_button")
+        self.edit_button.setProperty("role", BATCH_VIEWER_ROLE_EDIT)
         self.edit_button.setMinimumHeight(CONTROL_BUTTON_MIN_HEIGHT)
+        self._set_edit_button_active_state(False)
         connect_button_with_callback(self.edit_button, self.toggle_edit_mode)
         layout.addWidget(self.edit_button)
 
         # Export button with dropdown menu
         self.export_button = QPushButton()
-        self.export_button.setObjectName("export_button")
+        self.export_button.setProperty("role", BATCH_VIEWER_ROLE_EXPORT)
         self.export_button.setMinimumHeight(CONTROL_BUTTON_MIN_HEIGHT)
         self._create_export_menu()
         layout.addWidget(self.export_button)
 
         # Copy all button
         self.copy_button = QPushButton()
-        self.copy_button.setObjectName("copy_button")
+        self.copy_button.setProperty("role", BATCH_VIEWER_ROLE_COPY)
         self.copy_button.setMinimumHeight(CONTROL_BUTTON_MIN_HEIGHT)
         connect_button_with_callback(self.copy_button, self.copy_all)
         layout.addWidget(self.copy_button)
 
         # Search button
         self.search_button = QPushButton()
+        self.search_button.setProperty("role", BATCH_VIEWER_ROLE_SEARCH)
         self.search_button.setMinimumHeight(CONTROL_BUTTON_MIN_HEIGHT)
         connect_button_with_callback(self.search_button, self._toggle_search)
         layout.addWidget(self.search_button)
@@ -380,6 +389,13 @@ class TranscriptViewerDialog(QDialog):
         layout.addStretch()
 
         return frame
+
+    def _set_edit_button_active_state(self, is_active: bool):
+        """Expose edit mode state as a semantic property for unified theming."""
+        self.edit_button.setProperty("state", "active" if is_active else "default")
+        self.edit_button.style().unpolish(self.edit_button)
+        self.edit_button.style().polish(self.edit_button)
+        self.edit_button.update()
 
     def _create_export_menu(self):
         """Create export dropdown menu with format options."""
@@ -492,6 +508,7 @@ class TranscriptViewerDialog(QDialog):
             self.is_edit_mode = True
             self.text_edit.setReadOnly(False)
             self.edit_button.setText(self.i18n.t("common.save"))
+            self._set_edit_button_active_state(True)
 
             # Clear undo stack when entering edit mode for clean state
             self.text_edit.document().clearUndoRedoStacks()
@@ -505,6 +522,7 @@ class TranscriptViewerDialog(QDialog):
             self.is_edit_mode = False
             self.text_edit.setReadOnly(True)
             self.edit_button.setText(self.i18n.t("common.edit"))
+            self._set_edit_button_active_state(False)
             return
 
         output_path = self.task_data["output_path"]
@@ -546,6 +564,7 @@ class TranscriptViewerDialog(QDialog):
             self.is_edit_mode = False
             self.text_edit.setReadOnly(True)
             self.edit_button.setText(self.i18n.t("common.edit"))
+            self._set_edit_button_active_state(False)
 
             # Show success notification
             self.show_info(self.i18n.t("common.success"), self.i18n.t("viewer.save_success"))

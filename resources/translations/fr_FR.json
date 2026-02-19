@@ -7,6 +7,16 @@
     "exit_confirmation_message": "There are tasks in progress. Are you sure you want to exit?\n\nUnfinished tasks will be stopped.",
     "exit_confirmation_message_with_count": "There are {count} task(s) in progress. Are you sure you want to exit?\n\nUnfinished tasks will be stopped."
   },
+  "app_shell": {
+    "search_placeholder": "Rechercher des pages (lot, enregistrement, calendrier...)",
+    "search_hint": "Ctrl+K",
+    "search_no_match": "Aucune page correspondante : {query}",
+    "search_result": "Page ouverte : {page}",
+    "tasks_running": "Tâches : {count} en cours",
+    "recording_on": "Enregistrement : actif",
+    "recording_off": "Enregistrement : inactif",
+    "theme_status": "Thème : {theme}"
+  },
   "common": {
     "ok": "OK",
     "cancel": "Annuler",
@@ -338,11 +348,15 @@
       "initial_time": "00:00",
       "play_button_label": "Lire",
       "pause_button_label": "Pause",
+      "stop_button_label": "Arrêter",
       "play_tooltip": "Lire",
       "pause_tooltip": "Pause",
+      "stop_tooltip": "Arrêter",
       "progress_tooltip": "Se déplacer dans l'enregistrement",
       "volume_tooltip": "Ajuster le volume",
-      "volume_icon": "Volume",
+      "mute_icon": "Muet",
+      "low_volume_icon": "Volume bas",
+      "high_volume_icon": "Volume élevé",
       "load_failed": "Échec du chargement audio : {error}",
       "playback_error": "Erreur de lecture : {error}",
       "invalid_media": "Format média non pris en charge ou fichier corrompu",
@@ -921,15 +935,6 @@
       },
       "progress_bar": {
         "zero_percent": "0%"
-      }
-    },
-    "timeline": {
-      "audio_player": {
-        "mute_icon": "Muet",
-        "low_volume_icon": "Volume bas",
-        "high_volume_icon": "Volume élevé",
-        "pause_icon": "Pause",
-        "play_icon": "Lire"
       }
     },
     "gpu_detector": {

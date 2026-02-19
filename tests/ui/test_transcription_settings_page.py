@@ -130,3 +130,23 @@ def test_apply_post_save_collects_api_key_save_error_warning(qapp, mock_i18n):
         "settings.transcription.api_keys_save_failed_message" in warning.get("message", "")
         for warning in warnings
     )
+
+
+def test_transcription_settings_uses_semantic_roles_for_groups_and_inline_actions(qapp, mock_i18n):
+    page, _, _ = _create_page(mock_i18n)
+
+    assert page.whisper_group.property("role") == "settings-config-group"
+    assert page.cloud_group.property("role") == "settings-config-group"
+    assert page.openai_group.property("role") == "settings-config-group-nested"
+    assert page.google_group.property("role") == "settings-config-group-nested"
+    assert page.azure_group.property("role") == "settings-config-group-nested"
+
+    assert page.ffmpeg_install_btn.property("role") == "settings-inline-action"
+    assert page.browse_button.property("role") == "settings-inline-action"
+    assert page.refresh_usage_button.property("role") == "settings-inline-action"
+    assert page.openai_show_button.property("role") == "settings-inline-action"
+    assert page.openai_test_button.property("role") == "settings-inline-action"
+    assert page.google_show_button.property("role") == "settings-inline-action"
+    assert page.google_test_button.property("role") == "settings-inline-action"
+    assert page.azure_show_button.property("role") == "settings-inline-action"
+    assert page.azure_test_button.property("role") == "settings-inline-action"

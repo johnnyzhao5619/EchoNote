@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QApplication
 
 from ui.common.error_dialog import ErrorDialog
 from ui.common.notification import NotificationManager
+from ui.constants import ERROR_DIALOG_DETAILS_MAX_HEIGHT
 
 
 class TestErrorDialog:
@@ -43,6 +44,13 @@ class TestErrorDialog:
         dialog = ErrorDialog(title="Test Error", message="Test message", i18n=mock_i18n)
 
         assert dialog.minimumWidth() >= 500
+
+    def test_error_dialog_details_height_uses_constant(self, qapp, mock_i18n):
+        """Details section height should use centralized UI constant."""
+        dialog = ErrorDialog(
+            title="Test Error", message="Test message", details="Detail line", i18n=mock_i18n
+        )
+        assert dialog.details_text.maximumHeight() == ERROR_DIALOG_DETAILS_MAX_HEIGHT
 
 
 class TestNotificationManager:

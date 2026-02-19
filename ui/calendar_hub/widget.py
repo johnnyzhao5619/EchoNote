@@ -51,10 +51,9 @@ from ui.base_widgets import (
 from ui.constants import (
     CALENDAR_ADD_ACCOUNT_DIALOG_MIN_WIDTH,
     PAGE_COMPACT_SPACING,
-    PAGE_CONTENT_MARGINS,
     PAGE_DENSE_SPACING,
-    PAGE_LAYOUT_SPACING,
     STATUS_INDICATOR_SYMBOL,
+    ZERO_MARGINS,
 )
 from utils.i18n import I18nQtManager
 from core.calendar.constants import CalendarSource
@@ -129,14 +128,10 @@ class CalendarHubWidget(BaseWidget):
     def setup_ui(self):
         """Set up the calendar hub UI."""
         # Main layout
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(*PAGE_CONTENT_MARGINS)
-        layout.setSpacing(PAGE_LAYOUT_SPACING)
+        layout = self.create_page_layout()
 
         # Title
-        self.title_label = QLabel(self.i18n.t("calendar_hub.title"))
-        self.title_label.setObjectName("page_title")
-        layout.addWidget(self.title_label)
+        self.title_label = self.create_page_title("calendar_hub.title", layout)
 
         # Create toolbar
         toolbar = self._create_toolbar()
@@ -157,10 +152,10 @@ class CalendarHubWidget(BaseWidget):
         Returns:
             Toolbar widget
         """
-        toolbar = QWidget()
-        toolbar_layout = QHBoxLayout(toolbar)
-        toolbar_layout.setContentsMargins(0, 0, 0, 0)
-        toolbar_layout.setSpacing(PAGE_COMPACT_SPACING)
+        toolbar, toolbar_layout = self.create_row_container(
+            margins=ZERO_MARGINS,
+            spacing=PAGE_COMPACT_SPACING,
+        )
 
         # View switching buttons
         view_group = QButtonGroup(self)
@@ -168,19 +163,19 @@ class CalendarHubWidget(BaseWidget):
 
         self.month_btn = create_button(self.i18n.t("calendar_hub.view_month"))
         self.month_btn.setCheckable(True)
-        self.month_btn.setObjectName("view_button")
+        self.month_btn.setProperty("role", "calendar-view-toggle")
         view_group.addButton(self.month_btn)
 
         self.week_btn = create_button(self.i18n.t("calendar_hub.view_week"))
         self.week_btn.setCheckable(True)
         self.week_btn.setChecked(self.current_view == "week")
-        self.week_btn.setObjectName("view_button")
+        self.week_btn.setProperty("role", "calendar-view-toggle")
         view_group.addButton(self.week_btn)
 
         self.day_btn = create_button(self.i18n.t("calendar_hub.view_day"))
         self.day_btn.setCheckable(True)
         self.day_btn.setChecked(self.current_view == "day")
-        self.day_btn.setObjectName("view_button")
+        self.day_btn.setProperty("role", "calendar-view-toggle")
         view_group.addButton(self.day_btn)
 
         self.month_btn.setChecked(self.current_view == "month")
@@ -198,14 +193,13 @@ class CalendarHubWidget(BaseWidget):
 
         # Date navigation
         self.prev_btn = create_button("<")
-        from ui.constants import BUTTON_FIXED_WIDTH_LARGE
-
-        self.prev_btn.setFixedWidth(BUTTON_FIXED_WIDTH_LARGE)
+        self.prev_btn.setProperty("role", "calendar-nav-action")
         self.prev_btn.setToolTip(self.i18n.t("calendar_hub.widget.previous"))
         self.today_btn = create_button(self.i18n.t("calendar_hub.today"))
+        self.today_btn.setProperty("role", "calendar-nav-action")
 
         self.next_btn = create_button(">")
-        self.next_btn.setFixedWidth(BUTTON_FIXED_WIDTH_LARGE)
+        self.next_btn.setProperty("role", "calendar-nav-action")
         self.next_btn.setToolTip(self.i18n.t("calendar_hub.widget.next"))
 
         # Connect navigation buttons using helper
@@ -227,8 +221,8 @@ class CalendarHubWidget(BaseWidget):
         toolbar_layout.addStretch()
 
         # Create event button
-        self.create_event_btn = create_button(self.i18n.t("calendar_hub.create_event"))
-        self.create_event_btn = create_primary_button(self.create_event_btn.text())
+        self.create_event_btn = create_primary_button(self.i18n.t("calendar_hub.create_event"))
+        self.create_event_btn.setProperty("role", "calendar-primary-action")
         self.create_event_btn.clicked.connect(lambda: self._show_event_dialog())
         toolbar_layout.addWidget(self.create_event_btn)
 
@@ -241,10 +235,10 @@ class CalendarHubWidget(BaseWidget):
         Returns:
             Accounts section widget
         """
-        accounts_widget = QWidget()
-        accounts_layout = QHBoxLayout(accounts_widget)
-        accounts_layout.setContentsMargins(0, 0, 0, 0)
-        accounts_layout.setSpacing(PAGE_COMPACT_SPACING)
+        accounts_widget, accounts_layout = self.create_row_container(
+            margins=ZERO_MARGINS,
+            spacing=PAGE_COMPACT_SPACING,
+        )
 
         # Connected accounts label
         self.accounts_label = QLabel(self.i18n.t("calendar_hub.connected_accounts") + ":")
@@ -253,7 +247,7 @@ class CalendarHubWidget(BaseWidget):
         # Container for account badges
         self.accounts_container = QWidget()
         self.accounts_container_layout = QHBoxLayout(self.accounts_container)
-        self.accounts_container_layout.setContentsMargins(0, 0, 0, 0)
+        self.accounts_container_layout.setContentsMargins(*ZERO_MARGINS)
         self.accounts_container_layout.setSpacing(PAGE_DENSE_SPACING)
         accounts_layout.addWidget(self.accounts_container)
 
@@ -266,12 +260,14 @@ class CalendarHubWidget(BaseWidget):
 
         # Sync now button
         self.sync_now_btn = create_button(self.i18n.t("calendar_hub.sync_now"))
+        self.sync_now_btn.setProperty("role", "calendar-utility-action")
         self.sync_now_btn.setToolTip(self.i18n.t("calendar_hub.sync_now_tooltip"))
         self.sync_now_btn.clicked.connect(self._on_sync_now_clicked)
         accounts_layout.addWidget(self.sync_now_btn)
 
         # Add account button
         self.add_account_btn = create_button(self.i18n.t("calendar_hub.add_account"))
+        self.add_account_btn.setProperty("role", "calendar-utility-action")
         self.add_account_btn.clicked.connect(self.show_add_account_dialog)
         accounts_layout.addWidget(self.add_account_btn)
 

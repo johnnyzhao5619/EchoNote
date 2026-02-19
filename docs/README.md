@@ -85,7 +85,7 @@ Topic-specific documentation:
 - Development guide: [`echonote-landing/README.md`](../echonote-landing/README.md)
 - Deployment guide: [`echonote-landing/DEPLOYMENT.md`](../echonote-landing/DEPLOYMENT.md)
 - Archived implementation: [`docs/landing/`](landing/) (historical reference only)
-- Current release (`v1.3.1`) includes single-page architecture, i18n persistence, and responsive header stability improvements.
+- Current release (`v1.3.3`) includes single-page architecture, i18n persistence, and responsive header stability improvements.
 
 ---
 
@@ -123,4 +123,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 ---
 
 **Last Updated**: February 17, 2026  
-**Version**: v1.3.1
+**Version**: v1.3.3

@@ -26,6 +26,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QLabel, QProgressBar, QVBoxLayout, QWidget
 
 from ui.base_widgets import BaseWidget, create_hbox
+from ui.constants import ZERO_MARGINS
 
 logger = logging.getLogger("echonote.ui.progress_bar")
 
@@ -82,7 +83,7 @@ class ProgressBar(BaseWidget):
         layout = QVBoxLayout(self)
 
         # Create top row with label and percentage
-        top_layout = create_hbox(margins=(0, 0, 0, 0))
+        top_layout = create_hbox(margins=ZERO_MARGINS)
 
         # Create label
         self.label = QLabel(label_text)

@@ -57,6 +57,18 @@ from ui.base_widgets import (
     create_vbox,
 )
 from ui.common.error_dialog import show_error_dialog
+from ui.constants import (
+    MODEL_CONFIG_DIALOG_MIN_WIDTH,
+    MODEL_DETAILS_DIALOG_MIN_HEIGHT,
+    MODEL_DETAILS_DIALOG_MIN_WIDTH,
+    MODEL_MANAGEMENT_ACTION_BUTTON_MAX_WIDTH_MEDIUM,
+    MODEL_MANAGEMENT_ACTION_BUTTON_MAX_WIDTH_SMALL,
+    MODEL_MANAGEMENT_LIST_SPACING,
+    MODEL_MANAGEMENT_MODEL_NAME_FONT_SIZE,
+    MODEL_MANAGEMENT_RECOMMENDED_BUTTON_MAX_WIDTH,
+    MODEL_MANAGEMENT_SECTION_TITLE_FONT_SIZE,
+    ZERO_MARGINS,
+)
 from ui.settings.base_page import BaseSettingsPage
 from utils.i18n import I18nQtManager
 from utils.model_download import run_model_download
@@ -68,12 +80,12 @@ class ModelManagementPage(BaseSettingsPage):
     """模型管理页面"""
 
     PAGE_TITLE_OBJECT_NAME = "page_title"
-    MODEL_LIST_SPACING = 10
-    SECTION_TITLE_FONT_SIZE = 12
-    MODEL_NAME_FONT_SIZE = 11
-    ACTION_BUTTON_MAX_WIDTH_SMALL = 80
-    ACTION_BUTTON_MAX_WIDTH_MEDIUM = 100
-    RECOMMENDED_BUTTON_MAX_WIDTH = 200
+    MODEL_LIST_SPACING = MODEL_MANAGEMENT_LIST_SPACING
+    SECTION_TITLE_FONT_SIZE = MODEL_MANAGEMENT_SECTION_TITLE_FONT_SIZE
+    MODEL_NAME_FONT_SIZE = MODEL_MANAGEMENT_MODEL_NAME_FONT_SIZE
+    ACTION_BUTTON_MAX_WIDTH_SMALL = MODEL_MANAGEMENT_ACTION_BUTTON_MAX_WIDTH_SMALL
+    ACTION_BUTTON_MAX_WIDTH_MEDIUM = MODEL_MANAGEMENT_ACTION_BUTTON_MAX_WIDTH_MEDIUM
+    RECOMMENDED_BUTTON_MAX_WIDTH = MODEL_MANAGEMENT_RECOMMENDED_BUTTON_MAX_WIDTH
 
     def __init__(self, settings_manager, i18n: I18nQtManager, model_manager):
         """
@@ -125,7 +137,7 @@ class ModelManagementPage(BaseSettingsPage):
         self.recommendation_container = QWidget()
         self.recommendation_layout = create_vbox(
             spacing=self.MODEL_LIST_SPACING,
-            margins=(0, 0, 0, 0),
+            margins=ZERO_MARGINS,
         )
         self.recommendation_container.setLayout(self.recommendation_layout)
         self.content_layout.addWidget(self.recommendation_container)
@@ -138,7 +150,7 @@ class ModelManagementPage(BaseSettingsPage):
         self.downloaded_models_container = QWidget()
         self.downloaded_models_layout = create_vbox(
             spacing=self.MODEL_LIST_SPACING,
-            margins=(0, 0, 0, 0),
+            margins=ZERO_MARGINS,
         )
         self.downloaded_models_container.setLayout(self.downloaded_models_layout)
         self.content_layout.addWidget(self.downloaded_models_container)
@@ -153,7 +165,7 @@ class ModelManagementPage(BaseSettingsPage):
         self.available_models_container = QWidget()
         self.available_models_layout = create_vbox(
             spacing=self.MODEL_LIST_SPACING,
-            margins=(0, 0, 0, 0),
+            margins=ZERO_MARGINS,
         )
         self.available_models_container.setLayout(self.available_models_layout)
         self.content_layout.addWidget(self.available_models_container)
@@ -387,6 +399,7 @@ class ModelManagementPage(BaseSettingsPage):
         # 下载按钮
         download_btn = create_button(self.i18n.t("settings.model_management.download"))
         download_btn.setObjectName(f"download_btn_{model.name}")
+        download_btn.setProperty("role", "model-download")
         download_btn.setMaximumWidth(self.ACTION_BUTTON_MAX_WIDTH_MEDIUM)
         download_btn.clicked.connect(lambda: self._on_download_clicked(model.name))
         header_layout.addWidget(download_btn)
@@ -1086,8 +1099,8 @@ class ModelManagementPage(BaseSettingsPage):
 class ModelDetailsDialog(QDialog):
     """模型详情对话框"""
 
-    MIN_WIDTH = 500
-    MIN_HEIGHT = 400
+    MIN_WIDTH = MODEL_DETAILS_DIALOG_MIN_WIDTH
+    MIN_HEIGHT = MODEL_DETAILS_DIALOG_MIN_HEIGHT
 
     def __init__(self, model: ModelInfo, i18n: I18nQtManager, parent=None):
         """
@@ -1281,7 +1294,7 @@ class ModelDetailsDialog(QDialog):
 class ModelConfigDialog(QDialog):
     """模型配置对话框"""
 
-    MIN_WIDTH = 450
+    MIN_WIDTH = MODEL_CONFIG_DIALOG_MIN_WIDTH
 
     def __init__(self, model: ModelInfo, settings_manager, i18n: I18nQtManager, parent=None):
         """
@@ -1312,8 +1325,13 @@ class ModelConfigDialog(QDialog):
         # 配置表单
         form_layout = QFormLayout()
 
+        def _create_form_label(i18n_key: str) -> QLabel:
+            label = QLabel(i18n.t(i18n_key) + ":")
+            label.setProperty("role", "model-config-field-label")
+            return label
+
         # 计算设备选择
-        device_label = QLabel(i18n.t("settings.model_management.compute_device") + ":")
+        device_label = _create_form_label("settings.model_management.compute_device")
         device_combo = QComboBox()
         device_combo.addItems(SUPPORTED_TRANSCRIPTION_DEVICES)
 
@@ -1335,18 +1353,18 @@ class ModelConfigDialog(QDialog):
         form_layout.addRow(device_label, device_combo)
 
         # 计算精度选择
-        compute_type_label = QLabel(i18n.t("settings.model_management.compute_precision") + ":")
+        compute_type_label = _create_form_label("settings.model_management.compute_precision")
         compute_type_combo = QComboBox()
         compute_type_combo.addItems(SUPPORTED_COMPUTE_TYPES)
         form_layout.addRow(compute_type_label, compute_type_combo)
 
         # VAD 过滤（批量转录）
-        vad_label = QLabel(i18n.t("settings.model_management.enable_vad") + ":")
+        vad_label = _create_form_label("settings.model_management.enable_vad")
         vad_checkbox = QCheckBox(i18n.t("settings.model_management.vad_description"))
         form_layout.addRow(vad_label, vad_checkbox)
 
         # VAD 静音阈值
-        vad_threshold_label = QLabel(i18n.t("settings.model_management.vad_threshold") + ":")
+        vad_threshold_label = _create_form_label("settings.model_management.vad_threshold")
         vad_threshold_spin = QSpinBox()
         vad_threshold_spin.setMinimum(100)
         vad_threshold_spin.setMaximum(5000)

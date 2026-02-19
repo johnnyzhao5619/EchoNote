@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 from PySide6.QtCore import Qt
 
+from ui.constants import SETTINGS_NAV_WIDTH
 from ui.settings.widget import SettingsWidget
 
 
@@ -69,7 +70,7 @@ class TestSettingsWidget:
 
     def test_category_list_width(self, widget):
         """Test category list has fixed width."""
-        assert widget.category_list.width() == 200
+        assert widget.category_list.width() == SETTINGS_NAV_WIDTH
 
     def test_pages_container_exists(self, widget):
         """Test pages container exists."""
@@ -87,6 +88,15 @@ class TestSettingsWidget:
     def test_reset_button_exists(self, widget):
         """Test reset button exists."""
         assert widget.reset_button is not None
+
+    def test_footer_buttons_use_semantic_roles_and_variants(self, widget):
+        """Settings footer buttons should expose stable semantic styling hooks."""
+        assert widget.save_button.property("role") == "settings-save-action"
+        assert widget.save_button.property("variant") == "primary"
+        assert widget.cancel_button.property("role") == "settings-cancel-action"
+        assert widget.cancel_button.property("variant") == "secondary"
+        assert widget.reset_button.property("role") == "settings-reset-action"
+        assert widget.reset_button.property("variant") == "secondary"
 
     def test_language_change_connected(self, widget, mock_i18n):
         """Test language change signal is connected."""

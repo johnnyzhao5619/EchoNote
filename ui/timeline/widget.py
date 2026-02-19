@@ -51,7 +51,7 @@ if TYPE_CHECKING:
 
 from core.timeline.manager import to_local_naive
 from ui.base_widgets import BaseWidget, create_button, create_hbox, create_vbox
-from ui.constants import PAGE_COMPACT_SPACING, PAGE_CONTENT_MARGINS, PAGE_LAYOUT_SPACING
+from ui.constants import PAGE_COMPACT_SPACING, PAGE_LAYOUT_SPACING, ZERO_MARGINS
 from utils.i18n import I18nQtManager
 from core.calendar.constants import EventType, CalendarSource
 
@@ -75,6 +75,18 @@ class TimelineWidget(BaseWidget):
     # Signals
     event_selected = Signal(str)  # event_id
     auto_task_changed = Signal(str, dict)  # event_id, config
+    _EVENT_TYPE_FILTER_OPTIONS = (
+        ("timeline.filter_all", None),
+        ("timeline.filter_event", EventType.EVENT),
+        ("timeline.filter_task", EventType.TASK),
+        ("timeline.filter_appointment", EventType.APPOINTMENT),
+    )
+    _SOURCE_FILTER_OPTIONS = (
+        ("timeline.source_all", None),
+        ("timeline.source_local", CalendarSource.LOCAL),
+        ("timeline.source_google", CalendarSource.GOOGLE),
+        ("timeline.source_outlook", CalendarSource.OUTLOOK),
+    )
 
     def __init__(
         self,
@@ -130,14 +142,10 @@ class TimelineWidget(BaseWidget):
     def setup_ui(self):
         """Set up the timeline UI."""
         # Main layout
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(*PAGE_CONTENT_MARGINS)
-        layout.setSpacing(PAGE_LAYOUT_SPACING)
+        layout = self.create_page_layout()
 
         # Title
-        self.title_label = QLabel(self.i18n.t("timeline.title"))
-        self.title_label.setObjectName("page_title")
-        layout.addWidget(self.title_label)
+        self.title_label = self.create_page_title("timeline.title", layout)
 
         # Header with search and filters
         header_layout = self.create_header()
@@ -152,7 +160,7 @@ class TimelineWidget(BaseWidget):
         # Timeline container
         self.timeline_container = QWidget()
         self.timeline_layout = QVBoxLayout(self.timeline_container)
-        self.timeline_layout.setContentsMargins(0, 0, 0, 0)
+        self.timeline_layout.setContentsMargins(*ZERO_MARGINS)
         self.timeline_layout.setSpacing(PAGE_LAYOUT_SPACING)
 
         # Add stretch at the end
@@ -180,6 +188,7 @@ class TimelineWidget(BaseWidget):
 
         # Search box
         self.search_input = QLineEdit()
+        self.search_input.setProperty("role", "timeline-search-input")
         self.search_input.setPlaceholderText(self.i18n.t("timeline.search_placeholder"))
         self.search_input.setClearButtonEnabled(True)
         self.search_input.returnPressed.connect(self._on_search)
@@ -187,6 +196,7 @@ class TimelineWidget(BaseWidget):
 
         # Search button
         self.search_button = create_button(self.i18n.t("timeline.search"))
+        self.search_button.setProperty("role", "timeline-search-action")
         connect_button_with_callback(self.search_button, self._on_search)
         search_row.addWidget(self.search_button)
 
@@ -200,6 +210,7 @@ class TimelineWidget(BaseWidget):
         filter_row.addWidget(self.date_range_label)
 
         self.start_date_edit = QDateEdit()
+        self.start_date_edit.setProperty("role", "timeline-filter-control")
         self.start_date_edit.setCalendarPopup(True)
         filter_row.addWidget(self.start_date_edit)
 
@@ -207,6 +218,7 @@ class TimelineWidget(BaseWidget):
         filter_row.addWidget(self.date_range_separator)
 
         self.end_date_edit = QDateEdit()
+        self.end_date_edit.setProperty("role", "timeline-filter-control")
         self.end_date_edit.setCalendarPopup(True)
         self.sync_date_filters_with_preferences()
 
@@ -216,25 +228,46 @@ class TimelineWidget(BaseWidget):
 
         # Filter by event type
         self.type_filter = QComboBox()
-        self.type_filter.addItem(self.i18n.t("timeline.filter_all"), None)
-        self.type_filter.addItem(self.i18n.t("timeline.filter_event"), EventType.EVENT)
-        self.type_filter.addItem(self.i18n.t("timeline.filter_task"), EventType.TASK)
-        self.type_filter.addItem(self.i18n.t("timeline.filter_appointment"), EventType.APPOINTMENT)
+        self.type_filter.setProperty("role", "timeline-filter-control")
+        self._populate_filter_combo(
+            self.type_filter,
+            self._EVENT_TYPE_FILTER_OPTIONS,
+        )
         self.type_filter.currentIndexChanged.connect(self._on_filter_changed)
         filter_row.addWidget(self.type_filter, stretch=1)
 
         # Filter by source
         self.source_filter = QComboBox()
-        self.source_filter.addItem(self.i18n.t("timeline.source_all"), None)
-        self.source_filter.addItem(self.i18n.t("timeline.source_local"), CalendarSource.LOCAL)
-        self.source_filter.addItem(self.i18n.t("timeline.source_google"), CalendarSource.GOOGLE)
-        self.source_filter.addItem(self.i18n.t("timeline.source_outlook"), CalendarSource.OUTLOOK)
+        self.source_filter.setProperty("role", "timeline-filter-control")
+        self._populate_filter_combo(
+            self.source_filter,
+            self._SOURCE_FILTER_OPTIONS,
+        )
         self.source_filter.currentIndexChanged.connect(self._on_filter_changed)
         filter_row.addWidget(self.source_filter, stretch=1)
 
         header_layout.addLayout(filter_row)
 
         return header_layout
+
+    def _populate_filter_combo(
+        self,
+        combo: QComboBox,
+        options: tuple[tuple[str, object], ...],
+        selected_data: object = None,
+    ) -> None:
+        """Populate a filter combo box from i18n key/value option tuples."""
+        previous_state = combo.blockSignals(True)
+        try:
+            combo.clear()
+            selected_index = 0
+            for index, (text_key, value) in enumerate(options):
+                combo.addItem(self.i18n.t(text_key), value)
+                if value == selected_data:
+                    selected_index = index
+            combo.setCurrentIndex(selected_index)
+        finally:
+            combo.blockSignals(previous_state)
 
     def _normalize_day_span(self, value: Any) -> int:
         """Return a non-negative integer day span derived from ``value``."""
@@ -946,16 +979,17 @@ class TimelineWidget(BaseWidget):
         if hasattr(self, "date_range_separator"):
             self.date_range_separator.setText(self.i18n.t("timeline.filter_date_range_separator"))
 
-        # Update filter combo boxes
-        self.type_filter.setItemText(0, self.i18n.t("timeline.filter_all"))
-        self.type_filter.setItemText(1, self.i18n.t("timeline.filter_event"))
-        self.type_filter.setItemText(2, self.i18n.t("timeline.filter_task"))
-        self.type_filter.setItemText(3, self.i18n.t("timeline.filter_appointment"))
-
-        self.source_filter.setItemText(0, self.i18n.t("timeline.source_all"))
-        self.source_filter.setItemText(1, self.i18n.t("timeline.source_local"))
-        self.source_filter.setItemText(2, self.i18n.t("timeline.source_google"))
-        self.source_filter.setItemText(3, self.i18n.t("timeline.source_outlook"))
+        # Update filter combo boxes while keeping selected value stable.
+        self._populate_filter_combo(
+            self.type_filter,
+            self._EVENT_TYPE_FILTER_OPTIONS,
+            selected_data=self.type_filter.currentData(),
+        )
+        self._populate_filter_combo(
+            self.source_filter,
+            self._SOURCE_FILTER_OPTIONS,
+            selected_data=self.source_filter.currentData(),
+        )
 
         # Update event cards
         for card in self.event_cards:

@@ -123,7 +123,7 @@ Released under the [Apache 2.0 License](LICENSE). PySide6 (LGPL v3) is used for 
 
 ## 📊 Project Status
 
-- **Version**: v1.3.1 (Latest release)
+- **Version**: v1.3.3 (Latest release)
 - **Test Suite**: unit / integration / UI / performance categories
 - **Code Quality**: Excellent (PEP 8 compliant, type-annotated)
 - **Documentation**: Complete and restructured

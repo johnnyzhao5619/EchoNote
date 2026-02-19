@@ -46,7 +46,11 @@ from ui.base_widgets import (
     create_hbox,
     create_primary_button,
 )
-from ui.constants import CALENDAR_OAUTH_DIALOG_MIN_WIDTH, CALENDAR_OAUTH_RESULT_DIALOG_MIN_WIDTH
+from ui.constants import (
+    CALENDAR_OAUTH_DIALOG_MIN_WIDTH,
+    CALENDAR_OAUTH_INSTRUCTIONS_MAX_HEIGHT,
+    CALENDAR_OAUTH_RESULT_DIALOG_MIN_WIDTH,
+)
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.oauth_dialog")
@@ -228,7 +232,7 @@ class OAuthDialog(QDialog):
         """
         instructions = QTextEdit()
         instructions.setReadOnly(True)
-        instructions.setMaximumHeight(150)
+        instructions.setMaximumHeight(CALENDAR_OAUTH_INSTRUCTIONS_MAX_HEIGHT)
 
         text = self.i18n.t(
             "calendar_hub.oauth_dialog.instructions_html", provider=self.provider.capitalize()

@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "description": "Semantic theme outline contract for all QSS themes.",
+  "themes": [
+    "light",
+    "dark"
+  ],
+  "sections": [
+    {
+      "id": "shell",
+      "selectors": [
+        "QWidget#app_shell",
+        "QWidget#top_bar",
+        "QLabel#top_bar_brand",
+        "QLineEdit#top_bar_search",
+        "QLabel#top_bar_hint",
+        "#sidebar",
+        "#sidebar QPushButton[role=\"sidebar-nav-button\"]",
+        "QWidget#shell_status_bar"
+      ]
+    },
+    {
+      "id": "base_controls",
+      "selectors": [
+        "QPushButton[variant=\"primary\"]",
+        "QPushButton[variant=\"secondary\"]",
+        "QPushButton[variant=\"danger\"]",
+        "QLineEdit:focus",
+        "QComboBox::drop-down",
+        "QDateEdit::drop-down",
+        "QCheckBox::indicator",
+        "QRadioButton::indicator",
+        "QProgressBar::chunk",
+        "QScrollBar:vertical"
+      ]
+    },
+    {
+      "id": "dialog_and_global_actions",
+      "selectors": [
+        "QPushButton[role=\"dialog-primary-action\"]",
+        "QPushButton[role=\"dialog-secondary-action\"]",
+        "QPushButton[role=\"dialog-nav-action\"]",
+        "QPushButton[role=\"toolbar-secondary-action\"]",
+        "QPushButton[role=\"search-nav-action\"]",
+        "QPushButton[role=\"search-close-action\"]"
+      ]
+    },
+    {
+      "id": "calendar",
+      "selectors": [
+        "QPushButton[role=\"calendar-view-toggle\"]",
+        "QPushButton[role=\"calendar-nav-action\"]",
+        "QPushButton[role=\"calendar-utility-action\"]",
+        "QPushButton[role=\"calendar-primary-action\"]",
+        "QWidget[role=\"event-card\"]",
+        "QFrame[role=\"calendar-day-cell\"]"
+      ]
+    },
+    {
+      "id": "timeline",
+      "selectors": [
+        "QPushButton[role=\"timeline-search-action\"]",
+        "QLineEdit[role=\"timeline-search-input\"]",
+        "QDateEdit[role=\"timeline-filter-control\"]",
+        "QComboBox[role=\"timeline-filter-control\"]",
+        "QPushButton[role=\"timeline-recording-action\"]",
+        "QPushButton[role=\"timeline-transcript-action\"]",
+        "QPushButton[role=\"timeline-translation-action\"]",
+        "QLabel[role=\"current-time\"]",
+        "QFrame[role=\"current-time-line\"]"
+      ]
+    },
+    {
+      "id": "realtime_record",
+      "selectors": [
+        "QLabel[role=\"realtime-duration\"]",
+        "QPushButton[role=\"realtime-marker-action\"]",
+        "QPushButton[role=\"realtime-record-action\"]",
+        "QComboBox[role=\"realtime-field-control\"]"
+      ]
+    },
+    {
+      "id": "settings",
+      "selectors": [
+        "QListWidget[role=\"settings-nav\"]",
+        "QPushButton[role=\"settings-save-action\"]",
+        "QPushButton[role=\"settings-cancel-action\"]",
+        "QPushButton[role=\"settings-reset-action\"]",
+        "QPushButton[role=\"settings-inline-action\"]",
+        "QGroupBox[role=\"settings-config-group\"]",
+        "QGroupBox[role=\"settings-config-group-nested\"]"
+      ]
+    },
+    {
+      "id": "audio_player",
+      "selectors": [
+        "QPushButton[role=\"audio-player-primary\"]",
+        "QPushButton[role=\"audio-player-control\"]",
+        "QSlider[role=\"audio-player-progress\"]",
+        "QSlider[role=\"audio-player-volume\"]",
+        "QLabel[role=\"audio-player-time\"]",
+        "QLabel[role=\"audio-player-transcript-title\"]",
+        "QTextEdit[role=\"audio-player-transcript-text\"]",
+        "QPushButton[role=\"audio-player-transcript-toggle\"]"
+      ]
+    },
+    {
+      "id": "batch",
+      "selectors": [
+        "QFrame[role=\"batch-viewer-toolbar\"]",
+        "QPushButton[role=\"batch-viewer-search-action\"]",
+        "QPushButton[role=\"batch-viewer-edit-action\"]",
+        "QPushButton[role=\"batch-viewer-copy-action\"]",
+        "QPushButton[role=\"batch-viewer-export-action\"]",
+        "QPushButton[role=\"task-action-start\"]",
+        "QPushButton[role=\"task-action-pause\"]",
+        "QPushButton[role=\"task-action-cancel\"]",
+        "QPushButton[role=\"task-action-delete\"]",
+        "QPushButton[role=\"task-action-view\"]",
+        "QPushButton[role=\"task-action-export\"]",
+        "QPushButton[role=\"task-action-retry\"]"
+      ]
+    }
+  ]
+}

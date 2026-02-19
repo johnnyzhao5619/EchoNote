@@ -40,6 +40,14 @@ from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.batch_transcribe.task_item")
 
+TASK_ACTION_ROLE_START = "task-action-start"
+TASK_ACTION_ROLE_PAUSE = "task-action-pause"
+TASK_ACTION_ROLE_CANCEL = "task-action-cancel"
+TASK_ACTION_ROLE_DELETE = "task-action-delete"
+TASK_ACTION_ROLE_VIEW = "task-action-view"
+TASK_ACTION_ROLE_EXPORT = "task-action-export"
+TASK_ACTION_ROLE_RETRY = "task-action-retry"
+
 
 class TaskItem(BaseWidget):
     """
@@ -141,34 +149,34 @@ class TaskItem(BaseWidget):
 
         # Create action buttons
         self.start_btn = QPushButton()
-        self.start_btn.setObjectName("start_btn")
+        self.start_btn.setProperty("role", TASK_ACTION_ROLE_START)
         actions_layout.addWidget(self.start_btn)
 
         self.pause_btn = QPushButton()
-        self.pause_btn.setObjectName("pause_btn")
+        self.pause_btn.setProperty("role", TASK_ACTION_ROLE_PAUSE)
         self.pause_btn.setVisible(False)
         actions_layout.addWidget(self.pause_btn)
 
         self.cancel_btn = QPushButton()
-        self.cancel_btn.setObjectName("cancel_btn")
+        self.cancel_btn.setProperty("role", TASK_ACTION_ROLE_CANCEL)
         actions_layout.addWidget(self.cancel_btn)
 
         self.delete_btn = QPushButton()
-        self.delete_btn.setObjectName("delete_btn")
+        self.delete_btn.setProperty("role", TASK_ACTION_ROLE_DELETE)
         actions_layout.addWidget(self.delete_btn)
 
         self.view_btn = QPushButton()
-        self.view_btn.setObjectName("view_btn")
+        self.view_btn.setProperty("role", TASK_ACTION_ROLE_VIEW)
         self.view_btn.setVisible(False)
         actions_layout.addWidget(self.view_btn)
 
         self.export_btn = QPushButton()
-        self.export_btn.setObjectName("export_btn")
+        self.export_btn.setProperty("role", TASK_ACTION_ROLE_EXPORT)
         self.export_btn.setVisible(False)
         actions_layout.addWidget(self.export_btn)
 
         self.retry_btn = QPushButton()
-        self.retry_btn.setObjectName("retry_btn")
+        self.retry_btn.setProperty("role", TASK_ACTION_ROLE_RETRY)
         self.retry_btn.setVisible(False)
         actions_layout.addWidget(self.retry_btn)
 

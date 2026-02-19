@@ -238,6 +238,9 @@ CODE_QUALITY_IMPROVEMENT_REPORT.md
 # Development and maintenance artifacts
 IMPROVEMENT_PLAN_*.md
 PROJECT_REVIEW_*.md
+
+# Local media/debug artifacts
+test/*.mp4
 RELEASE_NOTES_*.md
 REVIEW_SUMMARY.md
 *_SUMMARY.md

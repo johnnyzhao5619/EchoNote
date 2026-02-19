@@ -66,6 +66,12 @@ class TestBatchTranscribeWidget:
         """Test clear queue button exists."""
         assert widget.clear_queue_btn is not None
 
+    def test_toolbar_buttons_use_semantic_role(self, widget):
+        """Toolbar buttons should expose semantic role hook for unified styling."""
+        assert widget.import_file_btn.property("role") == "toolbar-secondary-action"
+        assert widget.import_folder_btn.property("role") == "toolbar-secondary-action"
+        assert widget.clear_queue_btn.property("role") == "toolbar-secondary-action"
+
     def test_task_list_exists(self, widget):
         """Test task list widget exists."""
         assert widget.task_list is not None

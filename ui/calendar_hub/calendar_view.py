@@ -36,10 +36,12 @@ from PySide6.QtWidgets import (
 
 from ui.base_widgets import BaseWidget
 from ui.constants import (
+    CALENDAR_GRID_CELL_SPACING,
     CALENDAR_DAY_CELL_MIN_HEIGHT,
     PAGE_COMPACT_SPACING,
     PAGE_DENSE_SPACING,
     STATUS_INDICATOR_SYMBOL,
+    ZERO_MARGINS,
 )
 from utils.i18n import I18nQtManager
 
@@ -219,7 +221,7 @@ class MonthView(BaseWidget):
     def setup_ui(self):
         """Set up month view UI."""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(*ZERO_MARGINS)
         layout.setSpacing(PAGE_COMPACT_SPACING)
 
         # Month/year header
@@ -230,8 +232,8 @@ class MonthView(BaseWidget):
 
         # Calendar grid
         self.calendar_grid = QGridLayout()
-        self.calendar_grid.setSpacing(1)
-        self.calendar_grid.setContentsMargins(0, 0, 0, 0)
+        self.calendar_grid.setSpacing(CALENDAR_GRID_CELL_SPACING)
+        self.calendar_grid.setContentsMargins(*ZERO_MARGINS)
 
         # Add day headers
         day_names = _get_weekday_labels(self.i18n)
@@ -438,7 +440,7 @@ class WeekView(BaseWidget):
     def setup_ui(self):
         """Set up week view UI."""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(*ZERO_MARGINS)
         layout.setSpacing(PAGE_COMPACT_SPACING)
 
         # Week header
@@ -455,8 +457,8 @@ class WeekView(BaseWidget):
         # Week grid container
         week_container = QWidget()
         self.week_grid = QGridLayout(week_container)
-        self.week_grid.setSpacing(1)
-        self.week_grid.setContentsMargins(0, 0, 0, 0)
+        self.week_grid.setSpacing(CALENDAR_GRID_CELL_SPACING)
+        self.week_grid.setContentsMargins(*ZERO_MARGINS)
 
         scroll.setWidget(week_container)
         layout.addWidget(scroll)
@@ -540,7 +542,7 @@ class WeekView(BaseWidget):
         column = QWidget()
         column.setProperty("role", "calendar-day-column")
         layout = QVBoxLayout(column)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(*ZERO_MARGINS)
         layout.setSpacing(PAGE_DENSE_SPACING)
 
         sorted_events = sorted(events, key=_event_sort_key)
@@ -623,7 +625,7 @@ class DayView(BaseWidget):
     def setup_ui(self):
         """Set up day view UI."""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(*ZERO_MARGINS)
         layout.setSpacing(PAGE_COMPACT_SPACING)
 
         # Day header

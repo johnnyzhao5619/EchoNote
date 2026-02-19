@@ -26,21 +26,18 @@ from typing import Any, Dict
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QFrame,
-    QHBoxLayout,
     QLabel,
     QListWidget,
     QListWidgetItem,
     QMessageBox,
-    QPushButton,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
 )
 
-from ui.base_widgets import BaseWidget, create_button, create_hbox, create_vbox
+from ui.base_widgets import BaseWidget, create_hbox, create_primary_button, create_secondary_button
 from ui.constants import (
     PAGE_COMPACT_SPACING,
-    PAGE_CONTENT_MARGINS,
     PAGE_LAYOUT_SPACING,
     SETTINGS_NAV_WIDTH,
 )
@@ -101,14 +98,10 @@ class SettingsWidget(BaseWidget):
     def setup_ui(self):
         """Set up the settings UI layout."""
         # Main layout
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(*PAGE_CONTENT_MARGINS)
-        main_layout.setSpacing(PAGE_LAYOUT_SPACING)
+        main_layout = self.create_page_layout()
 
         # Title
-        self.title_label = QLabel(self.i18n.t("settings.title"))
-        self.title_label.setObjectName("page_title")
-        main_layout.addWidget(self.title_label)
+        self.title_label = self.create_page_title("settings.title", main_layout)
 
         # Content layout (category list + pages)
         content_layout = create_hbox(spacing=PAGE_LAYOUT_SPACING)
@@ -139,17 +132,20 @@ class SettingsWidget(BaseWidget):
         button_layout.addStretch()
 
         # Reset button
-        self.reset_button = create_button(self.i18n.t("settings.reset"))
+        self.reset_button = create_secondary_button(self.i18n.t("settings.reset"))
+        self.reset_button.setProperty("role", "settings-reset-action")
         self.reset_button.clicked.connect(self._on_reset_clicked)
         button_layout.addWidget(self.reset_button)
 
         # Cancel button
-        self.cancel_button = create_button(self.i18n.t("settings.cancel"))
+        self.cancel_button = create_secondary_button(self.i18n.t("settings.cancel"))
+        self.cancel_button.setProperty("role", "settings-cancel-action")
         self.cancel_button.clicked.connect(self._on_cancel_clicked)
         button_layout.addWidget(self.cancel_button)
 
         # Save button
-        self.save_button = create_button(self.i18n.t("settings.save"))
+        self.save_button = create_primary_button(self.i18n.t("settings.save"))
+        self.save_button.setProperty("role", "settings-save-action")
         self.save_button.clicked.connect(self._on_save_clicked)
         self.save_button.setDefault(True)
         button_layout.addWidget(self.save_button)
@@ -584,21 +580,22 @@ class SettingsWidget(BaseWidget):
         """Handle save button click."""
         self.save_settings()
 
+    def _confirm_discard_changes(self) -> bool:
+        """Ask user to confirm discarding unsaved settings."""
+        reply = QMessageBox.question(
+            self,
+            self.i18n.t("settings.confirm.title"),
+            self.i18n.t("settings.confirm.discard_changes"),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        return reply == QMessageBox.StandardButton.Yes
+
     def _on_cancel_clicked(self):
         """Handle cancel button click."""
-        if self.has_unsaved_changes:
-            # Confirm discard changes
-            reply = QMessageBox.question(
-                self,
-                self.i18n.t("settings.confirm.title"),
-                self.i18n.t("settings.confirm.discard_changes"),
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
-            )
-
-            if reply == QMessageBox.StandardButton.Yes:
-                # Reload original settings
-                self.load_settings()
+        if self.has_unsaved_changes and self._confirm_discard_changes():
+            # Reload original settings
+            self.load_settings()
 
     def _on_reset_clicked(self):
         """Handle reset button click."""
@@ -673,12 +670,4 @@ class SettingsWidget(BaseWidget):
         if not self.has_unsaved_changes:
             return True
 
-        reply = QMessageBox.question(
-            self,
-            self.i18n.t("settings.confirm.title"),
-            self.i18n.t("settings.confirm.discard_changes"),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-
-        return reply == QMessageBox.StandardButton.Yes
+        return self._confirm_discard_changes()

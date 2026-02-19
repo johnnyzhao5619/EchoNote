@@ -25,7 +25,7 @@ from typing import Optional
 from PySide6.QtCore import QTimer
 
 from ui.base_widgets import connect_button_with_callback, create_hbox
-from ui.constants import ERROR_DIALOG_MIN_WIDTH
+from ui.constants import ERROR_DIALOG_DETAILS_MAX_HEIGHT, ERROR_DIALOG_MIN_WIDTH
 from ui.qt_imports import (
     QApplication,
     QDialog,
@@ -102,7 +102,7 @@ class ErrorDialog(QDialog):
             self.details_text = QTextEdit()
             self.details_text.setPlainText(self.error_details)
             self.details_text.setReadOnly(True)
-            self.details_text.setMaximumHeight(200)
+            self.details_text.setMaximumHeight(ERROR_DIALOG_DETAILS_MAX_HEIGHT)
             self.details_text.setObjectName("error_details")
 
             # Initially hide details

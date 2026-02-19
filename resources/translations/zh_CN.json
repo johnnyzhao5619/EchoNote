@@ -7,6 +7,16 @@
     "exit_confirmation_message": "There are tasks in progress. Are you sure you want to exit?\n\nUnfinished tasks will be stopped.",
     "exit_confirmation_message_with_count": "There are {count} task(s) in progress. Are you sure you want to exit?\n\nUnfinished tasks will be stopped."
   },
+  "app_shell": {
+    "search_placeholder": "搜索页面（转写、录音、日历…）",
+    "search_hint": "Ctrl+K",
+    "search_no_match": "未找到匹配页面：{query}",
+    "search_result": "已打开 {page}",
+    "tasks_running": "任务：运行中 {count}",
+    "recording_on": "录音：进行中",
+    "recording_off": "录音：空闲",
+    "theme_status": "主题：{theme}"
+  },
   "common": {
     "ok": "确定",
     "cancel": "取消",
@@ -355,11 +365,15 @@
       "initial_time": "00:00",
       "play_button_label": "播放",
       "pause_button_label": "暂停",
+      "stop_button_label": "停止",
       "play_tooltip": "播放",
       "pause_tooltip": "暂停",
+      "stop_tooltip": "停止",
       "progress_tooltip": "在录音中定位",
       "volume_tooltip": "调整音量",
-      "volume_icon": "音量",
+      "mute_icon": "静音",
+      "low_volume_icon": "低音量",
+      "high_volume_icon": "高音量",
       "load_failed": "加载音频失败：{error}",
       "playback_error": "播放错误：{error}",
       "invalid_media": "媒体格式不受支持或文件已损坏",
@@ -938,15 +952,6 @@
       },
       "progress_bar": {
         "zero_percent": "0%"
-      }
-    },
-    "timeline": {
-      "audio_player": {
-        "mute_icon": "静音",
-        "low_volume_icon": "低音量",
-        "high_volume_icon": "高音量",
-        "pause_icon": "暂停",
-        "play_icon": "播放"
       }
     },
     "gpu_detector": {

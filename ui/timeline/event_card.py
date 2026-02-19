@@ -38,7 +38,12 @@ from PySide6.QtWidgets import (
 
 from core.timeline.manager import to_local_naive
 from ui.base_widgets import create_button, create_hbox, create_vbox
-from ui.constants import TIMELINE_CURRENT_TIME_LINE_HEIGHT, TIMELINE_TRANSLATION_COMBO_MIN_WIDTH
+from ui.constants import (
+    PAGE_DENSE_SPACING,
+    TIMELINE_CURRENT_TIME_LINE_HEIGHT,
+    TIMELINE_TRANSLATION_COMBO_MIN_WIDTH,
+    ZERO_MARGINS,
+)
 from utils.i18n import LANGUAGE_OPTION_KEYS, I18nQtManager
 
 logger = logging.getLogger("echonote.ui.timeline.event_card")
@@ -167,6 +172,8 @@ class EventCard(QFrame):
 
         # Main layout
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(*ZERO_MARGINS)
+        layout.setSpacing(PAGE_DENSE_SPACING)
 
         # Header with title and time
         header_layout = self.create_header()
@@ -191,7 +198,7 @@ class EventCard(QFrame):
         Returns:
             Header layout
         """
-        header_layout = create_vbox(spacing=5)
+        header_layout = create_vbox(spacing=PAGE_DENSE_SPACING)
 
         # Title
         title_label = QLabel(self.calendar_event.title)
@@ -221,6 +228,7 @@ class EventCard(QFrame):
 
         time_label = QLabel(time_str)
         time_label.setObjectName("time_label")
+        time_label.setProperty("role", "event-meta")
         time_layout.addWidget(time_label)
 
         # Event type badge
@@ -248,13 +256,14 @@ class EventCard(QFrame):
         Returns:
             Details layout
         """
-        details_layout = create_vbox(spacing=5)
+        details_layout = create_vbox(spacing=PAGE_DENSE_SPACING)
 
         # Location
         if self.calendar_event.location:
             location_layout = create_hbox()
             location_label = QLabel(self.calendar_event.location)
             location_label.setObjectName("detail_label")
+            location_label.setProperty("role", "event-meta")
             location_layout.addWidget(location_label)
             location_layout.addStretch()
 
@@ -269,6 +278,7 @@ class EventCard(QFrame):
 
             attendees_label = QLabel(attendees_text)
             attendees_label.setObjectName("detail_label")
+            attendees_label.setProperty("role", "event-meta")
             attendees_layout.addWidget(attendees_label)
             attendees_layout.addStretch()
 
@@ -293,7 +303,7 @@ class EventCard(QFrame):
         Returns:
             Actions layout
         """
-        actions_layout = create_hbox(spacing=15)
+        actions_layout = create_hbox(spacing=8)
 
         # Get auto-task config
         auto_tasks = self.event_data.get("auto_tasks", {})
@@ -353,7 +363,7 @@ class EventCard(QFrame):
         Returns:
             Actions layout
         """
-        actions_layout = create_hbox(spacing=10)
+        actions_layout = create_hbox(spacing=8)
 
         # Recording button
         has_recording = bool(self.artifacts.get("recording"))
@@ -363,7 +373,7 @@ class EventCard(QFrame):
         if has_recording:
             self.recording_btn = create_button(self.i18n.t("timeline.play_recording"))
             self.recording_btn.clicked.connect(self._on_play_recording)
-            self.recording_btn.setObjectName("recording_btn")
+            self.recording_btn.setProperty("role", "timeline-recording-action")
             # Styling is handled by theme files (dark.qss / light.qss)
             actions_layout.addWidget(self.recording_btn)
 
@@ -371,14 +381,14 @@ class EventCard(QFrame):
         if has_transcript:
             self.transcript_btn = create_button(self.i18n.t("timeline.view_transcript"))
             self.transcript_btn.clicked.connect(self._on_view_transcript)
-            self.transcript_btn.setObjectName("transcript_btn")
+            self.transcript_btn.setProperty("role", "timeline-transcript-action")
             # Styling is handled by theme files (dark.qss / light.qss)
             actions_layout.addWidget(self.transcript_btn)
 
         if has_translation:
             self.translation_btn = create_button(self.i18n.t("timeline.view_translation"))
             self.translation_btn.clicked.connect(self._on_view_translation)
-            self.translation_btn.setObjectName("translation_btn")
+            self.translation_btn.setProperty("role", "timeline-translation-action")
             actions_layout.addWidget(self.translation_btn)
 
         # Show message if no artifacts

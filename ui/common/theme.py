@@ -38,40 +38,40 @@ class ThemeManager:
     INDEX_TO_THEME = {index: name for name, index in THEME_TO_INDEX.items()}
 
     # Color palettes
-    # Based on Material Design Blue (#2196F3) for primary brand color
+    # Shell colors are aligned with Docker Desktop-inspired UI styling in QSS.
     PALETTES = {
         "light": {
-            "primary": "#2196F3",  # Blue 500
-            "primary_hover": "#1976D2",  # Blue 700
-            "primary_pressed": "#0D47A1",  # Blue 900
-            "background": "#FFFFFF",
-            "surface": "#F5F5F5",
-            "text": "#212121",
-            "text_secondary": "#757575",
-            "border": "#E0E0E0",
-            "success": "#4CAF50",
-            "warning": "#FF9800",
-            "error": "#F44336",
-            "info": "#2196F3",
-            "highlight": "#BBDEFB",  # Blue 100 (for search highlights)
+            "primary": "#1D63E9",
+            "primary_hover": "#1354CF",
+            "primary_pressed": "#0F46B6",
+            "background": "#F4F6FB",
+            "surface": "#FFFFFF",
+            "text": "#1F293B",
+            "text_secondary": "#5C6F8F",
+            "border": "#D9DEEA",
+            "success": "#2E9E5B",
+            "warning": "#F59E0B",
+            "error": "#D64545",
+            "info": "#1D63E9",
+            "highlight": "#E7F0FF",
             "splash_text": "#FFFFFF",
             "splash_progress_track": "#80FFFFFF",
             "splash_progress_fill": "#FFFFFF",
         },
         "dark": {
-            "primary": "#2196F3",  # Blue 500
-            "primary_hover": "#64B5F6",  # Blue 300
-            "primary_pressed": "#90CAF9",  # Blue 200
-            "background": "#212121",  # Modified slightly from pure black
-            "surface": "#424242",
-            "text": "#FAFAFA",
-            "text_secondary": "#BDBDBD",
-            "border": "#616161",
-            "success": "#81C784",
-            "warning": "#FFB74D",
-            "error": "#E57373",
-            "info": "#64B5F6",
-            "highlight": "#1565C0",  # Blue 800 (for search highlights)
+            "primary": "#64A2FF",
+            "primary_hover": "#86B8FF",
+            "primary_pressed": "#A5CBFF",
+            "background": "#1F232C",
+            "surface": "#262B36",
+            "text": "#ECF2FF",
+            "text_secondary": "#AAB6CF",
+            "border": "#323B49",
+            "success": "#4FB878",
+            "warning": "#F6B547",
+            "error": "#EE7070",
+            "info": "#86B3FF",
+            "highlight": "#2B4068",
             "splash_text": "#FFFFFF",
             "splash_progress_track": "#80FFFFFF",
             "splash_progress_fill": "#FFFFFF",
@@ -162,3 +162,7 @@ class ThemeManager:
         if target_theme == "system":
             target_theme = "light"
         return self.PALETTES.get(target_theme, self.PALETTES["light"])
+
+    def get_current_theme(self) -> str:
+        """Get current resolved theme name."""
+        return self._current_theme

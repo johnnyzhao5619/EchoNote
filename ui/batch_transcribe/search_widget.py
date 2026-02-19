@@ -26,8 +26,7 @@ from typing import List, Optional
 
 from ui.base_widgets import BaseWidget, create_button
 from ui.constants import (
-    BUTTON_FIXED_WIDTH_LARGE,
-    BUTTON_FIXED_WIDTH_MEDIUM,
+    LARGE_DOCUMENT_THRESHOLD,
     SEARCH_DEBOUNCE_DELAY_MS,
     SEARCH_INPUT_MIN_WIDTH,
     SEARCH_MATCH_LABEL_MIN_WIDTH,
@@ -54,6 +53,9 @@ from utils.i18n import I18nQtManager
 from ui.common.theme import ThemeManager
 
 logger = logging.getLogger("echonote.ui.search_widget")
+
+SEARCH_ROLE_NAV_BUTTON = "search-nav-action"
+SEARCH_ROLE_CLOSE_BUTTON = "search-close-action"
 
 
 class SearchWidget(BaseWidget):
@@ -158,17 +160,14 @@ class SearchWidget(BaseWidget):
 
         # Previous button
         self.prev_button = create_button(self.i18n.t("search.previous"))
-        self.prev_button.setObjectName("prev_button")
-
-        self.prev_button.setFixedWidth(BUTTON_FIXED_WIDTH_LARGE)
+        self.prev_button.setProperty("role", SEARCH_ROLE_NAV_BUTTON)
         self.prev_button.setToolTip(self.i18n.t("search.previous"))
         connect_button_with_callback(self.prev_button, self.find_previous)
         layout.addWidget(self.prev_button)
 
         # Next button
         self.next_button = create_button(self.i18n.t("search.next"))
-        self.next_button.setObjectName("next_button")
-        self.next_button.setFixedWidth(BUTTON_FIXED_WIDTH_LARGE)
+        self.next_button.setProperty("role", SEARCH_ROLE_NAV_BUTTON)
         self.next_button.setToolTip(self.i18n.t("search.next"))
         connect_button_with_callback(self.next_button, self.find_next)
         layout.addWidget(self.next_button)
@@ -180,9 +179,7 @@ class SearchWidget(BaseWidget):
 
         # Close button
         self.close_button = create_button(self.i18n.t("search.close"))
-        self.close_button.setObjectName("close_button")
-
-        self.close_button.setFixedWidth(BUTTON_FIXED_WIDTH_MEDIUM)
+        self.close_button.setProperty("role", SEARCH_ROLE_CLOSE_BUTTON)
         self.close_button.setToolTip(self.i18n.t("search.close"))
         connect_button_with_callback(self.close_button, self._on_close_clicked)
         layout.addWidget(self.close_button)
@@ -299,7 +296,6 @@ class SearchWidget(BaseWidget):
         content = self.text_edit.toPlainText()
 
         # For very large documents, use regex for better performance
-        LARGE_DOCUMENT_THRESHOLD = 50000
         if len(content) > LARGE_DOCUMENT_THRESHOLD:
             self.matches = self._regex_search(query, content, case_sensitive)
         else:

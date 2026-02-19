@@ -31,6 +31,7 @@ from ui.constants import (
     PAGE_COMPACT_SPACING,
     PAGE_CONTENT_MARGINS,
     PAGE_LAYOUT_SPACING,
+    ZERO_MARGINS,
 )
 from utils.i18n import I18nQtManager
 
@@ -82,7 +83,7 @@ class BaseSettingsPage(BaseWidget):
 
         # Content widget
         self.content_widget = QWidget()
-        self.content_layout = create_vbox(spacing=PAGE_LAYOUT_SPACING, margins=(0, 0, 0, 0))
+        self.content_layout = create_vbox(spacing=PAGE_LAYOUT_SPACING, margins=ZERO_MARGINS)
         self.content_widget.setLayout(self.content_layout)
 
         scroll_area.setWidget(self.content_widget)

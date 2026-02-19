@@ -2,7 +2,7 @@
 
 This document describes how `echonote-landing` is deployed to GitHub Pages.
 
-Release baseline: `v1.3.1`
+Release baseline: `v1.3.3`
 
 ## Deployment Modes
 

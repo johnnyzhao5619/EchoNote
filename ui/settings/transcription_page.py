@@ -147,6 +147,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         self.ffmpeg_install_btn = create_button(
             self.i18n.t("settings.transcription.ffmpeg_view_guide")
         )
+        self.ffmpeg_install_btn.setProperty("role", "settings-inline-action")
         self.ffmpeg_install_btn.clicked.connect(self._on_show_ffmpeg_guide)
         ffmpeg_status_layout.addWidget(self.ffmpeg_install_btn)
 
@@ -168,6 +169,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         self.path_edit = QLineEdit()
         self.path_edit.textChanged.connect(self._emit_changed)
         self.browse_button = create_button(self.i18n.t("settings.transcription.browse"))
+        self.browse_button.setProperty("role", "settings-inline-action")
         self.browse_button.clicked.connect(self._on_browse_clicked)
         path_layout.addWidget(self.path_label)
         path_layout.addWidget(self.path_edit, stretch=1)
@@ -201,6 +203,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         """Create engine-specific configuration sections."""
         # Faster-Whisper configuration
         self.whisper_group = QGroupBox(self.i18n.t("settings.transcription.whisper_config"))
+        self.whisper_group.setProperty("role", "settings-config-group")
         whisper_layout = QFormLayout()
 
         # Model size
@@ -241,6 +244,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
 
         # Cloud engine configuration (will be shown/hidden based on selection)
         self.cloud_group = QGroupBox(self.i18n.t("settings.transcription.cloud_config"))
+        self.cloud_group.setProperty("role", "settings-config-group")
         cloud_layout = create_vbox()
 
         # Note about API keys
@@ -258,6 +262,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         self.refresh_usage_button = create_button(
             self.i18n.t("settings.transcription.refresh_usage")
         )
+        self.refresh_usage_button.setProperty("role", "settings-inline-action")
         self.refresh_usage_button.clicked.connect(self._load_usage_statistics)
         refresh_layout.addWidget(self.refresh_usage_button)
         cloud_layout.addLayout(refresh_layout)
@@ -336,6 +341,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
 
         # OpenAI API Key
         self.openai_group = QGroupBox(self.i18n.t("settings.transcription.cloud_api_openai"))
+        self.openai_group.setProperty("role", "settings-config-group-nested")
         openai_layout = QFormLayout()
 
         self.openai_key_edit = QLineEdit()
@@ -348,14 +354,16 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         key_layout = create_hbox()
         key_layout.addWidget(self.openai_key_edit)
 
-        self.openai_show_button = create_button(self.i18n.t("settings.transcription.show_password"))
+        self.openai_show_button = self._create_inline_action_button(
+            self.i18n.t("settings.transcription.show_password")
+        )
         self.openai_show_button.setCheckable(True)
         self.openai_show_button.clicked.connect(
             lambda: self._toggle_password_visibility(self.openai_key_edit, self.openai_show_button)
         )
         key_layout.addWidget(self.openai_show_button)
 
-        self.openai_test_button = create_button(
+        self.openai_test_button = self._create_inline_action_button(
             self.i18n.t("settings.transcription.test_connection")
         )
         self.openai_test_button.clicked.connect(lambda: self._test_api_key("openai"))
@@ -377,6 +385,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
 
         # Google API Key
         self.google_group = QGroupBox(self.i18n.t("settings.transcription.cloud_api_google"))
+        self.google_group.setProperty("role", "settings-config-group-nested")
         google_layout = QFormLayout()
 
         self.google_key_edit = QLineEdit()
@@ -386,14 +395,16 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         google_key_layout = create_hbox()
         google_key_layout.addWidget(self.google_key_edit)
 
-        self.google_show_button = create_button(self.i18n.t("settings.transcription.show_password"))
+        self.google_show_button = self._create_inline_action_button(
+            self.i18n.t("settings.transcription.show_password")
+        )
         self.google_show_button.setCheckable(True)
         self.google_show_button.clicked.connect(
             lambda: self._toggle_password_visibility(self.google_key_edit, self.google_show_button)
         )
         google_key_layout.addWidget(self.google_show_button)
 
-        self.google_test_button = create_button(
+        self.google_test_button = self._create_inline_action_button(
             self.i18n.t("settings.transcription.test_connection")
         )
         self.google_test_button.clicked.connect(lambda: self._test_api_key("google"))
@@ -414,6 +425,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
 
         # Azure API Key
         self.azure_group = QGroupBox(self.i18n.t("settings.transcription.cloud_api_azure"))
+        self.azure_group.setProperty("role", "settings-config-group-nested")
         azure_layout = QFormLayout()
 
         self.azure_key_edit = QLineEdit()
@@ -423,14 +435,16 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         azure_key_layout = create_hbox()
         azure_key_layout.addWidget(self.azure_key_edit)
 
-        self.azure_show_button = create_button(self.i18n.t("settings.transcription.show_password"))
+        self.azure_show_button = self._create_inline_action_button(
+            self.i18n.t("settings.transcription.show_password")
+        )
         self.azure_show_button.setCheckable(True)
         self.azure_show_button.clicked.connect(
             lambda: self._toggle_password_visibility(self.azure_key_edit, self.azure_show_button)
         )
         azure_key_layout.addWidget(self.azure_show_button)
 
-        self.azure_test_button = create_button(
+        self.azure_test_button = self._create_inline_action_button(
             self.i18n.t("settings.transcription.test_connection")
         )
         self.azure_test_button.clicked.connect(lambda: self._test_api_key("azure"))
@@ -455,6 +469,12 @@ class TranscriptionSettingsPage(BaseSettingsPage):
 
         self.azure_group.setLayout(azure_layout)
         parent_layout.addWidget(self.azure_group)
+
+    def _create_inline_action_button(self, text: str) -> QPushButton:
+        """Create compact inline action button with a shared semantic role."""
+        button = create_button(text)
+        button.setProperty("role", "settings-inline-action")
+        return button
 
     def _toggle_password_visibility(self, line_edit: QLineEdit, button: QPushButton):
         """

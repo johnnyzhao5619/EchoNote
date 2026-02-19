@@ -29,14 +29,11 @@ from ui.base_widgets import (
     connect_button_with_callback,
     create_hbox,
     create_primary_button,
-    create_vbox,
 )
 from ui.batch_transcribe.task_item import TaskItem
 from ui.constants import (
     BATCH_SELECTOR_MIN_WIDTH,
     PAGE_COMPACT_SPACING,
-    PAGE_CONTENT_MARGINS,
-    PAGE_LAYOUT_SPACING,
 )
 from ui.qt_imports import (
     QComboBox,
@@ -141,38 +138,26 @@ class BatchTranscribeWidget(BaseWidget):
     def setup_ui(self):
         """Set up the user interface."""
         # Main layout
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(*PAGE_CONTENT_MARGINS)
-        layout.setSpacing(PAGE_LAYOUT_SPACING)
+        layout = self.create_page_layout()
 
         # Title
-        self.title_label = QLabel(self.i18n.t("batch_transcribe.title"))
-        self.title_label.setObjectName("page_title")
-        layout.addWidget(self.title_label)
+        self.title_label = self.create_page_title("batch_transcribe.title", layout)
 
         # Toolbar
         toolbar_layout = create_hbox(spacing=PAGE_COMPACT_SPACING)
 
-        # Import file button
-        import_file_btn = QPushButton()
-        import_file_btn.setObjectName("import_file_btn")
-        connect_button_with_callback(import_file_btn, self._on_import_file)
-        toolbar_layout.addWidget(import_file_btn)
-        self.import_file_btn = import_file_btn
-
-        # Import folder button
-        import_folder_btn = QPushButton()
-        import_folder_btn.setObjectName("import_folder_btn")
-        connect_button_with_callback(import_folder_btn, self._on_import_folder)
-        toolbar_layout.addWidget(import_folder_btn)
-        self.import_folder_btn = import_folder_btn
-
-        # Clear queue button
-        clear_queue_btn = QPushButton()
-        clear_queue_btn.setObjectName("clear_queue_btn")
-        connect_button_with_callback(clear_queue_btn, self._on_clear_queue)
-        toolbar_layout.addWidget(clear_queue_btn)
-        self.clear_queue_btn = clear_queue_btn
+        self.import_file_btn = self._create_toolbar_button(
+            toolbar_layout,
+            callback=self._on_import_file,
+        )
+        self.import_folder_btn = self._create_toolbar_button(
+            toolbar_layout,
+            callback=self._on_import_folder,
+        )
+        self.clear_queue_btn = self._create_toolbar_button(
+            toolbar_layout,
+            callback=self._on_clear_queue,
+        )
 
         # Spacer
         toolbar_layout.addStretch()
@@ -225,6 +210,19 @@ class BatchTranscribeWidget(BaseWidget):
         self.update_translations()
 
         logger.debug("Batch transcribe UI setup complete")
+
+    def _create_toolbar_button(
+        self,
+        toolbar_layout: QHBoxLayout,
+        *,
+        callback,
+    ) -> QPushButton:
+        """Create and append a standard toolbar action button."""
+        button = QPushButton()
+        button.setProperty("role", "toolbar-secondary-action")
+        connect_button_with_callback(button, callback)
+        toolbar_layout.addWidget(button)
+        return button
 
     def _populate_engines(self, combo: QComboBox):
         """
