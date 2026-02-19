@@ -22,7 +22,7 @@
 1. 三平台测试矩阵：`ubuntu-latest` / `windows-latest` / `macos-latest`
 2. 安装平台依赖（含 Linux/macOS 音频相关依赖）
 3. 仅对变更的 Python 文件执行增量质量检查（black/isort/flake8/mypy/bandit）
-4. 执行测试并生成覆盖率统计
+4. 执行测试（覆盖率在 Ubuntu 采集，Windows/macOS 运行稳定性测试）
 
 说明：CI 不再承担 release 事件下的构建职责，避免与发布链路重复。
 
