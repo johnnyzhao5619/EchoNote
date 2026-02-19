@@ -65,6 +65,10 @@ class _FakeConfigManager:
             return value == "default"
         if key == "timeline.auto_start_enabled":
             return isinstance(value, bool)
+        if key == "timeline.auto_stop_grace_minutes":
+            return isinstance(value, int) and value >= 0
+        if key == "timeline.stop_confirmation_delay_minutes":
+            return isinstance(value, int) and value >= 1
         return True
 
     def get_all(self):
@@ -105,3 +109,21 @@ def test_validate_timeline_auto_start_enabled_setting():
 
     assert manager.validate_setting("timeline.auto_start_enabled", True)
     assert not manager.validate_setting("timeline.auto_start_enabled", "true")
+
+
+def test_validate_timeline_auto_stop_grace_setting():
+    manager = SettingsManager(_FakeConfigManager())
+
+    assert manager.validate_setting("timeline.auto_stop_grace_minutes", 0)
+    assert manager.validate_setting("timeline.auto_stop_grace_minutes", 15)
+    assert not manager.validate_setting("timeline.auto_stop_grace_minutes", -1)
+    assert not manager.validate_setting("timeline.auto_stop_grace_minutes", "15")
+
+
+def test_validate_timeline_stop_confirmation_delay_setting():
+    manager = SettingsManager(_FakeConfigManager())
+
+    assert manager.validate_setting("timeline.stop_confirmation_delay_minutes", 1)
+    assert manager.validate_setting("timeline.stop_confirmation_delay_minutes", 10)
+    assert not manager.validate_setting("timeline.stop_confirmation_delay_minutes", 0)
+    assert not manager.validate_setting("timeline.stop_confirmation_delay_minutes", "10")

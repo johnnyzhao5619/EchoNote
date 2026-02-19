@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "echonote"
-version = "1.3.5"
+version = "1.3.6"
 description = "Local-first desktop application for intelligent voice transcription and calendar management"
 license = {text = "Apache-2.0"}
 authors = [{name = "EchoNote Contributors"}]

@@ -399,7 +399,10 @@ class ConfigManager:
         return True
 
     def _validate_timeline_setting(self, setting: str, value: Any) -> bool:
-        from config.constants import TIMELINE_REMINDER_MINUTES_OPTIONS
+        from config.constants import (
+            TIMELINE_REMINDER_MINUTES_OPTIONS,
+            TIMELINE_STOP_CONFIRMATION_DELAY_MAX_MINUTES,
+        )
 
         if setting in ["past_days", "future_days"]:
             return isinstance(value, int) and value >= 1
@@ -409,6 +412,13 @@ class ConfigManager:
             return isinstance(value, int) and value >= 1
         elif setting == "auto_start_enabled":
             return isinstance(value, bool)
+        elif setting == "auto_stop_grace_minutes":
+            return isinstance(value, int) and value >= 0
+        elif setting == "stop_confirmation_delay_minutes":
+            return (
+                isinstance(value, int)
+                and 1 <= value <= TIMELINE_STOP_CONFIRMATION_DELAY_MAX_MINUTES
+            )
         return True
 
     def _validate_resource_monitor_setting(self, setting: str, value: Any) -> bool:

@@ -351,15 +351,18 @@ class CalendarEvent:
         if source:
             query = """
                 SELECT * FROM calendar_events
-                WHERE start_time < ? AND end_time > ? AND source = ?
-                ORDER BY start_time
+                WHERE julianday(start_time) < julianday(?)
+                  AND julianday(COALESCE(end_time, start_time)) > julianday(?)
+                  AND source = ?
+                ORDER BY julianday(start_time)
             """
             result = db_connection.execute(query, (end_time, start_time, source))
         else:
             query = """
                 SELECT * FROM calendar_events
-                WHERE start_time < ? AND end_time > ?
-                ORDER BY start_time
+                WHERE julianday(start_time) < julianday(?)
+                  AND julianday(COALESCE(end_time, start_time)) > julianday(?)
+                ORDER BY julianday(start_time)
             """
             result = db_connection.execute(query, (end_time, start_time))
 

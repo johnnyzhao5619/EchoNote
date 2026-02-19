@@ -394,6 +394,16 @@ class TestCalendarManagerGetEvents:
             events = calendar_manager.get_events(start_date, end_date)
             assert len(events) == 3
 
+            call_args = CalendarEvent.get_by_time_range.call_args
+            assert call_args is not None
+            normalized_start = call_args[0][1]
+            normalized_end = call_args[0][2]
+            assert isinstance(normalized_start, str)
+            assert isinstance(normalized_end, str)
+            # Queries should use timezone-aware UTC bounds to match stored event times.
+            assert normalized_start.endswith("+00:00")
+            assert normalized_end.endswith("+00:00")
+
     def test_get_events_with_filters(self, calendar_manager):
         """Test getting events with filters."""
         start_date = "2025-11-01T00:00:00"

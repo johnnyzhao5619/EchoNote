@@ -384,11 +384,11 @@ class CalendarManager:
         try:
             filters = filters or {}
 
-            # Convert datetime objects to ISO format strings if needed
-            if isinstance(start_date, datetime):
-                start_date = start_date.isoformat()
-            if isinstance(end_date, datetime):
-                end_date = end_date.isoformat()
+            # Normalize query bounds to UTC-aware ISO strings so comparisons
+            # remain stable regardless of caller timezone representation.
+            start_dt, end_dt = self._normalize_event_window(start_date, end_date)
+            start_date = start_dt.isoformat()
+            end_date = end_dt.isoformat()
 
             # Get events by time range
             events = CalendarEvent.get_by_time_range(

@@ -61,6 +61,8 @@
     "past_days": 30,
     "future_days": 30,
     "reminder_minutes": 5,
+    "auto_stop_grace_minutes": 15,
+    "stop_confirmation_delay_minutes": 10,
     "page_size": 50,
     "auto_start_enabled": true
   },

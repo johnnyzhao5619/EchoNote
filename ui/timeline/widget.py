@@ -357,7 +357,10 @@ class TimelineWidget(BaseWidget):
                     else:
                         future_events.append({"event": event, "auto_tasks": result["auto_tasks"]})
 
-                future_events.sort(key=lambda item: to_local_naive(item["event"].start_time))
+                future_events.sort(
+                    key=lambda item: to_local_naive(item["event"].start_time),
+                    reverse=True,
+                )
 
                 data = {
                     "current_time": center_time_local.isoformat(),
@@ -653,12 +656,13 @@ class TimelineWidget(BaseWidget):
             )
 
             # Search within the future event group for the correct position.
+            # Future group is ordered from farthest -> nearest.
             search_limit = indicator_index if indicator_index is not None else len(self.event_cards)
             insert_pos = search_limit
             for i in range(search_limit):
                 existing_card = self.event_cards[i]
                 existing_start = to_local_naive(existing_card.calendar_event.start_time)
-                if existing_start > new_start:
+                if existing_start < new_start:
                     insert_pos = i
                     break
 

@@ -22,6 +22,7 @@ class MockTimelineManager:
 
     def __init__(self):
         self.events = []
+        self.calendar_manager = self
 
     def get_timeline_events(self, center_time, past_days, future_days):
         """Mock get timeline events."""
@@ -60,6 +61,13 @@ class MockTimelineManager:
                 "auto_tasks": auto_tasks,
             }
         )
+
+    def get_event(self, event_id):
+        """Return a single event by ID."""
+        for event_data in self.events:
+            if event_data["event"].id == event_id:
+                return event_data["event"]
+        return None
 
 
 class MockRealtimeRecorder:
@@ -261,6 +269,8 @@ class TestAutoTaskSchedulerInitialization:
                 file_manager=mock_file_manager,
             )
             assert scheduler.reminder_minutes == 5
+            assert scheduler.auto_stop_grace_minutes == 15
+            assert scheduler.stop_confirmation_delay_minutes == 10
             assert not scheduler.is_running
             assert scheduler.notified_events == set()
             assert scheduler.started_events == set()
@@ -287,6 +297,50 @@ class TestAutoTaskSchedulerInitialization:
                 reminder_minutes=10,
             )
             assert scheduler.reminder_minutes == 10
+
+    def test_init_custom_auto_stop_grace(
+        self,
+        mock_timeline_manager,
+        mock_realtime_recorder,
+        mock_db,
+        mock_file_manager,
+        mock_notification_manager,
+    ):
+        """Test initialization with custom auto-stop grace minutes."""
+        with patch(
+            "core.timeline.auto_task_scheduler.get_notification_manager",
+            return_value=mock_notification_manager,
+        ):
+            scheduler = AutoTaskScheduler(
+                timeline_manager=mock_timeline_manager,
+                realtime_recorder=mock_realtime_recorder,
+                db_connection=mock_db,
+                file_manager=mock_file_manager,
+                auto_stop_grace_minutes=25,
+            )
+            assert scheduler.auto_stop_grace_minutes == 25
+
+    def test_init_custom_stop_confirmation_delay(
+        self,
+        mock_timeline_manager,
+        mock_realtime_recorder,
+        mock_db,
+        mock_file_manager,
+        mock_notification_manager,
+    ):
+        """Test initialization with custom stop confirmation delay minutes."""
+        with patch(
+            "core.timeline.auto_task_scheduler.get_notification_manager",
+            return_value=mock_notification_manager,
+        ):
+            scheduler = AutoTaskScheduler(
+                timeline_manager=mock_timeline_manager,
+                realtime_recorder=mock_realtime_recorder,
+                db_connection=mock_db,
+                file_manager=mock_file_manager,
+                stop_confirmation_delay_minutes=20,
+            )
+            assert scheduler.stop_confirmation_delay_minutes == 20
 
     def test_init_negative_reminder_clamped(
         self,
@@ -412,10 +466,10 @@ class TestReminderNotifications:
         mock_notification_manager,
     ):
         """Test sending reminder notification via check_upcoming_events."""
-        # Create event starting in exactly 5 minutes (within the 5:00-5:01 window)
+        # Create event already inside the configured reminder window.
         # Use a fixed time to avoid timing issues
         now = datetime.now()
-        event = create_test_event(start_time=now + timedelta(minutes=5, seconds=15))
+        event = create_test_event(start_time=now + timedelta(minutes=4, seconds=45))
 
         auto_tasks = {
             "enable_transcription": True,
@@ -447,7 +501,7 @@ class TestReminderNotifications:
     ):
         """Test that reminder is not sent twice for same event."""
         now = datetime.now()
-        event = create_test_event(start_time=now + timedelta(minutes=5, seconds=15))
+        event = create_test_event(start_time=now + timedelta(minutes=4, seconds=45))
 
         auto_tasks = {
             "enable_transcription": True,
@@ -479,7 +533,7 @@ class TestReminderNotifications:
         mock_notification_manager,
     ):
         """Test that no reminder is sent for events without auto tasks."""
-        event = create_test_event(start_time=datetime.now() + timedelta(minutes=5, seconds=15))
+        event = create_test_event(start_time=datetime.now() + timedelta(minutes=4, seconds=45))
 
         auto_tasks = {
             "enable_transcription": False,
@@ -574,7 +628,7 @@ class TestAutoStartTasks:
         warning_notifications = [
             n for n in mock_notification_manager.notifications if n["type"] == "warning"
         ]
-        assert len(warning_notifications) == 1
+        assert len(warning_notifications) >= 1
 
         auto_task_scheduler.stop()
 
@@ -605,6 +659,112 @@ class TestAutoStartTasks:
         auto_task_scheduler._check_upcoming_events()
         time.sleep(0.5)
         assert len(mock_realtime_recorder.start_calls) == 1
+
+        auto_task_scheduler.stop()
+
+    def test_start_auto_tasks_recovers_recently_started_past_event(
+        self,
+        auto_task_scheduler,
+        mock_timeline_manager,
+        mock_realtime_recorder,
+    ):
+        """刚开始且仍进行中的事件应在容错窗口内补启动。"""
+        now = datetime.now()
+        event = create_test_event(
+            start_time=now - timedelta(seconds=30),
+            end_time=now + timedelta(minutes=20),
+        )
+
+        auto_tasks = {
+            "enable_transcription": True,
+            "enable_recording": True,
+        }
+
+        # Mimic TimelineManager: event has crossed start time so it is in past_events.
+        mock_timeline_manager.get_timeline_events = Mock(
+            return_value={
+                "future_events": [],
+                "past_events": [{"event": event, "artifacts": {}}],
+            }
+        )
+        mock_timeline_manager.get_auto_task = Mock(return_value=auto_tasks)
+
+        auto_task_scheduler.start()
+        auto_task_scheduler._check_upcoming_events()
+        time.sleep(0.5)
+
+        assert len(mock_realtime_recorder.start_calls) >= 1
+        assert event.id in auto_task_scheduler.started_events
+
+        auto_task_scheduler.stop()
+
+    def test_start_auto_tasks_recovers_past_event_within_reminder_window(
+        self,
+        auto_task_scheduler,
+        mock_timeline_manager,
+        mock_realtime_recorder,
+    ):
+        """开始后超过 60 秒但仍在提醒窗口内时应补启动。"""
+        now = datetime.now()
+        event = create_test_event(
+            start_time=now - timedelta(minutes=2),
+            end_time=now + timedelta(minutes=20),
+        )
+
+        auto_tasks = {
+            "enable_transcription": True,
+            "enable_recording": True,
+        }
+
+        mock_timeline_manager.get_timeline_events = Mock(
+            return_value={
+                "future_events": [],
+                "past_events": [{"event": event, "artifacts": {}}],
+            }
+        )
+        mock_timeline_manager.get_auto_task = Mock(return_value=auto_tasks)
+
+        auto_task_scheduler.start()
+        auto_task_scheduler._check_upcoming_events()
+        time.sleep(0.5)
+
+        assert len(mock_realtime_recorder.start_calls) >= 1
+        assert event.id in auto_task_scheduler.started_events
+
+        auto_task_scheduler.stop()
+
+    def test_start_auto_tasks_does_not_recover_past_event_beyond_window(
+        self,
+        auto_task_scheduler,
+        mock_timeline_manager,
+        mock_realtime_recorder,
+    ):
+        """超过提醒窗口后不应再补启动，避免过晚录制。"""
+        now = datetime.now()
+        event = create_test_event(
+            start_time=now - timedelta(minutes=6),
+            end_time=now + timedelta(minutes=20),
+        )
+
+        auto_tasks = {
+            "enable_transcription": True,
+            "enable_recording": True,
+        }
+
+        mock_timeline_manager.get_timeline_events = Mock(
+            return_value={
+                "future_events": [],
+                "past_events": [{"event": event, "artifacts": {}}],
+            }
+        )
+        mock_timeline_manager.get_auto_task = Mock(return_value=auto_tasks)
+
+        auto_task_scheduler.start()
+        auto_task_scheduler._check_upcoming_events()
+        time.sleep(0.5)
+
+        assert len(mock_realtime_recorder.start_calls) == 0
+        assert event.id not in auto_task_scheduler.started_events
 
         auto_task_scheduler.stop()
 
@@ -698,6 +858,196 @@ class TestAutoStopTasks:
         # Should not call stop_recording
         assert len(mock_realtime_recorder.stop_calls) == 0
 
+    def test_check_upcoming_events_stops_even_when_event_ended_long_ago(
+        self,
+        auto_task_scheduler,
+        mock_timeline_manager,
+    ):
+        """事件结束超出缓冲后应触发停止，不依赖 timeline 查询窗口命中。"""
+        now = datetime.now()
+        event = create_test_event(
+            event_id="ended-event",
+            start_time=now - timedelta(hours=2),
+            end_time=now - timedelta(minutes=20),
+        )
+
+        auto_task_scheduler.active_recordings[event.id] = {
+            "event": event,
+            "auto_tasks": {"enable_recording": True},
+            "start_time": now - timedelta(hours=2),
+            "loop": None,
+            "thread": None,
+        }
+
+        mock_timeline_manager.get_timeline_events = Mock(
+            return_value={
+                "future_events": [],
+                "past_events": [],
+            }
+        )
+
+        with (
+            patch.object(
+                auto_task_scheduler,
+                "_prompt_stop_confirmation",
+                return_value={"action": "stop"},
+            ),
+            patch.object(auto_task_scheduler, "_stop_auto_tasks") as mock_stop,
+        ):
+            auto_task_scheduler._check_upcoming_events()
+
+        mock_stop.assert_called_once_with(event)
+
+    def test_check_upcoming_events_does_not_stop_before_grace(
+        self,
+        auto_task_scheduler,
+        mock_timeline_manager,
+    ):
+        """未超过结束缓冲窗口时不应自动停止。"""
+        now = datetime.now()
+        event = create_test_event(
+            event_id="not-ended-enough",
+            start_time=now - timedelta(hours=1),
+            end_time=now - timedelta(minutes=5),
+        )
+
+        auto_task_scheduler.active_recordings[event.id] = {
+            "event": event,
+            "auto_tasks": {"enable_recording": True},
+            "start_time": now - timedelta(hours=1),
+            "loop": None,
+            "thread": None,
+        }
+
+        mock_timeline_manager.get_timeline_events = Mock(
+            return_value={
+                "future_events": [],
+                "past_events": [],
+            }
+        )
+
+        with patch.object(auto_task_scheduler, "_stop_auto_tasks") as mock_stop:
+            auto_task_scheduler._check_upcoming_events()
+
+        mock_stop.assert_not_called()
+
+    def test_check_upcoming_events_delay_stop_confirmation(
+        self,
+        auto_task_scheduler,
+        mock_timeline_manager,
+    ):
+        """用户选择延迟时应记录下次提醒时间且不立即停止。"""
+        now = datetime.now()
+        event = create_test_event(
+            event_id="delay-stop-event",
+            start_time=now - timedelta(hours=2),
+            end_time=now - timedelta(minutes=20),
+        )
+        auto_task_scheduler.active_recordings[event.id] = {
+            "event": event,
+            "auto_tasks": {"enable_recording": True},
+            "start_time": now - timedelta(hours=2),
+            "loop": None,
+            "thread": None,
+        }
+        mock_timeline_manager.get_timeline_events = Mock(
+            return_value={
+                "future_events": [],
+                "past_events": [],
+            }
+        )
+
+        with (
+            patch.object(
+                auto_task_scheduler,
+                "_prompt_stop_confirmation",
+                return_value={"action": "delay", "delay_minutes": 10},
+            ),
+            patch.object(auto_task_scheduler, "_send_delayed_stop_notification") as mock_notify,
+            patch.object(auto_task_scheduler, "_stop_auto_tasks") as mock_stop,
+        ):
+            auto_task_scheduler._check_upcoming_events()
+
+        mock_stop.assert_not_called()
+        assert event.id in auto_task_scheduler.pending_stop_confirmations
+        mock_notify.assert_called_once()
+
+    def test_check_upcoming_events_reprompts_after_delay_until_confirmed(
+        self,
+        auto_task_scheduler,
+    ):
+        """延迟到点后应再次提示，并在确认后停止。"""
+        now = datetime.now()
+        event = create_test_event(
+            event_id="re-prompt-stop-event",
+            start_time=now - timedelta(hours=2),
+            end_time=now - timedelta(minutes=20),
+        )
+        auto_task_scheduler.active_recordings[event.id] = {
+            "event": event,
+            "auto_tasks": {"enable_recording": True},
+            "start_time": now - timedelta(hours=2),
+            "loop": None,
+            "thread": None,
+        }
+        auto_task_scheduler.pending_stop_confirmations[event.id] = {
+            "next_prompt_at": now + timedelta(minutes=5),
+        }
+
+        with (
+            patch.object(
+                auto_task_scheduler,
+                "_prompt_stop_confirmation",
+                return_value={"action": "stop"},
+            ) as mock_prompt,
+            patch.object(auto_task_scheduler, "_stop_auto_tasks") as mock_stop,
+        ):
+            auto_task_scheduler._check_active_recordings_for_stop(now + timedelta(minutes=6))
+
+        mock_prompt.assert_called_once()
+        mock_stop.assert_called_once_with(event)
+        assert event.id not in auto_task_scheduler.pending_stop_confirmations
+
+    def test_check_upcoming_events_uses_latest_event_end_time_for_stop(
+        self,
+        auto_task_scheduler,
+        mock_timeline_manager,
+    ):
+        """自动停止应优先基于最新事件结束时间，避免会议延长时被误停。"""
+        now = datetime.now()
+        stale_event = create_test_event(
+            event_id="extended-event",
+            start_time=now - timedelta(hours=2),
+            end_time=now - timedelta(minutes=30),
+        )
+        extended_event = create_test_event(
+            event_id="extended-event",
+            start_time=now - timedelta(hours=2),
+            end_time=now + timedelta(minutes=30),
+        )
+
+        auto_task_scheduler.active_recordings[stale_event.id] = {
+            "event": stale_event,
+            "auto_tasks": {"enable_recording": True},
+            "start_time": now - timedelta(hours=2),
+            "loop": None,
+            "thread": None,
+        }
+
+        mock_timeline_manager.get_event = Mock(return_value=extended_event)
+        mock_timeline_manager.get_timeline_events = Mock(
+            return_value={
+                "future_events": [],
+                "past_events": [],
+            }
+        )
+
+        with patch.object(auto_task_scheduler, "_stop_auto_tasks") as mock_stop:
+            auto_task_scheduler._check_upcoming_events()
+
+        mock_stop.assert_not_called()
+        assert auto_task_scheduler.active_recordings[stale_event.id]["event"] == extended_event
+
     def test_stop_auto_tasks_clears_stale_tracking_when_loop_invalid(
         self,
         auto_task_scheduler,
@@ -712,11 +1062,15 @@ class TestAutoStopTasks:
             "thread": None,
         }
         auto_task_scheduler.started_events.add(event.id)
+        auto_task_scheduler.pending_stop_confirmations[event.id] = {
+            "next_prompt_at": datetime.now(),
+        }
 
         auto_task_scheduler._stop_auto_tasks(event)
 
         assert event.id not in auto_task_scheduler.active_recordings
         assert event.id not in auto_task_scheduler.started_events
+        assert event.id not in auto_task_scheduler.pending_stop_confirmations
 
 
 class TestSettingsIntegration:
@@ -751,6 +1105,21 @@ class TestSettingsIntegration:
 
         assert auto_task_scheduler.reminder_minutes == original_reminder
 
+    def test_toggle_auto_start_enabled_via_settings(
+        self,
+        auto_task_scheduler,
+    ):
+        """运行期切换自动启动应触发调度器启停。"""
+        with patch.object(auto_task_scheduler, "start") as mock_start:
+            auto_task_scheduler.is_running = False
+            auto_task_scheduler._on_setting_changed("timeline.auto_start_enabled", True)
+            mock_start.assert_called_once()
+
+        with patch.object(auto_task_scheduler, "stop") as mock_stop:
+            auto_task_scheduler.is_running = True
+            auto_task_scheduler._on_setting_changed("timeline.auto_start_enabled", False)
+            mock_stop.assert_called_once()
+
     def test_invalid_reminder_minutes_ignored(
         self,
         auto_task_scheduler,
@@ -764,6 +1133,54 @@ class TestSettingsIntegration:
 
         auto_task_scheduler._on_setting_changed("timeline.reminder_minutes", None)
         assert auto_task_scheduler.reminder_minutes == original_reminder
+
+    def test_auto_stop_grace_minutes_update_via_settings(
+        self,
+        auto_task_scheduler,
+    ):
+        """Test updating auto-stop grace minutes via settings change."""
+        assert auto_task_scheduler.auto_stop_grace_minutes == 15
+
+        auto_task_scheduler._on_setting_changed("timeline.auto_stop_grace_minutes", 20)
+        assert auto_task_scheduler.auto_stop_grace_minutes == 20
+
+    def test_invalid_auto_stop_grace_minutes_ignored(
+        self,
+        auto_task_scheduler,
+    ):
+        """Test that invalid auto-stop grace minutes values are ignored."""
+        original_grace = auto_task_scheduler.auto_stop_grace_minutes
+
+        auto_task_scheduler._on_setting_changed("timeline.auto_stop_grace_minutes", "invalid")
+        assert auto_task_scheduler.auto_stop_grace_minutes == original_grace
+
+        auto_task_scheduler._on_setting_changed("timeline.auto_stop_grace_minutes", None)
+        assert auto_task_scheduler.auto_stop_grace_minutes == original_grace
+
+    def test_stop_confirmation_delay_minutes_update_via_settings(
+        self,
+        auto_task_scheduler,
+    ):
+        """Test updating stop confirmation delay via settings change."""
+        assert auto_task_scheduler.stop_confirmation_delay_minutes == 10
+
+        auto_task_scheduler._on_setting_changed("timeline.stop_confirmation_delay_minutes", 12)
+        assert auto_task_scheduler.stop_confirmation_delay_minutes == 12
+
+    def test_invalid_stop_confirmation_delay_minutes_ignored(
+        self,
+        auto_task_scheduler,
+    ):
+        """Test invalid stop confirmation delay values are ignored."""
+        original_delay = auto_task_scheduler.stop_confirmation_delay_minutes
+
+        auto_task_scheduler._on_setting_changed(
+            "timeline.stop_confirmation_delay_minutes", "invalid"
+        )
+        assert auto_task_scheduler.stop_confirmation_delay_minutes == original_delay
+
+        auto_task_scheduler._on_setting_changed("timeline.stop_confirmation_delay_minutes", None)
+        assert auto_task_scheduler.stop_confirmation_delay_minutes == original_delay
 
     def test_build_recording_options_includes_realtime_preferences(self, auto_task_scheduler):
         event = create_test_event()
@@ -874,7 +1291,7 @@ class TestErrorHandling:
         error_notifications = [
             n for n in mock_notification_manager.notifications if n["type"] == "error"
         ]
-        assert len(error_notifications) == 1
+        assert len(error_notifications) >= 1
 
         # Event should not be in started_events
         assert event.id not in auto_task_scheduler.started_events

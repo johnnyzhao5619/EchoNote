@@ -47,6 +47,8 @@ def create_auto_task_scheduler(
     db,
     file_manager,
     reminder_minutes,
+    auto_stop_grace_minutes,
+    stop_confirmation_delay_minutes,
     settings_manager,
     i18n_manager=None,
 ):
@@ -59,6 +61,8 @@ def create_auto_task_scheduler(
         db_connection=db,
         file_manager=file_manager,
         reminder_minutes=reminder_minutes,
+        auto_stop_grace_minutes=auto_stop_grace_minutes,
+        stop_confirmation_delay_minutes=stop_confirmation_delay_minutes,
         settings_manager=settings_manager,
         i18n_manager=i18n_manager,
     )

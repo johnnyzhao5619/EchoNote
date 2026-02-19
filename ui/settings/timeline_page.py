@@ -24,7 +24,12 @@ from typing import Tuple
 
 from PySide6.QtWidgets import QCheckBox, QComboBox, QLabel, QSpinBox
 
-from config.constants import TIMELINE_REMINDER_MINUTES_OPTIONS, STANDARD_LABEL_WIDTH
+from config.constants import (
+    STANDARD_LABEL_WIDTH,
+    TIMELINE_AUTO_STOP_GRACE_MAX_MINUTES,
+    TIMELINE_REMINDER_MINUTES_OPTIONS,
+    TIMELINE_STOP_CONFIRMATION_DELAY_MAX_MINUTES,
+)
 from ui.base_widgets import create_hbox
 from ui.settings.base_page import BaseSettingsPage
 from utils.i18n import I18nQtManager
@@ -112,6 +117,43 @@ class TimelineSettingsPage(BaseSettingsPage):
         reminder_layout.addStretch()
         self.content_layout.addLayout(reminder_layout)
 
+        # Auto-stop grace time
+        self.auto_stop_grace_spin = QSpinBox()
+        self.auto_stop_grace_spin.setMinimum(0)
+        self.auto_stop_grace_spin.setMaximum(TIMELINE_AUTO_STOP_GRACE_MAX_MINUTES)
+        self.auto_stop_grace_spin.setSuffix(" " + self.i18n.t("settings.timeline.minutes"))
+        self.auto_stop_grace_spin.valueChanged.connect(self._emit_changed)
+        _, self.auto_stop_grace_label = self.add_labeled_row(
+            self.i18n.t("settings.timeline.auto_stop_grace_minutes"),
+            self.auto_stop_grace_spin,
+            label_width=STANDARD_LABEL_WIDTH,
+        )
+
+        self.auto_stop_grace_desc = QLabel(
+            self.i18n.t("settings.timeline.auto_stop_grace_description")
+        )
+        self.auto_stop_grace_desc.setWordWrap(True)
+        self.auto_stop_grace_desc.setProperty("role", "auto-start-desc")
+        self.content_layout.addWidget(self.auto_stop_grace_desc)
+
+        self.stop_confirmation_delay_spin = QSpinBox()
+        self.stop_confirmation_delay_spin.setMinimum(1)
+        self.stop_confirmation_delay_spin.setMaximum(TIMELINE_STOP_CONFIRMATION_DELAY_MAX_MINUTES)
+        self.stop_confirmation_delay_spin.setSuffix(" " + self.i18n.t("settings.timeline.minutes"))
+        self.stop_confirmation_delay_spin.valueChanged.connect(self._emit_changed)
+        _, self.stop_confirmation_delay_label = self.add_labeled_row(
+            self.i18n.t("settings.timeline.stop_confirmation_delay_minutes"),
+            self.stop_confirmation_delay_spin,
+            label_width=STANDARD_LABEL_WIDTH,
+        )
+
+        self.stop_confirmation_delay_desc = QLabel(
+            self.i18n.t("settings.timeline.stop_confirmation_delay_description")
+        )
+        self.stop_confirmation_delay_desc.setWordWrap(True)
+        self.stop_confirmation_delay_desc.setProperty("role", "auto-start-desc")
+        self.content_layout.addWidget(self.stop_confirmation_delay_desc)
+
         self.add_section_spacing()
 
         # Auto-start settings section
@@ -154,6 +196,17 @@ class TimelineSettingsPage(BaseSettingsPage):
                 if index >= 0:
                     self.reminder_combo.setCurrentIndex(index)
 
+            auto_stop_grace_minutes = self.settings_manager.get_setting(
+                "timeline.auto_stop_grace_minutes"
+            )
+            if auto_stop_grace_minutes is not None:
+                self.auto_stop_grace_spin.setValue(int(auto_stop_grace_minutes))
+            stop_confirmation_delay_minutes = self.settings_manager.get_setting(
+                "timeline.stop_confirmation_delay_minutes"
+            )
+            if stop_confirmation_delay_minutes is not None:
+                self.stop_confirmation_delay_spin.setValue(int(stop_confirmation_delay_minutes))
+
             # Auto-start (if this setting exists)
             auto_start = self.settings_manager.get_setting("timeline.auto_start_enabled")
             if auto_start is not None:
@@ -176,6 +229,13 @@ class TimelineSettingsPage(BaseSettingsPage):
             # Reminder time
             reminder_minutes = int(self.reminder_combo.currentText())
             self._set_setting_or_raise("timeline.reminder_minutes", reminder_minutes)
+            self._set_setting_or_raise(
+                "timeline.auto_stop_grace_minutes", self.auto_stop_grace_spin.value()
+            )
+            self._set_setting_or_raise(
+                "timeline.stop_confirmation_delay_minutes",
+                self.stop_confirmation_delay_spin.value(),
+            )
 
             # Auto-start
             self._set_setting_or_raise(
@@ -219,6 +279,22 @@ class TimelineSettingsPage(BaseSettingsPage):
             self.reminder_label.setText(self.i18n.t("settings.timeline.reminder_time"))
         if hasattr(self, "reminder_suffix"):
             self.reminder_suffix.setText(self.i18n.t("settings.timeline.minutes"))
+        if hasattr(self, "auto_stop_grace_label"):
+            self.auto_stop_grace_label.setText(
+                self.i18n.t("settings.timeline.auto_stop_grace_minutes")
+            )
+        if hasattr(self, "auto_stop_grace_desc"):
+            self.auto_stop_grace_desc.setText(
+                self.i18n.t("settings.timeline.auto_stop_grace_description")
+            )
+        if hasattr(self, "stop_confirmation_delay_label"):
+            self.stop_confirmation_delay_label.setText(
+                self.i18n.t("settings.timeline.stop_confirmation_delay_minutes")
+            )
+        if hasattr(self, "stop_confirmation_delay_desc"):
+            self.stop_confirmation_delay_desc.setText(
+                self.i18n.t("settings.timeline.stop_confirmation_delay_description")
+            )
 
         # Update checkbox
         if hasattr(self, "auto_start_check"):
@@ -233,3 +309,9 @@ class TimelineSettingsPage(BaseSettingsPage):
             self.past_days_spin.setSuffix(" " + self.i18n.t("settings.timeline.days"))
         if hasattr(self, "future_days_spin"):
             self.future_days_spin.setSuffix(" " + self.i18n.t("settings.timeline.days"))
+        if hasattr(self, "auto_stop_grace_spin"):
+            self.auto_stop_grace_spin.setSuffix(" " + self.i18n.t("settings.timeline.minutes"))
+        if hasattr(self, "stop_confirmation_delay_spin"):
+            self.stop_confirmation_delay_spin.setSuffix(
+                " " + self.i18n.t("settings.timeline.minutes")
+            )

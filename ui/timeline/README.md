@@ -147,7 +147,7 @@ The timeline UI integrates with:
 - 搜索模式下，UI 通过调用 `TimelineManager.search_events(..., include_future_auto_tasks=True)`
   获取结果。返回列表中的未来事件条目将额外携带 `auto_tasks` 字段，其结构与
   `get_timeline_events()` 中未来事件一致。
-- 未来事件在时间线上会按照开始时间从最近到最远的顺序排列，搜索模式与常规模式
+- 未来事件在时间线上会按照开始时间从最远到最近的顺序排列，搜索模式与常规模式
   保持一致，最靠近当前时间指示器的卡片对应即将开始的事件。
 - `auto_tasks` 始终提供完整的自动任务配置（已保存的配置或 `_default_auto_task_config`
   缺省值），UI 不再直接访问 `_get_auto_task_map()`。
@@ -158,6 +158,11 @@ The timeline UI integrates with:
 - `timeline.past_days`：控制向前加载多少天的事件，默认 30。
 - `timeline.future_days`：控制向后加载多少天的事件，默认 30。
 - `timeline.page_size`：分页加载的事件数量，默认 50。
+- `timeline.reminder_minutes`：事件开始前提醒窗口（分钟）。调度器会在事件首次进入该窗口时提醒一次，避免轮询漂移漏提醒；同时用于“开始后补偿启动”窗口（默认 5 分钟，且不小于 60 秒），降低轮询/启动抖动导致的漏触发。
+- `timeline.auto_stop_grace_minutes`：事件结束后的自动停止缓冲时间（分钟），默认 15。自动任务会在“结束时间 + 缓冲”后停止，并优先使用最新事件结束时间，降低会议延时导致的中断风险。
+- `timeline.stop_confirmation_delay_minutes`：自动停止确认弹窗中“延迟停止”的默认分钟数，默认 10。
+
+当录制达到自动停止条件时，系统会先弹出确认：用户可选择立即结束，或设置延迟停止（默认 10 分钟，可改为其他分钟数）。延迟到期后会再次提醒并继续等待确认，直到用户明确结束。
 
 时间线顶部的日期范围选择器会在构建时根据上述 past/future 配置自动计算默认范围，
 并且在需要重置控件时同样会重新同步，确保界面与设置保持一致。

@@ -667,6 +667,10 @@
       "notifications": "通知设置",
       "reminder_time": "提醒时间",
       "minutes": "分钟",
+      "auto_stop_grace_minutes": "自动停止缓冲",
+      "auto_stop_grace_description": "在事件计划结束后继续保留指定分钟再自动停止，避免会议延时导致录音/转写被中断",
+      "stop_confirmation_delay_minutes": "停止确认默认延迟",
+      "stop_confirmation_delay_description": "在自动停止确认弹窗中选择延迟时的默认分钟数",
       "auto_start": "自动启动",
       "enable_auto_start": "启用事件开始时自动录音",
       "auto_start_description": "在事件开始时自动启动实时录音与转写"
@@ -846,6 +850,17 @@
         "title": "{app_name} - Unable to start auto tasks",
         "message": "Could not start automatic recording for \"{event_title}\":\\nRecorder is already in use"
       }
+    },
+    "stop_confirmation": {
+      "title": "{app_name} - 自动停止确认",
+      "message": "事件“{event_title}”已到自动停止时间。是否立即结束录音和转写？",
+      "stop_now": "立即结束",
+      "delay_default": "延迟 {minutes} 分钟",
+      "delay_custom": "自定义延迟...",
+      "custom_delay_title": "延迟自动停止",
+      "custom_delay_label": "延迟分钟数：",
+      "delayed_title": "{app_name} - 已延迟自动停止",
+      "delayed_message": "“{event_title}”已延迟 {delay_minutes} 分钟停止，将在 {next_time} 再次提醒确认。"
     }
   },
   "logging": {

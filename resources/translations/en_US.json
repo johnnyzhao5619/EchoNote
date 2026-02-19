@@ -667,6 +667,10 @@
       "notifications": "Notification Settings",
       "reminder_time": "Reminder Time",
       "minutes": "minutes",
+      "auto_stop_grace_minutes": "Auto-stop Grace",
+      "auto_stop_grace_description": "Keep recording/transcription running for the configured buffer after the scheduled end to avoid cutting off extended meetings",
+      "stop_confirmation_delay_minutes": "Stop Confirmation Delay",
+      "stop_confirmation_delay_description": "Default delay (minutes) when you choose to postpone stopping at the auto-stop confirmation prompt",
       "auto_start": "Auto-start",
       "enable_auto_start": "Enable auto-start recording",
       "auto_start_description": "Automatically start real-time recording and transcription when an event begins"
@@ -844,6 +848,17 @@
         "title": "{app_name} - Unable to start auto tasks",
         "message": "Could not start automatic recording for \"{event_title}\":\\nRecorder is already in use"
       }
+    },
+    "stop_confirmation": {
+      "title": "{app_name} - Confirm Auto Stop",
+      "message": "Event \"{event_title}\" has reached auto-stop time. Stop recording and transcription now?",
+      "stop_now": "Stop Now",
+      "delay_default": "Delay {minutes} min",
+      "delay_custom": "Custom Delay...",
+      "custom_delay_title": "Delay Auto Stop",
+      "custom_delay_label": "Delay minutes:",
+      "delayed_title": "{app_name} - Auto Stop Delayed",
+      "delayed_message": "\"{event_title}\" stop delayed by {delay_minutes} minutes. You will be reminded again at {next_time}."
     }
   },
   "logging": {

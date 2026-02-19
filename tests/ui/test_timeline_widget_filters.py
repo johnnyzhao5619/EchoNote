@@ -60,3 +60,34 @@ def test_update_translations_preserves_selected_filters(widget):
     assert widget.source_filter.currentData() == selected_source
     assert widget.type_filter.itemText(0) == "timeline.filter_all"
     assert widget.source_filter.itemText(0) == "timeline.source_all"
+
+
+def test_future_cards_insert_farthest_first(widget):
+    """未来事件卡片应按最远->最近靠近当前时间线。"""
+
+    def _build_event(event_id: str, start_time: str):
+        event = MagicMock()
+        event.id = event_id
+        event.title = event_id
+        event.start_time = start_time
+        event.end_time = start_time
+        event.event_type = EventType.EVENT
+        event.source = CalendarSource.LOCAL
+        event.location = None
+        event.attendees = []
+        event.description = None
+        return event
+
+    widget.clear_timeline()
+    widget._add_current_time_indicator()
+
+    near_event = _build_event("near", "2026-02-19T11:00:00")
+    far_event = _build_event("far", "2026-02-19T14:00:00")
+
+    widget._add_event_card({"event": near_event, "auto_tasks": {}}, is_future=True)
+    widget._add_event_card({"event": far_event, "auto_tasks": {}}, is_future=True)
+
+    ordered_ids = [
+        card.calendar_event.id for card in widget.event_cards if hasattr(card, "calendar_event")
+    ]
+    assert ordered_ids[:2] == ["far", "near"]

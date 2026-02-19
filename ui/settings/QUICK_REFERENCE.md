@@ -91,6 +91,8 @@ self.add_page('settings', settings_widget)
   - `past_days`: 1-365
   - `future_days`: 1-365
   - `reminder_minutes`: 5/10/15/30
+  - `auto_stop_grace_minutes`: integer >= 0 (default 15)
+  - `stop_confirmation_delay_minutes`: integer >= 1 (default 10)
   - `auto_start_enabled`: boolean
 
 ### 5. Appearance Settings

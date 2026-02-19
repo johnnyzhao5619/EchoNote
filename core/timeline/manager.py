@@ -333,8 +333,9 @@ class TimelineManager:
                     auto_tasks = self._default_auto_task_config()
                 future_events.append({"event": event, "auto_tasks": auto_tasks})
 
-            # Sort events
-            future_events.sort(key=lambda x: to_local_naive(x["event"].start_time))
+            # Keep future events ordered from farthest to nearest so cards
+            # closer to "current time" stay visually closer to the indicator.
+            future_events.sort(key=lambda x: to_local_naive(x["event"].start_time), reverse=True)
 
             total_future = len(future_events)
 

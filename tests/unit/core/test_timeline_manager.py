@@ -122,6 +122,36 @@ class TestTimelineManagerGetEvents:
         assert len(result["past_events"]) == 1
         assert result["past_events"][0]["event"].id == "event_overlap"
 
+    def test_get_timeline_events_orders_future_events_farthest_first(
+        self, timeline_manager, mock_calendar_manager
+    ):
+        """未来事件应按开始时间从最远到最近排序。"""
+        center_time = datetime(2025, 11, 1, 12, 0, 0)
+
+        near_event = Mock()
+        near_event.id = "event_near"
+        near_event.title = "Near Event"
+        near_event.start_time = "2025-11-01T13:00:00"
+        near_event.end_time = "2025-11-01T14:00:00"
+        near_event.event_type = "Event"
+        near_event.source = "local"
+        near_event.attendees = []
+
+        far_event = Mock()
+        far_event.id = "event_far"
+        far_event.title = "Far Event"
+        far_event.start_time = "2025-11-01T18:00:00"
+        far_event.end_time = "2025-11-01T19:00:00"
+        far_event.event_type = "Event"
+        far_event.source = "local"
+        far_event.attendees = []
+
+        mock_calendar_manager.get_events.return_value = [near_event, far_event]
+
+        result = timeline_manager.get_timeline_events(center_time, past_days=1, future_days=1)
+
+        assert [item["event"].id for item in result["future_events"]] == ["event_far", "event_near"]
+
 
 class TestTimelineManagerSearch:
     """Test search functionality."""

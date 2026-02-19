@@ -24,11 +24,17 @@ import asyncio
 import logging
 import queue
 import threading
-from datetime import datetime
-from typing import Any, Dict, Optional
+from datetime import datetime, timedelta
+from typing import Any, Callable, Dict, Optional, Tuple
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
+from config.constants import (
+    DEFAULT_AUTO_STOP_GRACE_MINUTES,
+    DEFAULT_REMINDER_MINUTES,
+    DEFAULT_STOP_CONFIRMATION_DELAY_MINUTES,
+    TIMELINE_STOP_CONFIRMATION_DELAY_MAX_MINUTES,
+)
 from core.realtime.integration import save_event_attachments
 from core.timeline.manager import to_local_naive
 from ui.common.notification import get_notification_manager
@@ -55,7 +61,9 @@ class AutoTaskScheduler:
         realtime_recorder,
         db_connection,
         file_manager,
-        reminder_minutes: int = 5,
+        reminder_minutes: int = DEFAULT_REMINDER_MINUTES,
+        auto_stop_grace_minutes: int = DEFAULT_AUTO_STOP_GRACE_MINUTES,
+        stop_confirmation_delay_minutes: int = DEFAULT_STOP_CONFIRMATION_DELAY_MINUTES,
         settings_manager=None,
         i18n_manager: Optional[I18nQtManager] = None,
     ):
@@ -68,6 +76,8 @@ class AutoTaskScheduler:
             db_connection: Database connection instance
             file_manager: FileManager instance
             reminder_minutes: Minutes before event to send reminder (default: 5)
+            auto_stop_grace_minutes: Grace period after event end before auto-stop
+            stop_confirmation_delay_minutes: Default delay for stop confirmation
             settings_manager: SettingsManager instance providing global defaults
         """
         self.timeline_manager = timeline_manager
@@ -81,13 +91,25 @@ class AutoTaskScheduler:
 
         initial_reminder = self._coerce_reminder_minutes(reminder_minutes)
         if initial_reminder is None:
-            initial_reminder = 5
+            initial_reminder = DEFAULT_REMINDER_MINUTES
         self._apply_reminder_minutes(initial_reminder)
+        initial_stop_grace = self._coerce_auto_stop_grace_minutes(auto_stop_grace_minutes)
+        if initial_stop_grace is None:
+            initial_stop_grace = DEFAULT_AUTO_STOP_GRACE_MINUTES
+        self._apply_auto_stop_grace_minutes(initial_stop_grace)
+        initial_stop_confirmation_delay = self._coerce_stop_confirmation_delay_setting(
+            stop_confirmation_delay_minutes
+        )
+        if initial_stop_confirmation_delay is None:
+            initial_stop_confirmation_delay = DEFAULT_STOP_CONFIRMATION_DELAY_MINUTES
+        self._apply_stop_confirmation_delay_minutes(initial_stop_confirmation_delay)
 
         # Track events that have been notified/started/stopped
         self.notified_events = set()
         self.started_events = set()
         self.active_recordings = {}  # event_id -> recording_info
+        self.pending_stop_confirmations = {}  # event_id -> pending_stop_info
+        self._ui_prompt_bridge = None
 
         # Get notification manager
         self.notification_manager = get_notification_manager()
@@ -96,7 +118,10 @@ class AutoTaskScheduler:
         self._subscribe_to_setting_changes()
 
         logger.info(
-            f"AutoTaskScheduler initialized " f"(reminder: {self.reminder_minutes} minutes)"
+            "AutoTaskScheduler initialized (reminder: %s minutes, auto-stop grace: %s minutes, stop confirmation delay: %s minutes)",
+            self.reminder_minutes,
+            self.auto_stop_grace_minutes,
+            self.stop_confirmation_delay_minutes,
         )
 
     def start(self):
@@ -112,11 +137,18 @@ class AutoTaskScheduler:
         try:
             # Add job to check upcoming events every minute
             self.scheduler.add_job(
-                self._check_upcoming_events, "interval", minutes=1, id="check_upcoming_events"
+                self._check_upcoming_events,
+                "interval",
+                minutes=1,
+                id="check_upcoming_events",
+                replace_existing=True,
             )
 
             self.scheduler.start()
             self.is_running = True
+            # Run one pass immediately so events that are about to start are
+            # not delayed by the first scheduler tick.
+            self._check_upcoming_events()
             logger.info("AutoTaskScheduler started")
 
         except Exception as e:
@@ -141,9 +173,13 @@ class AutoTaskScheduler:
                             self._stop_auto_tasks(event)
                     except Exception as e:
                         logger.error(f"Error stopping recording for event {event_id}: {e}")
+            self.pending_stop_confirmations.clear()
 
             # Shutdown scheduler
             self.scheduler.shutdown(wait=False)
+            # Recreate scheduler so runtime enable/disable toggles can restart
+            # background polling cleanly after a shutdown.
+            self.scheduler = BackgroundScheduler()
             self.is_running = False
             logger.info("AutoTaskScheduler stopped")
 
@@ -188,6 +224,71 @@ class AutoTaskScheduler:
 
         return minutes
 
+    def _coerce_auto_stop_grace_minutes(self, value) -> Optional[int]:
+        """Convert auto-stop grace minutes to a non-negative integer when possible."""
+        if value is None:
+            logger.info("Received None for auto-stop grace minutes; keeping previous value")
+            return None
+
+        try:
+            minutes = int(value)
+        except (TypeError, ValueError):
+            logger.warning(
+                "Invalid auto-stop grace minutes value %r; keeping previous value",
+                value,
+            )
+            return None
+
+        if minutes < 0:
+            logger.warning("Auto-stop grace minutes %s is negative; clamping to zero", minutes)
+            minutes = 0
+
+        return minutes
+
+    def _coerce_stop_confirmation_delay_setting(self, value) -> Optional[int]:
+        """Convert stop confirmation delay to a positive integer when possible."""
+        if value is None:
+            logger.info("Received None for stop confirmation delay; keeping previous value")
+            return None
+
+        try:
+            minutes = int(value)
+        except (TypeError, ValueError):
+            logger.warning(
+                "Invalid stop confirmation delay value %r; keeping previous value",
+                value,
+            )
+            return None
+
+        if minutes < 1:
+            logger.warning("Stop confirmation delay %s is invalid; clamping to 1", minutes)
+            minutes = 1
+
+        return min(minutes, TIMELINE_STOP_CONFIRMATION_DELAY_MAX_MINUTES)
+
+    @staticmethod
+    def _coerce_auto_start_enabled(value) -> Optional[bool]:
+        """Coerce auto-start preference values to booleans when possible."""
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"1", "true", "yes", "on"}:
+                return True
+            if normalized in {"0", "false", "no", "off"}:
+                return False
+            return None
+        if value is None:
+            return None
+        return bool(value)
+
+    @staticmethod
+    def _auto_tasks_enabled(auto_tasks: Optional[dict]) -> bool:
+        """Return whether any auto-start action is enabled for an event."""
+        if not auto_tasks:
+            return False
+        return bool(auto_tasks.get("enable_transcription") or auto_tasks.get("enable_recording"))
+
     def _apply_reminder_minutes(self, minutes: int) -> None:
         """Persist reminder minutes and refresh dependent time windows."""
         self.reminder_minutes = minutes
@@ -201,6 +302,20 @@ class AutoTaskScheduler:
         self._future_window_minutes = max(
             minutes + REMINDER_FUTURE_WINDOW_OFFSET_MINUTES, MIN_FUTURE_WINDOW_MINUTES
         )
+
+    def _apply_auto_stop_grace_minutes(self, minutes: int) -> None:
+        """Persist auto-stop grace period settings for runtime checks."""
+        self.auto_stop_grace_minutes = minutes
+        self._auto_stop_grace_seconds = minutes * 60
+
+    def _apply_stop_confirmation_delay_minutes(self, minutes: int) -> None:
+        """Persist default stop confirmation delay minutes."""
+        self.stop_confirmation_delay_minutes = minutes
+
+    def _auto_start_recovery_window_seconds(self) -> int:
+        """Return late-start recovery window based on reminder settings."""
+        reminder_seconds = max(self.reminder_minutes, 0) * 60
+        return max(60, reminder_seconds)
 
     def _subscribe_to_setting_changes(self) -> None:
         """Listen for reminder preference updates from the settings manager."""
@@ -224,18 +339,47 @@ class AutoTaskScheduler:
             )
 
     def _on_setting_changed(self, key: str, value) -> None:
-        """React to reminder preference updates without restarting the scheduler."""
-        if key != "timeline.reminder_minutes":
+        """React to timeline preference updates at runtime."""
+        if key == "timeline.reminder_minutes":
+            minutes = self._coerce_reminder_minutes(value)
+            if minutes is None or minutes == self.reminder_minutes:
+                return
+
+            self._apply_reminder_minutes(minutes)
+            self.notified_events.clear()
+            logger.info("Reminder minutes updated to %s via settings change", minutes)
             return
 
-        minutes = self._coerce_reminder_minutes(value)
-        if minutes is None or minutes == self.reminder_minutes:
+        if key == "timeline.auto_stop_grace_minutes":
+            minutes = self._coerce_auto_stop_grace_minutes(value)
+            if minutes is None or minutes == self.auto_stop_grace_minutes:
+                return
+
+            self._apply_auto_stop_grace_minutes(minutes)
+            logger.info("Auto-stop grace minutes updated to %s via settings change", minutes)
             return
 
-        self._apply_reminder_minutes(minutes)
-        self.notified_events.clear()
+        if key == "timeline.stop_confirmation_delay_minutes":
+            minutes = self._coerce_stop_confirmation_delay_setting(value)
+            if minutes is None or minutes == self.stop_confirmation_delay_minutes:
+                return
 
-        logger.info("Reminder minutes updated to %s via settings change", minutes)
+            self._apply_stop_confirmation_delay_minutes(minutes)
+            logger.info("Stop confirmation delay updated to %s via settings change", minutes)
+            return
+
+        if key == "timeline.auto_start_enabled":
+            enabled = self._coerce_auto_start_enabled(value)
+            if enabled is None:
+                logger.warning("Ignoring invalid timeline.auto_start_enabled value: %r", value)
+                return
+
+            if enabled and not self.is_running:
+                logger.info("Enabling auto task scheduler via settings change")
+                self.start()
+            elif not enabled and self.is_running:
+                logger.info("Disabling auto task scheduler via settings change")
+                self.stop()
 
     def _check_upcoming_events(self):
         """
@@ -243,9 +387,9 @@ class AutoTaskScheduler:
 
         This method is called every minute by the scheduler.
         """
-        try:
-            now_local = to_local_naive(datetime.now().astimezone())
+        now_local = to_local_naive(datetime.now().astimezone())
 
+        try:
             past_window_days = self._past_window_minutes / (24 * 60)
             future_window_days = self._future_window_minutes / (24 * 60)
 
@@ -263,9 +407,7 @@ class AutoTaskScheduler:
                 auto_tasks = event_data["auto_tasks"]
 
                 # Skip if no auto tasks configured
-                if not (
-                    auto_tasks.get("enable_transcription") or auto_tasks.get("enable_recording")
-                ):
+                if not self._auto_tasks_enabled(auto_tasks):
                     continue
 
                 event_start = to_local_naive(event.start_time)
@@ -274,7 +416,8 @@ class AutoTaskScheduler:
                 # Send reminder N minutes before event
                 reminder_seconds = self.reminder_minutes * 60
                 if (
-                    reminder_seconds <= time_until_start <= reminder_seconds + 60
+                    reminder_seconds > 0
+                    and 0 < time_until_start <= reminder_seconds
                     and event.id not in self.notified_events
                 ):
                     self._send_reminder_notification(event, auto_tasks)
@@ -282,31 +425,306 @@ class AutoTaskScheduler:
 
                 # Start auto tasks when event begins
                 # (within 1 minute of start time)
-                if -60 <= time_until_start <= 60 and event.id not in self.started_events:
+                if 0 <= time_until_start <= 60 and event.id not in self.started_events:
                     started = self._start_auto_tasks(event, auto_tasks)
                     if started:
                         self.started_events.add(event.id)
 
-            # Process past events (stop recordings)
+            # Process past events (stop recordings and recover starts missed by
+            # scheduler drift/app startup).
             for event_data in past_events:
                 event = event_data["event"]
+                event_start, event_end = self._resolve_event_window(event)
 
-                # Check if this event has an active recording
+                # Stop checks are handled centrally via active_recordings so we
+                # do not rely on the timeline query window to include long events.
                 if event.id in self.active_recordings:
-                    event_end = to_local_naive(event.end_time)
-                    time_since_end = (now_local - event_end).total_seconds()
+                    continue
 
-                    # Stop recording if event ended (within 2 minutes)
-                    if 0 <= time_since_end <= 120:
-                        self._stop_auto_tasks(event)
+                if event.id in self.started_events:
+                    continue
 
+                # If polling runs slightly late and the event has just started,
+                # recover within a short grace period.
+                if event_start <= now_local < event_end:
+                    time_since_start = (now_local - event_start).total_seconds()
+                    recovery_window_seconds = self._auto_start_recovery_window_seconds()
+                    if 0 <= time_since_start <= recovery_window_seconds:
+                        auto_tasks = self.timeline_manager.get_auto_task(event.id) or {}
+                        if self._auto_tasks_enabled(auto_tasks):
+                            started = self._start_auto_tasks(event, auto_tasks)
+                            if started:
+                                self.started_events.add(event.id)
+
+        except Exception as e:
+            logger.error(f"Error checking upcoming events: {e}", exc_info=True)
+        finally:
+            self._check_active_recordings_for_stop(now_local)
             # Clean up old event IDs from tracking sets
             # (events more than 1 hour old)
             self._cleanup_tracking_sets(now_local)
 
-        except Exception as e:
-            logger.error(f"Error checking upcoming events: {e}", exc_info=True)
-            # Don't raise - we want the scheduler to continue
+    def _get_latest_event_for_recording(self, event_id: str, fallback_event):
+        """Return the freshest event snapshot for active recording stop checks."""
+        calendar_manager = getattr(self.timeline_manager, "calendar_manager", None)
+        if calendar_manager is None:
+            return fallback_event
+
+        get_event = getattr(calendar_manager, "get_event", None)
+        if not callable(get_event):
+            return fallback_event
+
+        try:
+            latest_event = get_event(event_id)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to refresh event %s for auto-stop: %s", event_id, exc)
+            return fallback_event
+
+        if latest_event is None:
+            return fallback_event
+
+        return latest_event
+
+    def _check_active_recordings_for_stop(self, now_local: datetime) -> None:
+        """Stop active recordings when event end + grace period has elapsed."""
+        for event_id in list(self.active_recordings.keys()):
+            recording_info = self.active_recordings.get(event_id)
+            if not recording_info:
+                continue
+
+            try:
+                event = recording_info.get("event")
+                if event is None:
+                    logger.warning(
+                        "Active recording %s has no event metadata; skipping auto-stop check",
+                        event_id,
+                    )
+                    continue
+
+                latest_event = self._get_latest_event_for_recording(event_id, event)
+                if latest_event is not event:
+                    recording_info["event"] = latest_event
+                    event = latest_event
+
+                event_start, event_end = self._resolve_event_window(event)
+
+                stop_deadline = event_end + timedelta(seconds=self._auto_stop_grace_seconds)
+                if now_local < stop_deadline:
+                    self.pending_stop_confirmations.pop(event_id, None)
+                    continue
+
+                pending_info = self.pending_stop_confirmations.get(event_id)
+                if pending_info:
+                    next_prompt_at = pending_info.get("next_prompt_at", stop_deadline)
+                    if now_local < next_prompt_at:
+                        continue
+
+                decision = self._prompt_stop_confirmation(event)
+                if decision.get("action") == "stop":
+                    self.pending_stop_confirmations.pop(event_id, None)
+                    self._stop_auto_tasks(event)
+                    continue
+
+                delay_minutes = self._coerce_stop_confirmation_delay_minutes(
+                    decision.get("delay_minutes")
+                )
+                next_prompt_at = now_local + timedelta(minutes=delay_minutes)
+                self.pending_stop_confirmations[event_id] = {
+                    "next_prompt_at": next_prompt_at,
+                }
+                self._send_delayed_stop_notification(event, delay_minutes, next_prompt_at)
+            except Exception as exc:  # noqa: BLE001
+                logger.error(
+                    "Failed to evaluate auto-stop for event %s: %s",
+                    event_id,
+                    exc,
+                    exc_info=True,
+                )
+
+    def _coerce_stop_confirmation_delay_minutes(self, value) -> int:
+        """Normalize delay confirmation minutes to supported range."""
+        minutes = self._coerce_stop_confirmation_delay_setting(value)
+        if minutes is None:
+            return self.stop_confirmation_delay_minutes
+        return minutes
+
+    def _prompt_stop_confirmation(self, event) -> Dict[str, Any]:
+        """Ask user whether to stop now or postpone the stop prompt."""
+        default_delay = self.stop_confirmation_delay_minutes
+        result, error = self._run_ui_callable(
+            lambda: self._show_stop_confirmation_dialog(event, default_delay),
+            timeout_seconds=180,
+        )
+        if error is not None:
+            logger.warning(
+                "Stop confirmation dialog unavailable for event %s, falling back to delay: %s",
+                event.id,
+                error,
+            )
+            return {
+                "action": "delay",
+                "delay_minutes": default_delay,
+            }
+
+        if not isinstance(result, dict):
+            return {
+                "action": "delay",
+                "delay_minutes": default_delay,
+            }
+
+        action = result.get("action")
+        if action == "stop":
+            return {"action": "stop"}
+
+        return {
+            "action": "delay",
+            "delay_minutes": self._coerce_stop_confirmation_delay_minutes(
+                result.get("delay_minutes")
+            ),
+        }
+
+    def _show_stop_confirmation_dialog(self, event, default_delay_minutes: int) -> Dict[str, Any]:
+        """Render stop confirmation dialog in UI thread and return decision."""
+        from PySide6.QtWidgets import QApplication, QInputDialog, QMessageBox
+
+        app_name = self.i18n.t("app.name")
+        dialog_title = self.i18n.t("auto_task.stop_confirmation.title", app_name=app_name)
+        dialog_message = self.i18n.t("auto_task.stop_confirmation.message", event_title=event.title)
+        parent = QApplication.activeWindow()
+
+        box = QMessageBox(parent)
+        box.setIcon(QMessageBox.Icon.Warning)
+        box.setWindowTitle(dialog_title)
+        box.setText(dialog_message)
+
+        stop_now_btn = box.addButton(
+            self.i18n.t("auto_task.stop_confirmation.stop_now"),
+            QMessageBox.ButtonRole.AcceptRole,
+        )
+        delay_default_btn = box.addButton(
+            self.i18n.t(
+                "auto_task.stop_confirmation.delay_default",
+                minutes=str(default_delay_minutes),
+            ),
+            QMessageBox.ButtonRole.ActionRole,
+        )
+        delay_custom_btn = box.addButton(
+            self.i18n.t("auto_task.stop_confirmation.delay_custom"),
+            QMessageBox.ButtonRole.ActionRole,
+        )
+        cancel_btn = box.addButton(
+            self.i18n.t("common.cancel"),
+            QMessageBox.ButtonRole.RejectRole,
+        )
+        box.setDefaultButton(delay_default_btn)
+        box.exec()
+
+        clicked = box.clickedButton()
+        if clicked == stop_now_btn:
+            return {"action": "stop"}
+        if clicked == delay_custom_btn:
+            custom_title = self.i18n.t("auto_task.stop_confirmation.custom_delay_title")
+            custom_label = self.i18n.t("auto_task.stop_confirmation.custom_delay_label")
+            minutes, ok = QInputDialog.getInt(
+                parent,
+                custom_title,
+                custom_label,
+                default_delay_minutes,
+                1,
+                TIMELINE_STOP_CONFIRMATION_DELAY_MAX_MINUTES,
+            )
+            if ok:
+                return {"action": "delay", "delay_minutes": minutes}
+        if clicked == delay_default_btn or clicked == cancel_btn:
+            return {"action": "delay", "delay_minutes": default_delay_minutes}
+        return {"action": "delay", "delay_minutes": default_delay_minutes}
+
+    def _run_ui_callable(
+        self,
+        callback: Callable[[], Dict[str, Any]],
+        timeout_seconds: int = 60,
+    ) -> Tuple[Optional[Dict[str, Any]], Optional[Exception]]:
+        """Execute callback on UI thread and wait for completion."""
+        try:
+            from PySide6.QtCore import QObject, Signal, Slot
+            from PySide6.QtWidgets import QApplication
+        except Exception as exc:  # noqa: BLE001
+            return None, exc
+
+        app = QApplication.instance()
+        if app is None:
+            return None, RuntimeError("QApplication is not initialized")
+
+        if self._ui_prompt_bridge is None:
+
+            class _UiPromptBridge(QObject):
+                run_requested = Signal(object)
+
+                def __init__(self):
+                    super().__init__()
+                    self.run_requested.connect(self._run)
+
+                @Slot(object)
+                def _run(self, payload):
+                    try:
+                        payload["result"]["value"] = payload["callback"]()
+                    except Exception as callback_exc:  # noqa: BLE001
+                        payload["result"]["error"] = callback_exc
+                    finally:
+                        payload["done"].set()
+
+            self._ui_prompt_bridge = _UiPromptBridge()
+            self._ui_prompt_bridge.moveToThread(app.thread())
+
+        result: Dict[str, Any] = {}
+        done = threading.Event()
+        payload = {
+            "callback": callback,
+            "done": done,
+            "result": result,
+        }
+        self._ui_prompt_bridge.run_requested.emit(payload)
+        if not done.wait(timeout_seconds):
+            return None, TimeoutError("Timed out waiting for UI prompt response")
+
+        if "error" in result:
+            callback_error = result["error"]
+            if isinstance(callback_error, Exception):
+                return None, callback_error
+            return None, RuntimeError(str(callback_error))
+
+        return result.get("value"), None
+
+    def _send_delayed_stop_notification(
+        self,
+        event,
+        delay_minutes: int,
+        next_prompt_at: datetime,
+    ) -> None:
+        """Inform user that stop has been deferred and will be confirmed again."""
+        title = self.i18n.t("auto_task.stop_confirmation.delayed_title", app_name=self.i18n.t("app.name"))
+        message = self.i18n.t(
+            "auto_task.stop_confirmation.delayed_message",
+            event_title=event.title,
+            delay_minutes=str(delay_minutes),
+            next_time=next_prompt_at.strftime("%H:%M"),
+        )
+        self.notification_manager.send_info(title, message)
+
+    @staticmethod
+    def _resolve_event_window(event) -> Tuple[datetime, datetime]:
+        """Normalize event start/end times into a safe local-naive window."""
+        event_start = to_local_naive(event.start_time)
+        event_end_raw = getattr(event, "end_time", None) or event.start_time
+        try:
+            event_end = to_local_naive(event_end_raw)
+        except Exception:
+            event_end = event_start
+
+        if event_end < event_start:
+            event_start, event_end = event_end, event_start
+
+        return event_start, event_end
 
     def _send_reminder_notification(self, event, auto_tasks: dict):
         """
@@ -670,6 +1088,7 @@ class AutoTaskScheduler:
             if should_remove_active_state:
                 self.active_recordings.pop(event.id, None)
                 self.started_events.discard(event.id)
+                self.pending_stop_confirmations.pop(event.id, None)
 
     def _save_event_attachments(self, event_id: str, recording_result: Dict[str, Any]):
         """
@@ -735,6 +1154,15 @@ class AutoTaskScheduler:
                         self._stop_auto_tasks(event)
                 except Exception as e:
                     logger.error(f"Error force-stopping old recording {event_id}: {e}")
+
+            active_event_ids = set(self.active_recordings.keys())
+            stale_pending_ids = [
+                event_id
+                for event_id in self.pending_stop_confirmations
+                if event_id not in active_event_ids
+            ]
+            for event_id in stale_pending_ids:
+                self.pending_stop_confirmations.pop(event_id, None)
 
         except Exception as e:
             logger.error(f"Error cleaning up tracking sets: {e}", exc_info=True)

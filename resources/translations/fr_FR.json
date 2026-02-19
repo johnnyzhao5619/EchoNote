@@ -650,6 +650,10 @@
       "notifications": "Paramètres de notification",
       "reminder_time": "Heure de rappel",
       "minutes": "minutes",
+      "auto_stop_grace_minutes": "Délai avant arrêt auto",
+      "auto_stop_grace_description": "Maintient l'enregistrement/la transcription pendant le délai configuré après l'heure de fin pour éviter les coupures lors des réunions prolongées",
+      "stop_confirmation_delay_minutes": "Délai défaut de confirmation",
+      "stop_confirmation_delay_description": "Délai par défaut (minutes) lorsque vous reportez l'arrêt dans la fenêtre de confirmation",
       "auto_start": "Démarrage automatique",
       "enable_auto_start": "Activer l'enregistrement automatique",
       "auto_start_description": "Démarrer automatiquement l'enregistrement et la transcription au début d'un événement"
@@ -829,6 +833,17 @@
         "title": "{app_name} - Unable to start auto tasks",
         "message": "Could not start automatic recording for \"{event_title}\":\\nRecorder is already in use"
       }
+    },
+    "stop_confirmation": {
+      "title": "{app_name} - Confirmer l'arrêt auto",
+      "message": "L'événement \"{event_title}\" a atteint l'heure d'arrêt automatique. Arrêter l'enregistrement et la transcription maintenant ?",
+      "stop_now": "Arrêter maintenant",
+      "delay_default": "Reporter de {minutes} min",
+      "delay_custom": "Délai personnalisé...",
+      "custom_delay_title": "Reporter l'arrêt auto",
+      "custom_delay_label": "Minutes de report :",
+      "delayed_title": "{app_name} - Arrêt auto reporté",
+      "delayed_message": "L'arrêt de \"{event_title}\" est reporté de {delay_minutes} minutes. Nouveau rappel à {next_time}."
     }
   },
   "logging": {

@@ -421,12 +421,24 @@ def main():
 
         # Background initialization for non-critical components
         logger.info("Starting background initialization...")
-        from config.constants import DEFAULT_REMINDER_MINUTES, DEFAULT_SYNC_INTERVAL_MINUTES
+        from config.constants import (
+            DEFAULT_AUTO_STOP_GRACE_MINUTES,
+            DEFAULT_REMINDER_MINUTES,
+            DEFAULT_STOP_CONFIRMATION_DELAY_MINUTES,
+            DEFAULT_SYNC_INTERVAL_MINUTES,
+        )
         from utils.startup_optimizer import BackgroundInitializer
 
         # Get reminder time and sync interval from config
         reminder_minutes = config.get("timeline.reminder_minutes", DEFAULT_REMINDER_MINUTES)
         sync_interval = config.get("calendar.sync_interval_minutes", DEFAULT_SYNC_INTERVAL_MINUTES)
+        auto_stop_grace_minutes = config.get(
+            "timeline.auto_stop_grace_minutes", DEFAULT_AUTO_STOP_GRACE_MINUTES
+        )
+        stop_confirmation_delay_minutes = config.get(
+            "timeline.stop_confirmation_delay_minutes",
+            DEFAULT_STOP_CONFIRMATION_DELAY_MINUTES,
+        )
 
         from utils.app_initializer import create_auto_task_scheduler, create_sync_scheduler
 
@@ -443,6 +455,8 @@ def main():
                     db,
                     file_manager,
                     reminder_minutes,
+                    auto_stop_grace_minutes,
+                    stop_confirmation_delay_minutes,
                     settings_manager,
                     i18n,
                 ),
