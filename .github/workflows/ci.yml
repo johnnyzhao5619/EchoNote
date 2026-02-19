@@ -12,8 +12,11 @@ jobs:
   test:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
+    env:
+      CI: "true"
 
     steps:
       - uses: actions/checkout@v4
@@ -37,7 +40,16 @@ jobs:
 
       - name: Install system dependencies (macOS)
         if: matrix.os == 'macos-latest'
-        run: brew install portaudio
+        run: |
+          brew install portaudio pkg-config
+          echo "HOMEBREW_PREFIX=$(brew --prefix)" >> "$GITHUB_ENV"
+          echo "PKG_CONFIG_PATH=$(brew --prefix)/lib/pkgconfig" >> "$GITHUB_ENV"
+          echo "LDFLAGS=-L$(brew --prefix)/lib" >> "$GITHUB_ENV"
+          echo "CPPFLAGS=-I$(brew --prefix)/include" >> "$GITHUB_ENV"
+
+      - name: Configure Qt headless mode (macOS)
+        if: matrix.os == 'macos-latest'
+        run: echo "QT_QPA_PLATFORM=offscreen" >> "$GITHUB_ENV"
 
       - name: Install Python dependencies
         run: |
