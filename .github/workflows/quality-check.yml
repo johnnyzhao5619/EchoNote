@@ -81,7 +81,6 @@ jobs:
       with:
         script: |
           const fs = require('fs');
-          const path = require('path');
           
           try {
             // Read quality report if it exists
@@ -100,23 +99,24 @@ jobs:
               };
               
               const emoji = statusEmoji[summary.overall_status] || '⚪';
-              
-              const comment = \`## 🔍 Code Quality Report
-              
-**Overall Status**: \${emoji} \${summary.overall_status.replace('_', ' ')}
-**Quality Score**: \${qualityScore.score}/100 (Grade: \${qualityScore.grade})
 
-### Summary
-- **Files Analyzed**: \${summary.total_files_analyzed}
-- **Static Issues**: \${summary.total_static_issues}
-- **High Complexity**: \${summary.high_complexity_items}
-- **Duplicate Code**: \${(summary.duplicate_code_ratio * 100).toFixed(1)}%
-
-### Priority Actions
-\${summary.priority_actions.map((action, i) => \`\${i + 1}. \${action}\`).join('\\n')}
-
-📊 [View detailed reports in artifacts](https://github.com/\${context.repo.owner}/\${context.repo.repo}/actions/runs/\${context.runId})
-              \`;
+              const comment = [
+                '## 🔍 Code Quality Report',
+                '',
+                `**Overall Status**: ${emoji} ${summary.overall_status.replace('_', ' ')}`,
+                `**Quality Score**: ${qualityScore.score}/100 (Grade: ${qualityScore.grade})`,
+                '',
+                '### Summary',
+                `- **Files Analyzed**: ${summary.total_files_analyzed}`,
+                `- **Static Issues**: ${summary.total_static_issues}`,
+                `- **High Complexity**: ${summary.high_complexity_items}`,
+                `- **Duplicate Code**: ${(summary.duplicate_code_ratio * 100).toFixed(1)}%`,
+                '',
+                '### Priority Actions',
+                ...summary.priority_actions.map((action, i) => `${i + 1}. ${action}`),
+                '',
+                `📊 [View detailed reports in artifacts](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`
+              ].join('\\n');
               
               github.rest.issues.createComment({
                 issue_number: context.issue.number,
