@@ -241,6 +241,9 @@ PROJECT_REVIEW_*.md
 
 # Local media/debug artifacts
 test/*.mp4
+
+# Local Codex skills
+skills/
 RELEASE_NOTES_*.md
 REVIEW_SUMMARY.md
 *_SUMMARY.md
