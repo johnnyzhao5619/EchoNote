@@ -19,18 +19,10 @@ const heroDescription = computed(() => props.description || t('hero.description'
 const releaseBadge = computed(() =>
   t('hero.releaseBadge', { version: projectConfig.releaseTag || 'latest' }),
 )
-
-const scrollToFeatures = (event: Event) => {
-  event.preventDefault()
-  const featureSection = document.getElementById('features')
-  if (featureSection) {
-    featureSection.scrollIntoView({ behavior: 'smooth' })
-  }
-}
 </script>
 
 <template>
-  <section class="hero-shell section-shell">
+  <header class="hero-shell section-shell" aria-labelledby="hero-heading">
     <div class="site-container">
       <div class="grid items-center gap-10 lg:grid-cols-[1.04fr_0.96fr]">
         <div class="text-center lg:text-left">
@@ -41,7 +33,7 @@ const scrollToFeatures = (event: Event) => {
             {{ releaseBadge }}
           </p>
 
-          <h1 class="mb-5 text-balance text-4xl font-semibold leading-tight text-slate-950 sm:text-5xl lg:text-6xl">
+          <h1 id="hero-heading" class="mb-5 text-balance text-4xl font-semibold leading-tight text-slate-950 sm:text-5xl lg:text-6xl">
             {{ heroTitle }}
           </h1>
 
@@ -55,11 +47,12 @@ const scrollToFeatures = (event: Event) => {
               target="_blank"
               rel="noopener noreferrer"
               class="ui-primary-action"
+              aria-label="View EchoNote on GitHub"
             >
               <GitHubIcon icon-class="h-5 w-5" />
               <span>{{ t('hero.viewOnGitHub') }}</span>
             </a>
-            <a href="#features" class="ui-secondary-action" @click="scrollToFeatures">
+            <a href="#features" class="ui-secondary-action">
               {{ t('hero.learnMore') }}
             </a>
           </div>
@@ -93,5 +86,5 @@ const scrollToFeatures = (event: Event) => {
         </div>
       </div>
     </div>
-  </section>
+  </header>
 </template>

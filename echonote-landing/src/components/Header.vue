@@ -5,6 +5,7 @@ import { projectConfig } from '../config/project'
 import { useProjectLinks } from '../composables/useProjectLinks'
 import LanguageSwitcher from './LanguageSwitcher.vue'
 import GitHubIcon from './icons/GitHubIcon.vue'
+import Logo from './Logo.vue'
 
 const { t } = useI18n()
 const { sectionNav, headerResourceNav } = useProjectLinks()
@@ -60,12 +61,7 @@ onUnmounted(() => {
     <div class="site-container">
       <div class="flex h-16 items-center justify-between gap-4">
         <a href="#top" class="inline-flex items-center gap-3 text-slate-900" @click="closeMobileMenu">
-          <img
-            src="/Logo.png"
-            :alt="`${projectConfig.name} logo`"
-            class="h-8 w-8 rounded-lg border border-slate-200/70"
-            loading="eager"
-          />
+          <Logo class-name="h-8 w-8" loading="eager" />
           <span class="text-base font-semibold tracking-tight sm:text-lg">{{ projectConfig.name }}</span>
         </a>
 

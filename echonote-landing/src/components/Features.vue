@@ -23,13 +23,13 @@ defineProps<Props>()
         </p>
       </div>
 
-      <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        <article
+      <ul class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <li
           v-for="feature in features"
           :key="feature.id"
           class="landing-card h-full p-6 sm:p-7"
         >
-          <div class="flex h-full flex-col">
+          <article class="flex h-full flex-col">
             <div
               class="mb-5 inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-2xl"
             >
@@ -43,9 +43,9 @@ defineProps<Props>()
             <p class="leading-relaxed text-slate-600">
               {{ t(feature.description) }}
             </p>
-          </div>
-        </article>
-      </div>
+          </article>
+        </li>
+      </ul>
     </div>
   </section>
 </template>

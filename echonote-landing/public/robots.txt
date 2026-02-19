@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://johnnyzhao5619.github.io/EchoNote/sitemap.xml

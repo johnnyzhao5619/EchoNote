@@ -115,22 +115,42 @@ export const githubConfig = {
 // Structured data for search engines
 export const structuredData = {
   '@context': 'https://schema.org',
-  '@type': 'SoftwareApplication',
-  name: PROJECT_NAME,
-  description: projectConfig.description,
-  url: GITHUB_URL,
-  applicationCategory: 'ProductivityApplication',
-  operatingSystem: 'Cross-platform',
-  offers: {
-    '@type': 'Offer',
-    price: '0',
-    priceCurrency: 'USD',
-  },
-  author: {
-    '@type': 'Person',
-    name: GITHUB_OWNER,
-  },
-  license: 'https://www.apache.org/licenses/LICENSE-2.0',
+  '@graph': [
+    {
+      '@type': 'SoftwareApplication',
+      '@id': `${BASE_URL}/#application`,
+      name: PROJECT_NAME,
+      description: projectConfig.description,
+      url: BASE_URL,
+      applicationCategory: 'ProductivityApplication',
+      operatingSystem: 'Cross-platform',
+      offers: {
+        '@type': 'Offer',
+        price: '0',
+        priceCurrency: 'USD',
+      },
+      author: {
+        '@id': `${BASE_URL}/#organization`,
+      },
+      license: 'https://www.apache.org/licenses/LICENSE-2.0',
+    },
+    {
+      '@type': 'Organization',
+      '@id': `${BASE_URL}/#organization`,
+      name: GITHUB_OWNER,
+      url: GITHUB_URL,
+    },
+    {
+      '@type': 'WebSite',
+      '@id': `${BASE_URL}/#website`,
+      url: BASE_URL,
+      name: PROJECT_NAME,
+      description: projectConfig.description,
+      publisher: {
+        '@id': `${BASE_URL}/#organization`,
+      },
+    },
+  ],
 }
 
 // License information

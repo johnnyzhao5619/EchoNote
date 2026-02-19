@@ -30,6 +30,17 @@ h4 {
   font-family: var(--font-display);
 }
 
+@theme {
+  --color-primary-500: theme('colors.blue.500');
+  /* ... custom theme values ... */
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
 .site-container {
   width: min(100% - 2rem, var(--content-max-width));
   margin-inline: auto;

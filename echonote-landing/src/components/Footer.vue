@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import StarIcon from './icons/StarIcon.vue'
+import Logo from './Logo.vue'
 import { projectConfig, githubConfig, licenseInfo } from '../config/project'
 import { useProjectLinks } from '../composables/useProjectLinks'
 
@@ -17,12 +18,7 @@ const currentYear = computed(() => new Date().getFullYear())
       <div class="grid grid-cols-1 gap-8 md:grid-cols-3">
         <div class="space-y-4">
           <div class="flex items-center gap-3">
-            <img
-              src="/Logo.png"
-              :alt="`${projectConfig.name} logo`"
-              class="h-7 w-7 rounded-lg border border-slate-200"
-              loading="lazy"
-            />
+            <Logo class-name="h-7 w-7" />
             <h3 class="text-base font-semibold text-slate-900 sm:text-lg">
               {{ projectConfig.name }}
             </h3>

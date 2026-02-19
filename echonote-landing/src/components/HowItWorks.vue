@@ -1,16 +1,14 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { projectConfig } from '../config/project'
+import type { HowItWorksStep } from '../types'
 
 const { t } = useI18n()
 
-const steps = computed(() =>
-  (projectConfig.howItWorks || []).map((step) => ({
-    ...step,
-    stepLabel: String(step.step).padStart(2, '0'),
-  })),
-)
+interface Props {
+  steps: HowItWorksStep[]
+}
+
+defineProps<Props>()
 </script>
 
 <template>
@@ -32,9 +30,9 @@ const steps = computed(() =>
           class="landing-card relative h-full overflow-hidden p-6 sm:p-7"
         >
           <span
-            class="mb-4 inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold tracking-wider text-slate-600"
+            class="mb-4 inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold tracking-wider text-slate-400"
           >
-            STEP {{ step.stepLabel }}
+            {{ String(step.step).padStart(2, '0') }}
           </span>
           <h3 class="mb-3 text-xl font-semibold text-slate-900">
             {{ t(step.title) }}

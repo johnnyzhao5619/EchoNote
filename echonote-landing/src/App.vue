@@ -17,7 +17,7 @@ import GitHubStats from './components/GitHubStats.vue'
 
       <Features :features="projectConfig.features" />
 
-      <HowItWorks />
+      <HowItWorks :steps="projectConfig.howItWorks || []" />
       <GitHubStats />
     </main>
 
