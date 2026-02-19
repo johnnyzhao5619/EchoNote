@@ -3,8 +3,9 @@
 Tests for batch transcript search widget semantic style hooks.
 """
 
-import pytest
 from PySide6.QtWidgets import QTextEdit
+
+import pytest
 
 from ui.batch_transcribe.search_widget import SearchWidget
 

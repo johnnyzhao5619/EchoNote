@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """Tests for timeline delete-event wiring."""
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from ui.timeline.widget import TimelineWidget
 

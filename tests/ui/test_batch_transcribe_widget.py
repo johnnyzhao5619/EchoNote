@@ -5,18 +5,19 @@ Tests for batch transcribe widget.
 
 from unittest.mock import MagicMock, Mock, patch
 
-import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFileDialog, QMessageBox
 
-from ui.batch_transcribe.widget import BatchTranscribeWidget
+import pytest
+
 from config.constants import (
-    TASK_STATUS_PENDING,
-    TASK_STATUS_PROCESSING,
+    TASK_STATUS_CANCELLED,
     TASK_STATUS_COMPLETED,
     TASK_STATUS_FAILED,
-    TASK_STATUS_CANCELLED,
+    TASK_STATUS_PENDING,
+    TASK_STATUS_PROCESSING,
 )
+from ui.batch_transcribe.widget import BatchTranscribeWidget
 
 pytestmark = pytest.mark.ui
 
