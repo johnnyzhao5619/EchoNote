@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { projectConfig } from '../config/project'
 import { useResponsiveImage } from '../composables/useLogo'
-import bannerUrl from '@/assets/Banner.svg'
+const bannerUrl = '/echonote.png'
 import type { ActionButton } from '../types'
 import GitHubIcon from './icons/GitHubIcon.vue'
 
