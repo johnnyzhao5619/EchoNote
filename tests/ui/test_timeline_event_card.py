@@ -1,12 +1,15 @@
 # SPDX-License-Identifier: Apache-2.0
 """UI tests for timeline event card semantic style hooks."""
 
+import pytest
 from datetime import datetime
 from types import SimpleNamespace
 
 from PySide6.QtWidgets import QLabel
 
 from ui.timeline.event_card import EventCard
+
+pytestmark = pytest.mark.ui
 
 
 def test_event_card_title_uses_semantic_role(qapp, mock_i18n):

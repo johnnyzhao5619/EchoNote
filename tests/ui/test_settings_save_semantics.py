@@ -1,10 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
 """Tests for explicit-save behavior in settings pages."""
 
+import pytest
 from unittest.mock import Mock
 
 from ui.settings.appearance_page import AppearanceSettingsPage
 from ui.settings.language_page import LanguageSettingsPage
+
+pytestmark = pytest.mark.ui
 
 
 class _FakeSettingsManager:

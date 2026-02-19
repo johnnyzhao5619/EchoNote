@@ -3,7 +3,10 @@
 Tests for task item semantic style hooks.
 """
 
+import pytest
 from ui.batch_transcribe.task_item import TaskItem
+
+pytestmark = pytest.mark.ui
 
 
 def test_task_item_action_buttons_use_semantic_roles(qapp, mock_i18n):

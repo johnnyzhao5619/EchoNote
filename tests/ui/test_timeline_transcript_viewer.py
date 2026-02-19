@@ -1,7 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 """UI tests for timeline transcript viewer semantic style hooks."""
 
+import pytest
 from ui.timeline.transcript_viewer import TranscriptViewer, TranscriptViewerDialog
+
+pytestmark = pytest.mark.ui
 
 
 def test_transcript_viewer_action_buttons_use_semantic_roles(qapp, mock_i18n, tmp_path):

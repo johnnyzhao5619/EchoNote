@@ -3,9 +3,12 @@
 Tests for batch transcript search widget semantic style hooks.
 """
 
+import pytest
 from PySide6.QtWidgets import QTextEdit
 
 from ui.batch_transcribe.search_widget import SearchWidget
+
+pytestmark = pytest.mark.ui
 
 
 def test_search_widget_buttons_use_semantic_roles(qapp, mock_i18n):

@@ -3,13 +3,16 @@
 Tests for calendar dialog layout constants.
 """
 
+import pytest
 from datetime import datetime
 from unittest.mock import Mock
 
 from PySide6.QtCore import QDate, QDateTime, QTime
 from PySide6.QtWidgets import QTextEdit
 
-from ui.calendar_hub.event_dialog import EventDialog
+from ui.dialogs.calendar_event_dialog import CalendarEventDialog
+
+pytestmark = pytest.mark.ui
 from ui.calendar_hub.oauth_dialog import OAuthDialog
 from ui.constants import (
     CALENDAR_EVENT_DESCRIPTION_MAX_HEIGHT,

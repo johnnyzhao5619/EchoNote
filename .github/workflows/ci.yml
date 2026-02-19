@@ -111,6 +111,10 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: xvfb-run -a pytest tests/ --cov=core --cov=engines --cov=data --cov=utils --cov=ui
 
-      - name: Run tests (Windows/macOS)
-        if: matrix.os != 'ubuntu-latest'
-        run: pytest tests/ -v
+      - name: Run tests (macOS)
+        if: matrix.os == 'macos-latest'
+        run: pytest tests/ -v --ignore=tests/ui
+
+      - name: Run tests (Windows)
+        if: matrix.os == 'windows-latest'
+        run: pytest tests/ -v --ignore=tests/ui

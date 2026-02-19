@@ -10,6 +10,8 @@ import pytest
 from core.calendar.constants import CalendarSource, EventType
 from ui.timeline.widget import TimelineWidget
 
+pytestmark = pytest.mark.ui
+
 
 @pytest.fixture
 def widget(qapp, mock_i18n, mock_settings_manager):

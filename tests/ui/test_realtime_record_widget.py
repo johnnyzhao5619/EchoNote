@@ -10,6 +10,8 @@ from PySide6.QtCore import Qt
 
 from ui.realtime_record.widget import RealtimeRecorderSignals, RealtimeRecordWidget
 
+pytestmark = pytest.mark.ui
+
 
 class TestRealtimeRecorderSignals:
     """Tests for RealtimeRecorderSignals."""

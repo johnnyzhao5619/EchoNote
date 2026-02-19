@@ -11,6 +11,8 @@ from ui.common.error_dialog import ErrorDialog
 from ui.common.notification import NotificationManager
 from ui.constants import ERROR_DIALOG_DETAILS_MAX_HEIGHT
 
+pytestmark = pytest.mark.ui
+
 
 class TestErrorDialog:
     """Tests for ErrorDialog component."""

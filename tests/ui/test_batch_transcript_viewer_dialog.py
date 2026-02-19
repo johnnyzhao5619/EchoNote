@@ -3,9 +3,12 @@
 Tests for batch transcript viewer semantic style hooks.
 """
 
+import pytest
 from unittest.mock import Mock
 
 from ui.batch_transcribe.transcript_viewer import TranscriptViewerDialog
+
+pytestmark = pytest.mark.ui
 
 
 def test_transcript_viewer_toolbar_uses_semantic_roles(qapp, mock_i18n, monkeypatch, tmp_path):

@@ -1,9 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
 """Tests for transcription settings page side-effect behavior."""
 
+import pytest
 from unittest.mock import Mock
 
 from ui.settings.transcription_page import TranscriptionSettingsPage
+
+pytestmark = pytest.mark.ui
 
 
 class _FakeSettingsManager:

@@ -12,6 +12,8 @@ from PySide6.QtWidgets import QLabel, QPushButton
 from core.models.registry import ModelInfo
 from ui.settings.model_management_page import ModelConfigDialog, ModelManagementPage
 
+pytestmark = pytest.mark.ui
+
 
 def _make_signal_stub() -> Mock:
     signal = Mock()

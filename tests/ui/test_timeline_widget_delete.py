@@ -1,9 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
 """Tests for timeline delete-event wiring."""
 
+import pytest
 from unittest.mock import MagicMock, patch
 
 from ui.timeline.widget import TimelineWidget
+
+pytestmark = pytest.mark.ui
 
 
 def test_timeline_widget_delete_event_uses_shared_flow(qapp, mock_i18n, mock_settings_manager):

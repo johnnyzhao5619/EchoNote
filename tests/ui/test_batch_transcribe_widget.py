@@ -18,6 +18,8 @@ from config.constants import (
     TASK_STATUS_CANCELLED,
 )
 
+pytestmark = pytest.mark.ui
+
 
 class TestBatchTranscribeWidget:
     """Tests for BatchTranscribeWidget."""
