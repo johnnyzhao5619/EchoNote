@@ -91,12 +91,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mapfile -t changed_py_files < changed_python_files.txt
-          black --check "${changed_py_files[@]}"
-          isort --check-only "${changed_py_files[@]}"
-          flake8 "${changed_py_files[@]}"
-          mypy "${changed_py_files[@]}"
-          bandit -c pyproject.toml "${changed_py_files[@]}"
+          changed_py_files=$(cat changed_python_files.txt | tr '\n' ' ')
+          black --check $changed_py_files
+          isort --check-only $changed_py_files
+          flake8 $changed_py_files
+          mypy $changed_py_files
+          bandit -c pyproject.toml $changed_py_files
 
       - name: Skip code quality checks
         if: steps.changed-python.outputs.count == '0'
