@@ -9,7 +9,7 @@ This document describes how `echonote-landing` is deployed to GitHub Pages.
 
 ## Automatic Deployment (GitHub Actions)
 
-Workflow file: `echonote-landing/.github/workflows/deploy.yml`
+Workflow file: `.github/workflows/deploy-landing.yml`
 
 Trigger:
 

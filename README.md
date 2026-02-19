@@ -98,7 +98,7 @@ EchoNote/
 
 > Landing maintenance note: the Vue implementation in `echonote-landing/` is the active source.  
 > `docs/landing/` is archived for historical reference only.  
-> The active landing is a single-page, i18n-driven architecture with centralized link composition and GitHub Pages deployment from `echonote-landing/.github/workflows/deploy.yml`.
+> The active landing is a single-page, i18n-driven architecture with centralized link composition and GitHub Pages deployment from `.github/workflows/deploy-landing.yml`.
 
 ### 🧪 Development & Testing
 
