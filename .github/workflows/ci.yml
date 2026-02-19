@@ -20,6 +20,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -61,13 +63,44 @@ jobs:
         run: |
           python -c "import PySide6; print(f'PySide6 version: {PySide6.__version__}')"
 
-      - name: Run code quality checks
+      - name: Detect changed Python files
+        id: changed-python
+        shell: bash
         run: |
-          black --check .
-          isort --check-only .
-          flake8 .
-          mypy .
-          bandit -c pyproject.toml -r .
+          set -euo pipefail
+
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          elif [[ "${{ github.event_name }}" == "push" ]]; then
+            BASE_SHA="${{ github.event.before }}"
+          else
+            BASE_SHA="$(git rev-parse HEAD~1)"
+          fi
+
+          if [[ -z "${BASE_SHA}" || "${BASE_SHA}" == "0000000000000000000000000000000000000000" ]]; then
+            BASE_SHA="$(git rev-list --max-parents=0 HEAD)"
+          fi
+
+          git diff --name-only "${BASE_SHA}" "${{ github.sha }}" -- '*.py' > changed_python_files.txt
+          COUNT="$(wc -l < changed_python_files.txt | tr -d ' ')"
+          echo "count=${COUNT}" >> "$GITHUB_OUTPUT"
+          echo "Changed Python files: ${COUNT}"
+
+      - name: Run code quality checks
+        if: steps.changed-python.outputs.count != '0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t changed_py_files < changed_python_files.txt
+          black --check "${changed_py_files[@]}"
+          isort --check-only "${changed_py_files[@]}"
+          flake8 "${changed_py_files[@]}"
+          mypy "${changed_py_files[@]}"
+          bandit -c pyproject.toml "${changed_py_files[@]}"
+
+      - name: Skip code quality checks
+        if: steps.changed-python.outputs.count == '0'
+        run: echo "No changed Python files detected; skipping black/isort/flake8/mypy/bandit."
 
       - name: Run tests (Ubuntu)
         if: matrix.os == 'ubuntu-latest'
