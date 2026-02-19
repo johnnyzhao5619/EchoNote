@@ -114,6 +114,9 @@ jobs:
     needs: test
     runs-on: ${{ matrix.os }}
     if: github.event_name == 'release'
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: "utf-8"
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
