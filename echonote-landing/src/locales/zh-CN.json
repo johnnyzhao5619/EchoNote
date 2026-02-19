@@ -13,7 +13,8 @@
       "issues": "问题反馈",
       "releases": "发布版本",
       "license": "许可证"
-    }
+    },
+    "previewAlt": "EchoNote 界面预览"
   },
   "header": {
     "github": "查看 GitHub",
@@ -103,6 +104,7 @@
     "copyright": "版权所有",
     "openSource": "开源资源",
     "links": "相关链接",
+    "summary": "EchoNote 提供本地优先的语音转写、实时录音与日历时间线管理能力，帮助你把会议内容快速转化为可执行信息。",
     "sourceCode": "源代码",
     "documentation": "文档",
     "releases": "发布版本",

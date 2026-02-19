@@ -13,7 +13,8 @@
       "issues": "Issues",
       "releases": "Versions",
       "license": "Licence"
-    }
+    },
+    "previewAlt": "Apercu de l'interface EchoNote"
   },
   "header": {
     "github": "Voir sur GitHub",
@@ -103,6 +104,7 @@
     "copyright": "Droits d'auteur",
     "openSource": "Ressources Open Source",
     "links": "Liens",
+    "summary": "EchoNote propose un workflow desktop local-first pour la transcription vocale, l'enregistrement en direct et la timeline liee au calendrier.",
     "sourceCode": "Code source",
     "documentation": "Documentation",
     "releases": "Versions",

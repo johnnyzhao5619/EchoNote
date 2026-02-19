@@ -5,6 +5,8 @@ on:
   # Runs on pushes targeting the default branch
   push:
     branches: ['main']
+    paths:
+      - 'echonote-landing/**'
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -25,6 +27,8 @@ jobs:
   # Build job
   build:
     runs-on: ubuntu-latest
+    env:
+      VITE_BASE_PATH: ${{ vars.VITE_BASE_PATH }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -46,6 +50,11 @@ jobs:
       - name: Type check
         run: npm run type-check
         working-directory: ./echonote-landing
+
+      - name: Resolve Vite base path
+        run: |
+          BASE_PATH="${VITE_BASE_PATH:-/${GITHUB_REPOSITORY##*/}/}"
+          echo "VITE_BASE_PATH=$BASE_PATH" >> "$GITHUB_ENV"
 
       - name: Build with Vite
         run: npm run build

@@ -85,7 +85,7 @@ Topic-specific documentation:
 - Development guide: [`echonote-landing/README.md`](../echonote-landing/README.md)
 - Deployment guide: [`echonote-landing/DEPLOYMENT.md`](../echonote-landing/DEPLOYMENT.md)
 - Archived implementation: [`docs/landing/`](landing/) (historical reference only)
-- Current release (`v1.3.3`) includes single-page architecture, i18n persistence, and responsive header stability improvements.
+- Current baseline uses a single-page architecture, centralized link composition, i18n locale persistence, and GitHub Pages deployment with auto-resolved base path.
 
 ---
 

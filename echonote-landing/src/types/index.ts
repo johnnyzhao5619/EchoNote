@@ -1,12 +1,5 @@
 // Core application types and interfaces
 
-export interface ActionButton {
-  text: string
-  url: string
-  type: 'primary' | 'secondary'
-  external?: boolean
-}
-
 export interface Feature {
   id: string
   icon: string

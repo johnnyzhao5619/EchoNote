@@ -5,11 +5,12 @@ import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 import { seoMetaPlugin } from './vite-plugins/seo-meta'
 
+const repositoryName = process.env.GITHUB_REPOSITORY?.split('/')[1]
+const defaultBasePath = repositoryName ? `/${repositoryName}/` : '/'
+
 // https://vite.dev/config/
 export default defineConfig({
-  // Set base path for GitHub Pages deployment
-  // Use environment variable or default to repository name
-  base: process.env.VITE_BASE_PATH || '/EchoNote/',
+  base: process.env.VITE_BASE_PATH || defaultBasePath,
 
   plugins: [vue(), vueDevTools(), seoMetaPlugin()],
 
@@ -24,7 +25,7 @@ export default defineConfig({
       output: {
         // Manual chunks for better caching
         manualChunks: {
-          vendor: ['vue', 'vue-router', 'vue-i18n'],
+          vendor: ['vue', 'vue-i18n'],
         },
         // Asset file naming with type-based organization
         assetFileNames: (assetInfo) => {

@@ -13,7 +13,8 @@
       "issues": "問題回報",
       "releases": "發布版本",
       "license": "授權"
-    }
+    },
+    "previewAlt": "EchoNote 介面預覽"
   },
   "header": {
     "github": "查看 GitHub",
@@ -103,6 +104,7 @@
     "copyright": "版權所有",
     "openSource": "開源資源",
     "links": "相關連結",
+    "summary": "EchoNote 提供本地優先的語音轉寫、即時錄音與日曆時間線管理，幫助你把會議內容快速轉化為可執行資訊。",
     "sourceCode": "原始碼",
     "documentation": "文件",
     "releases": "發布版本",

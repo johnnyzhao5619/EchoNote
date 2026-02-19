@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, computed } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useGitHubApi } from '../composables/useGitHubApi'
 import { githubConfig, projectConfig } from '../config/project'
@@ -18,7 +18,7 @@ const props = withDefaults(defineProps<Props>(), {
   repository: `${githubConfig.owner}/${githubConfig.repo}`,
   refreshInterval: 300000,
   showLanguage: true,
-  showRelease: true
+  showRelease: true,
 })
 
 const [owner, repo] = props.repository.split('/')
@@ -26,7 +26,8 @@ if (!owner || !repo) {
   throw new Error('Invalid repository format. Expected "owner/repo"')
 }
 
-const { stats, loading, error, fetchAll, repository: repoData, latestRelease } = useGitHubApi(owner, repo)
+const { stats, loading, error, fetchAll, refresh, repository: repoData, latestRelease } =
+  useGitHubApi(owner, repo)
 
 const compactFormatter = new Intl.NumberFormat(undefined, {
   notation: 'compact',
@@ -51,28 +52,22 @@ const statsItems = computed(() => {
       icon: '⭐',
       label: t('github.stars'),
       value: formatNumber(stats.value.stars),
-      color: 'text-yellow-600',
-      bgColor: 'bg-yellow-50',
-      borderColor: 'border-yellow-200'
+      tone: 'bg-amber-50 border-amber-200 text-amber-700',
     },
     {
       id: 'forks',
       icon: '🍴',
       label: t('github.forks'),
       value: formatNumber(stats.value.forks),
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-50',
-      borderColor: 'border-blue-200'
+      tone: 'bg-sky-50 border-sky-200 text-sky-700',
     },
     {
       id: 'issues',
       icon: '🐛',
       label: t('github.issues'),
       value: formatNumber(stats.value.issues),
-      color: 'text-rose-600',
-      bgColor: 'bg-rose-50',
-      borderColor: 'border-rose-200'
-    }
+      tone: 'bg-rose-50 border-rose-200 text-rose-700',
+    },
   ]
 })
 
@@ -83,7 +78,7 @@ onMounted(() => {
 
   if (props.refreshInterval > 0) {
     refreshTimer = setInterval(() => {
-      void fetchAll()
+      void refresh()
     }, props.refreshInterval)
   }
 })
@@ -99,7 +94,7 @@ onUnmounted(() => {
   <section id="github-stats" aria-labelledby="github-title" class="section-shell bg-slate-50">
     <div class="site-container">
       <div class="section-head mb-14">
-        <h2 id="github-title" class="mb-3 text-3xl font-bold text-slate-900 sm:text-4xl">
+        <h2 id="github-title" class="mb-3 text-3xl font-semibold text-slate-900 sm:text-4xl">
           {{ t('github.title') }}
         </h2>
         <p class="mx-auto max-w-3xl text-lg text-slate-600">
@@ -111,10 +106,10 @@ onUnmounted(() => {
       </div>
 
       <div v-if="loading && !stats" aria-live="polite" class="text-center">
-        <div class="inline-flex items-center rounded-lg bg-white px-6 py-3 shadow-md">
-          <svg class="-ml-1 mr-3 h-5 w-5 animate-spin text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        <div class="inline-flex items-center rounded-lg border border-slate-200 bg-white px-5 py-3 text-sm text-slate-600 shadow-sm">
+          <svg class="mr-2 h-4 w-4 animate-spin text-blue-600" viewBox="0 0 24 24" fill="none">
+            <circle class="opacity-30" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-90" d="M22 12a10 10 0 00-10-10" stroke="currentColor" stroke-width="4" stroke-linecap="round"></path>
           </svg>
           {{ t('github.loading') }}
         </div>
@@ -122,46 +117,47 @@ onUnmounted(() => {
 
       <div v-else-if="error" class="text-center">
         <div class="inline-flex items-center rounded-lg border border-rose-200 bg-rose-50 px-6 py-3 text-rose-700">
-          <svg class="mr-2 h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
-          </svg>
           {{ t('github.error') }}
         </div>
       </div>
 
-      <div v-else-if="stats" class="space-y-10">
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-6">
+      <div v-else-if="stats" class="space-y-8">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <article
             v-for="item in statsItems"
             :key="item.id"
-            :class="`group relative overflow-hidden rounded-xl border-2 p-5 text-center transition-all duration-300 hover:-translate-y-1 hover:shadow-lg ${item.bgColor} ${item.borderColor}`"
+            :class="['rounded-xl border p-5 text-center transition hover:-translate-y-0.5 hover:shadow-md', item.tone]"
           >
-            <div class="mb-2 text-3xl transition-transform duration-300 group-hover:scale-110">{{ item.icon }}</div>
-            <div :class="`mb-1 text-3xl font-bold ${item.color}`">
-              {{ item.value }}
-            </div>
-            <div class="text-sm font-medium text-slate-600 sm:text-base">
-              {{ item.label }}
-            </div>
+            <div class="mb-2 text-2xl">{{ item.icon }}</div>
+            <div class="text-3xl font-semibold">{{ item.value }}</div>
+            <div class="mt-1 text-sm text-slate-600">{{ item.label }}</div>
           </article>
         </div>
 
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 sm:gap-6">
-          <article class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-300 hover:border-blue-200 hover:shadow-md">
-            <h3 class="mb-4 text-lg font-semibold text-slate-900 sm:text-xl">
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <article class="landing-card p-6">
+            <h3 class="mb-3 text-lg font-semibold text-slate-900">
               {{ t('github.repository') }}
             </h3>
             <p class="mb-4 text-sm leading-relaxed text-slate-600 sm:text-base">
               {{ repoData?.description }}
             </p>
             <div class="flex flex-wrap gap-2">
-              <span v-if="showLanguage && repoData?.language" class="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800 sm:text-sm">
+              <span
+                v-if="showLanguage && repoData?.language"
+                class="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800"
+              >
                 {{ repoData.language }}
               </span>
-              <span v-if="repoData?.license?.name" class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 sm:text-sm">
+              <span
+                v-if="repoData?.license?.name"
+                class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700"
+              >
                 {{ t('github.license') }}: {{ repoData.license.name }}
               </span>
-              <span class="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-800 sm:text-sm">
+              <span
+                class="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-800"
+              >
                 {{ t('github.openSource') }}
               </span>
             </div>
@@ -170,22 +166,22 @@ onUnmounted(() => {
             </p>
           </article>
 
-          <article v-if="showRelease" class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-300 hover:border-indigo-200 hover:shadow-md">
-            <h3 class="mb-4 text-lg font-semibold text-slate-900 sm:text-xl">
+          <article v-if="showRelease" class="landing-card p-6">
+            <h3 class="mb-3 text-lg font-semibold text-slate-900">
               {{ t('github.latestRelease') }}
             </h3>
-            <div v-if="latestRelease">
-              <div class="mb-2 text-2xl font-bold text-blue-600">
+            <div v-if="latestRelease" class="space-y-2">
+              <p class="text-2xl font-semibold text-blue-700">
                 {{ latestRelease.tag_name }}
-              </div>
-              <div class="text-sm text-slate-600">
+              </p>
+              <p class="text-sm text-slate-600">
                 {{ t('github.released') }} {{ formatDate(latestRelease.published_at) }}
-              </div>
+              </p>
               <a
                 :href="latestRelease.html_url"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="mt-3 inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-800 sm:text-base"
+                class="inline-flex items-center text-sm font-medium text-blue-700 hover:text-blue-900"
               >
                 {{ t('github.viewRelease') }}
                 <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -193,21 +189,16 @@ onUnmounted(() => {
                 </svg>
               </a>
             </div>
-            <p v-else class="text-sm text-slate-500 sm:text-base">
+            <p v-else class="text-sm text-slate-500">
               {{ t('github.noReleases') }}
             </p>
           </article>
         </div>
 
         <div class="text-center">
-          <a
-            :href="projectConfig.githubUrl"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="ui-primary-action"
-          >
-            <GitHubIcon icon-class="mr-2 h-5 w-5 sm:mr-3 sm:h-6 sm:w-6" />
-            {{ t('github.viewOnGitHub') }}
+          <a :href="projectConfig.githubUrl" target="_blank" rel="noopener noreferrer" class="ui-primary-action">
+            <GitHubIcon icon-class="h-5 w-5" />
+            <span>{{ t('github.viewOnGitHub') }}</span>
           </a>
         </div>
       </div>

@@ -2,13 +2,11 @@ import './assets/main.css'
 
 import { createApp, watch } from 'vue'
 import App from './App.vue'
-import router from './router'
 import i18n from './i18n'
 import { LOCALE_STORAGE_KEY } from './i18n/locales'
 
 const app = createApp(App)
 
-app.use(router)
 app.use(i18n)
 
 const syncLocaleToDocument = (locale: string) => {

@@ -2,20 +2,24 @@
 
 Vue 3 + TypeScript + Tailwind CSS landing site for EchoNote.
 
-This is the only actively maintained landing implementation.  
+This is the only actively maintained landing implementation.
 The old static page under `docs/landing/` is archived and should not receive feature updates.
-The site is intentionally maintained as a single-page landing (`/` only).
 
-## v1.3.3 Highlights
+## Current Architecture
 
-- Fixed stale settings API references in desktop settings flows after `SettingsManager` refactor.
-- Aligned settings save/rollback path with `ConfigManager` (`get_all` / `save` / `replace_all`).
+- Single-page landing (`/`) without client-side routing.
+- Data-driven sections: Hero, Features, How It Works, GitHub Stats, Footer.
+- i18n-first copy: all user-facing text lives in `src/locales/*.json`.
+- Centralized link composition through `src/composables/useProjectLinks.ts`.
+- Runtime GitHub metrics with short-lived session cache in `src/composables/useGitHubApi.ts`.
 
-- Single-page information architecture (removed legacy `/about` route and template residue).
-- Header navigation hardening across breakpoints (`md`/`lg`/`xl`), including compact `More` menu behavior.
-- Fixed narrow-width menu toggle mismatch causing "X only" state.
-- Reworked language switcher to stable select control with persisted locale and synchronized `<html lang>`.
-- Removed frontend-stack promo section from the landing page to keep product messaging focused.
+## Latest Refactor Highlights
+
+- Removed redundant routing stack (`vue-router`, `src/router`, `src/views/HomeView.vue`).
+- Consolidated repeated navigation/resource link logic into one composable.
+- Simplified header interaction model (desktop + mobile from one source of truth).
+- Reworked style system around shared layout/action/card primitives in `src/assets/main.css`.
+- Removed stale and unused source assets/icons/composables.
 
 ## Development
 
@@ -24,32 +28,32 @@ npm install
 npm run dev
 ```
 
-## Build
+## Quality Checks
 
 ```bash
+npm run lint
+npm run type-check
 npm run build
-npm run preview
 ```
 
 ## Source of Truth
 
-To avoid content drift across page and docs, keep these files aligned:
+Keep these files aligned to avoid content or behavior drift:
 
-- `src/config/project.ts`: repository links, SEO metadata, feature ordering, release tag.
-- `src/locales/*.json`: all user-facing copy (hero, feature cards, workflow, navigation labels).
-- `src/composables/useGitHubApi.ts`: runtime repository statistics source (GitHub API).
-- `src/i18n/locales.ts`: supported locales and initial locale resolution.
+- `src/config/project.ts`: repository links, SEO metadata, feature order, release tag.
+- `src/locales/*.json`: all translatable copy.
+- `src/composables/useProjectLinks.ts`: section/resource/quick/footer links.
+- `src/composables/useGitHubApi.ts`: GitHub API integration and cache behavior.
+- `src/assets/main.css`: shared design tokens and reusable UI utilities.
 
-Do not hardcode version strings, release text, or docs links directly inside components.
+Do not hardcode copy or repository links directly inside components.
 
-## UI/UX Baseline
+## Asset Policy
 
-- Unified container and spacing utilities in `src/assets/main.css`: `.site-container`, `.section-shell`.
-- Single page heading (`h1`) in hero; section headings use `h2`.
-- Keyboard and accessibility support: skip link, focus states, semantic landmarks.
-- Locale UX: user-selected language is persisted to `localStorage`, and `<html lang>` is synchronized.
-- Open source resource visibility: docs, issues, releases, license, contributing links.
+- Keep only referenced files in `public/`.
+- Prefer one canonical asset per semantic role (logo, banner, og image, favicon).
+- Remove generated/legacy source assets in `src/assets/` when no longer referenced.
 
 ## Deployment
 
-See `DEPLOYMENT.md` for GitHub Pages setup and workflow details.
+See `DEPLOYMENT.md` for GitHub Pages setup, base-path strategy, and release checklist.

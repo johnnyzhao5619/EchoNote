@@ -13,7 +13,8 @@
       "issues": "Issues",
       "releases": "Releases",
       "license": "License"
-    }
+    },
+    "previewAlt": "EchoNote interface preview"
   },
   "header": {
     "github": "View on GitHub",
@@ -103,6 +104,7 @@
     "copyright": "Copyright",
     "openSource": "Open Source Resources",
     "links": "Links",
+    "summary": "EchoNote is a local-first desktop workflow for voice transcription, live recording, and calendar-aware timelines that turn meetings into actionable records.",
     "sourceCode": "Source Code",
     "documentation": "Documentation",
     "releases": "Releases",
