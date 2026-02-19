@@ -13,8 +13,8 @@ Workflow file: `.github/workflows/deploy-landing.yml`
 
 Trigger:
 
-- Push to `main` under path `echonote-landing/**`
-- Manual `workflow_dispatch`
+- Push to `main`
+- Manual `workflow_dispatch` (must run on `main` ref)
 
 Pipeline steps:
 

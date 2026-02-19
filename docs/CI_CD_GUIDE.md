@@ -75,7 +75,7 @@
 **触发条件：**
 
 - push 到 `main`
-- `workflow_dispatch`
+- `workflow_dispatch`（仅 `main` ref 会执行构建与部署）
 
 **职责：**
 
