@@ -64,7 +64,7 @@ jobs:
       - name: Run code quality checks
         run: |
           black --check .
-          isort --check .
+          isort --check-only .
           flake8 .
           mypy .
           bandit -c pyproject.toml -r .
