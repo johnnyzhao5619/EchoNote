@@ -24,16 +24,23 @@ import shutil
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (
+from ui.qt_imports import (
     QCheckBox,
     QComboBox,
     QDoubleSpinBox,
     QFileDialog,
+    QFormLayout,
     QLabel,
     QLineEdit,
     QSlider,
     QSpinBox,
+    Qt,
+    QVBoxLayout,
+)
+from ui.base_widgets import (
+    create_button,
+    create_hbox,
+    create_vbox,
 )
 
 from config.constants import (

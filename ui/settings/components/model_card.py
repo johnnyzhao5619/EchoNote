@@ -5,14 +5,14 @@ import logging
 from datetime import datetime
 from typing import Union
 
-from PySide6.QtCore import Signal
-from PySide6.QtGui import QFont
-from PySide6.QtWidgets import (
+from ui.qt_imports import (
+    QFont,
     QFrame,
     QLabel,
     QProgressBar,
     QPushButton,
     QVBoxLayout,
+    Signal,
 )
 
 from core.models.registry import ModelInfo

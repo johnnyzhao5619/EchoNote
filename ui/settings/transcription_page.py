@@ -22,13 +22,14 @@ Provides UI for configuring batch transcription settings.
 import logging
 from pathlib import Path
 from typing import Any, Dict, Tuple
-from PySide6.QtWidgets import (
+from ui.qt_imports import (
     QComboBox,
     QFileDialog,
     QFormLayout,
     QGroupBox,
     QLabel,
     QLineEdit,
+    QPushButton,
     QSpinBox,
     QVBoxLayout,
 )
@@ -337,7 +338,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         Args:
             parent_layout: Parent layout to add widgets to
         """
-        from PySide6.QtWidgets import QFormLayout, QGroupBox, QPushButton
+        # Lazy load removed - now at module level via ui.qt_imports
 
         # OpenAI API Key
         self.openai_group = QGroupBox(self.i18n.t("settings.transcription.cloud_api_openai"))

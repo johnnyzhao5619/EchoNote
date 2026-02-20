@@ -22,8 +22,13 @@ Provides common functionality for all settings pages.
 import logging
 from typing import Tuple, TypedDict
 
-from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QLabel, QScrollArea, QWidget
+from ui.qt_imports import (
+    QLabel,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+    Signal,
+)
 
 from ui.base_widgets import BaseWidget, create_hbox, create_vbox
 from ui.constants import (

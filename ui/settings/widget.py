@@ -23,8 +23,7 @@ for configuring all application features.
 import logging
 from typing import Any, Dict
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import (
+from ui.qt_imports import (
     QFrame,
     QLabel,
     QListWidget,
@@ -32,8 +31,10 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QStackedWidget,
+    Qt,
     QVBoxLayout,
     QWidget,
+    Signal,
 )
 
 from ui.base_widgets import BaseWidget, create_hbox, create_primary_button, create_secondary_button

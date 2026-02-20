@@ -70,10 +70,13 @@ from PySide6.QtGui import (
 # Widget classes
 from PySide6.QtWidgets import (  # Layout classes; Container widgets; Input widgets; Display widgets; Item widgets; Item views; Menu and toolbar; Spacers
     QApplication,
+    QButtonGroup,
     QCheckBox,
     QComboBox,
     QDateEdit,
+    QDateTimeEdit,
     QDialog,
+    QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
     QFrame,
@@ -135,7 +138,9 @@ __all__ = [
     "QRadioButton",
     "QSlider",
     "QSpinBox",
+    "QDoubleSpinBox",
     "QProgressBar",
+    "QButtonGroup",
     "QListWidget",
     "QListWidgetItem",
     "QTreeWidget",
@@ -176,5 +181,7 @@ __all__ = [
     "QRect",
     "QKeySequence",
     "QDateEdit",
+    "QDateTimeEdit",
     "QTextDocument",
+    "QFont",
 ]

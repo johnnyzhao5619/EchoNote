@@ -23,15 +23,24 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
-from PySide6.QtCore import QDate, QLocale, Qt, Signal
-from PySide6.QtWidgets import (
+from ui.qt_imports import (
+    QBrush,
+    QColor,
+    QDate,
+    QFont,
     QFrame,
     QGridLayout,
     QLabel,
+    QLocale,
+    QPainter,
+    QPen,
     QPushButton,
+    QRect,
     QScrollArea,
+    Qt,
     QVBoxLayout,
     QWidget,
+    Signal,
 )
 
 from ui.base_widgets import BaseWidget

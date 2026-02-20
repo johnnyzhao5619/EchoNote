@@ -22,9 +22,7 @@
 import logging
 from typing import Dict, Union
 
-from PySide6.QtCore import Slot
-from PySide6.QtGui import QFont
-from PySide6.QtWidgets import (
+from ui.qt_imports import (
     QCheckBox,
     QComboBox,
     QDialog,
@@ -38,6 +36,7 @@ from PySide6.QtWidgets import (
     QTabWidget,
     QVBoxLayout,
     QWidget,
+    Slot,
 )
 
 from config.constants import (

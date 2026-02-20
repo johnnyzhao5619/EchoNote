@@ -23,19 +23,22 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, Optional
 
-from PySide6.QtCore import QDateTime, QLocale, Signal
-from PySide6.QtWidgets import (
+from ui.qt_imports import (
     QCheckBox,
     QComboBox,
+    QDate,
+    QDateTime,
     QDateTimeEdit,
     QDialog,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
     QLineEdit,
+    QLocale,
     QTextEdit,
     QVBoxLayout,
     QWidget,
+    Signal,
 )
 
 from core.calendar.constants import EventType

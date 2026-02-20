@@ -22,8 +22,12 @@ Provides UI for configuring language preferences.
 import logging
 from typing import Tuple
 
-from PySide6.QtWidgets import QComboBox, QLabel
-
+from ui.qt_imports import (
+    QComboBox,
+    QFormLayout,
+    QLabel,
+    QVBoxLayout,
+)
 from ui.settings.base_page import BaseSettingsPage
 from utils.i18n import I18nQtManager, get_language_display_name, get_translation_codes
 

@@ -23,7 +23,13 @@ import logging
 from typing import Any, Dict, Tuple
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QComboBox, QFrame, QLabel, QVBoxLayout
+from ui.qt_imports import (
+    QComboBox,
+    QFormLayout,
+    QFrame,
+    QLabel,
+    QVBoxLayout,
+)
 
 from ui.common.theme import ThemeManager
 from ui.constants import SETTINGS_PREVIEW_MIN_HEIGHT

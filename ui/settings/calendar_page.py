@@ -22,14 +22,23 @@ Provides UI for managing external calendar account connections.
 import logging
 from typing import Any, Dict, Tuple
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (
+from ui.qt_imports import (
+    QCheckBox,
+    QFormLayout,
+    QGroupBox,
     QLabel,
     QListWidget,
     QListWidgetItem,
     QMessageBox,
+    QProgressBar,
+    QPushButton,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
+    Qt,
+    Signal,
+    Slot,
 )
-
 from ui.base_widgets import create_button, create_hbox
 from ui.constants import CALENDAR_ACCOUNTS_LIST_MIN_HEIGHT
 from ui.settings.base_page import BaseSettingsPage

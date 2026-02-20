@@ -22,8 +22,14 @@ Provides UI for configuring timeline view and auto-task settings.
 import logging
 from typing import Tuple
 
-from PySide6.QtWidgets import QCheckBox, QComboBox, QLabel, QSpinBox
-
+from ui.qt_imports import (
+    QCheckBox,
+    QComboBox,
+    QFormLayout,
+    QLabel,
+    QSpinBox,
+    QVBoxLayout,
+)
 from config.constants import (
     STANDARD_LABEL_WIDTH,
     TIMELINE_AUTO_STOP_GRACE_MAX_MINUTES,

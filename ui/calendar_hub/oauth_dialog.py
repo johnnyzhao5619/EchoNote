@@ -29,15 +29,16 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Optional, Tuple
 from urllib.parse import parse_qs, urlparse
 
-from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtWidgets import (
+from ui.qt_imports import (
     QDialog,
     QHBoxLayout,
     QLabel,
-    QMessageBox,
-    QProgressBar,
-    QTextEdit,
+    QLineEdit,
+    QPushButton,
+    Qt,
+    QTimer,
     QVBoxLayout,
+    Signal,
 )
 
 from ui.base_widgets import (
