@@ -5,6 +5,27 @@ All notable changes to EchoNote will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.7] - 2026-02-19
+
+### Added
+
+- **Automated Event Transcription**: Introduced `CalendarAutoTaskScheduler` using APScheduler to automatically trigger transcription when scheduled events end.
+- **High-Quality Re-transcription**: Added "Secondary Transcription (HQ)" capability for both real-time recordings and historical calendar events, allowing users to re-process audio with higher-precision models.
+- **Quick Event Creation**: Implemented direct event creation by clicking on empty dates in the Calendar Hub (Month/Week views).
+- **Secondary Transcription UI**: Integrated HQ transcription triggers in both Timeline and Calendar Hub `EventDialog`.
+
+### Fixed
+
+- **Calendar Hub Click Conflict**: Resolved issue where clicking an existing event simultaneously triggered the creation dialog by improving mouse event propagation control in `EventCard`.
+- **Audio Player Pathing**: Fixed bug where `AudioPlayer` failed to load transcripts if the filename didn't follow simple extension-replacement conventions.
+- **Export Robustness**: Relaxed `FormatConverter` validation to allow exporting recordings with no detected speech (empty segments), preventing crashes on silent audio.
+- **UI & Initialization Regressions**: Fixed `QWidget` NameError in `EventDialog` and `calendar_manager` KeyError during background service startup.
+
+### Changed
+
+- **UX Optimization**: Automatically hide the "Auto-transcribe" checkbox for historical events in `EventDialog` to reduce redundant options.
+- **I18n Coverage**: Expanded translation keys for transcription controls and calendar status indicators.
+
 ## [1.3.6] - 2026-02-19
 
 ### Changed

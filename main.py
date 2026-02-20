@@ -440,7 +440,7 @@ def main():
             DEFAULT_STOP_CONFIRMATION_DELAY_MINUTES,
         )
 
-        from utils.app_initializer import create_auto_task_scheduler, create_sync_scheduler
+        from utils.app_initializer import create_auto_task_scheduler, create_sync_scheduler, create_calendar_auto_task_scheduler
 
         bg_init_functions = [
             (
@@ -461,6 +461,14 @@ def main():
                     i18n,
                 ),
             ),
+            (
+                "calendar_auto_task_scheduler",
+                lambda: create_calendar_auto_task_scheduler(
+                    calendar_manager,
+                    transcription_manager,
+                    polling_interval_minutes=15,
+                ),
+            ),
         ]
 
         bg_init = BackgroundInitializer(bg_init_functions)
@@ -474,7 +482,7 @@ def main():
 
             from utils.post_init_tasks import start_background_services
 
-            start_background_services(results, config, db, logger)
+            start_background_services(managers, config, db, logger)
 
         bg_init.finished.connect(on_background_init_complete)
         bg_init.start()

@@ -29,6 +29,7 @@ from data.database.models import (
     CalendarEventLink,
     CalendarSyncStatus,
     EventAttachment,
+    AutoTaskConfig,
 )
 from core.calendar.constants import CalendarSource, EventType, SyncStatus
 from core.calendar.exceptions import CalendarError, EventNotFoundError, SyncError
@@ -72,7 +73,12 @@ class CalendarManager:
         self.sync_adapters = sync_adapters or {}
         self.oauth_manager = oauth_manager
         self.file_manager = file_manager
+        self.calendar_auto_task_scheduler = None
         logger.info("CalendarManager initialized")
+
+    def set_calendar_auto_task_scheduler(self, scheduler):
+        """Set the auto task scheduler for post-event processing."""
+        self.calendar_auto_task_scheduler = scheduler
 
     def create_event(self, event_data: dict, sync_to: Optional[List[str]] = None) -> str:
         """
@@ -147,6 +153,16 @@ class CalendarManager:
                     else:
                         logger.warning(f"Sync adapter for {provider} not found")
 
+            # Save auto task config if provided
+            if "auto_transcribe" in event_data:
+                config = AutoTaskConfig(
+                    event_id=event.id,
+                    enable_transcription=bool(event_data["auto_transcribe"])
+                )
+                config.save(self.db)
+                if self.calendar_auto_task_scheduler:
+                    self.calendar_auto_task_scheduler.schedule_event_task(event, config)
+
             return event.id
 
         except Exception as e:
@@ -210,6 +226,20 @@ class CalendarManager:
 
             event.save(self.db)
             logger.info(f"Updated event: {event_id}")
+
+            # Update auto task config if provided
+            if "auto_transcribe" in event_data:
+                config = AutoTaskConfig.get_by_event_id(self.db, event_id)
+                if config:
+                    config.enable_transcription = bool(event_data["auto_transcribe"])
+                else:
+                    config = AutoTaskConfig(
+                        event_id=event.id,
+                        enable_transcription=bool(event_data["auto_transcribe"])
+                    )
+                config.save(self.db)
+                if self.calendar_auto_task_scheduler:
+                    self.calendar_auto_task_scheduler.schedule_event_task(event, config)
 
             links = CalendarEventLink.list_for_event(self.db, event_id)
             sync_failures = []

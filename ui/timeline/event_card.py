@@ -107,10 +107,11 @@ class EventCard(QFrame):
 
     # Signals
     auto_task_changed = Signal(str, dict)  # event_id, config
-    view_recording = Signal(str)  # file_path
+    view_recording = Signal(str, str)  # file_path, event_id
     view_transcript = Signal(str)  # file_path
     view_translation = Signal(str)  # file_path
     delete_requested = Signal(str)  # event_id
+    secondary_transcribe_requested = Signal(str, str)  # event_id, recording_path
 
     EVENT_TYPE_TRANSLATION_MAP = {
         "event": "timeline.filter_event",
@@ -380,6 +381,14 @@ class EventCard(QFrame):
             # Styling is handled by theme files (dark.qss / light.qss)
             actions_layout.addWidget(self.recording_btn)
 
+            # Secondary Transcription button
+            self.secondary_transcribe_btn = create_button(
+                self.i18n.t("timeline.secondary_transcribe")
+            )
+            self.secondary_transcribe_btn.clicked.connect(self._on_secondary_transcribe)
+            self.secondary_transcribe_btn.setProperty("role", "timeline-secondary-transcribe-action")
+            actions_layout.addWidget(self.secondary_transcribe_btn)
+
         # Transcript button
         if has_transcript:
             self.transcript_btn = create_button(self.i18n.t("timeline.view_transcript"))
@@ -524,7 +533,7 @@ class EventCard(QFrame):
         recording_path = self.artifacts.get("recording")
         if recording_path:
             logger.info(f"Playing recording: {recording_path}")
-            self.view_recording.emit(recording_path)
+            self.view_recording.emit(recording_path, self.calendar_event.id)
 
     def _on_view_transcript(self):
         """Handle view transcript button click."""
@@ -539,6 +548,13 @@ class EventCard(QFrame):
         if translation_path:
             logger.info(f"Viewing translation: {translation_path}")
             self.view_translation.emit(translation_path)
+
+    def _on_secondary_transcribe(self):
+        """Handle re-transcription button click."""
+        recording_path = self.artifacts.get("recording")
+        if recording_path:
+            logger.info(f"Requesting secondary transcription for event {self.calendar_event.id}")
+            self.secondary_transcribe_requested.emit(self.calendar_event.id, recording_path)
 
     def _on_delete_clicked(self):
         """Handle delete action click."""
@@ -582,6 +598,8 @@ class EventCard(QFrame):
                 self.transcript_btn.setText(self.i18n.t("timeline.view_transcript"))
             if getattr(self, "translation_btn", None):
                 self.translation_btn.setText(self.i18n.t("timeline.view_translation"))
+            if hasattr(self, "secondary_transcribe_btn"):
+                self.secondary_transcribe_btn.setText(self.i18n.t("timeline.secondary_transcribe"))
 
             # Update no artifacts label
             for child in self.findChildren(QLabel):

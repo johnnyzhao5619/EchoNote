@@ -95,11 +95,8 @@ class FormatConverter:
             raise ValueError("Input missing 'segments' key")
 
         segments = internal_format["segments"]
-        if not isinstance(segments, list):
+        if segments and not isinstance(segments, list):
             raise ValueError("'segments' must be a list")
-
-        if not segments:
-            raise ValueError("Empty segments list")
 
     def _to_txt(self, segments: List[Dict]) -> str:
         """

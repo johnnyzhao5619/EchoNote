@@ -99,6 +99,7 @@ class AudioPlayer(BaseWidget):
         parent: Optional[QWidget] = None,
         *,
         auto_load: bool = True,
+        transcript_path: Optional[str] = None,
     ):
         """
         Initialize audio player.
@@ -108,6 +109,7 @@ class AudioPlayer(BaseWidget):
             i18n: Internationalization manager
             parent: Parent widget
             auto_load: Whether to immediately load the audio file.
+            transcript_path: Optional explicit path to the transcript file
         """
         super().__init__(i18n, parent)
 
@@ -147,7 +149,7 @@ class AudioPlayer(BaseWidget):
         # Load file when requested so callers can attach error handlers first.
         self._set_controls_enabled(False)
         if auto_load:
-            self.load_file(file_path)
+            self.load_file(file_path, transcript_path)
 
         logger.info(f"Audio player initialized: {file_path}")
 
@@ -384,12 +386,13 @@ class AudioPlayer(BaseWidget):
                 )
                 dialog.resize(dialog.width(), new_height)
 
-    def load_file(self, file_path: str):
+    def load_file(self, file_path: str, transcript_path: Optional[str] = None):
         """
         Load audio file and associated transcript.
 
         Args:
             file_path: Path to audio file
+            transcript_path: Optional explicit path to the transcript file
         """
         try:
             # Check if file exists
@@ -409,14 +412,14 @@ class AudioPlayer(BaseWidget):
             self.player.setSource(url)
 
             # Load transcript if available
-            self._load_transcript(resolved_path)
+            self._load_transcript(resolved_path, transcript_path)
 
             logger.info(f"Audio file loaded: {file_path}")
 
         except Exception as e:
             self._emit_playback_error("timeline.audio_player.load_failed", error=str(e))
 
-    def _load_transcript(self, audio_path: Path):
+    def _load_transcript(self, audio_path: Path, transcript_path: Optional[str] = None):
         """
         Load transcript file associated with audio file.
 
@@ -426,48 +429,75 @@ class AudioPlayer(BaseWidget):
 
         Args:
             audio_path: Path to audio file
+            transcript_path: Optional explicit path to the transcript file
         """
-        # Try JSON format first (with segments/timestamps)
-        json_path = audio_path.with_suffix(".json")
-        txt_path = audio_path.with_suffix(".txt")
-
         transcript_content = None
         transcript_format = None
 
-        # Try JSON format (segments with timestamps)
-        if json_path.exists():
-            try:
-                import json
+        # Helper function to attempt loading a JSON transcript
+        def load_json(path: Path) -> bool:
+            nonlocal transcript_content, transcript_format
+            if path.exists():
+                try:
+                    import json
 
-                with open(json_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
+                    with open(path, "r", encoding="utf-8") as f:
+                        data = json.load(f)
 
-                if "segments" in data and isinstance(data["segments"], list):
-                    # Format: JSON with segments (timestamped)
-                    transcript_format = "segments"
-                    transcript_content = self._format_segments_transcript(data["segments"])
-                    logger.info(f"Transcript loaded (segments): {json_path}")
-                elif isinstance(data, dict) and "text" in data:
-                    # Format: JSON with plain text
-                    transcript_content = data["text"]
-                    transcript_format = "text"
-                    logger.info(f"Transcript loaded (text): {json_path}")
-                else:
-                    logger.warning(f"Unknown JSON format in: {json_path}")
-            except Exception as e:
-                logger.warning(f"Failed to load JSON transcript: {e}")
+                    if "segments" in data and isinstance(data["segments"], list):
+                        transcript_format = "segments"
+                        transcript_content = self._format_segments_transcript(data["segments"])
+                        logger.info(f"Transcript loaded (segments): {path}")
+                        return True
+                    elif isinstance(data, dict) and "text" in data:
+                        transcript_content = data["text"]
+                        transcript_format = "text"
+                        logger.info(f"Transcript loaded (text): {path}")
+                        return True
+                    else:
+                        logger.warning(f"Unknown JSON format in: {path}")
+                except Exception as e:
+                    logger.warning(f"Failed to load JSON transcript at {path}: {e}")
+            return False
 
-        # Try plain text format if JSON not found or failed
-        if transcript_content is None and txt_path.exists():
-            try:
-                with open(txt_path, "r", encoding="utf-8") as f:
-                    transcript_content = f.read()
+        # Helper function to attempt loading a text transcript
+        def load_text(path: Path) -> bool:
+            nonlocal transcript_content, transcript_format
+            if path.exists():
+                try:
+                    with open(path, "r", encoding="utf-8") as f:
+                        content = f.read()
+                    if content.strip():
+                        transcript_content = content
+                        transcript_format = "text"
+                        logger.info(f"Transcript loaded (text): {path}")
+                        return True
+                except Exception as e:
+                    logger.warning(f"Failed to load text transcript at {path}: {e}")
+            return False
 
-                if transcript_content.strip():
-                    transcript_format = "text"
-                    logger.info(f"Transcript loaded (text): {txt_path}")
-            except Exception as e:
-                logger.warning(f"Failed to load text transcript: {e}")
+        # Try explicitly provided transcript path first
+        if transcript_path:
+            explicit_path = Path(transcript_path).expanduser().resolve()
+            if explicit_path.suffix.lower() == ".json":
+                if load_json(explicit_path):
+                    pass
+                elif load_text(explicit_path): # Fallback just in case text masquerades as json
+                    pass
+            else:
+                if load_text(explicit_path):
+                    pass
+                elif load_json(explicit_path): # Fallback
+                    pass
+
+        # If not found yet, try guessing based on audio path
+        if transcript_content is None:
+            json_path = audio_path.with_suffix(".json")
+            load_json(json_path)
+
+        if transcript_content is None:
+            txt_path = audio_path.with_suffix(".txt")
+            load_text(txt_path)
 
         # Update UI
         if transcript_content and transcript_content.strip():
@@ -835,7 +865,7 @@ class AudioPlayer(BaseWidget):
 class AudioPlayerDialog(QDialog):
     """Dialog wrapper for audio player."""
 
-    def __init__(self, file_path: str, i18n: I18nQtManager, parent: Optional[QWidget] = None):
+    def __init__(self, file_path: str, i18n: I18nQtManager, parent: Optional[QWidget] = None, transcript_path: Optional[str] = None):
         """
         Initialize audio player dialog.
 
@@ -843,6 +873,7 @@ class AudioPlayerDialog(QDialog):
             file_path: Path to audio file
             i18n: Internationalization manager
             parent: Parent widget
+            transcript_path: Optional explicit path to the transcript file
         """
         super().__init__(parent)
 
@@ -872,12 +903,13 @@ class AudioPlayerDialog(QDialog):
             i18n,
             self,
             auto_load=False,
+            transcript_path=transcript_path,
         )
         self.player.playback_error.connect(self._on_playback_error)
         layout.addWidget(self.player)
 
         # Explicitly load after signals are connected so initialization errors propagate.
-        self.player.load_file(file_path)
+        self.player.load_file(file_path, transcript_path)
 
         self.i18n.language_changed.connect(self.update_translations)
         self.update_translations()

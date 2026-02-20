@@ -147,6 +147,7 @@ class RealtimeRecordWidget(BaseWidget):
         i18n_manager,
         settings_manager: Optional[object] = None,
         model_manager=None,
+        transcription_manager: Optional[object] = None,
         parent=None,
     ):
         super().__init__(i18n_manager, parent)
@@ -155,6 +156,7 @@ class RealtimeRecordWidget(BaseWidget):
         self._audio_available = audio_capture is not None
         self.settings_manager = settings_manager
         self.model_manager = model_manager
+        self.transcription_manager = transcription_manager
         self._input_devices_by_index: Dict[int, Dict[str, Any]] = {}
         self._loopback_input_indices = set()
         self._system_audio_input_indices = set()
@@ -819,6 +821,16 @@ class RealtimeRecordWidget(BaseWidget):
         row3.addWidget(target_container)
         row3.addStretch()
         form.addRow(row3)
+
+        # Row 4: Secondary Transcription (High Quality)
+        row4 = create_hbox(spacing=PAGE_COMPACT_SPACING)
+        self.secondary_transcription_checkbox = QCheckBox(
+            self.i18n.t("realtime_record.secondary_transcription", default="Secondary Transcription (High Quality)")
+        )
+        self.secondary_transcription_checkbox.setObjectName("form_checkbox")
+        row4.addWidget(self.secondary_transcription_checkbox)
+        row4.addStretch()
+        form.addRow(row4)
 
         return container
 
@@ -1944,8 +1956,31 @@ class RealtimeRecordWidget(BaseWidget):
                     self._notification_manager.send_warning(title, label_message)
                 else:
                     self._notification_manager.send_success(title, detail)
+
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Failed to send success notification: %s", exc, exc_info=True)
+
+        if save_path and self.transcription_manager and getattr(self, "secondary_transcription_checkbox", None) and self.secondary_transcription_checkbox.isChecked():
+            try:
+                # Add a high-quality transcription task with replace_realtime flag
+                options = {
+                    "replace_realtime": True,
+                    "event_id": event_id
+                }
+                
+                # Fetch language selection
+                if hasattr(self, "source_lang_combo"):
+                    lang = self.source_lang_combo.currentData()
+                    if lang and lang != "auto":
+                        options["language"] = lang
+                        
+                self.transcription_manager.add_task(
+                    file_path=save_path,
+                    options=options
+                )
+                logger.info(f"Queued secondary transcription for {save_path}")
+            except Exception as e:
+                logger.error(f"Failed to queue secondary transcription: {e}")
 
     def _refresh_event_views(self) -> None:
         """Refresh timeline and calendar views after recording event creation."""

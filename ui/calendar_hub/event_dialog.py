@@ -23,7 +23,7 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, Optional
 
-from PySide6.QtCore import QDateTime
+from PySide6.QtCore import QDateTime, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -35,6 +35,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QTextEdit,
     QVBoxLayout,
+    QWidget,
 )
 
 from ui.base_widgets import (
@@ -57,12 +58,16 @@ class EventDialog(QDialog):
     Provides form for event information and validation.
     """
 
+    secondary_transcribe_requested = Signal()
+
     def __init__(
         self,
         i18n: I18nQtManager,
         connected_accounts: Dict[str, str],
         event_data: Optional[Dict[str, Any]] = None,
-        parent: Optional[QDialog] = None,
+        parent: Optional[QWidget] = None,
+        allow_retranscribe: bool = False,
+        is_past: bool = False,
     ):
         """
         Initialize event dialog.
@@ -80,6 +85,8 @@ class EventDialog(QDialog):
         self.connected_accounts = connected_accounts
         self.event_data = event_data
         self.is_edit_mode = event_data is not None
+        self.allow_retranscribe = allow_retranscribe
+        self.is_past = is_past
 
         # Result data
         self.result_data: Optional[Dict[str, Any]] = None
@@ -206,6 +213,14 @@ class EventDialog(QDialog):
         )
         form.addRow(self.i18n.t("calendar_hub.event_dialog.reminder_label"), self.reminder_combo)
 
+        # Auto-transcribe (optional)
+        self.auto_transcribe_checkbox = QCheckBox(
+            self.i18n.t("calendar_hub.event_dialog.auto_transcribe", default="Auto-transcribe when event ends")
+        )
+        if self.is_past:
+            self.auto_transcribe_checkbox.hide()
+        form.addRow("", self.auto_transcribe_checkbox)
+
         return form
 
     def _create_sync_options(self) -> QGroupBox:
@@ -248,6 +263,14 @@ class EventDialog(QDialog):
             delete_btn.setProperty("role", "danger")
             connect_button_with_callback(delete_btn, self._on_delete_clicked)
             buttons_layout.addWidget(delete_btn)
+
+            # Check if we should show secondary transcription button
+            if self.allow_retranscribe:
+                retranscribe_btn = create_button(
+                    self.i18n.t("timeline.secondary_transcribe", default="Secondary Transcription (HQ)")
+                )
+                connect_button_with_callback(retranscribe_btn, self._on_secondary_transcribe_clicked)
+                buttons_layout.addWidget(retranscribe_btn)
 
         buttons_layout.addStretch()
 
@@ -320,6 +343,10 @@ class EventDialog(QDialog):
             index = reminder_map.get(minutes, 0)
             self.reminder_combo.setCurrentIndex(index)
 
+        # Auto-transcribe
+        if "auto_transcribe" in self.event_data:
+            self.auto_transcribe_checkbox.setChecked(bool(self.event_data["auto_transcribe"]))
+
     def _on_save_clicked(self):
         """Handle save button click."""
         # Validate form
@@ -346,6 +373,11 @@ class EventDialog(QDialog):
 
         self._delete_requested = True
         self.result_data = {"id": event_id}
+        self.accept()
+
+    def _on_secondary_transcribe_clicked(self):
+        """Handle secondary transcription button click."""
+        self.secondary_transcribe_requested.emit()
         self.accept()
 
     def is_delete_requested(self) -> bool:
@@ -433,6 +465,7 @@ class EventDialog(QDialog):
             "description": self.description_input.toPlainText().strip() or None,
             "reminder_minutes": reminder_minutes,
             "sync_to": sync_to if sync_to else None,
+            "auto_transcribe": getattr(self, "auto_transcribe_checkbox", QCheckBox()).isChecked(),
         }
 
         # Add event ID if editing

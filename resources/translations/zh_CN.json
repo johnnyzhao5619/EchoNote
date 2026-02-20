@@ -206,7 +206,8 @@
     },
     "export_success": "导出成功",
     "transcription": "转写",
-    "translation": "翻译"
+    "translation": "翻译",
+    "secondary_transcription": "二次转写（高质量）"
   },
   "calendar_hub": {
     "title": "日历中心",
@@ -256,7 +257,8 @@
       "validation_error": "校验错误",
       "title_required": "标题不能为空。",
       "end_after_start": "结束时间必须晚于开始时间。",
-      "invalid_email": "邮箱格式无效：{email}"
+      "invalid_email": "邮箱格式无效：{email}",
+      "auto_transcribe": "结束后自动转写"
     },
     "oauth_dialog": {
       "ready_to_authorize": "准备授权",
@@ -371,6 +373,7 @@
     "play_recording": "播放录音",
     "view_transcript": "查看转写",
     "view_translation": "查看翻译",
+    "secondary_transcribe": "二次转写（高质量）",
     "translation_viewer_title": "翻译查看器",
     "no_artifacts": "无关联内容",
     "audio_player_title": "音频播放器",

@@ -91,6 +91,7 @@ class TimelineWidget(BaseWidget):
     def __init__(
         self,
         timeline_manager,
+        transcription_manager,
         i18n: I18nQtManager,
         parent: Optional[QWidget] = None,
         settings_manager: Optional[object] = None,
@@ -106,6 +107,7 @@ class TimelineWidget(BaseWidget):
         super().__init__(i18n, parent)
 
         self.timeline_manager = timeline_manager
+        self.transcription_manager = transcription_manager
         self.settings_manager = settings_manager
         self._settings_signal_connected = False
 
@@ -640,6 +642,7 @@ class TimelineWidget(BaseWidget):
         card.view_transcript.connect(self._on_view_transcript)
         card.view_translation.connect(self._on_view_translation)
         card.delete_requested.connect(self._on_delete_event_requested)
+        card.secondary_transcribe_requested.connect(self._on_secondary_transcribe_requested)
 
         # Insert card at appropriate position
         if is_future:
@@ -884,12 +887,13 @@ class TimelineWidget(BaseWidget):
             on_deleted=lambda: self._refresh_timeline(reset=True),
         )
 
-    def _on_view_recording(self, file_path: str):
+    def _on_view_recording(self, file_path: str, event_id: Optional[str] = None):
         """
         Handle view recording request.
 
         Args:
             file_path: Path to recording file
+            event_id: Associated event ID
         """
         try:
             audio_module = importlib.import_module("ui.timeline.audio_player")
@@ -917,7 +921,13 @@ class TimelineWidget(BaseWidget):
                 logger.info(f"Activated existing audio player for {file_path}")
                 return
 
-            dialog = AudioPlayerDialog(file_path, self.i18n, self)
+            transcript_path = None
+            if event_id:
+                card = self.get_event_card_by_id(event_id)
+                if card:
+                    transcript_path = card.artifacts.get("transcript")
+
+            dialog = AudioPlayerDialog(file_path, self.i18n, self, transcript_path)
         except Exception as exc:
             logger.exception("Failed to create audio player dialog for %s", file_path)
             title = self.i18n.t("timeline.audio_player_open_failed_title")
@@ -994,6 +1004,28 @@ class TimelineWidget(BaseWidget):
     def _on_view_translation(self, file_path: str):
         """Handle view translation request."""
         self._open_text_viewer(file_path, "timeline.translation_viewer_title")
+
+    def _on_secondary_transcribe_requested(self, event_id: str, recording_path: str):
+        """Handle request for high-quality secondary transcription of an existing event."""
+        if not self.transcription_manager:
+            logger.error("Transcription manager not available for re-transcription")
+            return
+
+        logger.info(f"Submitting high-quality re-transcription for event {event_id}")
+        options = {
+            "event_id": event_id,
+            "replace_realtime": True,
+        }
+
+        # Use event-specific language if available in auto-task config
+        try:
+            config = self.timeline_manager.get_auto_task(event_id)
+            if config and config.get("transcription_language") and config["transcription_language"] != "auto":
+                options["language"] = config["transcription_language"]
+        except Exception as e:
+            logger.warning(f"Failed to fetch auto-task config for event {event_id}, using default: {e}")
+
+        self.transcription_manager.add_task(recording_path, options=options)
 
     def update_translations(self):
         """Update UI text when language changes."""

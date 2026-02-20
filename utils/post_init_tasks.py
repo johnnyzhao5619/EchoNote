@@ -171,4 +171,12 @@ def start_background_services(managers, config, db, logger):
         except Exception as e:
             logger.error(f"Could not start auto task scheduler: {e}")
 
+    if "calendar_auto_task_scheduler" in managers and managers["calendar_auto_task_scheduler"]:
+        try:
+            logger.info("Starting calendar auto task scheduler...")
+            managers["calendar_manager"].set_calendar_auto_task_scheduler(managers["calendar_auto_task_scheduler"])
+            managers["calendar_auto_task_scheduler"].start()
+        except Exception as e:
+            logger.error(f"Could not start calendar auto task scheduler: {e}")
+
     logger.info("Background services started")

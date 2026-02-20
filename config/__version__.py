@@ -21,7 +21,7 @@ All other files should import version from this module to ensure consistency.
 """
 
 # Single source of truth for version information
-__version__ = "1.3.6"
+__version__ = "1.3.7"
 
 # Version metadata
 VERSION_INFO = {

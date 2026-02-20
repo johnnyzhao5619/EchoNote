@@ -307,6 +307,8 @@ class TranscriptionManager:
             "vad_min_silence_duration_ms",
             "prompt",
             "temperature",
+            "replace_realtime",
+            "event_id",
         }
 
         # Validate file exists
@@ -765,6 +767,8 @@ class TranscriptionManager:
 
             # Prepare engine options
             engine_kwargs = dict(self._task_engine_options.get(task_id, {}))
+            replace_realtime = engine_kwargs.pop("replace_realtime", False)
+            event_id = engine_kwargs.pop("event_id", None)
             engine_kwargs["progress_callback"] = progress_callback
             
             # Execute transcription
@@ -781,6 +785,23 @@ class TranscriptionManager:
             
             # Use helper to save internal result
             self._save_internal_result(task_id, result)
+
+            if replace_realtime:
+                try:
+                    audio_path = Path(task.file_path)
+                    json_path = audio_path.with_suffix(".json")
+                    txt_path = audio_path.with_suffix(".txt")
+                    
+                    with open(json_path, "w", encoding="utf-8") as f:
+                        json.dump(result, f, ensure_ascii=False, indent=2)
+                        
+                    if "text" in result:
+                        with open(txt_path, "w", encoding="utf-8") as f:
+                            f.write(result["text"])
+                            
+                    logger.info(f"Replaced realtime transcripts at {json_path}")
+                except Exception as e:
+                    logger.error(f"Failed to replace realtime transcripts: {e}", exc_info=True)
 
             # Finalize task
             ensure_not_cancelled("before marking task as completed")

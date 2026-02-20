@@ -68,6 +68,17 @@ def create_auto_task_scheduler(
     )
 
 
+def create_calendar_auto_task_scheduler(calendar_manager, transcription_manager, polling_interval_minutes=15):
+    """Create calendar auto task scheduler for post-event transcription tasks."""
+    from core.calendar.auto_task_scheduler import CalendarAutoTaskScheduler
+
+    return CalendarAutoTaskScheduler(
+        calendar_manager=calendar_manager,
+        transcription_manager=transcription_manager,
+        polling_interval_minutes=polling_interval_minutes,
+    )
+
+
 def create_resource_monitor_handlers(transcription_manager, i18n, logger):
     """Create handlers for resource monitor signals."""
     notification_manager = None

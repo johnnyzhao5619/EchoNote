@@ -355,6 +355,7 @@ class MainWindow(QMainWindow):
                 self.i18n,
                 settings_manager=self.managers.get("settings_manager"),
                 model_manager=self.managers.get("model_manager"),
+                transcription_manager=self.managers.get("transcription_manager"),
             ),
             missing_message=(
                 None
@@ -370,6 +371,7 @@ class MainWindow(QMainWindow):
                 self.managers["calendar_manager"],
                 self.managers["oauth_manager"],
                 self.i18n,
+                transcription_manager=self.managers["transcription_manager"],
             ),
             missing_message=self._get_calendar_missing_reason(),
         )
@@ -379,6 +381,7 @@ class MainWindow(QMainWindow):
             "timeline",
             lambda: TimelineWidget(
                 self.managers["timeline_manager"],
+                self.managers["transcription_manager"],
                 self.i18n,
                 settings_manager=self.managers.get("settings_manager"),
             ),

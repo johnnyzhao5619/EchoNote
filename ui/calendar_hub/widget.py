@@ -86,6 +86,7 @@ class CalendarHubWidget(BaseWidget):
         calendar_manager,
         oauth_manager,
         i18n: I18nQtManager,
+        transcription_manager: Optional[Any] = None,
         parent: Optional[QWidget] = None,
     ):
         """
@@ -101,6 +102,7 @@ class CalendarHubWidget(BaseWidget):
 
         self.calendar_manager = calendar_manager
         self.oauth_manager = oauth_manager
+        self.transcription_manager = transcription_manager
         self._config_manager = None
 
         # Current view and date
@@ -299,9 +301,11 @@ class CalendarHubWidget(BaseWidget):
         # Connect view signals
         self.month_view.date_changed.connect(self._on_date_changed)
         self.month_view.event_clicked.connect(self._on_event_clicked)
+        self.month_view.date_clicked.connect(self._on_calendar_date_clicked)
 
         self.week_view.date_changed.connect(self._on_date_changed)
         self.week_view.event_clicked.connect(self._on_event_clicked)
+        self.week_view.date_clicked.connect(self._on_calendar_date_clicked)
 
         self.day_view.date_changed.connect(self._on_date_changed)
         self.day_view.event_clicked.connect(self._on_event_clicked)
@@ -429,18 +433,37 @@ class CalendarHubWidget(BaseWidget):
         except Exception as e:
             logger.error(f"Error loading event: {e}")
 
-    def _show_event_dialog(self, event=None):
+    def _on_calendar_date_clicked(self, date: datetime):
+        """
+        Handle clicking on an empty date cell to create a new event.
+        
+        Args:
+            date: The datetime that was clicked
+        """
+        self._show_event_dialog(default_date=date)
+
+    def _show_event_dialog(self, event=None, default_date: Optional[datetime] = None):
         """
         Show event creation/editing dialog.
 
         Args:
             event: Optional event data for editing
+            default_date: Optional default datetime for creating a new event
         """
         from ui.calendar_hub.event_dialog import EventDialog
 
         # Prepare event data for dialog
         event_data = None
         if event:
+            auto_transcribe = False
+            try:
+                from data.database.models import AutoTaskConfig
+                config = AutoTaskConfig.get_by_event_id(self.calendar_manager.db, event.id)
+                if config:
+                    auto_transcribe = config.enable_transcription
+            except Exception as e:
+                logger.warning(f"Failed to fetch AutoTaskConfig for event {event.id}: {e}")
+
             event_data = {
                 "id": event.id,
                 "title": event.title,
@@ -451,10 +474,65 @@ class CalendarHubWidget(BaseWidget):
                 "attendees": event.attendees,
                 "description": event.description,
                 "reminder_minutes": event.reminder_minutes,
+                "auto_transcribe": auto_transcribe,
+            }
+        elif default_date:
+            now = datetime.now()
+            from datetime import timedelta
+            if default_date.date() == now.date():
+                start_dt = now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+            else:
+                start_dt = default_date.replace(hour=9, minute=0, second=0, microsecond=0)
+            end_dt = start_dt + timedelta(hours=1)
+            event_data = {
+                "start_time": start_dt.isoformat(),
+                "end_time": end_dt.isoformat(),
             }
 
         # Show dialog
-        dialog = EventDialog(self.i18n, self.connected_accounts, event_data, self)
+        recording_path = None
+        allow_retranscribe = False
+        is_past = False
+
+        now = datetime.now()
+
+        if event:
+            try:
+                from data.database.models import EventAttachment
+                attachments = EventAttachment.get_by_event_id(self.calendar_manager.db, event.id)
+                for attachment in attachments:
+                    if attachment.attachment_type == "recording":
+                        recording_path = attachment.file_path
+                        break
+
+                # Check if event is in the past
+                start_time = datetime.fromisoformat(event.start_time.replace("Z", "+00:00"))
+                if start_time < now.astimezone(start_time.tzinfo) if start_time.tzinfo else now:
+                    is_past = True
+                    if recording_path and self.transcription_manager:
+                        allow_retranscribe = True
+
+            except Exception as e:
+                logger.warning(f"Failed to fetch attachments or parse time for event {event.id}: {e}")
+        elif default_date:
+            # Check if default_date is in the past for new events
+            # default_date is typically naive from what I saw in calendar_view
+            if default_date < now:
+                is_past = True
+
+        dialog = EventDialog(
+            self.i18n,
+            self.connected_accounts,
+            event_data,
+            parent=self,
+            allow_retranscribe=allow_retranscribe,
+            is_past=is_past,
+        )
+
+        if allow_retranscribe and recording_path:
+            dialog.secondary_transcribe_requested.connect(
+                lambda p=recording_path, eid=event.id: self._on_secondary_transcribe_requested(eid, p)
+            )
 
         if dialog.exec() == QDialog.DialogCode.Accepted:
             # Get event data
@@ -1385,3 +1463,17 @@ class CalendarHubWidget(BaseWidget):
 
         except Exception as e:
             logger.error(f"Error loading connected accounts: {e}")
+
+    def _on_secondary_transcribe_requested(self, event_id: str, recording_path: str):
+        """Handle request for high-quality secondary transcription of an existing event."""
+        if not self.transcription_manager:
+            logger.error("Transcription manager not available for re-transcription")
+            return
+
+        logger.info(f"Submitting high-quality re-transcription from Calendar Hub for event {event_id}")
+        options = {
+            "event_id": event_id,
+            "replace_realtime": True,
+        }
+
+        self.transcription_manager.add_task(recording_path, options=options)

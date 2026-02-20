@@ -130,6 +130,34 @@ def _load_events_safe(calendar_manager: Any, start_date: datetime, end_date: dat
         return []
 
 
+class ClickableDayFrame(QFrame):
+    """A calendar day cell (MonthView) that can be clicked."""
+    clicked = Signal(datetime)
+
+    def __init__(self, date: datetime, parent=None):
+        super().__init__(parent)
+        self.date = date
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+    def mousePressEvent(self, event):
+        super().mousePressEvent(event)
+        self.clicked.emit(self.date)
+
+
+class ClickableDayWidget(QWidget):
+    """A calendar day column (WeekView) that can be clicked."""
+    clicked = Signal(datetime)
+
+    def __init__(self, date: datetime, parent=None):
+        super().__init__(parent)
+        self.date = date
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+    def mousePressEvent(self, event):
+        super().mousePressEvent(event)
+        self.clicked.emit(self.date)
+
+
 class EventCard(QFrame):
     """
     Visual representation of a calendar event.
@@ -188,8 +216,11 @@ class EventCard(QFrame):
 
     def mousePressEvent(self, mouse_event):
         """Handle mouse press event."""
-        self.clicked.emit(self.calendar_event.id)
-        super().mousePressEvent(mouse_event)
+        if mouse_event.button() == Qt.MouseButton.LeftButton:
+            self.clicked.emit(self.calendar_event.id)
+            mouse_event.accept()
+        else:
+            super().mousePressEvent(mouse_event)
 
 
 class MonthView(BaseWidget):
@@ -199,6 +230,7 @@ class MonthView(BaseWidget):
 
     date_changed = Signal(datetime)
     event_clicked = Signal(str)  # event_id
+    date_clicked = Signal(datetime)  # NEW: Emitted when an empty area of a day is clicked
 
     def __init__(self, calendar_manager, i18n: I18nQtManager, parent: Optional[QWidget] = None):
         """
@@ -307,7 +339,8 @@ class MonthView(BaseWidget):
 
         for day in range(1, days_in_month + 1):
             # Create day cell
-            cell = self._create_day_cell(day, events_by_day.get(day, []))
+            day_date = first_day + timedelta(days=day - 1)
+            cell = self._create_day_cell(day_date, events_by_day.get(day, []))
             self.calendar_grid.addWidget(cell, row, col)
             self.day_cells[day] = cell
 
@@ -317,18 +350,19 @@ class MonthView(BaseWidget):
                 col = 0
                 row += 1
 
-    def _create_day_cell(self, day: int, events: List[Any]) -> QWidget:
+    def _create_day_cell(self, day_date: datetime, events: List[Any]) -> QWidget:
         """
         Create a day cell widget.
 
         Args:
-            day: Day number
+            day_date: Date for this cell
             events: List of events for this day
 
         Returns:
             Day cell widget
         """
-        cell = QFrame()
+        cell = ClickableDayFrame(day_date)
+        cell.clicked.connect(self.date_clicked.emit)
         cell.setFrameStyle(QFrame.Shape.Box)
         cell.setMinimumHeight(CALENDAR_DAY_CELL_MIN_HEIGHT)
         cell.setProperty("role", "calendar-day-cell")
@@ -338,7 +372,7 @@ class MonthView(BaseWidget):
         layout.setSpacing(PAGE_DENSE_SPACING)
 
         # Day number
-        day_label = QLabel(str(day))
+        day_label = QLabel(str(day_date.day))
         day_label.setAlignment(Qt.AlignmentFlag.AlignRight)
         day_label.setProperty("role", "calendar-day-number")
         layout.addWidget(day_label)
@@ -418,6 +452,7 @@ class WeekView(BaseWidget):
 
     date_changed = Signal(datetime)
     event_clicked = Signal(str)  # event_id
+    date_clicked = Signal(datetime)  # NEW: Emitted when an empty area of a day is clicked
 
     def __init__(self, calendar_manager, i18n: I18nQtManager, parent: Optional[QWidget] = None):
         """
@@ -525,21 +560,24 @@ class WeekView(BaseWidget):
 
         # Create day columns
         for col in range(7):
+            day_start = week_start + timedelta(days=col)
             day_events = events_by_day.get(col, [])
-            day_column = self._create_day_column(day_events)
+            day_column = self._create_day_column(day_start, day_events)
             self.week_grid.addWidget(day_column, 1, col)
 
-    def _create_day_column(self, events: List[Any]) -> QWidget:
+    def _create_day_column(self, day_date: datetime, events: List[Any]) -> QWidget:
         """
         Create a day column with events.
 
         Args:
+            day_date: Date for this column
             events: List of events for this day
 
         Returns:
             Day column widget
         """
-        column = QWidget()
+        column = ClickableDayWidget(day_date)
+        column.clicked.connect(self.date_clicked.emit)
         column.setProperty("role", "calendar-day-column")
         layout = QVBoxLayout(column)
         layout.setContentsMargins(*ZERO_MARGINS)
