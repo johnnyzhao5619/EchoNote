@@ -125,11 +125,12 @@ class FFmpegChecker:
         if system == "Darwin":  # macOS
             if i18n:
                 title = i18n.t("ffmpeg.dialog_title", platform="macOS")
+                method = i18n.t("ffmpeg.macos.method_homebrew")
+                recommended = i18n.t("ffmpeg.recommended_install", method=method)
                 instructions = (
                     f"{i18n.t('ffmpeg.detected_system', system='macOS')}\n\n"
                     f"{i18n.t('ffmpeg.purpose')}\n\n"
-                    f"{i18n.t('ffmpeg.recommended_install', "
-                    f"method=i18n.t('ffmpeg.macos.method_homebrew'))}\n\n"
+                    f"{recommended}\n\n"
                     f"{i18n.t('ffmpeg.macos.step1')}\n"
                     f"{i18n.t('ffmpeg.macos.step1_url')}\n\n"
                     f"{i18n.t('ffmpeg.macos.step2')}\n"

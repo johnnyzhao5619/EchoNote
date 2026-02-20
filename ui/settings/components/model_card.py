@@ -2,6 +2,7 @@
 # Copyright (c) 2024-2025 EchoNote Contributors
 
 import logging
+from datetime import datetime
 from typing import Union
 
 from PySide6.QtCore import Signal

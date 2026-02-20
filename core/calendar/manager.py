@@ -34,7 +34,7 @@ from data.database.models import (
     EventAttachment,
 )
 from data.storage.file_manager import FileManager
-from utils.time_utils import now_utc
+from utils.time_utils import now_local, now_utc
 
 logger = logging.getLogger("echonote.calendar.manager")
 

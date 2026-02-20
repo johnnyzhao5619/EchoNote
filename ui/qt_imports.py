@@ -64,6 +64,7 @@ from PySide6.QtGui import (
     QShortcut,
     QShowEvent,
     QTextCursor,
+    QTextDocument,
 )
 
 # Widget classes
@@ -71,6 +72,7 @@ from PySide6.QtWidgets import (  # Layout classes; Container widgets; Input widg
     QApplication,
     QCheckBox,
     QComboBox,
+    QDateEdit,
     QDialog,
     QFileDialog,
     QFormLayout,
@@ -82,18 +84,24 @@ from PySide6.QtWidgets import (  # Layout classes; Container widgets; Input widg
     QLabel,
     QLineEdit,
     QListWidget,
+    QListWidgetItem,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QProgressBar,
     QPushButton,
     QRadioButton,
     QScrollArea,
     QSlider,
+    QSpinBox,
     QSplitter,
     QStackedWidget,
     QTableWidget,
+    QTableWidgetItem,
     QTabWidget,
     QTextEdit,
+    QTreeWidget,
+    QTreeWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -126,10 +134,14 @@ __all__ = [
     "QCheckBox",
     "QRadioButton",
     "QSlider",
+    "QSpinBox",
     "QProgressBar",
     "QListWidget",
+    "QListWidgetItem",
     "QTreeWidget",
+    "QTreeWidgetItem",
     "QTableWidget",
+    "QTableWidgetItem",
     # Containers
     "QFrame",
     "QGroupBox",
@@ -137,6 +149,9 @@ __all__ = [
     "QSplitter",
     "QStackedWidget",
     "QTabWidget",
+    # Menu and toolbar
+    "QMenu",
+    "QAction",
     # Dialogs
     "QMessageBox",
     "QFileDialog",
@@ -160,4 +175,6 @@ __all__ = [
     "QPoint",
     "QRect",
     "QKeySequence",
+    "QDateEdit",
+    "QTextDocument",
 ]

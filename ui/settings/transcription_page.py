@@ -22,7 +22,7 @@ Provides UI for configuring batch transcription settings.
 import logging
 from pathlib import Path
 from typing import Any, Dict, Tuple
-
+from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
     QFormLayout,

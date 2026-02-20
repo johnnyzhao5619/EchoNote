@@ -45,7 +45,11 @@ from ui.base_widgets import (
     create_hbox,
     create_primary_button,
 )
-from ui.constants import CALENDAR_EVENT_DESCRIPTION_MAX_HEIGHT, CALENDAR_EVENT_DIALOG_MIN_WIDTH
+from ui.constants import (
+    CALENDAR_EVENT_DESCRIPTION_MAX_HEIGHT,
+    CALENDAR_EVENT_DIALOG_MIN_WIDTH,
+    PAGE_COMPACT_SPACING,
+)
 from utils.i18n import I18nQtManager
 from utils.time_utils import to_local_datetime, to_utc_iso
 
@@ -67,7 +71,6 @@ class EventDialog(QDialog):
         connected_accounts: Dict[str, str],
         event_data: Optional[Dict[str, Any]] = None,
         parent: Optional[QWidget] = None,
-        allow_retranscribe: bool = False,
         allow_retranscribe: bool = False,
         is_past: bool = False,
         is_translation_available: bool = True,
