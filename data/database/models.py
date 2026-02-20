@@ -1077,7 +1077,8 @@ class TranslationModelRecord:
     @staticmethod
     def get_downloaded(db_connection) -> List["TranslationModelRecord"]:
         result = db_connection.execute(
-            "SELECT * FROM translation_model_downloads WHERE status = 'downloaded' ORDER BY model_id"
+            "SELECT * FROM translation_model_downloads "
+            "WHERE status = 'downloaded' ORDER BY model_id"
         )
         return [TranslationModelRecord.from_db_row(r) for r in result]
 

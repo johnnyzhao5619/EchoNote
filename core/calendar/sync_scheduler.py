@@ -20,6 +20,7 @@ Manages automatic periodic synchronization of external calendars.
 """
 
 import logging
+from datetime import timedelta
 from typing import Dict, Optional
 
 from apscheduler.schedulers.background import BackgroundScheduler

@@ -201,7 +201,9 @@ class I18nManager:
             value = self._lookup_key(self.fallback_translations, translation_key)
             if value is None:
                 logger.warning(
-                    f"Translation key not found: {translation_key} (language: {self.current_language})"
+                    "Translation key not found: %s (language: %s)",
+                    translation_key,
+                    self.current_language,
                 )
                 return fallback if fallback is not None else translation_key
             logger.debug(

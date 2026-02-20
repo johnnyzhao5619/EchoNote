@@ -943,7 +943,8 @@ class RealtimeRecordWidget(BaseWidget):
 
                 self.input_combo.addItem(display_name, device_index)
                 logger.info(
-                    "Input device classified: index=%s, name='%s', loopback=%s, system_audio=%s, scoped_app='%s'",
+                    "Input device classified: index=%s, name='%s', loopback=%s, "
+                    "system_audio=%s, scoped_app='%s'",
                     device_index,
                     device.get("name", "Unknown"),
                     is_loopback,
@@ -1086,17 +1087,17 @@ class RealtimeRecordWidget(BaseWidget):
                 return self._tr(
                     "realtime_record.routing.silent_system_audio_scoped",
                     "No audible input was captured from the selected {app_name} system-audio input. "
-                    "This route usually only carries {app_name} playback, not browser/local video output. "
-                    "Verify {app_name} output routing and ensure {app_name} audio is currently playing."
-                    "{device_hint}",
+                    "This route usually only carries {app_name} playback, not browser/local "
+                    "video output. Verify {app_name} output routing and ensure {app_name} "
+                    "audio is currently playing.{device_hint}",
                     app_name=app_scope,
                     device_hint=device_hint,
                 )
             return self._tr(
                 "realtime_record.routing.silent_system_audio",
                 "No audible input was captured from the selected system-audio input. "
-                "Verify meeting/video app output routing and ensure audio is being played to this input route."
-                "{device_hint}",
+                "Verify meeting/video app output routing and ensure audio is being played "
+                "to this input route.{device_hint}",
                 device_hint=device_hint,
             )
 
@@ -1118,9 +1119,8 @@ class RealtimeRecordWidget(BaseWidget):
                 "No audible input was captured. System-audio candidates were detected "
                 "({system_names}). These routes are often app-scoped and may not capture "
                 "browser/local video playback. For browser/local playback capture, use a loopback "
-                "input (e.g., BlackHole/Loopback). If you just installed a loopback driver, restart "
-                "macOS and reopen EchoNote before retrying."
-                "{device_hint}",
+                "input (e.g., BlackHole/Loopback). If you just installed a loopback driver, "
+                "restart macOS and reopen EchoNote before retrying.{device_hint}",
                 system_names=system_names,
                 device_hint=device_hint,
             )
@@ -1163,8 +1163,9 @@ class RealtimeRecordWidget(BaseWidget):
                 loopback_names = self._get_loopback_device_names()
                 message = self._tr(
                     "realtime_record.routing.plan_loopback_available",
-                    "Loopback input detected ({loopback_names}). Current input is '{selected_name}'. "
-                    "If you need system audio or online meeting playback capture, switch input to loopback.",
+                    "Loopback input detected ({loopback_names}). Current input is "
+                    "'{selected_name}'. If you need system audio or online meeting playback "
+                    "capture, switch input to loopback.",
                     loopback_names=loopback_names,
                     selected_name=selected_name,
                 )
@@ -1175,10 +1176,11 @@ class RealtimeRecordWidget(BaseWidget):
                 if app_scope:
                     message = self._tr(
                         "realtime_record.routing.plan_system_audio_selected_scoped",
-                        "{app_name} system-audio route selected. This input usually captures {app_name} playback only. "
-                        "For browser/local video playback capture, use a loopback virtual input "
-                        "(e.g., BlackHole/Loopback). If loopback was just installed, restart macOS "
-                        "and reopen EchoNote so the endpoint appears in device list.",
+                        "{app_name} system-audio route selected. This input usually captures "
+                        "{app_name} playback only. For browser/local video playback capture, "
+                        "use a loopback virtual input (e.g., BlackHole/Loopback). If loopback "
+                        "was just installed, restart macOS and reopen EchoNote so the endpoint "
+                        "appears in device list.",
                         app_name=app_scope,
                     )
                 else:
@@ -1190,10 +1192,11 @@ class RealtimeRecordWidget(BaseWidget):
             else:
                 message = self._tr(
                     "realtime_record.routing.plan_system_audio_available",
-                    "System-audio candidates detected ({system_names}). Current input is '{selected_name}'. "
-                    "If you need online meeting playback capture, select one of these system-audio inputs. "
-                    "For browser/local video playback capture, use a loopback input (e.g., BlackHole/Loopback); "
-                    "if loopback was just installed, restart macOS and reopen EchoNote.",
+                    "System-audio candidates detected ({system_names}). Current input is "
+                    "'{selected_name}'. If you need online meeting playback capture, select "
+                    "one of these system-audio inputs. For browser/local video playback capture, "
+                    "use a loopback input (e.g., BlackHole/Loopback); if loopback was just "
+                    "installed, restart macOS and reopen EchoNote.",
                     system_names=system_names,
                     selected_name=selected_name,
                 )

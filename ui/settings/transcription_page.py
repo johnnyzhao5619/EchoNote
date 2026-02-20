@@ -23,15 +23,12 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, Tuple
 
-from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
     QFormLayout,
     QGroupBox,
-    QHBoxLayout,
     QLabel,
     QLineEdit,
-    QPushButton,
     QSpinBox,
     QVBoxLayout,
 )

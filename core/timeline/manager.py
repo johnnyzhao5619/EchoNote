@@ -16,9 +16,8 @@
 """Timeline Manager for EchoNote."""
 
 import logging
-import sqlite3
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional
 
 from data.database.models import AutoTaskConfig, CalendarEvent, EventAttachment
 from utils.time_utils import to_local_datetime, to_utc_iso
@@ -116,10 +115,6 @@ class TimelineManager:
                 text = value.strip()
                 if text:
                     try:
-                        from config.constants import TIMEZONE_SUFFIX_END, TIMEZONE_SUFFIX_START
-
-                        # No need to manually append suffixes if we use to_utc_iso later,
-                        # but keep for now if dependencies expect it.
                         # Actually, let's just use to_utc_iso for consistency.
                         dt = datetime.strptime(text, "%Y-%m-%d")
                         if not is_start:

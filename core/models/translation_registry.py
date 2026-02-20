@@ -109,7 +109,8 @@ class TranslationModelInfo:
 # 预置语言对注册表
 # ---------------------------------------------------------------------------
 
-# 每条记录：(model_id, source_lang, target_lang, display_name, repo_id, estimated_size_mb)
+# 每条记录：(model_id, source_lang, target_lang, display_name, repo_id,
+# estimated_size_mb)
 _PRESET_MODELS: List[Tuple[str, str, str, str, str, int]] = [
     ("opus-mt-zh-en", "zh", "en", "中文 → English", "Helsinki-NLP/opus-mt-zh-en", 312),
     ("opus-mt-en-zh", "en", "zh", "English → 中文", "Helsinki-NLP/opus-mt-en-zh", 312),

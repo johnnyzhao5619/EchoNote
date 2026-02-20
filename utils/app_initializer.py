@@ -21,10 +21,6 @@ Contains helper functions for initializing various application components.
 """
 
 import logging
-from pathlib import Path
-
-logger = logging.getLogger("echonote.app_initializer")
-
 
 from config.constants import (
     ENGINE_AZURE,
@@ -35,6 +31,8 @@ from config.constants import (
     TRANSLATION_ENGINE_NONE,
     TRANSLATION_ENGINE_OPUS_MT,
 )
+
+logger = logging.getLogger("echonote.app_initializer")
 
 
 def create_sync_scheduler(calendar_manager, sync_interval):

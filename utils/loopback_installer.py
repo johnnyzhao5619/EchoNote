@@ -87,7 +87,8 @@ class LoopbackInstaller:
         """Return platform-aware confirmation message for one-click installation."""
         return self._t(
             "loopback.install_confirm_message",
-            "This action will install or configure {component} for system audio and online meeting capture. Continue?",
+            "This action will install or configure {component} for system audio "
+            "and online meeting capture. Continue?",
             component=self.get_component_name(),
         )
 
@@ -97,16 +98,20 @@ class LoopbackInstaller:
         if system in {"Darwin", "Windows"}:
             return self._t(
                 "loopback.install_requires_admin",
-                "One-click install uses the system authorization dialog. EchoNote does not collect or store your administrator password.",
+                "One-click install uses the system authorization dialog. EchoNote "
+                "does not collect or store your administrator password.",
             )
         if system == "Linux":
             return self._t(
                 "loopback.install_linux_note",
-                "Linux one-click setup creates a virtual sink with pactl. If required tools are missing, system authorization may be requested to install dependencies.",
+                "Linux one-click setup creates a virtual sink with pactl. If required "
+                "tools are missing, system authorization may be requested to install "
+                "dependencies.",
             )
         return self._t(
             "loopback.install_requires_admin",
-            "One-click install uses the system authorization dialog. EchoNote does not collect or store your administrator password.",
+            "One-click install uses the system authorization dialog. EchoNote "
+            "does not collect or store your administrator password.",
         )
 
     def supports_one_click_install(self) -> bool:
@@ -170,7 +175,8 @@ class LoopbackInstaller:
             install_result.requires_reboot = True
             install_result.message = self._t(
                 "loopback.install_success",
-                "Loopback component installed successfully. Please reboot macOS before recording system audio.",
+                "Loopback component installed successfully. Please reboot macOS "
+                "before recording system audio.",
             )
         return install_result
 
@@ -241,7 +247,8 @@ class LoopbackInstaller:
                 result.requires_reboot = True
                 result.message = self._t(
                     "loopback.install_windows_success",
-                    "Loopback component installed successfully. Please reboot Windows before recording system audio.",
+                    "Loopback component installed successfully. Please reboot Windows "
+                    "before recording system audio.",
                 )
             return result
 
@@ -287,7 +294,8 @@ class LoopbackInstaller:
             success=True,
             message=self._t(
                 "loopback.install_linux_success",
-                "Linux loopback virtual sink was configured. Select 'Monitor of EchoNote-Loopback' as EchoNote input and route app output to this sink.",
+                "Linux loopback virtual sink was configured. Select 'Monitor of "
+                "EchoNote-Loopback' as EchoNote input and route app output to this sink.",
             ),
         )
 
@@ -462,7 +470,8 @@ class LoopbackInstaller:
                 success=False,
                 message=self._t(
                     "loopback.install_linux_pkg_manager_not_found",
-                    "No supported Linux package manager was found to install loopback dependencies.",
+                    "No supported Linux package manager was found to install loopback "
+                    "dependencies.",
                 ),
             )
 
@@ -487,7 +496,8 @@ class LoopbackInstaller:
                 success=False,
                 message=self._t(
                     "loopback.install_linux_pkg_manager_not_found",
-                    "No supported Linux package manager was found to install loopback dependencies.",
+                    "No supported Linux package manager was found to install loopback "
+                    "dependencies.",
                 ),
             )
 

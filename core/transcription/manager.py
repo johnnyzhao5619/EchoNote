@@ -26,7 +26,6 @@ import json
 import logging
 import os
 import threading
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -35,7 +34,6 @@ from core.transcription.format_converter import FormatConverter
 from core.transcription.task_queue import TaskQueue, TaskStatus
 from data.database.connection import DatabaseConnection
 from data.database.models import (
-    CalendarEvent,
     TranscriptionTask,
     current_iso_timestamp,
 )
@@ -114,7 +112,8 @@ class TranscriptionManager:
                 )
         elif raw_default_path:
             logger.warning(
-                f"Ignoring default_save_path with unsupported type: {type(raw_default_path).__name__}"
+                "Ignoring default_save_path with unsupported type: %s",
+                type(raw_default_path).__name__,
             )
 
         task_queue_config = self.config.get("task_queue", {})
@@ -531,7 +530,8 @@ class TranscriptionManager:
 
                             if attempt == 2:
                                 logger.error(
-                                    "Task queue stop failed after %d attempts; proceeding with forced shutdown",
+                                    "Task queue stop failed after %d attempts; "
+                                    "proceeding with forced shutdown",
                                     attempt,
                                 )
 
@@ -791,7 +791,7 @@ class TranscriptionManager:
             # Prepare engine options
             engine_kwargs = dict(self._task_engine_options.get(task_id, {}))
             replace_realtime = engine_kwargs.pop("replace_realtime", False)
-            event_id = engine_kwargs.pop("event_id", None)
+            engine_kwargs.pop("event_id", None)
             engine_kwargs["progress_callback"] = progress_callback
 
             # Execute transcription

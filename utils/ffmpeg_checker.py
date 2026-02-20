@@ -128,7 +128,8 @@ class FFmpegChecker:
                 instructions = (
                     f"{i18n.t('ffmpeg.detected_system', system='macOS')}\n\n"
                     f"{i18n.t('ffmpeg.purpose')}\n\n"
-                    f"{i18n.t('ffmpeg.recommended_install', method=i18n.t('ffmpeg.macos.method_homebrew'))}\n\n"
+                    f"{i18n.t('ffmpeg.recommended_install', "
+                    f"method=i18n.t('ffmpeg.macos.method_homebrew'))}\n\n"
                     f"{i18n.t('ffmpeg.macos.step1')}\n"
                     f"{i18n.t('ffmpeg.macos.step1_url')}\n\n"
                     f"{i18n.t('ffmpeg.macos.step2')}\n"

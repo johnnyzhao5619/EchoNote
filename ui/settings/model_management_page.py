@@ -20,8 +20,7 @@
 """
 
 import logging
-from datetime import datetime
-from typing import Dict, Optional, Union
+from typing import Dict, Union
 
 from PySide6.QtCore import Slot
 from PySide6.QtGui import QFont
@@ -31,7 +30,6 @@ from PySide6.QtWidgets import (
     QDialog,
     QFormLayout,
     QFrame,
-    QHBoxLayout,
     QLabel,
     QMessageBox,
     QProgressBar,
@@ -55,7 +53,6 @@ from ui.base_widgets import (
     connect_button_with_callback,
     create_button,
     create_hbox,
-    create_primary_button,
     create_vbox,
 )
 from ui.common.error_dialog import show_error_dialog

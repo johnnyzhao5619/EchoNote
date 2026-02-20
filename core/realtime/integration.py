@@ -20,7 +20,7 @@ Integration services for real-time recording (e.g., Calendar).
 import logging
 import os
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Dict
 
 from core.calendar.constants import CalendarSource, EventType
 from utils.time_utils import format_localized_datetime

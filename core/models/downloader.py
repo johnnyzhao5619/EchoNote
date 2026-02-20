@@ -169,7 +169,10 @@ class ModelDownloader(QObject):
     def _fetch_remote_manifest(self, model: ModelInfo) -> Tuple[_RemoteFile, ...]:
         """从 Hugging Face API 获取文件清单。"""
 
-        api_url = f"https://huggingface.co/api/models/{model.repo_id}" f"?revision={model.revision}"
+        api_url = (
+            f"https://huggingface.co/api/models/{model.repo_id}"
+            f"?revision={model.revision}"
+        )
         logger.info(f"Fetching manifest for {model.repo_id}@{model.revision}")
         response = requests.get(api_url, timeout=30)
         response.raise_for_status()

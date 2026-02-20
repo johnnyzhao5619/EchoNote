@@ -62,7 +62,10 @@ class AzureEngine(SpeechEngine):
         self.timeout = timeout
         self.max_retries = max_retries
 
-        self.api_base_url = f"https://{region}.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1"
+        self.api_base_url = (
+            f"https://{region}.stt.speech.microsoft.com/"
+            "speech/recognition/conversation/cognitiveservices/v1"
+        )
 
         self.client = httpx.AsyncClient(
             headers={"Ocp-Apim-Subscription-Key": subscription_key, "Content-Type": "audio/wav"},

@@ -22,9 +22,9 @@ FFmpeg checks, model validation, and first-run setup.
 
 import logging
 
-logger = logging.getLogger("echonote.post_init")
-
 from config.constants import ENGINE_FASTER_WHISPER
+
+logger = logging.getLogger("echonote.post_init")
 
 
 def check_ffmpeg_availability(config, i18n, main_window):

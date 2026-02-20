@@ -327,7 +327,8 @@ class FirstRunSetup:
             encryption_active = db.is_encryption_enabled()
             if not encryption_active:
                 logger.warning(
-                    "Database encryption is not active after initialization; attempting PRAGMA rekey."
+                    "Database encryption is not active after initialization; "
+                    "attempting PRAGMA rekey."
                 )
                 rekey_success = db.rekey(db_encryption_key)
                 if rekey_success:

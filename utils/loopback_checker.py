@@ -110,7 +110,8 @@ class LoopbackChecker:
                 instructions = (
                     f"{i18n.t('loopback.detected_system', system='macOS')}\n\n"
                     f"{i18n.t('loopback.purpose')}\n\n"
-                    f"{i18n.t('loopback.recommended_install', method=i18n.t('loopback.macos.method_blackhole'))}\n\n"
+                    f"{i18n.t('loopback.recommended_install', method=i18n.t('loopback.macos.method_blackhole'))}"
+                    "\n\n"
                     f"{i18n.t('loopback.macos.step1')}\n"
                     f"{i18n.t('loopback.macos.step1_cmd')}\n\n"
                     f"{i18n.t('loopback.macos.step2')}\n"

@@ -24,8 +24,8 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
-from core.calendar.constants import CalendarSource, EventType, SyncStatus
-from core.calendar.exceptions import CalendarError, EventNotFoundError, SyncError
+from core.calendar.constants import CalendarSource, EventType
+from core.calendar.exceptions import EventNotFoundError, SyncError
 from data.database.models import (
     AutoTaskConfig,
     CalendarEvent,
@@ -34,12 +34,7 @@ from data.database.models import (
     EventAttachment,
 )
 from data.storage.file_manager import FileManager
-from utils.time_utils import (
-    current_iso_timestamp,
-    now_local,
     now_utc,
-    to_local_datetime,
-    to_utc_iso,
 )
 
 logger = logging.getLogger("echonote.calendar.manager")

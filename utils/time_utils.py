@@ -17,9 +17,9 @@
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
-from PySide6.QtCore import QDate, QDateTime, QLocale, Qt, QTime
+from PySide6.QtCore import QDateTime, QLocale, Qt
 
 logger = logging.getLogger("echonote.utils.time_utils")
 

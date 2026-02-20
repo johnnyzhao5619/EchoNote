@@ -27,7 +27,7 @@ import psutil
 from PySide6.QtCore import QCoreApplication, QObject, QTimer, Signal
 
 from config.app_config import ConfigManager, get_app_dir
-from core.models.downloader import DownloadCancelled, ModelDownloader
+from core.models.downloader import ModelDownloader
 from core.models.registry import ModelInfo, ModelRegistry
 from core.models.translation_registry import (
     TranslationModelInfo,
@@ -36,7 +36,7 @@ from core.models.translation_registry import (
 from data.database.connection import DatabaseConnection
 from data.database.models import ModelUsageStats, TranslationModelRecord
 from utils.gpu_detector import GPUDetector
-from utils.time_utils import current_iso_timestamp, now_utc
+from utils.time_utils import current_iso_timestamp
 
 logger = logging.getLogger(__name__)
 

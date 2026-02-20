@@ -23,7 +23,7 @@ import asyncio
 import contextlib
 import logging
 import threading
-from datetime import datetime, timedelta
+from datetime import timedelta
 from pathlib import Path
 from typing import Any, AsyncIterator, Callable, Dict, List, Optional
 
@@ -311,7 +311,8 @@ class RealtimeRecorder:
             self._selected_input_device_name
         )
         logger.info(
-            "Recording input route: index=%s, name='%s', loopback=%s, system_audio=%s, scoped_app='%s'",
+            "Recording input route: index=%s, name='%s', loopback=%s, "
+            "system_audio=%s, scoped_app='%s'",
             input_source,
             self._selected_input_device_name,
             self._selected_input_device_is_loopback,
@@ -387,7 +388,8 @@ class RealtimeRecorder:
                     pass
                 else:
                     logger.warning(
-                        "Streaming recording persistence failed; falling back to in-memory buffering"
+                        "Streaming recording persistence failed; "
+                        "falling back to in-memory buffering"
                     )
                     preserved_prefix = False
                     failover = getattr(self.session_archiver, "failover_recording_capture", None)
@@ -762,7 +764,8 @@ class RealtimeRecorder:
             result["translation_preview"] = translation_preview
         if result["audio_input_silent"]:
             logger.warning(
-                "Recording session captured only silent samples (chunks=%s, max_abs=%.6f, last_rms=%.6f)",
+                "Recording session captured only silent samples "
+                "(chunks=%s, max_abs=%.6f, last_rms=%.6f)",
                 audio_chunks_received,
                 audio_max_abs_level,
                 audio_last_rms,
@@ -1245,7 +1248,8 @@ class RealtimeRecorder:
     def _start_audio_capture(self, input_source: Optional[int]) -> None:
         """Start audio capture with backward-compatible callback wiring."""
         logger.info(
-            "Starting audio capture with config: input_source=%s sample_rate=%s channels=%s chunk_size=%s",
+            "Starting audio capture with config: input_source=%s "
+            "sample_rate=%s channels=%s chunk_size=%s",
             input_source,
             getattr(self.audio_capture, "sample_rate", self.sample_rate),
             getattr(self.audio_capture, "channels", "unknown"),

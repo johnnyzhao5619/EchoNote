@@ -2,10 +2,9 @@
 # Copyright (c) 2024-2025 EchoNote Contributors
 
 import logging
-from datetime import datetime
-from typing import Dict, Optional, Union
+from typing import Union
 
-from PySide6.QtCore import Signal, Slot
+from PySide6.QtCore import Signal
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QFrame,
@@ -13,7 +12,6 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QVBoxLayout,
-    QWidget,
 )
 
 from core.models.registry import ModelInfo
@@ -25,7 +23,6 @@ from ui.base_widgets import (
 )
 from ui.constants import (
     MODEL_MANAGEMENT_ACTION_BUTTON_MAX_WIDTH_MEDIUM,
-    MODEL_MANAGEMENT_ACTION_BUTTON_MAX_WIDTH_SMALL,
     MODEL_MANAGEMENT_MODEL_NAME_FONT_SIZE,
 )
 from utils.i18n import I18nQtManager
@@ -175,9 +172,15 @@ class ModelCardWidget(QFrame):
             lang_text = f"{self.model.source_lang} -> {self.model.target_lang}"
             self.features_layout.addWidget(QLabel(lang_text))
         else:
-            speed_text = f"{self.i18n.t('settings.model_management.speed')}: {self._translate_speed(self.model.speed)}"
+            speed_text = (
+                f"{self.i18n.t('settings.model_management.speed')}: "
+                f"{self._translate_speed(self.model.speed)}"
+            )
             self.features_layout.addWidget(QLabel(speed_text))
-            accuracy_text = f"{self.i18n.t('settings.model_management.accuracy')}: {self._translate_accuracy(self.model.accuracy)}"
+            accuracy_text = (
+                f"{self.i18n.t('settings.model_management.accuracy')}: "
+                f"{self._translate_accuracy(self.model.accuracy)}"
+            )
             self.features_layout.addWidget(QLabel(accuracy_text))
 
         self.features_layout.addStretch()

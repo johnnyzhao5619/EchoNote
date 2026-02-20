@@ -22,7 +22,6 @@ Displays a vertical timeline of past and future events with search and filtering
 import importlib
 import logging
 import math
-from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, cast
 
 from ui.qt_imports import (
@@ -32,7 +31,6 @@ from ui.qt_imports import (
     QDateTime,
     QLabel,
     QLineEdit,
-    QLocale,
     QScrollArea,
     Qt,
     QTime,
