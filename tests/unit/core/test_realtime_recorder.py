@@ -65,7 +65,6 @@ class MockSpeechEngine:
         # Simulate transcription result
         return {"text": "Test transcription", "language": "en"}
 
-
     async def transcribe_file(self, file_path, language=None, progress_callback=None):
         """Mock file transcription."""
         self.transcribe_file_calls.append({"file_path": file_path, "language": language})

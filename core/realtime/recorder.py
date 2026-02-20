@@ -27,8 +27,6 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, AsyncIterator, Callable, Dict, List, Optional
 
-from utils.time_utils import now_utc
-
 import numpy as np
 
 from config.constants import RECORDING_FORMAT_WAV
@@ -41,6 +39,7 @@ from core.realtime.audio_routing import (
 )
 from core.realtime.config import RealtimeConfig
 from core.realtime.integration import CalendarIntegration
+from utils.time_utils import now_utc
 
 logger = logging.getLogger(__name__)
 
@@ -545,7 +544,6 @@ class RealtimeRecorder:
                         self._transcription_succeeded = True
                         await stream_queue.put(text)
 
-
                         if self.on_transcription_update:
                             try:
                                 self.on_transcription_update(text)
@@ -555,7 +553,6 @@ class RealtimeRecorder:
                         enable_trans = self.current_options.get("enable_translation", False)
                         if enable_trans and translation_queue is not None:
                             await translation_queue.put({"text": text, "language": detected_lang})
-
 
                         logger.info(f"Transcribed successfully: {text[:50]}...")
                         last_transcription = text
@@ -658,12 +655,13 @@ class RealtimeRecorder:
 
                     # If auto is selected and we have a detected language, use it as source.
                     # This allows MultiModelOpusMTEngine to pick the right model.
-                    effective_source = detected_lang if source_lang == "auto" and detected_lang else source_lang
+                    effective_source = (
+                        detected_lang if source_lang == "auto" and detected_lang else source_lang
+                    )
 
                     translated_text = await self.translation_engine.translate(
                         text, source_lang=effective_source, target_lang=target_lang
                     )
-
 
                     if translated_text.strip():
                         # Store translated text for persistence.

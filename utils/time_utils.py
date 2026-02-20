@@ -42,10 +42,10 @@ def current_iso_timestamp() -> str:
 def to_utc_iso(value: Any) -> str:
     """
     Convert various datetime-like inputs to UTC ISO 8601 string with 'Z' suffix.
-    
+
     Args:
         value: datetime, QDateTime, or ISO string.
-        
+
     Returns:
         ISO 8601 formatted string in UTC.
     """
@@ -87,17 +87,17 @@ def to_utc_iso(value: Any) -> str:
         else:
             dt = dt.astimezone(timezone.utc)
         return dt.isoformat().replace("+00:00", "Z")
-    
+
     return str(value)
 
 
 def to_local_datetime(value: Any) -> datetime:
     """
     Convert various datetime-like inputs to a Python datetime in system local timezone.
-    
+
     Args:
         value: datetime, QDateTime, or ISO string.
-        
+
     Returns:
         Aware datetime object in local time.
     """
@@ -106,7 +106,7 @@ def to_local_datetime(value: Any) -> datetime:
         dt = datetime.fromisoformat(text)
     elif isinstance(value, QDateTime):
         to_python = getattr(value, "toPython", None)
-        dt = to_python() if callable(to_python) else datetime.now() # Fallback
+        dt = to_python() if callable(to_python) else datetime.now()  # Fallback
     elif isinstance(value, datetime):
         dt = value
     else:
@@ -115,7 +115,7 @@ def to_local_datetime(value: Any) -> datetime:
     if dt.tzinfo is None:
         # Naive: assume it's already local or make it local
         return dt.astimezone()
-    
+
     return dt.astimezone()
 
 
@@ -127,13 +127,13 @@ def format_localized_datetime(
 ) -> str:
     """
     Format a datetime-like value into a localized string using system locale.
-    
+
     Args:
         value: datetime, QDateTime, or ISO string.
         format_type: QLocale format type (ShortFormat, LongFormat, etc.)
         include_date: Whether to include the date.
         include_time: Whether to include the time.
-        
+
     Returns:
         Localized string.
     """
@@ -141,7 +141,7 @@ def format_localized_datetime(
         dt_local = to_local_datetime(value)
         qdt = QDateTime(dt_local)
         locale = QLocale.system()
-        
+
         if include_date and include_time:
             return locale.toString(qdt, format_type)
         elif include_date:

@@ -52,8 +52,8 @@ class OpusMTEngine(TranslationEngine):
         self._model_dir = Path(model_dir)
         self._source_lang = source_lang
         self._target_lang = target_lang
-        self._model = None       # MarianMTModel（懒加载）
-        self._tokenizer = None   # MarianTokenizer（懒加载）
+        self._model = None  # MarianMTModel（懒加载）
+        self._tokenizer = None  # MarianTokenizer（懒加载）
         self._load_lock = asyncio.Lock()
 
     # ------------------------------------------------------------------
@@ -88,9 +88,9 @@ class OpusMTEngine(TranslationEngine):
         if len(chunks) == 1:
             translated = await asyncio.to_thread(self._translate_chunk, chunks[0])
         else:
-            parts = await asyncio.gather(*[
-                asyncio.to_thread(self._translate_chunk, chunk) for chunk in chunks
-            ])
+            parts = await asyncio.gather(
+                *[asyncio.to_thread(self._translate_chunk, chunk) for chunk in chunks]
+            )
             translated = " ".join(parts)
 
         logger.debug(
@@ -108,12 +108,11 @@ class OpusMTEngine(TranslationEngine):
             (self._model_dir / f).exists() for f in core_configs
         ):
             return False
-        
+
         # 权重文件检查（支持 bin 或 safetensors）
-        return (
-            (self._model_dir / "model.safetensors").exists() or 
-            (self._model_dir / "pytorch_model.bin").exists()
-        )
+        return (self._model_dir / "model.safetensors").exists() or (
+            self._model_dir / "pytorch_model.bin"
+        ).exists()
 
     def close(self) -> None:
         """释放模型和分词器资源。"""
@@ -169,6 +168,7 @@ class OpusMTEngine(TranslationEngine):
             max_length=_MAX_TOKENS,
         )
         import torch
+
         with torch.no_grad():
             translated_ids = self._model.generate(**inputs)
         result = self._tokenizer.decode(translated_ids[0], skip_special_tokens=True)
@@ -182,6 +182,7 @@ class OpusMTEngine(TranslationEngine):
 
         # 按句子结束符分割
         import re
+
         sentences = re.split(r"(?<=[.!?。！？\n])\s*", text)
         chunks: List[str] = []
         current = ""
@@ -196,6 +197,7 @@ class OpusMTEngine(TranslationEngine):
         if current:
             chunks.append(current)
         return chunks or [text]
+
 
 class MultiModelOpusMTEngine(TranslationEngine):
     """支持多语言对切换的 Opus-MT 引擎包装器。
@@ -255,9 +257,7 @@ class MultiModelOpusMTEngine(TranslationEngine):
                     logger.debug("Evicted old translation engine from cache: %s", old_id)
 
                 engine = OpusMTEngine(
-                    Path(model_info.local_path),
-                    model_info.source_lang,
-                    model_info.target_lang
+                    Path(model_info.local_path), model_info.source_lang, model_info.target_lang
                 )
                 self._engines[model_id] = engine
 

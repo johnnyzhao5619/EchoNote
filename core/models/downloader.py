@@ -118,10 +118,12 @@ class ModelDownloader(QObject):
         # 计算总字节数，如果获取失败（即 total_bytes=0），使用模型元数据中的预计大小兜底
         total_bytes = sum(f.size for f in files)
         if total_bytes == 0:
-            logger.info(f"Total bytes from manifest is 0, falling back to metadata size: {model.size_mb} MB")
+            logger.info(
+                f"Total bytes from manifest is 0, falling back to metadata size: {model.size_mb} MB"
+            )
             total_bytes = model.size_mb * 1024 * 1024
-        
-        total_bytes = max(total_bytes, 1) # 最终安全网
+
+        total_bytes = max(total_bytes, 1)  # 最终安全网
         downloaded_bytes = 0
         start_ts = time.monotonic()
 
@@ -175,28 +177,30 @@ class ModelDownloader(QObject):
 
         siblings = payload.get("siblings", [])
         files_list: List[_RemoteFile] = []
-        
+
         for sibling in siblings:
             path = sibling.get("rfilename")
             if not path:
                 continue
-            
+
             size = sibling.get("size")
             # 处理 size 为 null 或 0 的情况
             if size is None or size == 0:
                 logger.debug(f"Missing size for {path} in API, trying HEAD request...")
                 try:
-                    resolve_url = f"https://huggingface.co/{model.repo_id}/resolve/{model.revision}/{path}"
+                    resolve_url = (
+                        f"https://huggingface.co/{model.repo_id}/resolve/{model.revision}/{path}"
+                    )
                     head_resp = requests.head(resolve_url, timeout=10, allow_redirects=True)
                     if head_resp.status_code == 200:
                         size = int(head_resp.headers.get("Content-Length", 0))
                 except Exception as e:
                     logger.warning(f"Failed to get size for {path} via HEAD: {e}")
-            
+
             files_list.append(_RemoteFile(path=path, size=int(size or 0)))
 
         files = tuple(files_list)
-        
+
         # 若 manifest 中未提供大小信息，尝试读取 top-level 的 safetensors index
         if not files:
             logger.warning(f"Manifest for {model.repo_id} does not contain files")

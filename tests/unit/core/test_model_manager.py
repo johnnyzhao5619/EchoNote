@@ -28,7 +28,9 @@ def _build_config(
 
 @patch("core.models.manager.TranslationModelRecord.get_all", return_value=[])
 @patch("core.models.manager.ModelUsageStats.get_all", return_value=[])
-def test_validation_removes_invalid_model_and_keeps_cache_consistent(_mock_usage, _mock_trans, tmp_path):
+def test_validation_removes_invalid_model_and_keeps_cache_consistent(
+    _mock_usage, _mock_trans, tmp_path
+):
 
     models_dir = tmp_path / "models"
     base_dir = models_dir / "base"

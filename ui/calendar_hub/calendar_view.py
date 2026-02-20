@@ -24,7 +24,6 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 from PySide6.QtCore import QDate, QLocale, Qt, Signal
-from utils.time_utils import format_localized_datetime, now_local, to_local_datetime
 from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
@@ -45,6 +44,7 @@ from ui.constants import (
     ZERO_MARGINS,
 )
 from utils.i18n import I18nQtManager
+from utils.time_utils import format_localized_datetime, now_local, to_local_datetime
 
 logger = logging.getLogger("echonote.ui.calendar_view")
 

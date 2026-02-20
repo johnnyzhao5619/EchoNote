@@ -527,7 +527,9 @@ class CalendarHubWidget(BaseWidget):
                 is_past = True
 
         is_translation_available = False
-        if self.transcription_manager and getattr(self.transcription_manager, "translation_engine", None):
+        if self.transcription_manager and getattr(
+            self.transcription_manager, "translation_engine", None
+        ):
             is_translation_available = True
 
         dialog = EventDialog(

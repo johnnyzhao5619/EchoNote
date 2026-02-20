@@ -37,9 +37,9 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QSpinBox,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
-    QTabWidget,
 )
 
 from config.constants import (
@@ -76,7 +76,6 @@ from ui.settings.components.model_card import ModelCardWidget
 from utils.i18n import I18nQtManager
 from utils.model_download import run_model_download
 from utils.time_utils import format_localized_datetime
-
 
 logger = logging.getLogger("echonote.ui.settings.model_management")
 
@@ -173,8 +172,7 @@ class ModelManagementPage(BaseSettingsPage):
 
         # 已下载语音模型区域
         self.downloaded_title = self.add_section_title(
-            self.i18n.t("settings.model_management.downloaded_models"),
-            layout=self.speech_layout
+            self.i18n.t("settings.model_management.downloaded_models"), layout=self.speech_layout
         )
 
         self.downloaded_models_container = QWidget()
@@ -189,8 +187,7 @@ class ModelManagementPage(BaseSettingsPage):
 
         # 可下载语音模型区域
         self.available_title = self.add_section_title(
-            self.i18n.t("settings.model_management.available_models"),
-            layout=self.speech_layout
+            self.i18n.t("settings.model_management.available_models"), layout=self.speech_layout
         )
 
         self.available_models_container = QWidget()
@@ -211,7 +208,7 @@ class ModelManagementPage(BaseSettingsPage):
 
         self.translation_models_title = self.add_section_title(
             self.i18n.t("settings.model_management.translation_models"),
-            layout=self.translation_layout
+            layout=self.translation_layout,
         )
 
         self.translation_models_desc = QLabel(
@@ -230,7 +227,9 @@ class ModelManagementPage(BaseSettingsPage):
         self.translation_layout.addWidget(self.translation_models_container)
 
         self.translation_layout.addStretch()
-        self.tabs.addTab(self.translation_tab, self.i18n.t("settings.model_management.translation_tab"))
+        self.tabs.addTab(
+            self.translation_tab, self.i18n.t("settings.model_management.translation_tab")
+        )
 
         # 刷新模型列表
         self._refresh_model_list()
@@ -309,14 +308,14 @@ class ModelManagementPage(BaseSettingsPage):
                 self.available_models_layout.addWidget(card)
             self.model_cards[model.name] = card
 
-        logger.debug(
-            f"Speech model list refreshed: {len(downloaded_models)} downloaded"
-        )
+        logger.debug(f"Speech model list refreshed: {len(downloaded_models)} downloaded")
 
-    def _create_unified_card(self, model: Union[ModelInfo, TranslationModelInfo]) -> ModelCardWidget:
+    def _create_unified_card(
+        self, model: Union[ModelInfo, TranslationModelInfo]
+    ) -> ModelCardWidget:
         """创建并配置统一的模型卡片组件。"""
         card = ModelCardWidget(model, self.i18n, self.model_manager)
-        
+
         # 连接信号
         if isinstance(model, TranslationModelInfo):
             card.download_clicked.connect(self._download_translation_model)
@@ -326,16 +325,11 @@ class ModelManagementPage(BaseSettingsPage):
             card.download_clicked.connect(self._on_download_clicked)
             card.delete_clicked.connect(self._on_delete_clicked)
             card.details_clicked.connect(self._on_view_details_clicked)
-            
+
         card.config_clicked.connect(self._on_config_clicked)
         card.cancel_download_clicked.connect(self._on_cancel_download_clicked)
-        
+
         return card
-
-
-
-
-
 
     def _on_config_clicked(self, model_name: str):
         """
@@ -614,9 +608,6 @@ class ModelManagementPage(BaseSettingsPage):
             self.model_manager.cancel_download(model_name)
             logger.info(f"Cancel requested for model download: {model_name}")
 
-
-
-
     def _create_recommendation_card(self):
         """创建推荐模型卡片"""
         logger.debug("Creating recommendation card")
@@ -783,7 +774,6 @@ class ModelManagementPage(BaseSettingsPage):
         if card and isinstance(card, ModelCardWidget):
             card.update_progress(progress)
 
-
     @Slot(str)
     def _on_download_completed(self, model_name: str):
         """处理下载完成事件"""
@@ -805,7 +795,6 @@ class ModelManagementPage(BaseSettingsPage):
     def _on_download_failed(self, model_name: str, error: str):
         """处理下载失败事件"""
         logger.error(f"Download failed for {model_name}: {error}")
-
 
         # 显示错误对话框
         error_title = self.i18n.t("settings.model_management.download_error_title")
@@ -874,11 +863,6 @@ class ModelManagementPage(BaseSettingsPage):
     def save_settings(self):
         """保存设置（模型管理页面不需要保存设置）"""
 
-
-
-
-
-
     # ------------------------------------------------------------------
     # 翻译模型（Opus-MT）管理方法
     # ------------------------------------------------------------------
@@ -898,7 +882,6 @@ class ModelManagementPage(BaseSettingsPage):
             card = self._create_unified_card(model)
             self.translation_models_layout.addWidget(card)
             self.translation_model_cards[model.model_id] = card
-
 
     def _on_view_translation_details_clicked(self, model_id: str):
         """处理翻译模型查看详情点击"""
@@ -965,14 +948,15 @@ class ModelManagementPage(BaseSettingsPage):
                 )
 
 
-
 class ModelDetailsDialog(QDialog):
     """模型详情对话框"""
 
     MIN_WIDTH = MODEL_DETAILS_DIALOG_MIN_WIDTH
     MIN_HEIGHT = MODEL_DETAILS_DIALOG_MIN_HEIGHT
 
-    def __init__(self, model: Union[ModelInfo, TranslationModelInfo], i18n: I18nQtManager, parent=None):
+    def __init__(
+        self, model: Union[ModelInfo, TranslationModelInfo], i18n: I18nQtManager, parent=None
+    ):
         """
         初始化模型详情对话框
 
@@ -988,7 +972,7 @@ class ModelDetailsDialog(QDialog):
 
         self.model = model
         self.i18n = i18n
-        
+
         is_translation = isinstance(model, TranslationModelInfo)
         title = model.display_name if is_translation else model.full_name
         name_id = model.model_id if is_translation else model.name
@@ -1031,7 +1015,9 @@ class ModelDetailsDialog(QDialog):
             elif "large-v3" in name_id:
                 version = "v3"
 
-            info_layout.addWidget(QLabel(i18n.t("settings.model_management.model_version") + ":"), row, 0)
+            info_layout.addWidget(
+                QLabel(i18n.t("settings.model_management.model_version") + ":"), row, 0
+            )
             info_layout.addWidget(QLabel(version), row, 1)
             row += 1
 
@@ -1050,7 +1036,9 @@ class ModelDetailsDialog(QDialog):
             row += 1
         else:
             # 翻译模型特有信息：语言对
-            info_layout.addWidget(QLabel(i18n.t("settings.model_management.language_pair") + ":"), row, 0)
+            info_layout.addWidget(
+                QLabel(i18n.t("settings.model_management.language_pair") + ":"), row, 0
+            )
             info_layout.addWidget(QLabel(f"{model.source_lang} -> {model.target_lang}"), row, 1)
             row += 1
 
@@ -1117,7 +1105,6 @@ class ModelDetailsDialog(QDialog):
         info_layout.addWidget(QLabel(str(usage_count)), row, 1)
         row += 1
 
-
         layout.addLayout(info_layout)
 
         # 添加弹性空间
@@ -1178,8 +1165,8 @@ class ModelDetailsDialog(QDialog):
         except Exception as e:
             logger.error(f"Error opening file explorer: {e}")
 
-class ModelConfigDialog(QDialog):
 
+class ModelConfigDialog(QDialog):
     """模型配置对话框"""
 
     MIN_WIDTH = MODEL_CONFIG_DIALOG_MIN_WIDTH

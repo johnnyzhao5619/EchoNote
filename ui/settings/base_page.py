@@ -99,13 +99,13 @@ class BaseSettingsPage(BaseWidget):
         """
         label = QLabel(title)
         label.setObjectName("section_title")
-        
+
         target = layout if layout is not None else self.content_layout
         if hasattr(target, "addWidget"):
             target.addWidget(label)
         elif hasattr(target, "layout") and target.layout():
             target.layout().addWidget(label)
-            
+
         return label
 
     def add_labeled_row(
@@ -123,13 +123,13 @@ class BaseSettingsPage(BaseWidget):
         row_layout.addWidget(label)
         row_layout.addWidget(control_widget)
         row_layout.addStretch()
-        
+
         target = layout if layout is not None else self.content_layout
         if hasattr(target, "addLayout"):
             target.addLayout(row_layout)
         elif hasattr(target, "layout") and target.layout():
             target.layout().addLayout(row_layout)
-            
+
         return row_layout, label
 
     def add_spacing(self, height: int | None = None, layout: QWidget | None = None):
@@ -142,7 +142,7 @@ class BaseSettingsPage(BaseWidget):
         """
         if height is None:
             height = self.COMPACT_SPACING
-            
+
         target = layout if layout is not None else self.content_layout
         if hasattr(target, "addSpacing"):
             target.addSpacing(height)
@@ -152,7 +152,7 @@ class BaseSettingsPage(BaseWidget):
     def add_section_spacing(self, layout: QWidget | None = None):
         """
         Add standard spacing between major settings sections.
-        
+
         Args:
             layout: Optional layout to add to. If None, uses self.content_layout.
         """

@@ -20,9 +20,8 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional, Union
 
-from utils.time_utils import to_local_datetime, to_utc_iso
-
 from data.database.models import AutoTaskConfig, CalendarEvent, EventAttachment
+from utils.time_utils import to_local_datetime, to_utc_iso
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from utils.i18n import I18nQtManager as I18nManager
@@ -33,8 +32,6 @@ logger = logging.getLogger("echonote.timeline.manager")
 
 _DEFAULT_TRANSCRIPT_CANDIDATE_WINDOW_DAYS = DEFAULT_TRANSCRIPT_CANDIDATE_WINDOW_DAYS
 _MAX_TRANSCRIPT_CANDIDATES = MAX_TRANSCRIPT_CANDIDATES
-
-
 
 
 class TimelineManager:
@@ -122,7 +119,7 @@ class TimelineManager:
                         from config.constants import TIMEZONE_SUFFIX_END, TIMEZONE_SUFFIX_START
 
                         # No need to manually append suffixes if we use to_utc_iso later,
-                        # but keep for now if dependencies expect it. 
+                        # but keep for now if dependencies expect it.
                         # Actually, let's just use to_utc_iso for consistency.
                         dt = datetime.strptime(text, "%Y-%m-%d")
                         if not is_start:
@@ -158,7 +155,9 @@ class TimelineManager:
         start_dt = (
             to_local_datetime(resolved_filters["start_date"])
             if resolved_filters.get("start_date")
-            else datetime(TIMELINE_MIN_YEAR, TIMELINE_MIN_MONTH, TIMELINE_MIN_DAY, tzinfo=timezone.utc).astimezone()
+            else datetime(
+                TIMELINE_MIN_YEAR, TIMELINE_MIN_MONTH, TIMELINE_MIN_DAY, tzinfo=timezone.utc
+            ).astimezone()
         )
         end_dt = (
             to_local_datetime(resolved_filters["end_date"])

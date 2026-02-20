@@ -30,9 +30,9 @@ from config.constants import (
     DEFAULT_TRANSCRIPTION_ENGINE,
     TASK_STATUS_PENDING,
 )
-from utils.time_utils import current_iso_timestamp, to_utc_iso
 from core.calendar.constants import CalendarSource, EventType
 from data.database.encryption_helper import decrypt_sensitive_field, encrypt_sensitive_field
+from utils.time_utils import current_iso_timestamp, to_utc_iso
 
 logger = logging.getLogger("echonote.database.models")
 
@@ -40,8 +40,6 @@ logger = logging.getLogger("echonote.database.models")
 def generate_uuid() -> str:
     """Generate a new UUID string."""
     return str(uuid.uuid4())
-
-
 
 
 @dataclass
@@ -1089,4 +1087,3 @@ class TranslationModelRecord:
             (self.model_id,),
             commit=True,
         )
-

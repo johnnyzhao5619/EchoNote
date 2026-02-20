@@ -21,9 +21,9 @@ import logging
 import os
 from datetime import datetime
 from typing import Dict, Optional
-from utils.time_utils import format_localized_datetime
 
 from core.calendar.constants import CalendarSource, EventType
+from utils.time_utils import format_localized_datetime
 
 logger = logging.getLogger(__name__)
 

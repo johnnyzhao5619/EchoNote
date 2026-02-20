@@ -390,7 +390,6 @@ class TestTranscribeStream:
         mock_model.transcribe = Mock(return_value=([segment], info))
         mock_whisper_class.return_value = mock_model
 
-
         engine = FasterWhisperEngine(model_size="base", model_manager=mock_model_manager)
 
         # Create audio chunk
@@ -402,7 +401,6 @@ class TestTranscribeStream:
         assert "text" in result
         assert "language" in result
         assert result["language"] == "en"
-
 
 
 class TestConfigValidation:

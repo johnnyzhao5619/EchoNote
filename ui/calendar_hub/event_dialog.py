@@ -163,11 +163,13 @@ class EventDialog(QDialog):
         self.start_time_input = QDateTimeEdit()
         self.start_time_input.setCalendarPopup(True)
         self.start_time_input.setDateTime(QDateTime.currentDateTime())
-        
+
         # Use system locale for display format
         locale = QLocale.system()
         self.start_time_input.setLocale(locale)
-        self.start_time_input.setDisplayFormat(locale.dateTimeFormat(QLocale.FormatType.ShortFormat))
+        self.start_time_input.setDisplayFormat(
+            locale.dateTimeFormat(QLocale.FormatType.ShortFormat)
+        )
         form.addRow(
             self.i18n.t("calendar_hub.event_dialog.start_time_label"), self.start_time_input
         )
@@ -177,7 +179,7 @@ class EventDialog(QDialog):
         # Default to 1 hour after start
         default_end = QDateTime.currentDateTime().addSecs(3600)
         self.end_time_input.setDateTime(default_end)
-        
+
         # Use system locale for display format
         locale = QLocale.system()
         self.end_time_input.setLocale(locale)
@@ -271,7 +273,10 @@ class EventDialog(QDialog):
         if self.is_past:
             self.translation_container.hide()
 
-        form.addRow(self.i18n.t("batch_transcribe.translation", default="Translation"), self.translation_container)
+        form.addRow(
+            self.i18n.t("batch_transcribe.translation", default="Translation"),
+            self.translation_container,
+        )
 
         return form
 
@@ -542,7 +547,6 @@ class EventDialog(QDialog):
             data["id"] = self.event_data["id"]
 
         return data
-
 
     def get_event_data(self) -> Optional[Dict[str, Any]]:
         """

@@ -849,7 +849,6 @@ class TranscriptionManager:
                 del self._task_engine_options[task_id]
                 self._persist_task_engine_options()
 
-
         except asyncio.CancelledError:
             logger.info(f"Task {task_id} cancelled")
             # Update status to cancelled
@@ -1003,6 +1002,7 @@ class TranscriptionManager:
         if event_id:
             try:
                 from data.database.models import EventAttachment
+
                 attachment = EventAttachment(
                     event_id=event_id,
                     file_path=str(translation_path),

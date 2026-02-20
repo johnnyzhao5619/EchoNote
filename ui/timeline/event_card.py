@@ -36,12 +36,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ui.base_widgets import create_button, create_hbox, create_vbox
 from config.constants import (
     CALENDAR_API_TIMEOUT_SECONDS,
     OUTLOOK_CALENDAR_MAX_PAGE_SIZE,
 )
-from utils.time_utils import format_localized_datetime, to_local_datetime
+from ui.base_widgets import create_button, create_hbox, create_vbox
 from ui.constants import (
     PAGE_DENSE_SPACING,
     TIMELINE_CURRENT_TIME_LINE_HEIGHT,
@@ -49,6 +48,7 @@ from ui.constants import (
     ZERO_MARGINS,
 )
 from utils.i18n import LANGUAGE_OPTION_KEYS, I18nQtManager
+from utils.time_utils import format_localized_datetime, to_local_datetime
 
 logger = logging.getLogger("echonote.ui.timeline.event_card")
 

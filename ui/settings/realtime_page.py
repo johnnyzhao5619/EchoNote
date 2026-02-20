@@ -46,10 +46,10 @@ from config.constants import (
     RECORDING_FORMAT_WAV,
     STANDARD_LABEL_WIDTH,
     SUPPORTED_REALTIME_TRANSLATION_ENGINES,
+    SUPPORTED_RECORDING_FORMATS,
     TRANSLATION_ENGINE_GOOGLE,
     TRANSLATION_ENGINE_NONE,
     TRANSLATION_ENGINE_OPUS_MT,
-    SUPPORTED_RECORDING_FORMATS,
 )
 from ui.base_widgets import create_button, create_hbox, create_vbox
 from ui.constants import SETTINGS_GAIN_VALUE_LABEL_MIN_WIDTH, format_gain_display
@@ -753,10 +753,7 @@ class RealtimeSettingsPage(BaseSettingsPage):
                 self.i18n.t("settings.realtime.opus_mt_not_downloaded", model=model_info.model_id)
             )
         else:
-            self.opus_mt_status_label.setText(
-                self.i18n.t("settings.realtime.opus_mt_unavailable")
-            )
-
+            self.opus_mt_status_label.setText(self.i18n.t("settings.realtime.opus_mt_unavailable"))
 
     def _on_translation_engine_changed(self) -> None:
         """切换翻译引擎时显示/隐藏 Opus-MT 语言配置区域。"""

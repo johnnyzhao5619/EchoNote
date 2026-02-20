@@ -51,10 +51,10 @@ if TYPE_CHECKING:
     from ui.timeline.transcript_viewer import TranscriptViewerDialog
 
 from core.calendar.constants import CalendarSource, EventType
-from utils.time_utils import now_local, to_local_datetime, to_utc_iso
 from ui.base_widgets import BaseWidget, create_button, create_hbox, create_vbox
 from ui.constants import PAGE_COMPACT_SPACING, PAGE_LAYOUT_SPACING, ZERO_MARGINS
 from utils.i18n import I18nQtManager
+from utils.time_utils import now_local, to_local_datetime, to_utc_iso
 
 if TYPE_CHECKING:  # pragma: no cover - imported for type checking only
     from ui.timeline.event_card import EventCard

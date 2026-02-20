@@ -272,9 +272,9 @@ def initialize_translation_engine(config, secrets_manager=None, model_manager=No
                 logger.info("Opus-MT multi-model engine configured")
                 return engine
 
-
             if selected_engine == TRANSLATION_ENGINE_GOOGLE:
                 from engines.translation.google_translate import GoogleTranslateEngine
+
                 api_key = secrets_manager.get_api_key("google") if secrets_manager else None
                 if api_key:
                     engine = GoogleTranslateEngine(api_key)
@@ -299,7 +299,6 @@ def initialize_translation_engine(config, secrets_manager=None, model_manager=No
     logger.info("Translation engine configured (will load on first use)")
 
     return translation_engine_loader
-
 
 
 def initialize_calendar_adapters(config, oauth_manager, secrets_manager=None):

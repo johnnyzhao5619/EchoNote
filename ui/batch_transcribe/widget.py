@@ -807,18 +807,18 @@ class BatchTranscribeWidget(BaseWidget):
         """Perform heavy initial loading tasks after UI is established."""
         try:
             logger.debug("Performing delayed initial load for batch transcribe...")
-            
+
             # 1. Register listener (deferred to ensure main loop is ready)
             if self.transcription_manager:
                 self.transcription_manager.add_listener(self._on_manager_event)
-                
+
             # 2. Populate models
             if self.model_manager:
                 self._update_model_list()
-            
+
             # 3. Refresh task list (queries database and creates sub-widgets)
             self._refresh_tasks()
-            
+
             logger.debug("Initial load complete")
         except Exception as e:
             logger.error(f"Error during initial load: {e}")
@@ -826,7 +826,7 @@ class BatchTranscribeWidget(BaseWidget):
     def _on_manager_event(self, event_type: str, data: Dict):
         """
         Handle events from transcription manager (thread-safe bridge).
-        
+
         Emits signal to handle event on main UI thread.
         """
         try:

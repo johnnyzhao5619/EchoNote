@@ -23,8 +23,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Set
 
-from utils.time_utils import current_iso_timestamp, now_utc
-
 import psutil
 from PySide6.QtCore import QCoreApplication, QObject, QTimer, Signal
 
@@ -38,6 +36,7 @@ from core.models.translation_registry import (
 from data.database.connection import DatabaseConnection
 from data.database.models import ModelUsageStats, TranslationModelRecord
 from utils.gpu_detector import GPUDetector
+from utils.time_utils import current_iso_timestamp, now_utc
 
 logger = logging.getLogger(__name__)
 
@@ -86,9 +85,7 @@ class ModelManager(QObject):
         self.translation_downloader.download_completed.connect(
             self._on_translation_download_completed
         )
-        self.translation_downloader.download_failed.connect(
-            self._on_translation_download_failed
-        )
+        self.translation_downloader.download_failed.connect(self._on_translation_download_failed)
         # 刷新翻译模型本地状态
         self._refresh_translation_states()
 
@@ -179,16 +176,16 @@ class ModelManager(QObject):
         model = self.get_model(name)
         if not model:
             raise ValueError(f"Unknown model: {name}")
-        
+
         return await self._execute_download(name, model, self.downloader)
 
     async def _execute_download(
-        self, 
-        task_id: str, 
-        model_info, 
+        self,
+        task_id: str,
+        model_info,
         downloader: ModelDownloader,
         pre_download_cb: Optional[Callable[[], None]] = None,
-        post_download_cb: Optional[Callable[[Path], None]] = None
+        post_download_cb: Optional[Callable[[Path], None]] = None,
     ) -> Path:
         """通用的下载执行逻辑（含重入保护）。"""
         if model_info.is_downloaded:
@@ -546,17 +543,13 @@ class ModelManager(QObject):
 
     def get_downloaded_translation_models(self) -> List[str]:
         """返回已下载翻译模型的 model_id 列表。"""
-        return [
-            m.model_id
-            for m in self.get_all_translation_models()
-            if m.is_downloaded
-        ]
+        return [m.model_id for m in self.get_all_translation_models() if m.is_downloaded]
 
     def get_best_translation_model(
         self, source_lang: str, target_lang: str, auto_detect: bool = False
     ) -> Optional[TranslationModelInfo]:
         """寻找最匹配的翻译模型。
-        
+
         Args:
             source_lang: 源语言代码（如果 auto_detect 为 True，则此参数为候选项或被忽略）。
             target_lang: 目标语言代码。
@@ -568,9 +561,11 @@ class ModelManager(QObject):
             for mid in downloaded:
                 model = self._translation_registry.get_by_id(mid)
                 if model and model.target_lang == target_lang:
-                    logger.info("Auto-matched translation model for target '%s': %s", target_lang, mid)
+                    logger.info(
+                        "Auto-matched translation model for target '%s': %s", target_lang, mid
+                    )
                     return model
-            
+
             # 如果没找到已下载的，尝试在注册表中找一个默认的
             for model in self._translation_registry.get_all():
                 if model.target_lang == target_lang:
@@ -579,7 +574,7 @@ class ModelManager(QObject):
             # 精确匹配
             model_id = f"opus-mt-{source_lang}-{target_lang}"
             return self.get_translation_model(model_id)
-        
+
         return None
 
     async def download_translation_model(self, model_id: str) -> Path:
@@ -588,13 +583,12 @@ class ModelManager(QObject):
         if not model:
             raise ValueError(f"Unknown translation model: {model_id}")
 
-        record = (
-            TranslationModelRecord.get_by_model_id(self._database, model_id)
-            or TranslationModelRecord(
-                model_id=model_id,
-                source_lang=model.source_lang,
-                target_lang=model.target_lang,
-            )
+        record = TranslationModelRecord.get_by_model_id(
+            self._database, model_id
+        ) or TranslationModelRecord(
+            model_id=model_id,
+            source_lang=model.source_lang,
+            target_lang=model.target_lang,
         )
 
         def pre_cb():
@@ -614,11 +608,11 @@ class ModelManager(QObject):
 
         try:
             return await self._execute_download(
-                model_id, 
-                model, 
+                model_id,
+                model,
                 self.translation_downloader,
                 pre_download_cb=pre_cb,
-                post_download_cb=post_cb
+                post_download_cb=post_cb,
             )
         except Exception:
             record.update_status(self._database, "failed")
@@ -637,17 +631,17 @@ class ModelManager(QObject):
             path = Path(model.local_path)
             if path.exists():
                 shutil.rmtree(path, ignore_errors=True)
-            
+
             record = TranslationModelRecord.get_by_model_id(self._database, model_id)
             if record:
                 record.update_status(
-                    self._database, 
-                    "not_downloaded", 
-                    download_path=None, 
-                    size_bytes=None, 
-                    downloaded_at=None
+                    self._database,
+                    "not_downloaded",
+                    download_path=None,
+                    size_bytes=None,
+                    downloaded_at=None,
                 )
-            
+
             self._refresh_translation_states()
             self.translation_models_updated.emit()
             return True
@@ -667,4 +661,3 @@ class ModelManager(QObject):
         if record:
             record.update_status(self._database, "failed")
         self.translation_models_updated.emit()
-

@@ -354,7 +354,6 @@ class OpenAIEngine(SpeechEngine):
             logger.error(f"Stream transcription failed: {e}")
             return {"text": "", "language": "unknown"}
 
-
         finally:
             # 清理临时文件
             try:

@@ -271,7 +271,6 @@ class SpeechEngine(ABC):
             Dict[str, Any]: Transcription metadata including 'text' and 'language'.
         """
 
-
     @abstractmethod
     def get_config_schema(self) -> Dict:
         """Return the JSON schema that describes engine configuration."""

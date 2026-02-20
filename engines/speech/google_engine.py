@@ -255,7 +255,6 @@ class GoogleEngine(SpeechEngine):
             detected_lang = result.get("language", language or "unknown")
             return {"text": text, "language": detected_lang}
 
-
         finally:
             # 清理临时文件
             import os

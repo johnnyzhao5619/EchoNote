@@ -23,8 +23,8 @@ ModelDownloader.download() 实现鸭子类型复用，无需修改下载器。
 
 import logging
 from dataclasses import dataclass, field
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
@@ -38,15 +38,15 @@ class TranslationModelInfo:
     仅保留与翻译模型相关的属性，去掉语音模型专属的 speed / accuracy 字段。
     """
 
-    model_id: str = ""            # "opus-mt-zh-en"
-    source_lang: str = ""         # "zh"
-    target_lang: str = ""         # "en"
-    display_name: str = ""        # "中文 → English"
+    model_id: str = ""  # "opus-mt-zh-en"
+    source_lang: str = ""  # "zh"
+    target_lang: str = ""  # "en"
+    display_name: str = ""  # "中文 → English"
 
     # ---- ModelDownloader 需要读取的字段（与 ModelInfo 同名同义） ----
     # name 用于下载目录命名（ModelDownloader 使用 model.name 创建子目录）
     name: str = field(init=False, repr=False)
-    repo_id: str = ""             # "Helsinki-NLP/opus-mt-zh-en"
+    repo_id: str = ""  # "Helsinki-NLP/opus-mt-zh-en"
     revision: str = "main"
     # 核心配置文件，权重文件（bin/safetensors）在 ensure_local_state 中动态检查
     required_files: Tuple[str, ...] = (
@@ -78,15 +78,12 @@ class TranslationModelInfo:
         if candidate.exists() and candidate.is_dir():
             try:
                 # 检查核心配置
-                has_config = all(
-                    (candidate / f).exists() for f in self.required_files
-                )
+                has_config = all((candidate / f).exists() for f in self.required_files)
                 # 检查权重文件（支持 bin 或 safetensors）
-                has_weights = (
-                    (candidate / "model.safetensors").exists() or 
-                    (candidate / "pytorch_model.bin").exists()
-                )
- 
+                has_weights = (candidate / "model.safetensors").exists() or (
+                    candidate / "pytorch_model.bin"
+                ).exists()
+
                 if has_config and has_weights:
                     self.local_path = str(candidate)
                     self.is_downloaded = True
@@ -102,6 +99,7 @@ class TranslationModelInfo:
 
     def clone(self) -> "TranslationModelInfo":
         from dataclasses import replace
+
         cloned = replace(self)
         cloned.name = self.model_id  # 重新设置 post_init 属性
         return cloned
@@ -113,20 +111,19 @@ class TranslationModelInfo:
 
 # 每条记录：(model_id, source_lang, target_lang, display_name, repo_id, estimated_size_mb)
 _PRESET_MODELS: List[Tuple[str, str, str, str, str, int]] = [
-    ("opus-mt-zh-en", "zh", "en", "中文 → English",    "Helsinki-NLP/opus-mt-zh-en", 312),
-    ("opus-mt-en-zh", "en", "zh", "English → 中文",    "Helsinki-NLP/opus-mt-en-zh", 312),
-    ("opus-mt-ja-en", "ja", "en", "日本語 → English",  "Helsinki-NLP/opus-mt-ja-en", 312),
-    ("opus-mt-en-ja", "en", "ja", "English → 日本語",  "Helsinki-NLP/opus-mt-en-ja",  312),
-    ("opus-mt-ko-en", "ko", "en", "한국어 → English",   "Helsinki-NLP/opus-mt-ko-en", 312),
-    ("opus-mt-en-ko", "en", "ko", "English → 한국어",   "Helsinki-NLP/opus-mt-en-ko", 312),
+    ("opus-mt-zh-en", "zh", "en", "中文 → English", "Helsinki-NLP/opus-mt-zh-en", 312),
+    ("opus-mt-en-zh", "en", "zh", "English → 中文", "Helsinki-NLP/opus-mt-en-zh", 312),
+    ("opus-mt-ja-en", "ja", "en", "日本語 → English", "Helsinki-NLP/opus-mt-ja-en", 312),
+    ("opus-mt-en-ja", "en", "ja", "English → 日本語", "Helsinki-NLP/opus-mt-en-ja", 312),
+    ("opus-mt-ko-en", "ko", "en", "한국어 → English", "Helsinki-NLP/opus-mt-ko-en", 312),
+    ("opus-mt-en-ko", "en", "ko", "English → 한국어", "Helsinki-NLP/opus-mt-en-ko", 312),
     ("opus-mt-fr-en", "fr", "en", "Français → English", "Helsinki-NLP/opus-mt-fr-en", 300),
     ("opus-mt-en-fr", "en", "fr", "English → Français", "Helsinki-NLP/opus-mt-en-fr", 300),
-    ("opus-mt-de-en", "de", "en", "Deutsch → English",  "Helsinki-NLP/opus-mt-de-en", 298),
-    ("opus-mt-en-de", "en", "de", "English → Deutsch",  "Helsinki-NLP/opus-mt-en-de", 298),
-    ("opus-mt-es-en", "es", "en", "Español → English",  "Helsinki-NLP/opus-mt-es-en", 310),
-    ("opus-mt-en-es", "en", "es", "English → Español",  "Helsinki-NLP/opus-mt-en-es", 310),
+    ("opus-mt-de-en", "de", "en", "Deutsch → English", "Helsinki-NLP/opus-mt-de-en", 298),
+    ("opus-mt-en-de", "en", "de", "English → Deutsch", "Helsinki-NLP/opus-mt-en-de", 298),
+    ("opus-mt-es-en", "es", "en", "Español → English", "Helsinki-NLP/opus-mt-es-en", 310),
+    ("opus-mt-en-es", "en", "es", "English → Español", "Helsinki-NLP/opus-mt-en-es", 310),
 ]
-
 
 
 class TranslationModelRegistry:
@@ -144,7 +141,6 @@ class TranslationModelRegistry:
                 size_mb=estimated_size,
             )
             self._models[model_id] = info
-
 
     def get_all(self) -> List[TranslationModelInfo]:
         """返回所有已注册模型（副本列表）。"""

@@ -21,7 +21,6 @@ Provides translation engine implementations for real-time translation.
 
 from engines.translation.base import TranslationEngine
 from engines.translation.google_translate import GoogleTranslateEngine
-from engines.translation.opus_mt_engine import OpusMTEngine, MultiModelOpusMTEngine
+from engines.translation.opus_mt_engine import MultiModelOpusMTEngine, OpusMTEngine
 
 __all__ = ["TranslationEngine", "GoogleTranslateEngine", "OpusMTEngine", "MultiModelOpusMTEngine"]
-

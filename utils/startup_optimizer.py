@@ -117,7 +117,9 @@ class LazyLoader:
                     elapsed = time.time() - start_time
                     logger.info(f"Lazy loaded {self.name} in {elapsed:.2f}s")
                 else:
-                    logger.debug(f"Lazy loader {self.name} returned None, not marking as initialized")
+                    logger.debug(
+                        f"Lazy loader {self.name} returned None, not marking as initialized"
+                    )
             except Exception as e:
                 logger.error(f"Error lazy loading {self.name}: {e}")
                 raise

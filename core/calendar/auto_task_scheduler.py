@@ -22,7 +22,6 @@ when an event ends if it has a recording but no transcript and auto-transcribe i
 
 import logging
 from datetime import datetime, timezone
-from utils.time_utils import now_local, to_local_datetime, to_utc_iso
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.date import DateTrigger
@@ -30,10 +29,9 @@ from apscheduler.triggers.date import DateTrigger
 from core.calendar.manager import CalendarManager
 from core.transcription.manager import TranscriptionManager
 from data.database.models import AutoTaskConfig, CalendarEvent, EventAttachment
+from utils.time_utils import now_local, to_local_datetime, to_utc_iso
 
 logger = logging.getLogger("echonote.calendar.auto_task_scheduler")
-
-
 
 
 class CalendarAutoTaskScheduler:

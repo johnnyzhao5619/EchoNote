@@ -668,7 +668,6 @@ class FasterWhisperEngine(SpeechEngine):
                 logger.debug(f"Transcription result: '{text}' (language: {lang})")
                 return {"text": text, "language": lang}
 
-
             finally:
                 # 清理临时文件
                 try:

@@ -207,7 +207,9 @@ class RealtimeRecordWidget(BaseWidget):
         if self.model_manager:
             self.model_manager.models_updated.connect(self._update_model_list)
             if hasattr(self.model_manager, "translation_models_updated"):
-                self.model_manager.translation_models_updated.connect(self._on_translation_models_refresh)
+                self.model_manager.translation_models_updated.connect(
+                    self._on_translation_models_refresh
+                )
 
         if self.settings_manager and hasattr(self.settings_manager, "setting_changed"):
             try:
@@ -326,11 +328,15 @@ class RealtimeRecordWidget(BaseWidget):
                 new_target = preferences.get("translation_target_lang", "en")
 
                 # 如果配置变更，尝试通知引擎代理进行重载
-                if (getattr(self, "_last_translation_engine", None) != new_translation_engine or
-                    getattr(self, "_last_translation_source", None) != new_source or
-                    getattr(self, "_last_translation_target", None) != new_target):
+                if (
+                    getattr(self, "_last_translation_engine", None) != new_translation_engine
+                    or getattr(self, "_last_translation_source", None) != new_source
+                    or getattr(self, "_last_translation_target", None) != new_target
+                ):
 
-                    if self.recorder.translation_engine and hasattr(self.recorder.translation_engine, "reload"):
+                    if self.recorder.translation_engine and hasattr(
+                        self.recorder.translation_engine, "reload"
+                    ):
                         logger.info("Translation settings changed, reloading engine...")
                         self.recorder.translation_engine.reload()
                         self._update_placeholders()
@@ -1463,11 +1469,21 @@ class RealtimeRecordWidget(BaseWidget):
                 engine_type = preferences.get("translation_engine", "none")
 
                 if engine_type == "none":
-                    placeholder = self.i18n.t("realtime_record.translation_disabled_placeholder") or "Translation disabled"
+                    placeholder = (
+                        self.i18n.t("realtime_record.translation_disabled_placeholder")
+                        or "Translation disabled"
+                    )
                 elif engine_type == "opus-mt":
                     source = preferences.get("translation_source_lang", "auto")
                     target = preferences.get("translation_target_lang", "en")
-                    placeholder = self.i18n.t("realtime_record.opus_mt_not_ready_placeholder", source=source, target=target) or f"Opus-MT model ({source}->{target}) not ready"
+                    placeholder = (
+                        self.i18n.t(
+                            "realtime_record.opus_mt_not_ready_placeholder",
+                            source=source,
+                            target=target,
+                        )
+                        or f"Opus-MT model ({source}->{target}) not ready"
+                    )
                 else:
                     placeholder = self.i18n.t("realtime_record.translation_not_available")
 
@@ -1718,14 +1734,13 @@ class RealtimeRecordWidget(BaseWidget):
             # Available if engine is loaded OR if any local translation models exist
             if self.recorder.translation_engine:
                 return True
-            
+
             if self.model_manager:
                 downloaded = [
-                    m for m in self.model_manager.get_all_translation_models() 
-                    if m.is_downloaded
+                    m for m in self.model_manager.get_all_translation_models() if m.is_downloaded
                 ]
                 return len(downloaded) > 0
-                
+
             return False
         except Exception:
             return False
@@ -1859,7 +1874,7 @@ class RealtimeRecordWidget(BaseWidget):
                 self.settings_manager.update_setting("realtime.translation_engine", "opus-mt")
                 # Reload engine in recorder
                 try:
-                    # MainWindow handles major engine reloads, but we can try basic injection 
+                    # MainWindow handles major engine reloads, but we can try basic injection
                     # for the upcoming session if the recorder allows it.
                     # Usually, the MainWindow reloads everything, but we trigger the setting save.
                     pass
