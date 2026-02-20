@@ -135,7 +135,16 @@ def check_model_availability(config, model_manager, i18n, main_window):
 
 def start_background_services(managers, config, db, logger):
     """Start background services like sync scheduler and auto task scheduler."""
-    logger.info("Background initialization complete")
+    logger.info("Starting background services...")
+
+    # Start transcription manager background thread
+    if "transcription_manager" in managers and managers["transcription_manager"]:
+        try:
+            logger.info("Starting transcription manager background thread...")
+            managers["transcription_manager"].start_processing()
+            logger.info("Transcription manager background thread started")
+        except Exception as e:
+            logger.error(f"Could not start transcription manager: {e}")
 
     # Start schedulers
     if "sync_scheduler" in managers and managers["sync_scheduler"]:

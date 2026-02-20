@@ -28,13 +28,18 @@
     "default_gain": 1.0,
     "recording_format": "wav",
     "auto_save": true,
-    "translation_engine": "google",
+    "translation_engine": "none",
+    "translation_source_lang": "auto",
+    "translation_target_lang": "en",
     "save_transcript": true,
     "create_calendar_event": true,
     "recording_save_path": "~/Documents/EchoNote/Recordings",
     "vad_threshold": 0.5,
     "silence_duration_ms": 2000,
     "min_audio_duration": 3.0
+  },
+  "translation": {
+    "models_dir": "~/.echonote/translation_models"
   },
   "calendar": {
     "default_view": "week",

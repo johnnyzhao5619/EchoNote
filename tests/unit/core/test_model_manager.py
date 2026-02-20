@@ -26,8 +26,10 @@ def _build_config(
     return config
 
 
+@patch("core.models.manager.TranslationModelRecord.get_all", return_value=[])
 @patch("core.models.manager.ModelUsageStats.get_all", return_value=[])
-def test_validation_removes_invalid_model_and_keeps_cache_consistent(_mock_usage, tmp_path):
+def test_validation_removes_invalid_model_and_keeps_cache_consistent(_mock_usage, _mock_trans, tmp_path):
+
     models_dir = tmp_path / "models"
     base_dir = models_dir / "base"
     base_dir.mkdir(parents=True, exist_ok=True)
@@ -44,8 +46,10 @@ def test_validation_removes_invalid_model_and_keeps_cache_consistent(_mock_usage
     assert not manager.get_model("base").is_downloaded
 
 
+@patch("core.models.manager.TranslationModelRecord.get_all", return_value=[])
 @patch("core.models.manager.ModelUsageStats.get_all", return_value=[])
-def test_recommend_model_no_longer_reads_legacy_default_model(_mock_usage, tmp_path):
+def test_recommend_model_no_longer_reads_legacy_default_model(_mock_usage, _mock_trans, tmp_path):
+
     models_dir = tmp_path / "models"
     config = _build_config(models_dir)
 
@@ -65,8 +69,10 @@ def test_recommend_model_no_longer_reads_legacy_default_model(_mock_usage, tmp_p
     assert manager.recommend_model() == "base"
 
 
+@patch("core.models.manager.TranslationModelRecord.get_all", return_value=[])
 @patch("core.models.manager.ModelUsageStats.get_all", return_value=[])
-def test_has_active_downloads_reflects_downloader_state(_mock_usage, tmp_path):
+def test_has_active_downloads_reflects_downloader_state(_mock_usage, _mock_trans, tmp_path):
+
     manager = ModelManager(_build_config(tmp_path / "models"), Mock())
     assert manager.has_active_downloads() is False
 

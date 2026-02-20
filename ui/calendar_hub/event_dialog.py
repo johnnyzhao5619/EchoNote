@@ -23,7 +23,7 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, Optional
 
-from PySide6.QtCore import QDateTime, Signal
+from PySide6.QtCore import QDateTime, QLocale, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -47,6 +47,7 @@ from ui.base_widgets import (
 )
 from ui.constants import CALENDAR_EVENT_DESCRIPTION_MAX_HEIGHT, CALENDAR_EVENT_DIALOG_MIN_WIDTH
 from utils.i18n import I18nQtManager
+from utils.time_utils import to_local_datetime, to_utc_iso
 
 logger = logging.getLogger("echonote.ui.event_dialog")
 
@@ -58,7 +59,7 @@ class EventDialog(QDialog):
     Provides form for event information and validation.
     """
 
-    secondary_transcribe_requested = Signal()
+    secondary_transcribe_requested = Signal(object)
 
     def __init__(
         self,
@@ -67,7 +68,9 @@ class EventDialog(QDialog):
         event_data: Optional[Dict[str, Any]] = None,
         parent: Optional[QWidget] = None,
         allow_retranscribe: bool = False,
+        allow_retranscribe: bool = False,
         is_past: bool = False,
+        is_translation_available: bool = True,
     ):
         """
         Initialize event dialog.
@@ -87,6 +90,7 @@ class EventDialog(QDialog):
         self.is_edit_mode = event_data is not None
         self.allow_retranscribe = allow_retranscribe
         self.is_past = is_past
+        self.is_translation_available = is_translation_available
 
         # Result data
         self.result_data: Optional[Dict[str, Any]] = None
@@ -156,22 +160,28 @@ class EventDialog(QDialog):
         )
         form.addRow(self.i18n.t("calendar_hub.event_dialog.type_label"), self.type_combo)
 
-        # Start time (required)
         self.start_time_input = QDateTimeEdit()
         self.start_time_input.setCalendarPopup(True)
         self.start_time_input.setDateTime(QDateTime.currentDateTime())
-        self.start_time_input.setDisplayFormat("yyyy-MM-dd HH:mm")
+        
+        # Use system locale for display format
+        locale = QLocale.system()
+        self.start_time_input.setLocale(locale)
+        self.start_time_input.setDisplayFormat(locale.dateTimeFormat(QLocale.FormatType.ShortFormat))
         form.addRow(
             self.i18n.t("calendar_hub.event_dialog.start_time_label"), self.start_time_input
         )
 
-        # End time (required)
         self.end_time_input = QDateTimeEdit()
         self.end_time_input.setCalendarPopup(True)
         # Default to 1 hour after start
         default_end = QDateTime.currentDateTime().addSecs(3600)
         self.end_time_input.setDateTime(default_end)
-        self.end_time_input.setDisplayFormat("yyyy-MM-dd HH:mm")
+        
+        # Use system locale for display format
+        locale = QLocale.system()
+        self.end_time_input.setLocale(locale)
+        self.end_time_input.setDisplayFormat(locale.dateTimeFormat(QLocale.FormatType.ShortFormat))
         form.addRow(self.i18n.t("calendar_hub.event_dialog.end_time_label"), self.end_time_input)
 
         # Location (optional)
@@ -224,7 +234,51 @@ class EventDialog(QDialog):
             self.auto_transcribe_checkbox.hide()
         form.addRow("", self.auto_transcribe_checkbox)
 
+        # Translation (optional)
+        self.translation_container = QWidget()
+        trans_layout = QHBoxLayout(self.translation_container)
+        trans_layout.setContentsMargins(0, 0, 0, 0)
+        trans_layout.setSpacing(PAGE_COMPACT_SPACING)
+
+        self.enable_translation_checkbox = QCheckBox(
+            self.i18n.t("realtime_record.enable_translation", default="Enable Translation")
+        )
+        self.enable_translation_checkbox.stateChanged.connect(self._on_translation_toggled)
+
+        if not self.is_translation_available:
+            self.enable_translation_checkbox.setEnabled(False)
+            self.enable_translation_checkbox.setToolTip(
+                self.i18n.t("realtime_record.translation_disabled_tooltip")
+            )
+
+        trans_layout.addWidget(self.enable_translation_checkbox)
+
+        self.target_lang_combo = QComboBox()
+        self.target_lang_combo.setEnabled(False)
+        self.LANGUAGE_OPTIONS = [
+            ("zh", "realtime_record.available_languages.zh"),
+            ("en", "realtime_record.available_languages.en"),
+            ("fr", "realtime_record.available_languages.fr"),
+            ("ja", "realtime_record.available_languages.ja"),
+            ("ko", "realtime_record.available_languages.ko"),
+        ]
+        for code, label_key in self.LANGUAGE_OPTIONS:
+            self.target_lang_combo.addItem(self.i18n.t(label_key), code)
+
+        trans_layout.addWidget(self.target_lang_combo)
+        trans_layout.addStretch()
+
+        if self.is_past:
+            self.translation_container.hide()
+
+        form.addRow(self.i18n.t("batch_transcribe.translation", default="Translation"), self.translation_container)
+
         return form
+
+    def _on_translation_toggled(self, state: int):
+        """Handle translation checkbox toggle."""
+        is_enabled = bool(state)
+        self.target_lang_combo.setEnabled(is_enabled)
 
     def _create_sync_options(self) -> QGroupBox:
         """
@@ -316,17 +370,13 @@ class EventDialog(QDialog):
         # Start time
         if "start_time" in self.event_data:
             start_time = self.event_data["start_time"]
-            if isinstance(start_time, str):
-                start_time = datetime.fromisoformat(start_time)
-            qdt = QDateTime(start_time)
+            qdt = QDateTime(to_local_datetime(start_time))
             self.start_time_input.setDateTime(qdt)
 
         # End time
         if "end_time" in self.event_data:
             end_time = self.event_data["end_time"]
-            if isinstance(end_time, str):
-                end_time = datetime.fromisoformat(end_time)
-            qdt = QDateTime(end_time)
+            qdt = QDateTime(to_local_datetime(end_time))
             self.end_time_input.setDateTime(qdt)
 
         # Location
@@ -353,6 +403,15 @@ class EventDialog(QDialog):
         # Auto-transcribe
         if "auto_transcribe" in self.event_data:
             self.auto_transcribe_checkbox.setChecked(bool(self.event_data["auto_transcribe"]))
+
+        # Translation
+        if "enable_translation" in self.event_data:
+            self.enable_translation_checkbox.setChecked(bool(self.event_data["enable_translation"]))
+            if "translation_target_lang" in self.event_data:
+                target_lang = self.event_data["translation_target_lang"]
+                index = self.target_lang_combo.findData(target_lang)
+                if index >= 0:
+                    self.target_lang_combo.setCurrentIndex(index)
 
     def _on_save_clicked(self):
         """Handle save button click."""
@@ -384,7 +443,8 @@ class EventDialog(QDialog):
 
     def _on_secondary_transcribe_clicked(self):
         """Handle secondary transcription button click."""
-        self.secondary_transcribe_requested.emit()
+        data = self._collect_form_data()
+        self.secondary_transcribe_requested.emit(data)
         self.accept()
 
     def is_delete_requested(self) -> bool:
@@ -408,8 +468,8 @@ class EventDialog(QDialog):
             return False
 
         # Check start time < end time
-        start_time = self._qdatetime_to_python_datetime(self.start_time_input.dateTime())
-        end_time = self._qdatetime_to_python_datetime(self.end_time_input.dateTime())
+        start_time = to_local_datetime(self.start_time_input.dateTime())
+        end_time = to_local_datetime(self.end_time_input.dateTime())
 
         if start_time >= end_time:
             self.show_warning(
@@ -465,14 +525,16 @@ class EventDialog(QDialog):
         data = {
             "title": self.title_input.text().strip(),
             "event_type": event_type,
-            "start_time": self._qdatetime_to_python_datetime(self.start_time_input.dateTime()),
-            "end_time": self._qdatetime_to_python_datetime(self.end_time_input.dateTime()),
+            "start_time": to_utc_iso(self.start_time_input.dateTime()),
+            "end_time": to_utc_iso(self.end_time_input.dateTime()),
             "location": self.location_input.text().strip() or None,
             "attendees": attendees if attendees else None,
             "description": self.description_input.toPlainText().strip() or None,
             "reminder_minutes": reminder_minutes,
             "sync_to": sync_to if sync_to else None,
             "auto_transcribe": getattr(self, "auto_transcribe_checkbox", QCheckBox()).isChecked(),
+            "enable_translation": self.enable_translation_checkbox.isChecked(),
+            "translation_target_lang": self.target_lang_combo.currentData(),
         }
 
         # Add event ID if editing
@@ -481,35 +543,6 @@ class EventDialog(QDialog):
 
         return data
 
-    @staticmethod
-    def _qdatetime_to_python_datetime(value: QDateTime) -> datetime:
-        """Convert QDateTime to Python datetime across Qt binding variants."""
-        if not value.isValid():
-            raise ValueError("Invalid datetime input")
-
-        to_python = getattr(value, "toPython", None)
-        if callable(to_python):
-            result = to_python()
-            if isinstance(result, datetime):
-                return result
-
-        to_py_datetime = getattr(value, "toPyDateTime", None)
-        if callable(to_py_datetime):
-            result = to_py_datetime()
-            if isinstance(result, datetime):
-                return result
-
-        date_part = value.date()
-        time_part = value.time()
-        return datetime(
-            date_part.year(),
-            date_part.month(),
-            date_part.day(),
-            time_part.hour(),
-            time_part.minute(),
-            time_part.second(),
-            time_part.msec() * 1000,
-        )
 
     def get_event_data(self) -> Optional[Dict[str, Any]]:
         """

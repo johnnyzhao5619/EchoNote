@@ -307,12 +307,20 @@ class DatabaseConnection:
             Schema version number, or 0 if not set
         """
         try:
+            # Check if app_settings table exists before querying it
+            # This avoids noisy error logs from get_cursor when the table doesn't exist yet
+            table_check = self.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='app_settings'"
+            )
+            if not table_check:
+                return 0
+
             result = self.execute("SELECT value FROM app_settings WHERE key = 'schema_version'")
             if result:
                 return int(result[0]["value"])
             return 0
-        except sqlite3.OperationalError:
-            # Table doesn't exist yet
+        except (sqlite3.OperationalError, ValueError):
+            # Table doesn't exist yet or value is not an integer
             return 0
 
     def set_version(self, version: int):

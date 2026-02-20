@@ -22,6 +22,8 @@ Manages automatic periodic synchronization of external calendars.
 import logging
 from typing import Dict, Optional
 
+from utils.time_utils import now_utc
+
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
@@ -209,9 +211,7 @@ class SyncScheduler:
 
         try:
             # Schedule retry with exponential backoff
-            from datetime import datetime, timedelta
-
-            run_time = datetime.now() + timedelta(minutes=delay_minutes)
+            run_time = now_utc() + timedelta(minutes=delay_minutes)
 
             self.scheduler.add_job(
                 func=self._retry_sync,

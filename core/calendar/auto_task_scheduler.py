@@ -22,6 +22,7 @@ when an event ends if it has a recording but no transcript and auto-transcribe i
 
 import logging
 from datetime import datetime, timezone
+from utils.time_utils import now_local, to_local_datetime, to_utc_iso
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.date import DateTrigger
@@ -33,18 +34,6 @@ from data.database.models import AutoTaskConfig, CalendarEvent, EventAttachment
 logger = logging.getLogger("echonote.calendar.auto_task_scheduler")
 
 
-def to_local_naive(dt) -> datetime:
-    """Helper to convert to naive local datetime, similarly to timeline manager."""
-    if isinstance(dt, str):
-        try:
-            dt = datetime.fromisoformat(dt)
-        except ValueError:
-            pass
-    if isinstance(dt, datetime):
-        if dt.tzinfo is not None:
-            return dt.astimezone().replace(tzinfo=None)
-        return dt
-    return datetime.now().replace(tzinfo=None)
 
 
 class CalendarAutoTaskScheduler:
@@ -117,8 +106,8 @@ class CalendarAutoTaskScheduler:
             return
 
         try:
-            end_time = to_local_naive(event.end_time)
-            now = to_local_naive(datetime.now())
+            end_time = to_local_datetime(event.end_time)
+            now = now_local()
             if end_time <= now:
                 # Event already ended, process immediately
                 self._process_event(event.id)
@@ -154,7 +143,7 @@ class CalendarAutoTaskScheduler:
             if not configs:
                 return
 
-            now = to_local_naive(datetime.now())
+            now = to_local_datetime(datetime.now())
 
             for row in configs:
                 config = AutoTaskConfig.from_db_row(row)
@@ -162,7 +151,7 @@ class CalendarAutoTaskScheduler:
                 if not event:
                     continue
 
-                end_time = to_local_naive(event.end_time)
+                end_time = to_local_datetime(event.end_time)
                 # If event has ended
                 if end_time <= now:
                     self._process_event(event.id)
@@ -209,6 +198,10 @@ class CalendarAutoTaskScheduler:
             options = {"event_id": event_id}
             if config.transcription_language and config.transcription_language != "auto":
                 options["language"] = config.transcription_language
+
+            if config.enable_translation:
+                options["enable_translation"] = True
+                options["translation_target_lang"] = config.translation_target_language
 
             self.transcription_manager.add_task(recording_path, options=options)
 

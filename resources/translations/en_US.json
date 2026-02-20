@@ -145,8 +145,10 @@
     "go_to_download": "Go to Download Models",
     "no_model_selected": "Please select a model",
     "model_not_downloaded": "Selected model is not downloaded",
-    "translation_disabled_tooltip": "Translation not available. Configure a Google Translate API key in Settings > Transcription.",
-    "translation_not_available": "Translation not available. Please configure Google Translate API key in Settings > Transcription.",
+    "translation_disabled_tooltip": "Translation is disabled in settings.",
+    "translation_not_available": "Translation not available. Please check your configuration in Settings.",
+    "translation_disabled_placeholder": "Translation disabled",
+    "opus_mt_not_ready_placeholder": "Opus-MT model ({source}->{target}) not ready. Download it in Settings.",
     "audio_unavailable_short": "Microphone capture not available",
     "audio_unavailable_message": "Real-time recording requires PyAudio. Install it with: {command}",
     "audio_unavailable_tooltip": "Install PyAudio (pip install pyaudio) to enable real-time recording.",
@@ -207,7 +209,7 @@
     "export_success": "Export successful",
     "transcription": "Transcription",
     "translation": "Translation",
-    "secondary_transcription": "Secondary Transcription (High Quality)"
+    "secondary_transcription": "Secondary Transcription"
   },
   "calendar_hub": {
     "title": "Calendar Hub",
@@ -373,7 +375,7 @@
     "play_recording": "Play Recording",
     "view_transcript": "View Transcript",
     "view_translation": "View Translation",
-    "secondary_transcribe": "Secondary Transcription (High Quality)",
+    "secondary_transcribe": "Secondary Transcription",
     "translation_viewer_title": "Translation Viewer",
     "no_artifacts": "No artifacts",
     "audio_player_title": "Audio Player",
@@ -630,6 +632,14 @@
       "auto_save": "Auto-save Recordings",
       "translation": "Translation Settings",
       "translation_engine": "Translation Engine",
+      "engine_none": "None (Disabled)",
+      "engine_opus-mt": "Opus-MT (Local)",
+      "engine_google": "Google Translate",
+      "source_language": "Source Language",
+      "target_language": "Target Language",
+      "auto_detect": "Auto Detect",
+      "opus_mt_ready": "✓ Model {model} is ready",
+      "opus_mt_not_downloaded": "⚠ Model {model} not downloaded — go to Model Management to download",
       "no_translation": "No Translation",
       "google_translate": "Google Translate",
       "processing": "Processing Settings",
@@ -680,7 +690,9 @@
     },
     "model_management": {
       "title": "Model Management",
-      "description": "Manage local Whisper models, including download, delete, and configuration",
+      "description": "Manage local models for transcription and translation",
+      "speech_tab": "Speech Recognition (Whisper)",
+      "translation_tab": "Translation (Opus-MT)",
       "downloaded_models": "Downloaded Models",
       "available_models": "Available Models",
       "download_success_title": "Download Successful",
@@ -747,6 +759,7 @@
       "model_name": "Model Name",
       "model_version": "Model Version",
       "supported_languages": "Supported Languages",
+      "language_pair": "Language Pair",
       "model_size": "Model Size",
       "model_path": "Model Path",
       "disk_usage": "Actual Disk Usage",
@@ -779,7 +792,14 @@
       "reason_gpu_available": "GPU detected, can accelerate model execution.",
       "reason_no_gpu": "No GPU detected, will run on CPU.",
       "reminder_title": "Reminder",
-      "reminder_message": "You haven't downloaded any speech recognition models yet.\n\nTo use transcription features, please go to Settings > Model Management to download a model."
+      "reminder_message": "You haven't downloaded any speech recognition models yet.\n\nTo use transcription features, please go to Settings > Model Management to download a model.",
+      "translation_models": "Translation Models (Opus-MT)",
+      "translation_models_desc": "Download Helsinki-NLP/Opus-MT models for local, offline translation. Each language pair model is approximately 290 MB.",
+      "model_size_mb": "~{size} MB",
+      "downloaded": "Downloaded",
+      "confirm_delete_title": "Confirm Delete",
+      "confirm_delete_message": "Are you sure you want to delete model \"{model}\"?",
+      "delete_failed": "Failed to delete model. Please check file permissions or logs."
     },
     "theme": {
       "light": "Light Theme",
@@ -787,7 +807,9 @@
       "system": "Follow System"
     },
     "languages": {
-      "en_US": "English"
+      "en_US": "English",
+      "fr_FR": "French",
+      "zh_CN": "Chinese (Simplified)"
     }
   },
   "errors": {

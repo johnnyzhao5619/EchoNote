@@ -17,9 +17,11 @@ pytestmark = pytest.mark.ui
 def widget(qapp, mock_i18n, mock_settings_manager):
     """Create timeline widget without scheduling async data loading."""
     timeline_manager = MagicMock()
+    transcription_manager = MagicMock()
     with patch("ui.timeline.widget.QTimer.singleShot", side_effect=lambda _ms, _cb: None):
         created = TimelineWidget(
             timeline_manager=timeline_manager,
+            transcription_manager=transcription_manager,
             i18n=mock_i18n,
             settings_manager=mock_settings_manager,
         )

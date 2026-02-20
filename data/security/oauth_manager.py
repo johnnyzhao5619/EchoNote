@@ -27,6 +27,7 @@ from typing import Any, Dict, Optional
 
 from config.app_config import get_app_dir
 from data.security.encryption import SecurityManager
+from utils.time_utils import current_iso_timestamp, now_utc
 
 logger = logging.getLogger("echonote.security.oauth")
 
@@ -134,7 +135,7 @@ class OAuthManager:
             **extra_data: Additional provider-specific data
         """
         # Calculate expiration time and record storage timestamp
-        now = datetime.now()
+        now = now_utc()
         expires_at = None
         if expires_in is not None:
             expires_at = (now + timedelta(seconds=expires_in)).isoformat()
@@ -164,7 +165,7 @@ class OAuthManager:
         merged_data["access_token"] = access_token
         merged_data["expires_in"] = expires_in
         merged_data["expires_at"] = expires_at
-        merged_data["stored_at"] = now.isoformat()
+        merged_data["stored_at"] = current_iso_timestamp()
 
         self._tokens_cache[provider] = merged_data
         self._save_tokens()
@@ -250,7 +251,7 @@ class OAuthManager:
 
         try:
             expiration = datetime.fromisoformat(expires_at)
-            now = datetime.now()
+            now = now_utc()
 
             # Check if expired or will expire within buffer time
             is_expired = (expiration - now).total_seconds() <= buffer_seconds
@@ -293,7 +294,7 @@ class OAuthManager:
 
         # Update expiration time
         if expires_in is not None:
-            computed_expires_at = (datetime.now() + timedelta(seconds=expires_in)).isoformat()
+            computed_expires_at = (now_utc() + timedelta(seconds=expires_in)).isoformat()
             token_data["expires_at"] = computed_expires_at
             token_data["expires_in"] = expires_in
         elif expires_at is not None:
@@ -306,7 +307,7 @@ class OAuthManager:
             token_data["refresh_token"] = refresh_token
 
         # Update stored_at timestamp
-        token_data["stored_at"] = datetime.now().isoformat()
+        token_data["stored_at"] = current_iso_timestamp()
 
         self._tokens_cache[provider] = token_data
         self._save_tokens()

@@ -34,7 +34,11 @@ from config.app_config import get_app_dir
 from core.transcription.format_converter import FormatConverter
 from core.transcription.task_queue import TaskQueue, TaskStatus
 from data.database.connection import DatabaseConnection
-from data.database.models import TranscriptionTask
+from data.database.models import (
+    CalendarEvent,
+    TranscriptionTask,
+    current_iso_timestamp,
+)
 from engines.speech.base import AUDIO_VIDEO_SUFFIXES, SpeechEngine
 from ui.common.notification import get_notification_manager
 
@@ -63,6 +67,7 @@ class TranscriptionManager:
         *,
         i18n: Optional[Any] = None,
         translate: Optional[Callable[..., str]] = None,
+        translation_engine: Optional[Any] = None,
     ):
         """
         Initialize transcription manager.
@@ -83,6 +88,9 @@ class TranscriptionManager:
             translate_method = getattr(i18n, "t", None)
             if callable(translate_method):
                 self._translator = translate_method
+
+        # 翻译引擎（可选），用于批量转写任务完成后自动翻译
+        self.translation_engine = translation_engine
 
         self._default_save_path: Optional[str] = None
         raw_default_path = self.config.get("default_save_path")
@@ -272,16 +280,22 @@ class TranscriptionManager:
 
     async def _drain_buffered_tasks(self) -> None:
         """Add all buffered tasks to the async queue."""
+        logger.info("Starting to drain buffered transcription tasks...")
         buffered_tasks = self._pop_buffered_tasks()
         if not buffered_tasks:
+            logger.info("No buffered tasks to drain")
             return
 
+        logger.info(f"Draining {len(buffered_tasks)} tasks from buffer")
         for task_id, (task_func, args, kwargs) in buffered_tasks:
             try:
                 await self.task_queue.add_task(task_id, task_func, *args, **kwargs)
-                logger.info(f"Task {task_id} scheduled from buffer")
+                logger.info(f"Task {task_id} successfully scheduled from buffer")
             except Exception as exc:
-                logger.error(f"Failed to schedule buffered task {task_id}: {exc}", exc_info=True)
+                logger.error(
+                    f"CRITICAL: Failed to schedule buffered task {task_id}: {exc}", exc_info=True
+                )
+        logger.info("Finished draining buffered transcription tasks")
 
     def add_task(self, file_path: str, options: Optional[Dict[str, Any]] = None) -> str:
         """
@@ -312,6 +326,10 @@ class TranscriptionManager:
             "temperature",
             "replace_realtime",
             "event_id",
+            # 翻译选项
+            "enable_translation",
+            "translation_source_lang",
+            "translation_target_lang",
         }
 
         # Validate file exists
@@ -736,9 +754,10 @@ class TranscriptionManager:
 
             # Update status to processing
             from config.constants import TASK_STATUS_PROCESSING
+            from utils.time_utils import current_iso_timestamp
 
             task.status = TASK_STATUS_PROCESSING
-            task.started_at = datetime.now().isoformat()
+            task.started_at = current_iso_timestamp()
             task.progress = 0.0
             task.save(self.db)
 
@@ -811,6 +830,16 @@ class TranscriptionManager:
             ensure_not_cancelled("before marking task as completed")
             self._finalize_task_completion(task, result)
 
+            # Optional: translate transcription result
+            if self.translation_engine and engine_kwargs.get("enable_translation"):
+                try:
+                    await self._translate_and_save(task, result.get("text", ""), engine_kwargs)
+                except Exception as trans_exc:
+                    logger.error(
+                        "Translation failed for task %s: %s", task_id, trans_exc, exc_info=True
+                    )
+                    # 翻译失败不影响转写任务的完成状态
+
             # Notify completion
             self._notify_listeners("task_updated", task.to_dict())
             self._notify_listeners("task_completed", {"id": task_id})
@@ -819,6 +848,7 @@ class TranscriptionManager:
             if task_id in self._task_engine_options:
                 del self._task_engine_options[task_id]
                 self._persist_task_engine_options()
+
 
         except asyncio.CancelledError:
             logger.info(f"Task {task_id} cancelled")
@@ -883,7 +913,7 @@ class TranscriptionManager:
 
         # Update status
         task.status = TASK_STATUS_COMPLETED
-        task.completed_at = datetime.now().isoformat()
+        task.completed_at = current_iso_timestamp()
         task.progress = 100.0
         task.save(self.db)
 
@@ -936,6 +966,53 @@ class TranscriptionManager:
                 )
 
             # We don't fail the task if export fails, but we log it
+
+    async def _translate_and_save(
+        self, task: TranscriptionTask, text: str, options: Dict[str, Any]
+    ) -> None:
+        """翻译转写文本并将翻译文件路径关联到任务。
+
+        有 event_id 时通过 event_attachments 关联（attachment_type='translation'）；
+        无 event_id 时保存至音频文件同目录，命名为 <stem>_translation_<target_lang>.<format>。
+        """
+        if not text.strip():
+            return
+
+        source_lang = options.get("translation_source_lang", "auto")
+        target_lang = options.get("translation_target_lang", "en")
+        event_id = options.get("event_id")
+
+        logger.info("Translating task %s (%s→%s)", task.id, source_lang, target_lang)
+        translated_text = await self.translation_engine.translate(text, source_lang, target_lang)
+
+        if not translated_text:
+            return
+
+        # 确定翻译文件保存路径
+        audio_path = Path(task.file_path)
+        output_format = task.output_format or "txt"
+        translation_filename = f"{audio_path.stem}_translation_{target_lang}.{output_format}"
+        translation_path = audio_path.parent / translation_filename
+
+        with open(translation_path, "w", encoding="utf-8") as f:
+            f.write(translated_text)
+
+        logger.info("Translation saved to %s", translation_path)
+
+        # 若与日历事件关联，写入 event_attachments
+        if event_id:
+            try:
+                from data.database.models import EventAttachment
+                attachment = EventAttachment(
+                    event_id=event_id,
+                    file_path=str(translation_path),
+                    file_name=translation_filename,
+                    attachment_type="translation",
+                )
+                attachment.save(self.db)
+                logger.info("Translation attachment saved for event %s", event_id)
+            except Exception as exc:
+                logger.warning("Failed to save translation attachment: %s", exc)
 
     def _cleanup_after_cancellation(self, task_id: str) -> None:
         """Clean up resources after task cancellation."""

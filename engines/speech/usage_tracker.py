@@ -25,6 +25,8 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Dict, Optional
 
+from utils.time_utils import now_utc
+
 logger = logging.getLogger(__name__)
 
 
@@ -65,7 +67,7 @@ class UsageTracker:
             str: 使用记录 ID
         """
         if timestamp is None:
-            timestamp = datetime.now()
+            timestamp = now_utc()
 
         # 计算费用
         duration_minutes = Decimal(duration_seconds) / Decimal(60)
@@ -154,7 +156,7 @@ class UsageTracker:
                 }
             }
         """
-        now = datetime.now()
+        now = now_utc()
         year = year or now.year
         month = month or now.month
 
@@ -267,7 +269,7 @@ class UsageTracker:
         Returns:
             list: 使用记录列表
         """
-        start_date = datetime.now() - timedelta(days=days)
+        start_date = now_utc() - timedelta(days=days)
 
         try:
             with self.db.get_cursor() as cursor:

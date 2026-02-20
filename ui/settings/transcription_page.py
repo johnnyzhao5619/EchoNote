@@ -50,6 +50,7 @@ from core.models.registry import get_default_model_names
 from ui.base_widgets import create_button, create_hbox, create_vbox
 from ui.settings.base_page import BaseSettingsPage, PostSaveMessage
 from utils.i18n import I18nQtManager
+from utils.time_utils import now_local
 
 logger = logging.getLogger("echonote.ui.settings.transcription")
 
@@ -597,9 +598,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         usage_tracker = self.managers["usage_tracker"]
 
         try:
-            from datetime import datetime
-
-            now = datetime.now()
+            now = now_local()
 
             # Get monthly usage for each provider
             for provider, label in [
@@ -616,8 +615,13 @@ class TranscriptionSettingsPage(BaseSettingsPage):
                     cost = usage.get("total_cost", 0)
                     count = usage.get("usage_count", 0)
 
-                    # Format usage text
-                    usage_text = f"{count} calls, {duration_minutes:.1f} min, " f"${cost:.2f}"
+                    # Format usage text using i18n
+                    usage_text = self.i18n.t(
+                        "settings.transcription.monthly_usage_stats",
+                        count=count,
+                        duration=f"{duration_minutes:.1f}",
+                        cost=f"{cost:.2f}",
+                    )
                     label.setText(usage_text)
                     label.setProperty("role", "usage-stats")
                 else:
@@ -867,9 +871,10 @@ class TranscriptionSettingsPage(BaseSettingsPage):
             self._set_setting_or_raise("transcription.default_engine", selected_engine)
 
             # Faster-Whisper settings
-            self._set_setting_or_raise(
-                "transcription.faster_whisper.model_size", self.model_size_combo.currentText()
-            )
+            if self.model_size_combo.isEnabled():
+                self._set_setting_or_raise(
+                    "transcription.faster_whisper.model_size", self.model_size_combo.currentText()
+                )
 
             # Save device using the data (device_id) not the display text
             device_id = self.device_combo.currentData()

@@ -252,7 +252,9 @@ class GoogleEngine(SpeechEngine):
 
             # 合并所有段落的文本
             text = " ".join([seg["text"] for seg in result["segments"]])
-            return text
+            detected_lang = result.get("language", language or "unknown")
+            return {"text": text, "language": detected_lang}
+
 
         finally:
             # 清理临时文件

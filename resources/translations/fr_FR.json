@@ -147,6 +147,8 @@
     "model_not_downloaded": "Le modèle sélectionné n'est pas téléchargé",
     "translation_disabled_tooltip": "Traduction indisponible. Configurez une clé API Google Translate dans Paramètres > Transcription.",
     "translation_not_available": "Traduction indisponible. Configurez une clé API Google Translate dans Paramètres > Transcription.",
+    "translation_disabled_placeholder": "Traduction désactivée",
+    "opus_mt_not_ready_placeholder": "Le modèle Opus-MT ({source}->{target}) n'est pas prêt. Veuillez le télécharger dans les paramètres.",
     "audio_unavailable_short": "Capture micro indisponible",
     "audio_unavailable_message": "L'enregistrement en temps réel nécessite PyAudio. Installez-le avec : {command}",
     "audio_unavailable_tooltip": "Installez PyAudio (pip install pyaudio) pour activer l'enregistrement en temps réel.",
@@ -189,7 +191,25 @@
     "status_recording": "Enregistrement...",
     "export_success": "Export réussi",
     "transcription": "Transcription",
-    "translation": "Traduction"
+    "translation": "Traduction",
+    "secondary_transcription": "Seconde transcription",
+    "routing": {
+      "install_hint_macos": "Veuillez installer BlackHole/Loopback et router la sortie audio vers cette entrée virtuelle.",
+      "install_hint_windows": "Veuillez activer le Mixage stéréo ou installer VB-CABLE pour l'utiliser comme entrée d'enregistrement.",
+      "install_hint_linux": "Veuillez utiliser une source moniteur PipeWire/PulseAudio ou configurer un périphérique d'entrée loopback virtuel.",
+      "silent_loopback": "Le routage loopback sélectionné n'a capturé aucun son. Veuillez vérifier le routage de sortie du système. {device_hint}",
+      "silent_system_audio_scoped": "L'entrée {app_name} sélectionnée n'a capturé aucun son. Vérifiez le routage de sortie de l'application. {device_hint}",
+      "silent_system_audio": "L'entrée système sélectionnée n'a capturé aucun son. Vérifiez que la sortie est routée vers cette entrée. {device_hint}",
+      "silent_with_loopback_options": "Aucun son capturé. Pour enregistrer le système ou une réunion, utilisez loopback ({loopback_names}). {device_hint}",
+      "silent_with_system_audio_options": "Aucun son capturé. Pour capturer le navigateur/vidéo, utilisez loopback (BlackHole/Loopback). {device_hint}",
+      "silent_no_system_audio": "Aucun son capturé. Le micro ne capte pas le son système. Aucun loopback détecté. {install_hint} {device_hint}",
+      "plan_loopback_selected": "Routage loopback sélectionné. Routez le haut-parleur vers loopback et gardez le micro physique pour les réunions.",
+      "plan_loopback_available": "Loopback détecté ({loopback_names}). Pour enregistrer le son système, passez à l'entrée loopback.",
+      "plan_system_audio_selected_scoped": "Routage audio système {app_name} choisi. Capture uniquement le retour de {app_name}.",
+      "plan_system_audio_selected": "Routage audio système sélectionné. Routez la sortie de réunion vers cet appareil.",
+      "plan_system_audio_available": "Entrées audio système détectées ({system_names}). Passez à l'une d'elles pour les réunions.",
+      "plan_no_system_audio": "Aucun loopback détecté. {install_hint} Conseil réunion : sortie -> loopback, micro -> physique."
+    }
   },
   "calendar_hub": {
     "title": "Centre calendrier",
@@ -239,7 +259,8 @@
       "validation_error": "Erreur de validation",
       "title_required": "Le titre est obligatoire.",
       "end_after_start": "L'heure de fin doit être après l'heure de début.",
-      "invalid_email": "Format d'email invalide : {email}"
+      "invalid_email": "Format d'email invalide : {email}",
+      "auto_transcribe": "Transcription automatique après l'événement"
     },
     "oauth_dialog": {
       "ready_to_authorize": "Prêt pour l'autorisation",
@@ -354,6 +375,7 @@
     "play_recording": "Lire l'enregistrement",
     "view_transcript": "Voir la transcription",
     "view_translation": "Voir la traduction",
+    "secondary_transcribe": "Seconde transcription",
     "translation_viewer_title": "Visionneuse de traduction",
     "no_artifacts": "Aucun artefact",
     "audio_player_title": "Lecteur audio",
@@ -610,8 +632,16 @@
       "auto_save": "Enregistrement automatique",
       "translation": "Paramètres de traduction",
       "translation_engine": "Moteur de traduction",
+      "target_language": "Langue cible",
+      "auto_detect": "Auto-détection",
+      "opus_mt_ready": "✓ Modèle {model} prêt",
+      "opus_mt_not_downloaded": "⚠ Modèle {model} non téléchargé — Veuillez le télécharger dans Modèles",
       "no_translation": "Pas de traduction",
       "google_translate": "Google Traduction",
+      "engine_none": "Aucun (Pas de traduction)",
+      "engine_opus-mt": "Opus-MT (Local)",
+      "engine_google": "Google Traduction",
+      "source_language": "Langue source",
       "processing": "Paramètres de traitement",
       "save_transcript": "Enregistrer la transcription",
       "create_calendar_event": "Créer un événement calendrier",
@@ -661,6 +691,8 @@
     "model_management": {
       "title": "Gestion des modèles",
       "description": "Gérez les modèles Whisper locaux : téléchargement, suppression et configuration",
+      "speech_tab": "Reconnaissance vocale (Whisper)",
+      "translation_tab": "Traduction (Opus-MT)",
       "downloaded_models": "Modèles téléchargés",
       "available_models": "Modèles disponibles",
       "download_success_title": "Téléchargement réussi",
@@ -727,6 +759,7 @@
       "model_name": "Nom du modèle",
       "model_version": "Version du modèle",
       "supported_languages": "Langues prises en charge",
+      "language_pair": "Paire de langues",
       "model_size": "Taille du modèle",
       "model_path": "Chemin du modèle",
       "disk_usage": "Utilisation disque réelle",
@@ -759,7 +792,14 @@
       "reason_gpu_available": "GPU détecté : accélération disponible.",
       "reason_no_gpu": "Aucun GPU détecté : exécution sur CPU.",
       "reminder_title": "Rappel",
-      "reminder_message": "Vous n'avez encore téléchargé aucun modèle de reconnaissance vocale.\n\nPour utiliser la transcription, allez dans Paramètres > Gestion des modèles pour en télécharger un."
+      "reminder_message": "Vous n'avez encore téléchargé aucun modèle de reconnaissance vocale.\n\nPour utiliser la transcription, allez dans Paramètres > Gestion des modèles pour en télécharger un.",
+      "translation_models": "Modèles de traduction (Opus-MT)",
+      "translation_models_desc": "Téléchargez les modèles Opus-MT pour la traduction hors ligne.",
+      "model_size_mb": "Env. {size} Mo",
+      "downloaded": "Téléchargé",
+      "confirm_delete_title": "Confirmer la suppression",
+      "confirm_delete_message": "Êtes-vous sûr de vouloir supprimer le modèle {model} ?",
+      "delete_failed": "Échec de la suppression du modèle. Vérifiez les permissions."
     },
     "theme": {
       "light": "Thème clair",

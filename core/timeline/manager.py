@@ -16,8 +16,11 @@
 """Timeline Manager for EchoNote."""
 
 import logging
-from datetime import datetime, timedelta
+import sqlite3
+from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional, Union
+
+from utils.time_utils import to_local_datetime, to_utc_iso
 
 from data.database.models import AutoTaskConfig, CalendarEvent, EventAttachment
 
@@ -32,23 +35,6 @@ _DEFAULT_TRANSCRIPT_CANDIDATE_WINDOW_DAYS = DEFAULT_TRANSCRIPT_CANDIDATE_WINDOW_
 _MAX_TRANSCRIPT_CANDIDATES = MAX_TRANSCRIPT_CANDIDATES
 
 
-def to_local_naive(value: Union[datetime, str]) -> datetime:
-    """Convert datetime/ISO string to local-time naive datetime."""
-    if isinstance(value, str):
-        text = value.strip()
-        from config.constants import UTC_TIMEZONE_OFFSET, UTC_TIMEZONE_SUFFIX
-
-        if text.endswith(UTC_TIMEZONE_SUFFIX):
-            text = text[:-1] + UTC_TIMEZONE_OFFSET
-        dt = datetime.fromisoformat(text)
-    elif isinstance(value, datetime):
-        dt = value
-    else:
-        raise TypeError(f"Unsupported value type for to_local_naive: {type(value)!r}")
-
-    if dt.tzinfo is not None:
-        return dt.astimezone().replace(tzinfo=None)
-    return dt
 
 
 class TimelineManager:
@@ -133,14 +119,17 @@ class TimelineManager:
                 text = value.strip()
                 if text:
                     try:
-                        datetime.strptime(text, "%Y-%m-%d")
-                    except ValueError:
-                        pass
-                    else:
                         from config.constants import TIMEZONE_SUFFIX_END, TIMEZONE_SUFFIX_START
 
-                        suffix = TIMEZONE_SUFFIX_START if is_start else TIMEZONE_SUFFIX_END
-                        return f"{text}{suffix}"
+                        # No need to manually append suffixes if we use to_utc_iso later,
+                        # but keep for now if dependencies expect it. 
+                        # Actually, let's just use to_utc_iso for consistency.
+                        dt = datetime.strptime(text, "%Y-%m-%d")
+                        if not is_start:
+                            dt = dt.replace(hour=23, minute=59, second=59)
+                        return to_utc_iso(dt)
+                    except ValueError:
+                        pass
             return value
 
         if "start_date" in resolved_filters:
@@ -167,12 +156,12 @@ class TimelineManager:
         )
 
         start_dt = (
-            to_local_naive(resolved_filters["start_date"])
+            to_local_datetime(resolved_filters["start_date"])
             if resolved_filters.get("start_date")
-            else datetime(TIMELINE_MIN_YEAR, TIMELINE_MIN_MONTH, TIMELINE_MIN_DAY)
+            else datetime(TIMELINE_MIN_YEAR, TIMELINE_MIN_MONTH, TIMELINE_MIN_DAY, tzinfo=timezone.utc).astimezone()
         )
         end_dt = (
-            to_local_naive(resolved_filters["end_date"])
+            to_local_datetime(resolved_filters["end_date"])
             if resolved_filters.get("end_date")
             else datetime(
                 TIMELINE_MAX_YEAR,
@@ -208,10 +197,10 @@ class TimelineManager:
         filters = context["filters"]
 
         if context["has_date_filter"]:
-            event_start = to_local_naive(event.start_time)
+            event_start = to_local_datetime(event.start_time)
             event_end_raw = getattr(event, "end_time", None) or event.start_time
             try:
-                event_end = to_local_naive(event_end_raw)
+                event_end = to_local_datetime(event_end_raw)
             except Exception:
                 event_end = event_start
 
@@ -266,7 +255,7 @@ class TimelineManager:
               Always populated (when events exist) regardless of how many
               historical events fall into the current page window.
         """
-        center_time_local = to_local_naive(center_time)
+        center_time_local = to_local_datetime(center_time)
 
         try:
             # Calculate time range
@@ -299,7 +288,7 @@ class TimelineManager:
             past_event_items: List[CalendarEvent] = []
 
             for event in filtered_events:
-                event_start = to_local_naive(event.start_time)
+                event_start = to_local_datetime(event.start_time)
 
                 if event_start < center_time_local:
                     past_event_items.append(event)
@@ -308,7 +297,7 @@ class TimelineManager:
                     future_event_ids.append(event.id)
                     future_event_items.append(event)
 
-            past_event_items.sort(key=lambda evt: to_local_naive(evt.start_time), reverse=True)
+            past_event_items.sort(key=lambda evt: to_local_datetime(evt.start_time), reverse=True)
 
             total_past_count = len(past_event_items)
             start_idx = max(page, 0) * page_size
@@ -335,7 +324,7 @@ class TimelineManager:
 
             # Keep future events ordered from farthest to nearest so cards
             # closer to "current time" stay visually closer to the indicator.
-            future_events.sort(key=lambda x: to_local_naive(x["event"].start_time), reverse=True)
+            future_events.sort(key=lambda x: to_local_datetime(x["event"].start_time), reverse=True)
 
             total_future = len(future_events)
 
@@ -641,9 +630,8 @@ class TimelineManager:
                             event_ids.add(candidate.id)
                             attachments_map.setdefault(candidate.id, attachments)
 
-            # Build result with artifacts
             future_reference_time = (
-                to_local_naive(datetime.now().astimezone()) if include_future_auto_tasks else None
+                to_local_datetime(datetime.now()) if include_future_auto_tasks else None
             )
             future_event_items: Dict[str, Dict[str, Any]] = {}
             future_event_ids: List[str] = []
@@ -659,7 +647,7 @@ class TimelineManager:
                 }
 
                 if include_future_auto_tasks and future_reference_time is not None:
-                    event_start = to_local_naive(event.start_time)
+                    event_start = to_local_datetime(event.start_time)
                     if event_start >= future_reference_time:
                         future_event_items[event.id] = result_item
                         future_event_ids.append(event.id)
@@ -679,7 +667,7 @@ class TimelineManager:
             def _event_sort_key(item: Dict[str, Any]) -> datetime:
                 event = item["event"]
                 try:
-                    return to_local_naive(event.start_time)
+                    return to_local_datetime(event.start_time)
                 except Exception:  # pragma: no cover - defensive fallback
                     return datetime.min
 
@@ -928,8 +916,8 @@ class TimelineManager:
 
             if bounds:
                 min_start, max_end = bounds
-                candidate_start = to_local_naive(min_start)
-                candidate_end = to_local_naive(max_end)
+                candidate_start = to_local_datetime(min_start)
+                candidate_end = to_local_datetime(max_end)
             else:
                 attachment_bounds = EventAttachment.get_transcript_event_bounds(
                     self.db,
@@ -940,8 +928,8 @@ class TimelineManager:
 
                 if attachment_bounds:
                     min_start, max_end = attachment_bounds
-                    candidate_start = to_local_naive(min_start)
-                    candidate_end = to_local_naive(max_end)
+                    candidate_start = to_local_datetime(min_start)
+                    candidate_end = to_local_datetime(max_end)
                 else:
                     candidate_start = start_dt
                     candidate_end = end_dt

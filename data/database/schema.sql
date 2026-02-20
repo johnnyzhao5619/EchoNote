@@ -158,6 +158,26 @@ CREATE TABLE IF NOT EXISTS model_usage_stats (
 CREATE INDEX IF NOT EXISTS idx_model_usage_name ON model_usage_stats (model_name);
 
 -- ============================================================================
+-- Translation Model Downloads Table
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS translation_model_downloads (
+    model_id       TEXT PRIMARY KEY,        -- e.g. "opus-mt-zh-en"
+    source_lang    TEXT NOT NULL,           -- ISO 639-1 code, e.g. "zh"
+    target_lang    TEXT NOT NULL,           -- ISO 639-1 code, e.g. "en"
+    status         TEXT NOT NULL DEFAULT 'not_downloaded', -- not_downloaded/downloading/downloaded/failed
+    download_path  TEXT,
+    size_bytes     INTEGER,
+    downloaded_at  TIMESTAMP,
+    last_used      TIMESTAMP,
+    use_count      INTEGER DEFAULT 0,
+    created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_trans_model_status
+    ON translation_model_downloads (status);
+
+-- ============================================================================
 -- Initial Data
 -- ============================================================================
 
@@ -166,7 +186,7 @@ INSERT
     OR IGNORE INTO app_settings (key, value, updated_at)
 VALUES (
         'schema_version',
-        '1',
+        '2',
         CURRENT_TIMESTAMP
     );
 

@@ -119,19 +119,8 @@ class BatchTranscribeWidget(BaseWidget):
         # Connect manager event signal
         self.manager_event.connect(self._handle_manager_event)
 
-        # Register event listener with manager
-        self.transcription_manager.add_listener(self._on_manager_event_threadsafe)
-
-        # Initial load of tasks
-        self._refresh_tasks()
-
-        # Start transcription processing
-        logger.info(self.i18n.t("logging.batch_transcribe.starting_task_processing"))
-        try:
-            self.transcription_manager.start_processing()
-            logger.info(self.i18n.t("logging.batch_transcribe.processing_started"))
-        except Exception as e:
-            logger.error(f"Failed to start transcription processing: {e}")
+        # Initial load of tasks and models (delayed to avoid startup crash on macOS)
+        QTimer.singleShot(50, self._initial_load)
 
         logger.info(self.i18n.t("logging.batch_transcribe.widget_initialized"))
 
@@ -175,8 +164,8 @@ class BatchTranscribeWidget(BaseWidget):
             toolbar_layout.addWidget(model_combo)
             self.model_combo = model_combo
 
-            # Populate with available models
-            self._update_model_list()
+            # Models will be populated in _initial_load
+            pass
         else:
             # Fallback to engine selection for backward compatibility
             engine_label = QLabel()
@@ -814,15 +803,31 @@ class BatchTranscribeWidget(BaseWidget):
         except Exception as e:
             logger.error(f"Error removing viewer reference: {e}")
 
-    def _on_manager_event_threadsafe(self, event_type: str, data: Dict):
+    def _initial_load(self):
+        """Perform heavy initial loading tasks after UI is established."""
+        try:
+            logger.debug("Performing delayed initial load for batch transcribe...")
+            
+            # 1. Register listener (deferred to ensure main loop is ready)
+            if self.transcription_manager:
+                self.transcription_manager.add_listener(self._on_manager_event)
+                
+            # 2. Populate models
+            if self.model_manager:
+                self._update_model_list()
+            
+            # 3. Refresh task list (queries database and creates sub-widgets)
+            self._refresh_tasks()
+            
+            logger.debug("Initial load complete")
+        except Exception as e:
+            logger.error(f"Error during initial load: {e}")
+
+    def _on_manager_event(self, event_type: str, data: Dict):
         """
-        Handle manager event from background thread.
-
+        Handle events from transcription manager (thread-safe bridge).
+        
         Emits signal to handle event on main UI thread.
-
-        Args:
-            event_type: Type of event
-            data: Event data
         """
         try:
             self.manager_event.emit(event_type, data)

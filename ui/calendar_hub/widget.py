@@ -58,6 +58,7 @@ from ui.constants import (
     ZERO_MARGINS,
 )
 from utils.i18n import I18nQtManager
+from utils.time_utils import now_local, to_local_datetime
 
 logger = logging.getLogger("echonote.ui.calendar_hub")
 
@@ -478,7 +479,7 @@ class CalendarHubWidget(BaseWidget):
                 "auto_transcribe": auto_transcribe,
             }
         elif default_date:
-            now = datetime.now()
+            now = now_local()
             from datetime import timedelta
 
             if default_date.date() == now.date():
@@ -496,7 +497,7 @@ class CalendarHubWidget(BaseWidget):
         allow_retranscribe = False
         is_past = False
 
-        now = datetime.now()
+        now = now_local()
 
         if event:
             try:
@@ -509,8 +510,8 @@ class CalendarHubWidget(BaseWidget):
                         break
 
                 # Check if event is in the past
-                start_time = datetime.fromisoformat(event.start_time.replace("Z", "+00:00"))
-                if start_time < now.astimezone(start_time.tzinfo) if start_time.tzinfo else now:
+                start_time = to_local_datetime(event.start_time)
+                if start_time < now:
                     is_past = True
                     if recording_path and self.transcription_manager:
                         allow_retranscribe = True
@@ -525,6 +526,10 @@ class CalendarHubWidget(BaseWidget):
             if default_date < now:
                 is_past = True
 
+        is_translation_available = False
+        if self.transcription_manager and getattr(self.transcription_manager, "translation_engine", None):
+            is_translation_available = True
+
         dialog = EventDialog(
             self.i18n,
             self.connected_accounts,
@@ -532,12 +537,13 @@ class CalendarHubWidget(BaseWidget):
             parent=self,
             allow_retranscribe=allow_retranscribe,
             is_past=is_past,
+            is_translation_available=is_translation_available,
         )
 
         if allow_retranscribe and recording_path:
             dialog.secondary_transcribe_requested.connect(
-                lambda p=recording_path, eid=event.id: self._on_secondary_transcribe_requested(
-                    eid, p
+                lambda data, p=recording_path, eid=event.id: self._on_secondary_transcribe_requested(
+                    eid, p, data
                 )
             )
 
@@ -865,8 +871,8 @@ class CalendarHubWidget(BaseWidget):
             expires_at_value = token_data.get("expires_at")
             if expires_in is None and expires_at_value:
                 try:
-                    expires_at_dt = datetime.fromisoformat(expires_at_value)
-                    expires_delta = int((expires_at_dt - datetime.now()).total_seconds())
+                    expires_at_dt = to_local_datetime(expires_at_value)
+                    expires_delta = int((expires_at_dt - now_local()).total_seconds())
                     expires_in = max(expires_delta, 0)
                     logger.debug(
                         "Computed expires_in=%s from expires_at for %s",
@@ -1383,13 +1389,13 @@ class CalendarHubWidget(BaseWidget):
             most_recent = None
             for status in sync_statuses:
                 if status.last_sync_time:
-                    sync_time = datetime.fromisoformat(status.last_sync_time)
+                    sync_time = to_local_datetime(status.last_sync_time)
                     if most_recent is None or sync_time > most_recent:
                         most_recent = sync_time
 
             if most_recent:
                 # Calculate time ago
-                now = datetime.now()
+                now = now_local()
                 delta = now - most_recent
 
                 if delta.total_seconds() < 60:
@@ -1473,7 +1479,9 @@ class CalendarHubWidget(BaseWidget):
         except Exception as e:
             logger.error(f"Error loading connected accounts: {e}")
 
-    def _on_secondary_transcribe_requested(self, event_id: str, recording_path: str):
+    def _on_secondary_transcribe_requested(
+        self, event_id: str, recording_path: str, dialog_data: Optional[Dict[str, Any]] = None
+    ):
         """Handle request for high-quality secondary transcription of an existing event."""
         if not self.transcription_manager:
             logger.error("Transcription manager not available for re-transcription")
@@ -1482,9 +1490,12 @@ class CalendarHubWidget(BaseWidget):
         logger.info(
             f"Submitting high-quality re-transcription from Calendar Hub for event {event_id}"
         )
+        dialog_data = dialog_data or {}
         options = {
             "event_id": event_id,
             "replace_realtime": True,
+            "enable_translation": dialog_data.get("enable_translation", False),
+            "translation_target_lang": dialog_data.get("translation_target_lang"),
         }
 
         self.transcription_manager.add_task(recording_path, options=options)

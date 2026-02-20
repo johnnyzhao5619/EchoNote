@@ -109,11 +109,15 @@ class LazyLoader:
             start_time = time.time()
 
             try:
-                self._instance = self.init_func()
-                self._initialized = True
+                instance = self.init_func()
+                if instance is not None:
+                    self._instance = instance
+                    self._initialized = True
 
-                elapsed = time.time() - start_time
-                logger.info(f"Lazy loaded {self.name} in {elapsed:.2f}s")
+                    elapsed = time.time() - start_time
+                    logger.info(f"Lazy loaded {self.name} in {elapsed:.2f}s")
+                else:
+                    logger.debug(f"Lazy loader {self.name} returned None, not marking as initialized")
             except Exception as e:
                 logger.error(f"Error lazy loading {self.name}: {e}")
                 raise

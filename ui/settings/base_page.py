@@ -89,16 +89,23 @@ class BaseSettingsPage(BaseWidget):
         scroll_area.setWidget(self.content_widget)
         self.main_layout.addWidget(scroll_area)
 
-    def add_section_title(self, title: str) -> QLabel:
+    def add_section_title(self, title: str, layout: QWidget | None = None) -> QLabel:
         """
-        Add a section title to the page.
+        Add a section title to the page or specified layout.
 
         Args:
             title: Section title text
+            layout: Optional layout or widget to add to. If None, uses self.content_layout.
         """
         label = QLabel(title)
         label.setObjectName("section_title")
-        self.content_layout.addWidget(label)
+        
+        target = layout if layout is not None else self.content_layout
+        if hasattr(target, "addWidget"):
+            target.addWidget(label)
+        elif hasattr(target, "layout") and target.layout():
+            target.layout().addWidget(label)
+            
         return label
 
     def add_labeled_row(
@@ -107,6 +114,7 @@ class BaseSettingsPage(BaseWidget):
         control_widget: QWidget,
         *,
         label_width: int = LABEL_MIN_WIDTH,
+        layout: QWidget | None = None,
     ) -> tuple:
         """Add a standard label-control row and return (layout, label)."""
         row_layout = create_hbox()
@@ -115,23 +123,57 @@ class BaseSettingsPage(BaseWidget):
         row_layout.addWidget(label)
         row_layout.addWidget(control_widget)
         row_layout.addStretch()
-        self.content_layout.addLayout(row_layout)
+        
+        target = layout if layout is not None else self.content_layout
+        if hasattr(target, "addLayout"):
+            target.addLayout(row_layout)
+        elif hasattr(target, "layout") and target.layout():
+            target.layout().addLayout(row_layout)
+            
         return row_layout, label
 
-    def add_spacing(self, height: int | None = None):
+    def add_spacing(self, height: int | None = None, layout: QWidget | None = None):
         """
         Add vertical spacing.
 
         Args:
             height: Spacing height in pixels
+            layout: Optional layout to add to. If None, uses self.content_layout.
         """
         if height is None:
             height = self.COMPACT_SPACING
-        self.content_layout.addSpacing(height)
+            
+        target = layout if layout is not None else self.content_layout
+        if hasattr(target, "addSpacing"):
+            target.addSpacing(height)
+        elif hasattr(target, "layout") and target.layout():
+            target.layout().addSpacing(height)
 
-    def add_section_spacing(self):
-        """Add standard spacing between major settings sections."""
-        self.content_layout.addSpacing(self.SECTION_SPACING)
+    def add_section_spacing(self, layout: QWidget | None = None):
+        """
+        Add standard spacing between major settings sections.
+        
+        Args:
+            layout: Optional layout to add to. If None, uses self.content_layout.
+        """
+        self.add_spacing(self.SECTION_SPACING, layout=layout)
+
+    def _clear_layout(self, layout):
+        """
+        Safely clear all widgets from a layout.
+
+        Args:
+            layout: The layout to clear
+        """
+        if layout is None:
+            return
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+            else:
+                self._clear_layout(item.layout())
 
     def load_settings(self):
         """

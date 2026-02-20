@@ -21,8 +21,10 @@ Contains helper functions for initializing various application components.
 """
 
 import logging
+from pathlib import Path
 
 logger = logging.getLogger("echonote.app_initializer")
+
 
 from config.constants import (
     ENGINE_AZURE,
@@ -31,6 +33,7 @@ from config.constants import (
     ENGINE_OPENAI,
     TRANSLATION_ENGINE_GOOGLE,
     TRANSLATION_ENGINE_NONE,
+    TRANSLATION_ENGINE_OPUS_MT,
 )
 
 
@@ -234,45 +237,69 @@ def initialize_speech_engine(config, model_manager, secrets_manager=None, db_con
     return speech_engine_loader
 
 
-def initialize_translation_engine(config, secrets_manager=None):
-    """Initialize translation engine with lazy loading."""
+def initialize_translation_engine(config, secrets_manager=None, model_manager=None):
+    """Initialize translation engine with lazy loading.
+
+    Args:
+        config: ConfigManager instance
+        secrets_manager: SecretsManager instance for reading API keys
+        model_manager: ModelManager instance for looking up downloaded translation models
+    """
     from utils.startup_optimizer import LazyLoader
 
     def create_translation_engine():
         try:
             logger.info("Loading translation engine...")
             selected_engine = (
-                str(config.get("realtime.translation_engine", TRANSLATION_ENGINE_GOOGLE))
+                str(config.get("realtime.translation_engine", TRANSLATION_ENGINE_NONE))
                 .strip()
                 .lower()
             )
+
             if selected_engine == TRANSLATION_ENGINE_NONE:
                 logger.info("Translation engine disabled by realtime settings")
                 return None
-            if selected_engine != TRANSLATION_ENGINE_GOOGLE:
-                logger.warning(
-                    "Unsupported realtime translation engine '%s'. Falling back to Google.",
-                    selected_engine,
-                )
-            from engines.translation.google_translate import GoogleTranslateEngine
 
-            # Check if API key is configured in encrypted secrets storage.
-            api_key = secrets_manager.get_api_key("google") if secrets_manager else None
-            if api_key:
-                engine = GoogleTranslateEngine(api_key)
-                logger.info("Translation engine loaded successfully")
+            if selected_engine == TRANSLATION_ENGINE_OPUS_MT:
+                if not model_manager:
+                    logger.warning("ModelManager not available; Opus-MT disabled.")
+                    return None
+
+                target_lang = config.get("realtime.translation_target_lang", "en")
+                from engines.translation.opus_mt_engine import MultiModelOpusMTEngine
+
+                engine = MultiModelOpusMTEngine(model_manager, target_lang)
+                logger.info("Opus-MT multi-model engine configured")
                 return engine
-            else:
-                logger.info("Translation engine not configured (no API key)")
-                return None
+
+
+            if selected_engine == TRANSLATION_ENGINE_GOOGLE:
+                from engines.translation.google_translate import GoogleTranslateEngine
+                api_key = secrets_manager.get_api_key("google") if secrets_manager else None
+                if api_key:
+                    engine = GoogleTranslateEngine(api_key)
+                    logger.info("Google Translate engine loaded successfully")
+                    return engine
+                else:
+                    logger.info("Google Translate not configured (no API key)")
+                    return None
+
+            # 未知引擎：记录警告并禁用（不静默降级到付费服务）
+            logger.warning(
+                "Unknown translation engine '%s'; translation disabled.",
+                selected_engine,
+            )
+            return None
+
         except Exception as e:
-            logger.warning(f"Could not initialize translation engine: {e}")
+            logger.warning("Could not initialize translation engine: %s", e)
             return None
 
     translation_engine_loader = LazyLoader("translation_engine", create_translation_engine)
     logger.info("Translation engine configured (will load on first use)")
 
     return translation_engine_loader
+
 
 
 def initialize_calendar_adapters(config, oauth_manager, secrets_manager=None):

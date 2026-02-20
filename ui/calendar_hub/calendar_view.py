@@ -24,6 +24,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 from PySide6.QtCore import QDate, QLocale, Qt, Signal
+from utils.time_utils import format_localized_datetime, now_local, to_local_datetime
 from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
@@ -49,25 +50,11 @@ logger = logging.getLogger("echonote.ui.calendar_view")
 
 
 def _parse_datetime(value: Any) -> Optional[datetime]:
-    """Parse values into local naive datetimes for UI comparisons."""
-    if isinstance(value, datetime):
-        dt = value
-    elif isinstance(value, str):
-        text = value.strip()
-        if not text:
-            return None
-        if text.endswith("Z"):
-            text = f"{text[:-1]}+00:00"
-        try:
-            dt = datetime.fromisoformat(text)
-        except ValueError:
-            return None
-    else:
+    """Parse values into local datetimes for UI comparisons."""
+    try:
+        return to_local_datetime(value)
+    except (ValueError, TypeError):
         return None
-
-    if dt.tzinfo is not None:
-        return dt.astimezone().replace(tzinfo=None)
-    return dt
 
 
 def _event_bounds(calendar_event: Any) -> Optional[Tuple[datetime, datetime]]:
@@ -202,11 +189,11 @@ class EventCard(QFrame):
         title_label.setProperty("role", "event-title")
         layout.addWidget(title_label)
 
-        # Event time
+        # Event time (localized)
         bounds = _event_bounds(self.calendar_event)
         if bounds is not None:
             start_dt, end_dt = bounds
-            time_text = f"{start_dt.strftime('%H:%M')} - {end_dt.strftime('%H:%M')}"
+            time_text = f"{format_localized_datetime(start_dt, include_date=False)} - {format_localized_datetime(end_dt, include_date=False)}"
         else:
             start_value = getattr(self.calendar_event, "start_time", "")
             end_value = getattr(self.calendar_event, "end_time", "")
@@ -247,8 +234,8 @@ class MonthView(BaseWidget):
         self.calendar_manager = calendar_manager
         self.i18n = i18n
 
-        # Current date
-        self.current_date = datetime.now()
+        # Current date (aware)
+        self.current_date = now_local()
 
         self.setup_ui()
 
@@ -446,7 +433,7 @@ class MonthView(BaseWidget):
 
     def today(self):
         """Navigate to today."""
-        self.set_date(datetime.now())
+        self.set_date(now_local())
 
 
 class WeekView(BaseWidget):
@@ -471,8 +458,8 @@ class WeekView(BaseWidget):
         self.calendar_manager = calendar_manager
         self.i18n = i18n
 
-        # Current date
-        self.current_date = datetime.now()
+        # Current date (aware)
+        self.current_date = now_local()
 
         self.setup_ui()
 
@@ -633,7 +620,7 @@ class WeekView(BaseWidget):
 
     def today(self):
         """Navigate to today."""
-        self.set_date(datetime.now())
+        self.set_date(now_local())
 
 
 class DayView(BaseWidget):
@@ -657,8 +644,8 @@ class DayView(BaseWidget):
         self.calendar_manager = calendar_manager
         self.i18n = i18n
 
-        # Current date
-        self.current_date = datetime.now()
+        # Current date (aware)
+        self.current_date = to_local_datetime(datetime.now())
 
         self.setup_ui()
 
@@ -703,7 +690,7 @@ class DayView(BaseWidget):
         current_qdate = QDate(
             self.current_date.year, self.current_date.month, self.current_date.day
         )
-        self.header_label.setText(locale.toString(current_qdate, "dddd, MMMM dd, yyyy"))
+        self.header_label.setText(locale.toString(current_qdate, QLocale.FormatType.LongFormat))
 
         # Clear existing events
         while self.events_layout.count():
@@ -769,4 +756,4 @@ class DayView(BaseWidget):
 
     def today(self):
         """Navigate to today."""
-        self.set_date(datetime.now())
+        self.set_date(now_local())

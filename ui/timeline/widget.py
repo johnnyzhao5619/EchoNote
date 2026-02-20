@@ -32,6 +32,7 @@ from ui.qt_imports import (
     QDateTime,
     QLabel,
     QLineEdit,
+    QLocale,
     QScrollArea,
     Qt,
     QTime,
@@ -50,7 +51,7 @@ if TYPE_CHECKING:
     from ui.timeline.transcript_viewer import TranscriptViewerDialog
 
 from core.calendar.constants import CalendarSource, EventType
-from core.timeline.manager import to_local_naive
+from utils.time_utils import now_local, to_local_datetime, to_utc_iso
 from ui.base_widgets import BaseWidget, create_button, create_hbox, create_vbox
 from ui.constants import PAGE_COMPACT_SPACING, PAGE_LAYOUT_SPACING, ZERO_MARGINS
 from utils.i18n import I18nQtManager
@@ -335,8 +336,8 @@ class TimelineWidget(BaseWidget):
             self.is_loading = True
 
             # Get timeline data
-            center_time = datetime.now().astimezone()
-            center_time_local = to_local_naive(center_time)
+            center_time = now_local()
+            center_time_local = center_time
 
             if self.current_query:
                 # Search mode
@@ -352,7 +353,7 @@ class TimelineWidget(BaseWidget):
 
                 for result in results:
                     event = result["event"]
-                    event_start = to_local_naive(event.start_time)
+                    event_start = to_local_datetime(event.start_time)
 
                     if event_start < center_time_local:
                         past_events.append(result)
@@ -360,7 +361,7 @@ class TimelineWidget(BaseWidget):
                         future_events.append({"event": event, "auto_tasks": result["auto_tasks"]})
 
                 future_events.sort(
-                    key=lambda item: to_local_naive(item["event"].start_time),
+                    key=lambda item: to_local_datetime(item["event"].start_time),
                     reverse=True,
                 )
 
@@ -379,7 +380,7 @@ class TimelineWidget(BaseWidget):
                 if self.current_filters:
                     start_filter = self.current_filters.get("start_date")
                     if start_filter:
-                        start_dt = to_local_naive(start_filter)
+                        start_dt = to_local_datetime(start_filter)
                         if start_dt < center_time_local:
                             delta_seconds = (center_time_local - start_dt).total_seconds()
                             if delta_seconds > 0:
@@ -388,7 +389,7 @@ class TimelineWidget(BaseWidget):
 
                     end_filter = self.current_filters.get("end_date")
                     if end_filter:
-                        end_dt = to_local_naive(end_filter)
+                        end_dt = to_local_datetime(end_filter)
                         if end_dt > center_time_local:
                             delta_seconds = (end_dt - center_time_local).total_seconds()
                             if delta_seconds > 0:
@@ -547,8 +548,8 @@ class TimelineWidget(BaseWidget):
         start_dt = QDateTime(start_qdate, QTime(0, 0, 0))
         end_dt = QDateTime(end_qdate, QTime(23, 59, 59))
 
-        self.current_filters["start_date"] = start_dt.toString(Qt.DateFormat.ISODate)
-        self.current_filters["end_date"] = end_dt.toString(Qt.DateFormat.ISODate)
+        self.current_filters["start_date"] = to_utc_iso(start_dt)
+        self.current_filters["end_date"] = to_utc_iso(end_dt)
 
     def _on_settings_changed(self, key: str, _value: Any) -> None:
         """React to preference changes that impact the timeline view."""
@@ -647,7 +648,7 @@ class TimelineWidget(BaseWidget):
         # Insert card at appropriate position
         if is_future:
             # Future events stay grouped above the current time indicator.
-            new_start = to_local_naive(card.calendar_event.start_time)
+            new_start = to_local_datetime(card.calendar_event.start_time)
 
             indicator_index = next(
                 (
@@ -664,7 +665,7 @@ class TimelineWidget(BaseWidget):
             insert_pos = search_limit
             for i in range(search_limit):
                 existing_card = self.event_cards[i]
-                existing_start = to_local_naive(existing_card.calendar_event.start_time)
+                existing_start = to_local_datetime(existing_card.calendar_event.start_time)
                 if existing_start < new_start:
                     insert_pos = i
                     break

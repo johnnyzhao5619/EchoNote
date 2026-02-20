@@ -15,12 +15,15 @@
 # limitations under the License.
 """模型管理器实现。"""
 
+import asyncio
 import logging
 import threading
 from dataclasses import replace
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional, Set
+from typing import Callable, Dict, List, Optional, Set
+
+from utils.time_utils import current_iso_timestamp, now_utc
 
 import psutil
 from PySide6.QtCore import QCoreApplication, QObject, QTimer, Signal
@@ -28,8 +31,12 @@ from PySide6.QtCore import QCoreApplication, QObject, QTimer, Signal
 from config.app_config import ConfigManager, get_app_dir
 from core.models.downloader import DownloadCancelled, ModelDownloader
 from core.models.registry import ModelInfo, ModelRegistry
+from core.models.translation_registry import (
+    TranslationModelInfo,
+    TranslationModelRegistry,
+)
 from data.database.connection import DatabaseConnection
-from data.database.models import ModelUsageStats
+from data.database.models import ModelUsageStats, TranslationModelRecord
 from utils.gpu_detector import GPUDetector
 
 logger = logging.getLogger(__name__)
@@ -40,6 +47,7 @@ class ModelManager(QObject):
 
     models_updated = Signal()
     model_validation_failed = Signal(str, str)
+    translation_models_updated = Signal()
 
     def __init__(
         self,
@@ -64,6 +72,26 @@ class ModelManager(QObject):
         self.downloader.download_completed.connect(self._on_download_completed)
         self.downloader.download_failed.connect(self._on_download_failed)
 
+        # ---------- 翻译模型（独立目录和下载器，不与语音模型混用） ----------
+        self._translation_registry = TranslationModelRegistry()
+        self._translation_models_dir = Path(
+            self._config.get(
+                "translation.models_dir",
+                str(Path.home() / ".echonote" / "translation_models"),
+            )
+        ).expanduser()
+        self._translation_models_dir.mkdir(parents=True, exist_ok=True)
+        # 独立的 ModelDownloader 实例：目录不同，信号不同，互不干扰
+        self.translation_downloader = ModelDownloader(self._translation_models_dir, self)
+        self.translation_downloader.download_completed.connect(
+            self._on_translation_download_completed
+        )
+        self.translation_downloader.download_failed.connect(
+            self._on_translation_download_failed
+        )
+        # 刷新翻译模型本地状态
+        self._refresh_translation_states()
+
         self._lock = threading.RLock()
         self._model_cache: Dict[str, ModelInfo] = {}
         self._model_order: List[str] = []
@@ -71,6 +99,17 @@ class ModelManager(QObject):
         self._dirty = True
 
         self._refresh_cache()
+
+        # 下载任务缓存（用于重入保护）
+        self._active_downloads: Dict[str, asyncio.Task] = {}
+        self._async_lock_instance: Optional[asyncio.Lock] = None
+
+    @property
+    def _async_lock(self) -> asyncio.Lock:
+        """懒加载异步锁，确保在当前线程的事件循环中创建。"""
+        if self._async_lock_instance is None:
+            self._async_lock_instance = asyncio.Lock()
+        return self._async_lock_instance
 
     # ------------------------------------------------------------------
     # 公共接口
@@ -136,32 +175,48 @@ class ModelManager(QObject):
         return self.downloader.has_active_downloads()
 
     async def download_model(self, name: str) -> Path:
-        """下载指定的模型。
-
-        Args:
-            name: 模型名称。
-
-        Returns:
-            下载后的模型路径。
-
-        Raises:
-            ValueError: 如果模型名称未知。
-            DownloadCancelled: 如果下载被取消。
-        """
+        """下载指定的 Whisper 模型。"""
         model = self.get_model(name)
         if not model:
             raise ValueError(f"Unknown model: {name}")
-        if model.is_downloaded:
-            logger.info(f"Model {name} already downloaded")
-            return Path(model.local_path)
+        
+        return await self._execute_download(name, model, self.downloader)
 
-        logger.info(f"Downloading model: {name}")
-        try:
-            path = await self.downloader.download(model)
-            return path
-        except DownloadCancelled:
-            logger.info(f"Model download cancelled: {name}")
-            raise
+    async def _execute_download(
+        self, 
+        task_id: str, 
+        model_info, 
+        downloader: ModelDownloader,
+        pre_download_cb: Optional[Callable[[], None]] = None,
+        post_download_cb: Optional[Callable[[Path], None]] = None
+    ) -> Path:
+        """通用的下载执行逻辑（含重入保护）。"""
+        if model_info.is_downloaded:
+            logger.info(f"Model {task_id} already downloaded")
+            return Path(model_info.local_path)
+
+        async with self._async_lock:
+            if task_id in self._active_downloads:
+                logger.info(f"Model {task_id} is already downloading, waiting...")
+                return await self._active_downloads[task_id]
+
+            if pre_download_cb:
+                pre_download_cb()
+
+            async def _do_download():
+                try:
+                    path = await downloader.download(model_info)
+                    if post_download_cb:
+                        post_download_cb(path)
+                    return path
+                finally:
+                    self._active_downloads.pop(task_id, None)
+
+            download_task = asyncio.create_task(_do_download())
+            self._active_downloads[task_id] = download_task
+
+        logger.info(f"Starting download for: {task_id}")
+        return await download_task
 
     def cancel_download(self, name: str) -> None:
         """取消正在进行的模型下载。
@@ -405,7 +460,10 @@ class ModelManager(QObject):
         if not value:
             return None
         try:
-            return datetime.fromisoformat(value)
+            dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt
         except ValueError:
             logger.warning(f"Invalid datetime format: {value}")
             return None
@@ -427,3 +485,186 @@ class ModelManager(QObject):
         logger.error(f"Download failed for {name}: {error}")
         self._mark_dirty()
         self._refresh_cache()
+
+    # ------------------------------------------------------------------
+    # 翻译模型管理
+    # ------------------------------------------------------------------
+
+    def _refresh_translation_states(self) -> None:
+        """刷新所有翻译模型的本地下载状态及使用统计。"""
+        # 从数据库获取统计信息
+        translation_stats = {
+            rec.model_id: rec for rec in TranslationModelRecord.get_all(self._database)
+        }
+
+        for model in self._translation_registry.get_all():
+            model.ensure_local_state(self._translation_models_dir)
+
+            # 填充统计信息
+            stats = translation_stats.get(model.model_id)
+            if stats:
+                model.use_count = stats.use_count
+                model.last_used = self._parse_datetime(stats.last_used)
+                model.download_date = self._parse_datetime(stats.downloaded_at)
+
+            # 同步更新注册表内部对象
+            registered = self._translation_registry._models.get(model.model_id)
+            if registered:
+                registered.local_path = model.local_path
+                registered.is_downloaded = model.is_downloaded
+                if stats:
+                    registered.use_count = model.use_count
+                    registered.last_used = model.last_used
+                    registered.download_date = model.download_date
+
+    def get_all_translation_models(self) -> List[TranslationModelInfo]:
+        """返回所有翻译模型信息（含本地状态）。"""
+        self._refresh_translation_states()
+        return self._translation_registry.get_all()
+
+    def get_translation_model(self, model_id: str) -> Optional[TranslationModelInfo]:
+        """按 model_id 获取翻译模型信息。"""
+        model = self._translation_registry.get_by_id(model_id)
+        if model:
+            model.ensure_local_state(self._translation_models_dir)
+        return model
+
+    def is_translation_model_downloaded(self, model_id: str) -> bool:
+        """检查翻译模型是否已下载。"""
+        model = self._translation_registry.get_by_id(model_id)
+        if not model:
+            return False
+        model.ensure_local_state(self._translation_models_dir)
+        return model.is_downloaded
+
+    def get_translation_model_path(self, model_id: str) -> Optional[Path]:
+        """获取已下载翻译模型的本地路径。"""
+        model = self.get_translation_model(model_id)
+        if model and model.is_downloaded and model.local_path:
+            return Path(model.local_path)
+        return None
+
+    def get_downloaded_translation_models(self) -> List[str]:
+        """返回已下载翻译模型的 model_id 列表。"""
+        return [
+            m.model_id
+            for m in self.get_all_translation_models()
+            if m.is_downloaded
+        ]
+
+    def get_best_translation_model(
+        self, source_lang: str, target_lang: str, auto_detect: bool = False
+    ) -> Optional[TranslationModelInfo]:
+        """寻找最匹配的翻译模型。
+        
+        Args:
+            source_lang: 源语言代码（如果 auto_detect 为 True，则此参数为候选项或被忽略）。
+            target_lang: 目标语言代码。
+            auto_detect: 是否尝试根据已下载的模型自动匹配源语言。
+        """
+        if auto_detect:
+            # 搜索已下载的、目标语言匹配的所有模型
+            downloaded = self.get_downloaded_translation_models()
+            for mid in downloaded:
+                model = self._translation_registry.get_by_id(mid)
+                if model and model.target_lang == target_lang:
+                    logger.info("Auto-matched translation model for target '%s': %s", target_lang, mid)
+                    return model
+            
+            # 如果没找到已下载的，尝试在注册表中找一个默认的
+            for model in self._translation_registry.get_all():
+                if model.target_lang == target_lang:
+                    return model
+        else:
+            # 精确匹配
+            model_id = f"opus-mt-{source_lang}-{target_lang}"
+            return self.get_translation_model(model_id)
+        
+        return None
+
+    async def download_translation_model(self, model_id: str) -> Path:
+        """下载指定翻译模型，返回本地路径。"""
+        model = self._translation_registry.get_by_id(model_id)
+        if not model:
+            raise ValueError(f"Unknown translation model: {model_id}")
+
+        record = (
+            TranslationModelRecord.get_by_model_id(self._database, model_id)
+            or TranslationModelRecord(
+                model_id=model_id,
+                source_lang=model.source_lang,
+                target_lang=model.target_lang,
+            )
+        )
+
+        def pre_cb():
+            record.update_status(self._database, "downloading")
+
+        def post_cb(path: Path):
+            model.ensure_local_state(self._translation_models_dir)
+            record.update_status(
+                self._database,
+                "downloaded",
+                download_path=str(path),
+                size_bytes=int(model.size_mb * 1024 * 1024),
+                downloaded_at=current_iso_timestamp(),
+            )
+            self._refresh_translation_states()
+            self.translation_models_updated.emit()
+
+        try:
+            return await self._execute_download(
+                model_id, 
+                model, 
+                self.translation_downloader,
+                pre_download_cb=pre_cb,
+                post_download_cb=post_cb
+            )
+        except Exception:
+            record.update_status(self._database, "failed")
+            raise
+
+    def delete_translation_model(self, model_id: str) -> bool:
+        """删除已下载的翻译模型文件并更新记录。"""
+        import shutil
+
+        model = self.get_translation_model(model_id)
+        if not model or not model.is_downloaded or not model.local_path:
+            logger.warning("Translation model not downloaded: %s", model_id)
+            return False
+
+        try:
+            path = Path(model.local_path)
+            if path.exists():
+                shutil.rmtree(path, ignore_errors=True)
+            
+            record = TranslationModelRecord.get_by_model_id(self._database, model_id)
+            if record:
+                record.update_status(
+                    self._database, 
+                    "not_downloaded", 
+                    download_path=None, 
+                    size_bytes=None, 
+                    downloaded_at=None
+                )
+            
+            self._refresh_translation_states()
+            self.translation_models_updated.emit()
+            return True
+        except Exception as exc:
+            logger.error("Failed to delete translation model %s: %s", model_id, exc)
+            return False
+
+    def _on_translation_download_completed(self, name: str) -> None:
+        logger.info("Translation model download completed: %s", name)
+        self._refresh_translation_states()
+        self.translation_models_updated.emit()
+
+    def _on_translation_download_failed(self, name: str, error: str) -> None:
+        logger.error("Translation model download failed for %s: %s", name, error)
+        # 更新数据库状态为 failed
+        record = TranslationModelRecord.get_by_model_id(self._database, name)
+        if record:
+            record.update_status(self._database, "failed")
+        self.translation_models_updated.emit()
+

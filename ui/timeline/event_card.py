@@ -36,8 +36,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from core.timeline.manager import to_local_naive
 from ui.base_widgets import create_button, create_hbox, create_vbox
+from config.constants import (
+    CALENDAR_API_TIMEOUT_SECONDS,
+    OUTLOOK_CALENDAR_MAX_PAGE_SIZE,
+)
+from utils.time_utils import format_localized_datetime, to_local_datetime
 from ui.constants import (
     PAGE_DENSE_SPACING,
     TIMELINE_CURRENT_TIME_LINE_HEIGHT,
@@ -217,8 +221,8 @@ class EventCard(QFrame):
         end_value = self.calendar_event.end_time
 
         try:
-            start_time = to_local_naive(start_value)
-            end_time = to_local_naive(end_value)
+            start_time = to_local_datetime(start_value)
+            end_time = to_local_datetime(end_value)
         except Exception as exc:  # pragma: no cover - defensive log
             logger.warning(
                 "Failed to localize event time for %s: %s",
@@ -227,7 +231,7 @@ class EventCard(QFrame):
             )
             time_str = f"{start_value} - {end_value}"
         else:
-            time_str = f"{start_time.strftime('%Y-%m-%d %H:%M')} - " f"{end_time.strftime('%H:%M')}"
+            time_str = f"{format_localized_datetime(start_time)} - {format_localized_datetime(end_time, include_date=False)}"
 
         time_label = QLabel(time_str)
         time_label.setObjectName("time_label")

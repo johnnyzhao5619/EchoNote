@@ -22,9 +22,11 @@ Handles secure file operations with proper permissions and organization.
 import logging
 import os
 import shutil
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
+
+from utils.time_utils import now_utc
 
 logger = logging.getLogger("echonote.storage")
 
@@ -474,7 +476,7 @@ class FileManager:
 
         from config.constants import SECONDS_PER_DAY
 
-        cutoff_time = datetime.now().timestamp() - (older_than_days * SECONDS_PER_DAY)
+        cutoff_time = now_utc().timestamp() - (older_than_days * SECONDS_PER_DAY)
         deleted_count = 0
 
         for file_path in temp_dir.glob("*"):

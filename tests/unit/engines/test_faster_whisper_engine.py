@@ -383,7 +383,13 @@ class TestTranscribeStream:
     async def test_transcribe_stream_basic(self, mock_whisper_class, mock_model_manager):
         """Test basic stream transcription."""
         mock_model = Mock()
+        segment = Mock()
+        segment.text = "Test transcription"
+        info = Mock()
+        info.language = "en"
+        mock_model.transcribe = Mock(return_value=([segment], info))
         mock_whisper_class.return_value = mock_model
+
 
         engine = FasterWhisperEngine(model_size="base", model_manager=mock_model_manager)
 
@@ -392,7 +398,11 @@ class TestTranscribeStream:
 
         result = await engine.transcribe_stream(audio_chunk, language="en", sample_rate=16000)
 
-        assert isinstance(result, str)
+        assert isinstance(result, dict)
+        assert "text" in result
+        assert "language" in result
+        assert result["language"] == "en"
+
 
 
 class TestConfigValidation:

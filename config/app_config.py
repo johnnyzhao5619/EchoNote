@@ -378,6 +378,9 @@ class ConfigManager:
             return isinstance(value, (int, float)) and 0.0 <= value <= 10.0
         elif setting == "translation_engine":
             return value in SUPPORTED_REALTIME_TRANSLATION_ENGINES
+        elif setting in ("translation_source_lang", "translation_target_lang"):
+            # "auto" or ISO 639-1/639-2 language code (non-empty string)
+            return isinstance(value, str) and len(value.strip()) >= 2
         elif setting == "vad_threshold":
             return isinstance(value, (int, float)) and 0.0 <= value <= 1.0
         elif setting == "silence_duration_ms":

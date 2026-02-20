@@ -664,9 +664,10 @@ class FasterWhisperEngine(SpeechEngine):
                     text_parts.append(seg.text.strip())
 
                 text = " ".join(text_parts)
-                language = info.language if hasattr(info, "language") else "unknown"
-                logger.debug(f"Transcription result: '{text}' (language: {language})")
-                return text
+                lang = info.language if hasattr(info, "language") else "unknown"
+                logger.debug(f"Transcription result: '{text}' (language: {lang})")
+                return {"text": text, "language": lang}
+
 
             finally:
                 # 清理临时文件

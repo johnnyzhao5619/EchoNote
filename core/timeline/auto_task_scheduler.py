@@ -36,9 +36,9 @@ from config.constants import (
     TIMELINE_STOP_CONFIRMATION_DELAY_MAX_MINUTES,
 )
 from core.realtime.integration import save_event_attachments
-from core.timeline.manager import to_local_naive
 from ui.common.notification import get_notification_manager
 from utils.i18n import I18nQtManager
+from utils.time_utils import format_localized_datetime, to_local_datetime
 
 logger = logging.getLogger("echonote.timeline.auto_task_scheduler")
 
@@ -387,7 +387,7 @@ class AutoTaskScheduler:
 
         This method is called every minute by the scheduler.
         """
-        now_local = to_local_naive(datetime.now().astimezone())
+        now_local = to_local_datetime(datetime.now())
 
         try:
             past_window_days = self._past_window_minutes / (24 * 60)
@@ -410,7 +410,7 @@ class AutoTaskScheduler:
                 if not self._auto_tasks_enabled(auto_tasks):
                     continue
 
-                event_start = to_local_naive(event.start_time)
+                event_start = to_local_datetime(event.start_time)
                 time_until_start = (event_start - now_local).total_seconds()
 
                 # Send reminder N minutes before event
@@ -709,17 +709,17 @@ class AutoTaskScheduler:
             "auto_task.stop_confirmation.delayed_message",
             event_title=event.title,
             delay_minutes=str(delay_minutes),
-            next_time=next_prompt_at.strftime("%H:%M"),
+            next_time=format_localized_datetime(next_prompt_at, include_date=False),
         )
         self.notification_manager.send_info(title, message)
 
     @staticmethod
     def _resolve_event_window(event) -> Tuple[datetime, datetime]:
-        """Normalize event start/end times into a safe local-naive window."""
-        event_start = to_local_naive(event.start_time)
+        """Normalize event start/end times into a safe local-aware window."""
+        event_start = to_local_datetime(event.start_time)
         event_end_raw = getattr(event, "end_time", None) or event.start_time
         try:
-            event_end = to_local_naive(event_end_raw)
+            event_end = to_local_datetime(event_end_raw)
         except Exception:
             event_end = event_start
 
@@ -751,11 +751,11 @@ class AutoTaskScheduler:
 
             # Format start time for display
             try:
-                start_dt = to_local_naive(event.start_time)
+                start_dt = to_local_datetime(event.start_time)
             except Exception:
                 start_time_str = event.start_time
             else:
-                start_time_str = start_dt.strftime("%H:%M")
+                start_time_str = format_localized_datetime(start_dt, include_date=False)
 
             title = self.i18n.t("auto_task.reminder.title", app_name=self.i18n.t("app.name"))
             start_time_label = self.i18n.t("auto_task.reminder.start_time_label")
@@ -940,7 +940,7 @@ class AutoTaskScheduler:
             self.active_recordings[event.id] = {
                 "event": event,
                 "auto_tasks": auto_tasks,
-                "start_time": to_local_naive(datetime.now().astimezone()),
+                "start_time": to_local_datetime(datetime.now().astimezone()),
                 "loop": loop,
                 "thread": thread,
             }

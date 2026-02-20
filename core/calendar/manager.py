@@ -24,6 +24,14 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
+from utils.time_utils import (
+    current_iso_timestamp,
+    now_local,
+    now_utc,
+    to_local_datetime,
+    to_utc_iso,
+)
+
 from core.calendar.constants import CalendarSource, EventType, SyncStatus
 from core.calendar.exceptions import CalendarError, EventNotFoundError, SyncError
 from data.database.models import (
@@ -154,9 +162,12 @@ class CalendarManager:
                         logger.warning(f"Sync adapter for {provider} not found")
 
             # Save auto task config if provided
-            if "auto_transcribe" in event_data:
+            if "auto_transcribe" in event_data or "enable_translation" in event_data:
                 config = AutoTaskConfig(
-                    event_id=event.id, enable_transcription=bool(event_data["auto_transcribe"])
+                    event_id=event.id,
+                    enable_transcription=bool(event_data.get("auto_transcribe", False)),
+                    enable_translation=bool(event_data.get("enable_translation", False)),
+                    translation_target_language=event_data.get("translation_target_lang"),
                 )
                 config.save(self.db)
                 if self.calendar_auto_task_scheduler:
@@ -227,14 +238,18 @@ class CalendarManager:
             logger.info(f"Updated event: {event_id}")
 
             # Update auto task config if provided
-            if "auto_transcribe" in event_data:
+            if "auto_transcribe" in event_data or "enable_translation" in event_data:
                 config = AutoTaskConfig.get_by_event_id(self.db, event_id)
-                if config:
+                if not config:
+                    config = AutoTaskConfig(event_id=event.id)
+
+                if "auto_transcribe" in event_data:
                     config.enable_transcription = bool(event_data["auto_transcribe"])
-                else:
-                    config = AutoTaskConfig(
-                        event_id=event.id, enable_transcription=bool(event_data["auto_transcribe"])
-                    )
+                if "enable_translation" in event_data:
+                    config.enable_translation = bool(event_data["enable_translation"])
+                if "translation_target_lang" in event_data:
+                    config.translation_target_language = event_data["translation_target_lang"]
+
                 config.save(self.db)
                 if self.calendar_auto_task_scheduler:
                     self.calendar_auto_task_scheduler.schedule_event_task(event, config)
@@ -536,7 +551,7 @@ class CalendarManager:
                 self._remove_external_event(event_id, provider, external_id)
 
             # Update sync status
-            sync_status.last_sync_time = datetime.now().isoformat()
+            sync_status.last_sync_time = current_iso_timestamp()
             if new_sync_token:
                 sync_status.sync_token = new_sync_token
             sync_status.save(self.db)
@@ -922,7 +937,7 @@ class CalendarManager:
         elif isinstance(last_synced_at, str) and last_synced_at.strip():
             timestamp = last_synced_at
         else:
-            timestamp = datetime.now(timezone.utc).isoformat()
+            timestamp = current_iso_timestamp()
 
         existing_link = CalendarEventLink.get_by_event_and_provider(
             self.db,
@@ -980,7 +995,7 @@ class CalendarManager:
         start_dt = _coerce(start_time, "start_time")
         end_dt = _coerce(end_time, "end_time")
 
-        local_tz = datetime.now().astimezone().tzinfo
+        local_tz = now_local().tzinfo
 
         def _ensure_aware(value: datetime, reference: Optional[datetime], fallback_tz) -> datetime:
             if value.tzinfo:
@@ -1031,9 +1046,9 @@ class CalendarManager:
                 try:
                     expires_at_dt = datetime.fromisoformat(expires_at_value)
                     current_time = (
-                        datetime.now(expires_at_dt.tzinfo)
+                        now_utc().astimezone(expires_at_dt.tzinfo)
                         if expires_at_dt.tzinfo
-                        else datetime.now()
+                        else now_local()
                     )
                     resolved = max(int((expires_at_dt - current_time).total_seconds()), 0)
                     logger.debug(

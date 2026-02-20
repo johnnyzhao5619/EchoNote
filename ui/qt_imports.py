@@ -26,6 +26,7 @@ from PySide6.QtCore import (
     QDate,
     QDateTime,
     QEvent,
+    QLocale,
     QObject,
     QPoint,
     QRect,
@@ -136,6 +137,7 @@ __all__ = [
     "Qt",
     "Signal",
     "Slot",
+    "QLocale",
     "QTimer",
     "QThread",
     # Layouts

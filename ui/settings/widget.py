@@ -187,47 +187,53 @@ class SettingsWidget(BaseWidget):
 
     def _create_settings_pages(self):
         """Create all settings pages and add to container."""
-        try:
-            # Import page classes
-            from ui.settings.appearance_page import AppearanceSettingsPage
-            from ui.settings.calendar_page import CalendarSettingsPage
-            from ui.settings.language_page import LanguageSettingsPage
-            from ui.settings.model_management_page import ModelManagementPage
-            from ui.settings.realtime_page import RealtimeSettingsPage
-            from ui.settings.timeline_page import TimelineSettingsPage
-            from ui.settings.transcription_page import TranscriptionSettingsPage
+        # Import page classes
+        from ui.settings.appearance_page import AppearanceSettingsPage
+        from ui.settings.calendar_page import CalendarSettingsPage
+        from ui.settings.language_page import LanguageSettingsPage
+        from ui.settings.model_management_page import ModelManagementPage
+        from ui.settings.realtime_page import RealtimeSettingsPage
+        from ui.settings.timeline_page import TimelineSettingsPage
+        from ui.settings.transcription_page import TranscriptionSettingsPage
 
-            # Create pages
-            pages = [
-                (
-                    "transcription",
-                    TranscriptionSettingsPage(self.settings_manager, self.i18n, self.managers),
-                ),
-                (
-                    "realtime",
-                    RealtimeSettingsPage(self.settings_manager, self.i18n, self.managers),
-                ),
-                ("calendar", CalendarSettingsPage(self.settings_manager, self.i18n, self.managers)),
-                ("timeline", TimelineSettingsPage(self.settings_manager, self.i18n)),
-                (
-                    "appearance",
-                    AppearanceSettingsPage(self.settings_manager, self.i18n, self.managers),
-                ),
-                ("language", LanguageSettingsPage(self.settings_manager, self.i18n)),
-            ]
+        # Page definitions: (id, class, args)
+        page_defs = [
+            (
+                "transcription",
+                TranscriptionSettingsPage,
+                (self.settings_manager, self.i18n, self.managers),
+            ),
+            (
+                "realtime",
+                RealtimeSettingsPage,
+                (self.settings_manager, self.i18n, self.managers),
+            ),
+            (
+                "model_management",
+                ModelManagementPage,
+                (self.settings_manager, self.i18n, self.managers.get("model_manager")),
+            ),
+            (
+                "calendar",
+                CalendarSettingsPage,
+                (self.settings_manager, self.i18n, self.managers),
+            ),
+            ("timeline", TimelineSettingsPage, (self.settings_manager, self.i18n)),
+            (
+                "appearance",
+                AppearanceSettingsPage,
+                (self.settings_manager, self.i18n, self.managers),
+            ),
+            ("language", LanguageSettingsPage, (self.settings_manager, self.i18n)),
+        ]
 
-            # Add model management page if model_manager is available
-            if "model_manager" in self.managers:
-                model_management_page = ModelManagementPage(
-                    self.settings_manager, self.i18n, self.managers["model_manager"]
-                )
-                # Insert after realtime page (index 2)
-                pages.insert(2, ("model_management", model_management_page))
-            else:
-                logger.warning(self.i18n.t("logging.settings.model_manager_not_available"))
+        for page_id, page_class, args in page_defs:
+            # Skip model management if manager not available
+            if page_id == "model_management" and "model_manager" not in self.managers:
+                continue
 
-            # Add pages to container
-            for page_id, page_widget in pages:
+            try:
+                page_widget = page_class(*args)
                 self.pages_container.addWidget(page_widget)
                 self.settings_pages[page_id] = page_widget
 
@@ -235,26 +241,21 @@ class SettingsWidget(BaseWidget):
                 if hasattr(page_widget, "settings_changed"):
                     page_widget.settings_changed.connect(self._on_settings_changed)
 
-            logger.debug(f"Created {len(pages)} settings pages")
-
-        except Exception as e:
-            logger.error(f"Error creating settings pages: {e}", exc_info=True)
-            # Create placeholder pages if real ones fail
-            from PySide6.QtWidgets import QLabel, QVBoxLayout
-
-            categories = self._get_available_category_ids()
-
-            for category in categories:
+            except Exception as e:
+                logger.error(f"Error creating settings page '{page_id}': {e}", exc_info=True)
+                # Create placeholder for failed page
                 placeholder = QWidget()
                 layout = QVBoxLayout(placeholder)
-                label = QLabel(f"Settings page for {category}\n(Error loading: {str(e)})")
-                label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                layout.addWidget(label)
-
+                error_label = QLabel(
+                    self.i18n.t("settings.error.page_load_failed", category=page_id)
+                    + f"\n({str(e)})"
+                )
+                error_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                layout.addWidget(error_label)
                 self.pages_container.addWidget(placeholder)
-                self.settings_pages[category] = placeholder
+                self.settings_pages[page_id] = placeholder
 
-            logger.warning(f"Created {len(categories)} placeholder settings pages")
+        logger.debug(f"Created settings pages: {list(self.settings_pages.keys())}")
 
     def _get_available_category_ids(self) -> list[str]:
         """Return category IDs that should be visible for this session."""

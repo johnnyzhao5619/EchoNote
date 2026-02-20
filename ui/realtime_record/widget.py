@@ -206,6 +206,8 @@ class RealtimeRecordWidget(BaseWidget):
         # Connect model manager signals if available
         if self.model_manager:
             self.model_manager.models_updated.connect(self._update_model_list)
+            if hasattr(self.model_manager, "translation_models_updated"):
+                self.model_manager.translation_models_updated.connect(self._on_translation_models_refresh)
 
         if self.settings_manager and hasattr(self.settings_manager, "setting_changed"):
             try:
@@ -317,6 +319,26 @@ class RealtimeRecordWidget(BaseWidget):
                 self._create_calendar_event_enabled = bool(
                     preferences.get("create_calendar_event", True)
                 )
+
+                # 检查翻译引擎配置是否变更
+                new_translation_engine = preferences.get("translation_engine", "none")
+                new_source = preferences.get("translation_source_lang", "auto")
+                new_target = preferences.get("translation_target_lang", "en")
+
+                # 如果配置变更，尝试通知引擎代理进行重载
+                if (getattr(self, "_last_translation_engine", None) != new_translation_engine or
+                    getattr(self, "_last_translation_source", None) != new_source or
+                    getattr(self, "_last_translation_target", None) != new_target):
+
+                    if self.recorder.translation_engine and hasattr(self.recorder.translation_engine, "reload"):
+                        logger.info("Translation settings changed, reloading engine...")
+                        self.recorder.translation_engine.reload()
+                        self._update_placeholders()
+
+                    self._last_translation_engine = new_translation_engine
+                    self._last_translation_source = new_source
+                    self._last_translation_target = new_target
+
                 return
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Failed to refresh realtime preferences: %s", exc, exc_info=True)
@@ -831,7 +853,7 @@ class RealtimeRecordWidget(BaseWidget):
         self.secondary_transcription_checkbox = QCheckBox(
             self.i18n.t(
                 "realtime_record.secondary_transcription",
-                default="Secondary Transcription (High Quality)",
+                default="Secondary Transcription",
             )
         )
         self.secondary_transcription_checkbox.setObjectName("form_checkbox")
@@ -1434,10 +1456,24 @@ class RealtimeRecordWidget(BaseWidget):
                 self.status_text_label.setText(self.i18n.t("realtime_record.status_ready"))
 
     def _update_placeholders(self):
-        if hasattr(self, "translation_text") and not self.recorder.translation_engine:
-            self.translation_text.setPlaceholderText(
-                self.i18n.t("realtime_record.translation_not_available")
-            )
+        if hasattr(self, "translation_text"):
+            if not self.recorder.translation_engine:
+                # 获取当前选中的引擎
+                preferences = self.settings_manager.get_realtime_preferences()
+                engine_type = preferences.get("translation_engine", "none")
+
+                if engine_type == "none":
+                    placeholder = self.i18n.t("realtime_record.translation_disabled_placeholder") or "Translation disabled"
+                elif engine_type == "opus-mt":
+                    source = preferences.get("translation_source_lang", "auto")
+                    target = preferences.get("translation_target_lang", "en")
+                    placeholder = self.i18n.t("realtime_record.opus_mt_not_ready_placeholder", source=source, target=target) or f"Opus-MT model ({source}->{target}) not ready"
+                else:
+                    placeholder = self.i18n.t("realtime_record.translation_not_available")
+
+                self.translation_text.setPlaceholderText(placeholder)
+            else:
+                self.translation_text.setPlaceholderText("")
         if hasattr(self, "markers_list") and hasattr(self.markers_list, "setPlaceholderText"):
             self.markers_list.setPlaceholderText(self.i18n.t("realtime_record.markers_placeholder"))
             self._refresh_markers_list()
@@ -1679,9 +1715,26 @@ class RealtimeRecordWidget(BaseWidget):
     def _translation_engine_available(self) -> bool:
         """Check whether translation engine is currently available."""
         try:
-            return bool(self.recorder.translation_engine)
+            # Available if engine is loaded OR if any local translation models exist
+            if self.recorder.translation_engine:
+                return True
+            
+            if self.model_manager:
+                downloaded = [
+                    m for m in self.model_manager.get_all_translation_models() 
+                    if m.is_downloaded
+                ]
+                return len(downloaded) > 0
+                
+            return False
         except Exception:
             return False
+
+    @Slot()
+    def _on_translation_models_refresh(self):
+        """Handle translation models update signal."""
+        self._update_placeholders()
+        self._refresh_translation_availability()
 
     def _refresh_translation_availability(self) -> None:
         """Refresh translation-related controls based on runtime engine availability."""
@@ -1798,6 +1851,20 @@ class RealtimeRecordWidget(BaseWidget):
         source_lang = self.source_lang_combo.currentData()
         enable_translation = self.enable_translation_checkbox.isChecked()
         target_lang = self.target_lang_combo.currentData()
+
+        # Auto-switch engine if translation is requested but currently disabled
+        if enable_translation and not self.recorder.translation_engine:
+            if self.settings_manager:
+                logger.info("Translation enabled but engine is 'none'; auto-switching to 'opus-mt'")
+                self.settings_manager.update_setting("realtime.translation_engine", "opus-mt")
+                # Reload engine in recorder
+                try:
+                    # MainWindow handles major engine reloads, but we can try basic injection 
+                    # for the upcoming session if the recorder allows it.
+                    # Usually, the MainWindow reloads everything, but we trigger the setting save.
+                    pass
+                except Exception as e:
+                    logger.error(f"Failed to auto-switch translation engine: {e}")
 
         options: Dict[str, Any] = {
             "language": source_lang,

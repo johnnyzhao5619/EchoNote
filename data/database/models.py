@@ -30,6 +30,7 @@ from config.constants import (
     DEFAULT_TRANSCRIPTION_ENGINE,
     TASK_STATUS_PENDING,
 )
+from utils.time_utils import current_iso_timestamp, to_utc_iso
 from core.calendar.constants import CalendarSource, EventType
 from data.database.encryption_helper import decrypt_sensitive_field, encrypt_sensitive_field
 
@@ -41,9 +42,6 @@ def generate_uuid() -> str:
     return str(uuid.uuid4())
 
 
-def current_timestamp() -> str:
-    """Get current timestamp as ISO format string."""
-    return datetime.now().isoformat()
 
 
 @dataclass
@@ -62,7 +60,7 @@ class TranscriptionTask:
     output_format: Optional[str] = None
     output_path: Optional[str] = None
     error_message: Optional[str] = None
-    created_at: str = field(default_factory=current_timestamp)
+    created_at: str = field(default_factory=current_iso_timestamp)
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
 
@@ -116,6 +114,10 @@ class TranscriptionTask:
                 output_path, error_message, created_at, started_at, completed_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
+        self.created_at = to_utc_iso(self.created_at)
+        self.started_at = to_utc_iso(self.started_at)
+        self.completed_at = to_utc_iso(self.completed_at)
+
         params = (
             self.id,
             self.file_path,
@@ -182,8 +184,8 @@ class CalendarEvent:
     source: str = CalendarSource.LOCAL  # local/google/outlook
     external_id: Optional[str] = None
     is_readonly: bool = False
-    created_at: str = field(default_factory=current_timestamp)
-    updated_at: str = field(default_factory=current_timestamp)
+    created_at: str = field(default_factory=current_iso_timestamp)
+    updated_at: str = field(default_factory=current_iso_timestamp)
 
     @classmethod
     def from_db_row(cls, row) -> "CalendarEvent":
@@ -234,17 +236,12 @@ class CalendarEvent:
 
     def save(self, db_connection):
         """Save or update event in database."""
-        self.updated_at = current_timestamp()
+        self.updated_at = current_iso_timestamp()
 
-        def _ensure_iso(value):
-            if isinstance(value, datetime):
-                return value.isoformat()
-            return value
-
-        self.start_time = _ensure_iso(self.start_time)
-        self.end_time = _ensure_iso(self.end_time)
-        self.created_at = _ensure_iso(self.created_at)
-        self.updated_at = _ensure_iso(self.updated_at)
+        self.start_time = to_utc_iso(self.start_time)
+        self.end_time = to_utc_iso(self.end_time)
+        self.created_at = to_utc_iso(self.created_at)
+        self.updated_at = to_utc_iso(self.updated_at)
 
         attendees_value = self.attendees
         if attendees_value is None:
@@ -474,9 +471,7 @@ class CalendarEventLink:
     def save(self, db_connection):
         """Persist or update the link record."""
 
-        timestamp = self.last_synced_at
-        if isinstance(timestamp, datetime):
-            timestamp = timestamp.isoformat()
+        timestamp = to_utc_iso(self.last_synced_at)
 
         query = """
             INSERT INTO calendar_event_links (
@@ -529,7 +524,7 @@ class EventAttachment:
     attachment_type: str = ""  # recording/transcript
     file_path: str = ""
     file_size: Optional[int] = None
-    created_at: str = field(default_factory=current_timestamp)
+    created_at: str = field(default_factory=current_iso_timestamp)
 
     @classmethod
     def from_db_row(cls, row) -> "EventAttachment":
@@ -545,6 +540,7 @@ class EventAttachment:
 
     def save(self, db_connection):
         """Save attachment in database."""
+        self.created_at = to_utc_iso(self.created_at)
         query = """
             INSERT OR REPLACE INTO event_attachments (
                 id, event_id, attachment_type, file_path, file_size, created_at
@@ -665,7 +661,7 @@ class AutoTaskConfig:
     transcription_language: Optional[str] = None
     enable_translation: bool = False
     translation_target_language: Optional[str] = None
-    created_at: str = field(default_factory=current_timestamp)
+    created_at: str = field(default_factory=current_iso_timestamp)
 
     @classmethod
     def from_db_row(cls, row) -> "AutoTaskConfig":
@@ -683,6 +679,7 @@ class AutoTaskConfig:
 
     def save(self, db_connection):
         """Save configuration in database."""
+        self.created_at = to_utc_iso(self.created_at)
         query = """
             INSERT OR REPLACE INTO auto_task_configs (
                 id, event_id, enable_transcription, enable_recording,
@@ -743,8 +740,8 @@ class CalendarSyncStatus:
     last_sync_time: Optional[str] = None
     sync_token: Optional[str] = None
     is_active: bool = True
-    created_at: str = field(default_factory=current_timestamp)
-    updated_at: str = field(default_factory=current_timestamp)
+    created_at: str = field(default_factory=current_iso_timestamp)
+    updated_at: str = field(default_factory=current_iso_timestamp)
 
     @classmethod
     def from_db_row(cls, row) -> "CalendarSyncStatus":
@@ -765,7 +762,7 @@ class CalendarSyncStatus:
 
     def save(self, db_connection):
         """Save sync status in database."""
-        now = current_timestamp()
+        now = current_iso_timestamp()
         self.updated_at = now
 
         # Encrypt sync_token before saving
@@ -841,7 +838,7 @@ class APIUsage:
     engine: str = ""  # openai/google/azure
     duration_seconds: float = 0.0
     cost: Optional[float] = None
-    timestamp: str = field(default_factory=current_timestamp)
+    timestamp: str = field(default_factory=current_iso_timestamp)
 
     @classmethod
     def from_db_row(cls, row) -> "APIUsage":
@@ -899,8 +896,8 @@ class ModelUsageStats:
     usage_count: int = 0
     last_used: Optional[str] = None
     total_transcription_duration: float = 0.0
-    created_at: str = field(default_factory=current_timestamp)
-    updated_at: str = field(default_factory=current_timestamp)
+    created_at: str = field(default_factory=current_iso_timestamp)
+    updated_at: str = field(default_factory=current_iso_timestamp)
 
     @classmethod
     def from_db_row(cls, row) -> "ModelUsageStats":
@@ -917,7 +914,7 @@ class ModelUsageStats:
 
     def save(self, db_connection):
         """Save or update model usage stats in database."""
-        self.updated_at = current_timestamp()
+        self.updated_at = current_iso_timestamp()
 
         query = """
             INSERT OR REPLACE INTO model_usage_stats (
@@ -961,7 +958,7 @@ class ModelUsageStats:
         if stats:
             # Update existing stats
             stats.usage_count += 1
-            stats.last_used = current_timestamp()
+            stats.last_used = current_iso_timestamp()
             stats.total_transcription_duration += transcription_duration
             stats.save(db_connection)
         else:
@@ -969,7 +966,7 @@ class ModelUsageStats:
             stats = ModelUsageStats(
                 model_name=model_name,
                 usage_count=1,
-                last_used=current_timestamp(),
+                last_used=current_iso_timestamp(),
                 total_transcription_duration=transcription_duration,
             )
             stats.save(db_connection)
@@ -981,3 +978,115 @@ class ModelUsageStats:
         query = "DELETE FROM model_usage_stats WHERE id = ?"
         db_connection.execute(query, (self.id,), commit=True)
         logger.debug(f"Deleted model usage stats: {self.model_name}")
+
+
+@dataclass
+class TranslationModelRecord:
+    """翻译模型下载记录（对应 translation_model_downloads 表）。"""
+
+    model_id: str = ""  # e.g. "opus-mt-zh-en"
+    source_lang: str = ""
+    target_lang: str = ""
+    status: str = "not_downloaded"  # not_downloaded / downloading / downloaded / failed
+    download_path: Optional[str] = None
+    size_bytes: Optional[int] = None
+    downloaded_at: Optional[str] = None
+    last_used: Optional[str] = None
+    use_count: int = 0
+    created_at: str = field(default_factory=current_iso_timestamp)
+    updated_at: str = field(default_factory=current_iso_timestamp)
+
+    @staticmethod
+    def from_db_row(row) -> "TranslationModelRecord":
+        return TranslationModelRecord(
+            model_id=row["model_id"],
+            source_lang=row["source_lang"],
+            target_lang=row["target_lang"],
+            status=row["status"],
+            download_path=row["download_path"],
+            size_bytes=row["size_bytes"],
+            downloaded_at=row["downloaded_at"],
+            last_used=row["last_used"],
+            use_count=row["use_count"] if row["use_count"] is not None else 0,
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+
+    def save(self, db_connection) -> None:
+        """插入或更新记录。"""
+        self.updated_at = current_iso_timestamp()
+        query = """
+            INSERT INTO translation_model_downloads
+                (model_id, source_lang, target_lang, status, download_path,
+                 size_bytes, downloaded_at, last_used, use_count, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(model_id) DO UPDATE SET
+                status        = excluded.status,
+                download_path = excluded.download_path,
+                size_bytes    = excluded.size_bytes,
+                downloaded_at = excluded.downloaded_at,
+                last_used     = excluded.last_used,
+                use_count     = excluded.use_count,
+                updated_at    = excluded.updated_at
+        """
+        db_connection.execute(
+            query,
+            (
+                self.model_id,
+                self.source_lang,
+                self.target_lang,
+                self.status,
+                self.download_path,
+                self.size_bytes,
+                self.downloaded_at,
+                self.last_used,
+                self.use_count,
+                self.created_at,
+                self.updated_at,
+            ),
+            commit=True,
+        )
+
+    def update_status(self, db_connection, status: str, **kwargs) -> None:
+        """快速更新状态和相关字段（download_path、size_bytes、downloaded_at 等）。"""
+        self.status = status
+        self.updated_at = current_iso_timestamp()
+        for k, v in kwargs.items():
+            if hasattr(self, k):
+                setattr(self, k, v)
+        self.save(db_connection)
+
+    def mark_used(self, db_connection) -> None:
+        """更新使用时间和计数。"""
+        self.use_count += 1
+        self.last_used = current_iso_timestamp()
+        self.save(db_connection)
+
+    @staticmethod
+    def get_by_model_id(db_connection, model_id: str) -> Optional["TranslationModelRecord"]:
+        result = db_connection.execute(
+            "SELECT * FROM translation_model_downloads WHERE model_id = ?", (model_id,)
+        )
+        return TranslationModelRecord.from_db_row(result[0]) if result else None
+
+    @staticmethod
+    def get_all(db_connection) -> List["TranslationModelRecord"]:
+        result = db_connection.execute(
+            "SELECT * FROM translation_model_downloads ORDER BY model_id"
+        )
+        return [TranslationModelRecord.from_db_row(r) for r in result]
+
+    @staticmethod
+    def get_downloaded(db_connection) -> List["TranslationModelRecord"]:
+        result = db_connection.execute(
+            "SELECT * FROM translation_model_downloads WHERE status = 'downloaded' ORDER BY model_id"
+        )
+        return [TranslationModelRecord.from_db_row(r) for r in result]
+
+    def delete(self, db_connection) -> None:
+        db_connection.execute(
+            "DELETE FROM translation_model_downloads WHERE model_id = ?",
+            (self.model_id,),
+            commit=True,
+        )
+

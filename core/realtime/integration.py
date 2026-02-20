@@ -21,6 +21,7 @@ import logging
 import os
 from datetime import datetime
 from typing import Dict, Optional
+from utils.time_utils import format_localized_datetime
 
 from core.calendar.constants import CalendarSource, EventType
 
@@ -115,7 +116,7 @@ class CalendarIntegration:
                 return ""
 
             start_time = datetime.fromisoformat(start_time_str)
-            title_time = start_time.strftime("%Y-%m-%d %H:%M")
+            title_time = format_localized_datetime(start_time)
             duration_value = recording_result.get("duration", 0.0)
 
             title = self._translate(
@@ -188,8 +189,8 @@ class CalendarIntegration:
                 "Recording duration: {duration} seconds",
                 duration=f"{float(duration_value):.2f}",
             ),
-            f"Start: {start_time}",
-            f"End: {end_time}",
+            f"Start: {format_localized_datetime(start_time)}",
+            f"End: {format_localized_datetime(end_time)}",
             f"Input device: {input_device_name or 'N/A'}",
             f"Capture route: {capture_route}",
             f"Recording file: {recording_path or 'N/A'}",

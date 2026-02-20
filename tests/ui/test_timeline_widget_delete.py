@@ -17,6 +17,7 @@ def test_timeline_widget_delete_event_uses_shared_flow(qapp, mock_i18n, mock_set
     with patch("ui.timeline.widget.QTimer.singleShot", side_effect=lambda _ms, _cb: None):
         widget = TimelineWidget(
             timeline_manager=timeline_manager,
+            transcription_manager=MagicMock(),
             i18n=mock_i18n,
             settings_manager=mock_settings_manager,
         )

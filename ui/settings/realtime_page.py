@@ -46,9 +46,10 @@ from config.constants import (
     RECORDING_FORMAT_WAV,
     STANDARD_LABEL_WIDTH,
     SUPPORTED_REALTIME_TRANSLATION_ENGINES,
-    SUPPORTED_RECORDING_FORMATS,
     TRANSLATION_ENGINE_GOOGLE,
     TRANSLATION_ENGINE_NONE,
+    TRANSLATION_ENGINE_OPUS_MT,
+    SUPPORTED_RECORDING_FORMATS,
 )
 from ui.base_widgets import create_button, create_hbox, create_vbox
 from ui.constants import SETTINGS_GAIN_VALUE_LABEL_MIN_WIDTH, format_gain_display
@@ -234,11 +235,47 @@ class RealtimeSettingsPage(BaseSettingsPage):
         self.translation_label.setMinimumWidth(STANDARD_LABEL_WIDTH)
         self.translation_combo = QComboBox()
         self._populate_translation_options()
+        self.translation_combo.currentIndexChanged.connect(self._on_translation_engine_changed)
         self.translation_combo.currentTextChanged.connect(self._emit_changed)
         translation_layout.addWidget(self.translation_label)
         translation_layout.addWidget(self.translation_combo)
         translation_layout.addStretch()
         self.content_layout.addLayout(translation_layout)
+
+        # Opus-MT: language pair selection (visible only when Opus-MT is selected)
+        self._opus_mt_section = create_vbox()
+
+        src_tgt_layout = create_hbox()
+        self.translation_source_label = QLabel(self.i18n.t("settings.realtime.source_language"))
+        self.translation_source_label.setMinimumWidth(STANDARD_LABEL_WIDTH)
+        self.translation_source_combo = QComboBox()
+        self.translation_target_label = QLabel(self.i18n.t("settings.realtime.target_language"))
+        self.translation_target_combo = QComboBox()
+        src_tgt_layout.addWidget(self.translation_source_label)
+        src_tgt_layout.addWidget(self.translation_source_combo)
+        src_tgt_layout.addWidget(self.translation_target_label)
+        src_tgt_layout.addWidget(self.translation_target_combo)
+        src_tgt_layout.addStretch()
+        self._opus_mt_section.addLayout(src_tgt_layout)
+
+        self.opus_mt_status_label = QLabel()
+        self.opus_mt_status_label.setProperty("role", "device-info")
+        self.opus_mt_status_label.setWordWrap(True)
+        self._opus_mt_section.addWidget(self.opus_mt_status_label)
+
+        self._populate_opus_mt_language_options()
+        self.translation_source_combo.currentIndexChanged.connect(self._on_opus_mt_source_changed)
+        self.translation_source_combo.currentIndexChanged.connect(self._emit_changed)
+        self.translation_target_combo.currentIndexChanged.connect(self._update_opus_mt_status)
+        self.translation_target_combo.currentIndexChanged.connect(self._emit_changed)
+
+        self.content_layout.addLayout(self._opus_mt_section)
+        self._opus_mt_section.setEnabled(False)
+        # hide all widgets in the section initially
+        for i in range(self._opus_mt_section.count()):
+            item = self._opus_mt_section.itemAt(i)
+            if item and item.widget():
+                item.widget().setVisible(False)
 
         self.add_section_spacing()
 
@@ -425,10 +462,22 @@ class RealtimeSettingsPage(BaseSettingsPage):
                 self.auto_save_check.setChecked(auto_save)
 
             translation_engine = self.settings_manager.get_setting("realtime.translation_engine")
-            if translation_engine in {TRANSLATION_ENGINE_NONE, TRANSLATION_ENGINE_GOOGLE}:
+            if translation_engine in SUPPORTED_REALTIME_TRANSLATION_ENGINES:
                 index = self.translation_combo.findData(translation_engine)
                 if index >= 0:
                     self.translation_combo.setCurrentIndex(index)
+
+            source_lang = self.settings_manager.get_setting("realtime.translation_source_lang")
+            if source_lang:
+                index = self.translation_source_combo.findData(source_lang)
+                if index >= 0:
+                    self.translation_source_combo.setCurrentIndex(index)
+
+            target_lang = self.settings_manager.get_setting("realtime.translation_target_lang")
+            if target_lang:
+                index = self.translation_target_combo.findData(target_lang)
+                if index >= 0:
+                    self.translation_target_combo.setCurrentIndex(index)
 
             save_transcript = self.settings_manager.get_setting("realtime.save_transcript")
             if save_transcript is not None:
@@ -481,6 +530,11 @@ class RealtimeSettingsPage(BaseSettingsPage):
             if translation_engine is None:
                 translation_engine = TRANSLATION_ENGINE_NONE
             self._set_setting_or_raise("realtime.translation_engine", translation_engine)
+
+            source_lang = self.translation_source_combo.currentData() or "auto"
+            target_lang = self.translation_target_combo.currentData() or "en"
+            self._set_setting_or_raise("realtime.translation_source_lang", source_lang)
+            self._set_setting_or_raise("realtime.translation_target_lang", target_lang)
 
             self._set_setting_or_raise(
                 "realtime.save_transcript", self.save_transcript_check.isChecked()
@@ -606,6 +660,13 @@ class RealtimeSettingsPage(BaseSettingsPage):
                     self.translation_combo.setCurrentIndex(index)
             self.translation_combo.blockSignals(False)
 
+        if hasattr(self, "translation_source_label"):
+            self.translation_source_label.setText(self.i18n.t("settings.realtime.source_language"))
+        if hasattr(self, "translation_target_label"):
+            self.translation_target_label.setText(self.i18n.t("settings.realtime.target_language"))
+        if hasattr(self, "opus_mt_status_label"):
+            self._update_opus_mt_status()
+
     def _update_spinbox_suffixes(self) -> None:
         """Update localized unit suffixes for numeric controls."""
         if hasattr(self, "silence_duration_spin"):
@@ -618,16 +679,97 @@ class RealtimeSettingsPage(BaseSettingsPage):
             )
 
     def _populate_translation_options(self) -> None:
-        """Populate translation engine options with stable internal values."""
+        """从 SUPPORTED_REALTIME_TRANSLATION_ENGINES 动态生成翻译引擎下拉选项，避免硬编码。"""
         if not hasattr(self, "translation_combo"):
             return
         self.translation_combo.clear()
-        self.translation_combo.addItem(
-            self.i18n.t("settings.realtime.no_translation"), TRANSLATION_ENGINE_NONE
+        for engine in SUPPORTED_REALTIME_TRANSLATION_ENGINES:
+            # i18n key 规则：settings.realtime.engine_<engine_id>
+            label = self.i18n.t(f"settings.realtime.engine_{engine}")
+            self.translation_combo.addItem(label, engine)
+
+    def _populate_opus_mt_language_options(self) -> None:
+        """从 TranslationModelRegistry 读取语言对，填充源/目标语言下拉框。"""
+        from core.models.translation_registry import get_translation_registry
+
+        registry = get_translation_registry()
+        sources = registry.get_available_sources()
+
+        self.translation_source_combo.blockSignals(True)
+        self.translation_source_combo.clear()
+        self.translation_source_combo.addItem(self.i18n.t("settings.realtime.auto_detect"), "auto")
+        for lang in sources:
+            self.translation_source_combo.addItem(lang, lang)
+        self.translation_source_combo.blockSignals(False)
+
+        self._refresh_target_options()
+
+    def _refresh_target_options(self) -> None:
+        """根据当前源语言刷新目标语言选项。"""
+        from core.models.translation_registry import get_translation_registry
+
+        registry = get_translation_registry()
+        source = self.translation_source_combo.currentData()
+        targets = registry.get_available_targets(source if source != "auto" else None)
+
+        self.translation_target_combo.blockSignals(True)
+        current_target = self.translation_target_combo.currentData()
+        self.translation_target_combo.clear()
+        for lang in targets:
+            self.translation_target_combo.addItem(lang, lang)
+        # 恢复之前的目标语言选择
+        idx = self.translation_target_combo.findData(current_target)
+        if idx >= 0:
+            self.translation_target_combo.setCurrentIndex(idx)
+        self.translation_target_combo.blockSignals(False)
+        self._update_opus_mt_status()
+
+    def _on_opus_mt_source_changed(self) -> None:
+        self._refresh_target_options()
+
+    def _update_opus_mt_status(self) -> None:
+        """显示当前语言对的模型下载状态。"""
+        if not hasattr(self, "opus_mt_status_label"):
+            return
+        source = self.translation_source_combo.currentData() or "auto"
+        target = self.translation_target_combo.currentData() or "en"
+
+        # 通过 managers 获取 model_manager（如果有）
+        model_manager = self.managers.get("model_manager") if hasattr(self, "managers") else None
+        if not model_manager:
+            return
+
+        # 使用管理器统一的逻辑查找最佳模型
+        model_info = model_manager.get_best_translation_model(
+            source, target, auto_detect=(source == "auto")
         )
-        self.translation_combo.addItem(
-            self.i18n.t("settings.realtime.google_translate"), TRANSLATION_ENGINE_GOOGLE
-        )
+
+        if model_info and model_info.is_downloaded:
+            self.opus_mt_status_label.setText(
+                self.i18n.t("settings.realtime.opus_mt_ready", model=model_info.model_id)
+            )
+        elif model_info:
+            self.opus_mt_status_label.setText(
+                self.i18n.t("settings.realtime.opus_mt_not_downloaded", model=model_info.model_id)
+            )
+        else:
+            self.opus_mt_status_label.setText(
+                self.i18n.t("settings.realtime.opus_mt_unavailable")
+            )
+
+
+    def _on_translation_engine_changed(self) -> None:
+        """切换翻译引擎时显示/隐藏 Opus-MT 语言配置区域。"""
+        engine = self.translation_combo.currentData()
+        is_opus = engine == TRANSLATION_ENGINE_OPUS_MT
+        if hasattr(self, "_opus_mt_section"):
+            self._opus_mt_section.setEnabled(is_opus)
+            for i in range(self._opus_mt_section.count()):
+                item = self._opus_mt_section.itemAt(i)
+                if item and item.widget():
+                    item.widget().setVisible(is_opus)
+        if is_opus:
+            self._update_opus_mt_status()
 
     def _detect_mp3_support(self) -> bool:
         try:

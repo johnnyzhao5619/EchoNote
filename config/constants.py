@@ -312,8 +312,6 @@ ACCESSIBILITY_ANNOUNCEMENT_DELAY_MS = 100
 
 # ISO 8601 Date Handling
 ISO_DATE_ONLY_LENGTH = 10  # YYYY-MM-DD
-UTC_TIMEZONE_SUFFIX = "Z"
-UTC_TIMEZONE_OFFSET = "+00:00"
 
 # ============================================================================
 # Magic Numbers - Extracted from Codebase
@@ -432,13 +430,18 @@ SUPPORTED_RECORDING_FORMATS = [
 
 # Translation Engines (Realtime)
 TRANSLATION_ENGINE_NONE = "none"
-# Note: Google Translate typically used for lightweight realtime translation
+TRANSLATION_ENGINE_OPUS_MT = "opus-mt"
 TRANSLATION_ENGINE_GOOGLE = "google"
 
+# Order determines display order in settings UI
 SUPPORTED_REALTIME_TRANSLATION_ENGINES = [
     TRANSLATION_ENGINE_NONE,
+    TRANSLATION_ENGINE_OPUS_MT,
     TRANSLATION_ENGINE_GOOGLE,
 ]
+
+# Local translation model storage (Opus-MT / MarianMT)
+DEFAULT_TRANSLATION_MODELS_DIR = "~/.echonote/translation_models"
 
 
 # ============================================================================

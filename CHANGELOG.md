@@ -4,6 +4,26 @@ All notable changes to EchoNote will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [1.4.0] - 2026-02-20
+
+### Added
+
+- **Unified Local Translation**: Standardized translation functionality using **Helsinki-NLP/Opus-MT** (MarianMT) local models for improved privacy and offline support.
+- **Intelligent Translation Sync**: Automatically triggers re-translation after secondary transcription if a previous translation exists, ensuring consistency between audio and text.
+- **Enhanced Model Downloader**: Improved reliability of model management and download progress tracking.
+
+### Changed
+
+- **UTC-First Time Engine**: Optimized time handling logic to store UTC in the database while performing localized conversion on the frontend, fully supporting global timezones.
+- **I18n Synchronization**: Achieved full translation parity across English, Chinese, and French locales.
+- **Initialization Optimization**: Refactored application startup and model registration for better performance and stability.
+
+### Fixed
+
+- **Timezone Awareness**: Resolved `TypeError` exceptions caused by naive vs aware datetime comparisons in `CalendarHub` and `TranscriptionPage`.
+- **Download Progress Jump**: Fixed bug where model download progress would instantly report 100% while still processing.
+- **UI & Layout**: Fixed various CSS regressions in `QComboBox` and `QSpinBox` across themes.
+
 
 ## [1.3.7] - 2026-02-19
 

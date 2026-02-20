@@ -175,7 +175,7 @@ class I18nManager:
             logger.error(f"Invalid JSON in translation file {translation_file}: {e}")
             self.translations = {}
 
-    def t(self, key: str, **kwargs) -> str:
+    def t(self, translation_key: str, **kwargs) -> str:
         """
         Get translated string for the given key with enhanced dynamic string support.
 
@@ -183,7 +183,7 @@ class I18nManager:
         and performance optimization through caching.
 
         Args:
-            key: Translation key (supports dot notation, e.g., "ui.button")
+            translation_key: Translation key (supports dot notation, e.g., "ui.button")
             **kwargs: Parameters for string formatting, including special parameters:
                      - count: For plural forms (if supported)
                      - condition: For conditional text display
@@ -196,25 +196,25 @@ class I18nManager:
         fallback = kwargs.pop("fallback", None)
 
         # Navigate nested keys with fallback to fallback_language
-        value = self._lookup_key(self.translations, key)
+        value = self._lookup_key(self.translations, translation_key)
         if value is None:
-            value = self._lookup_key(self.fallback_translations, key)
+            value = self._lookup_key(self.fallback_translations, translation_key)
             if value is None:
                 logger.warning(
-                    f"Translation key not found: {key} (language: {self.current_language})"
+                    f"Translation key not found: {translation_key} (language: {self.current_language})"
                 )
-                return fallback if fallback is not None else key
+                return fallback if fallback is not None else translation_key
             logger.debug(
                 "Using fallback translation for key '%s' (language: %s, fallback: %s)",
-                key,
+                translation_key,
                 self.current_language,
                 self.fallback_language,
             )
 
         # Ensure we have a string
         if not isinstance(value, str):
-            logger.warning(f"Translation value is not a string: {key}")
-            return fallback if fallback is not None else key
+            logger.warning(f"Translation value is not a string: {translation_key}")
+            return fallback if fallback is not None else translation_key
 
         # Handle conditional text
         if "condition" in kwargs:
@@ -223,18 +223,18 @@ class I18nManager:
 
         # Handle plural forms (basic implementation)
         if "count" in kwargs:
-            value = self._handle_plural_forms(key, value, kwargs["count"])
+            value = self._handle_plural_forms(translation_key, value, kwargs["count"])
 
         # Cache parameter info if not already cached
-        if key not in self._parameter_cache and "{" in value:
+        if translation_key not in self._parameter_cache and "{" in value:
             parameters = self._extract_parameters(value)
-            self._parameter_cache[key] = parameters
+            self._parameter_cache[translation_key] = parameters
 
         # Substitute parameters with enhanced error handling
         try:
-            return self._substitute_parameters(key, value, kwargs)
+            return self._substitute_parameters(translation_key, value, kwargs)
         except Exception as e:
-            logger.warning(f"Error substituting parameters for key {key}: {e}")
+            logger.warning(f"Error substituting parameters for key {translation_key}: {e}")
             return fallback if fallback is not None else value
 
     def _substitute_parameters(self, key: str, value: str, params: Dict[str, Any]) -> str:
@@ -378,29 +378,29 @@ class I18nManager:
 
         return value
 
-    def validate_parameters(self, key: str, **kwargs) -> Dict[str, Any]:
+    def validate_parameters(self, translation_key: str, **kwargs) -> Dict[str, Any]:
         """
         Validate parameters for a translation key.
 
         Args:
-            key: Translation key
+            translation_key: Translation key
             **kwargs: Parameters to validate
 
         Returns:
             Dictionary with validation results
         """
         # Get the translation value
-        keys = key.split(".")
+        keys = translation_key.split(".")
         value = self.translations
 
         for k in keys:
             if isinstance(value, dict) and k in value:
                 value = value[k]
             else:
-                return {"valid": False, "error": f"Key not found: {key}"}
+                return {"valid": False, "error": f"Key not found: {translation_key}"}
 
         if not isinstance(value, str):
-            return {"valid": False, "error": f"Value is not a string: {key}"}
+            return {"valid": False, "error": f"Value is not a string: {translation_key}"}
 
         # Extract expected parameters from the translation string
         expected_params = set(self._extract_parameters(value))

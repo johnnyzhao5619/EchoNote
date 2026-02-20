@@ -21,7 +21,7 @@
 
 import logging
 from datetime import datetime
-from typing import Dict
+from typing import Dict, Optional, Union
 
 from PySide6.QtCore import Slot
 from PySide6.QtGui import QFont
@@ -39,6 +39,7 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QVBoxLayout,
     QWidget,
+    QTabWidget,
 )
 
 from config.constants import (
@@ -49,6 +50,7 @@ from config.constants import (
     SUPPORTED_TRANSCRIPTION_DEVICES,
 )
 from core.models.registry import ModelInfo
+from core.models.translation_registry import TranslationModelInfo
 from ui.base_widgets import (
     connect_button_with_callback,
     create_button,
@@ -70,8 +72,11 @@ from ui.constants import (
     ZERO_MARGINS,
 )
 from ui.settings.base_page import BaseSettingsPage
+from ui.settings.components.model_card import ModelCardWidget
 from utils.i18n import I18nQtManager
 from utils.model_download import run_model_download
+from utils.time_utils import format_localized_datetime
+
 
 logger = logging.getLogger("echonote.ui.settings.model_management")
 
@@ -110,6 +115,20 @@ class ModelManagementPage(BaseSettingsPage):
         self.model_manager.downloader.download_failed.connect(self._on_download_failed)
         self.model_manager.model_validation_failed.connect(self._on_validation_failed)
 
+        # 连接翻译模型下载器信号
+        self.model_manager.translation_models_updated.connect(self._refresh_translation_model_list)
+        self.model_manager.translation_downloader.download_progress.connect(
+            self._update_download_progress
+        )
+        self.model_manager.translation_downloader.download_completed.connect(
+            self._refresh_translation_model_list
+        )
+        self.model_manager.translation_downloader.download_failed.connect(
+            self._refresh_translation_model_list
+        )
+        # 翻译模型卡片引用
+        self.translation_model_cards: Dict[str, QWidget] = {}
+
         # 连接语言切换信号
         self.i18n.language_changed.connect(self.update_translations)
 
@@ -133,6 +152,16 @@ class ModelManagementPage(BaseSettingsPage):
 
         self.add_spacing()
 
+        # 引入标签页
+        self.tabs = QTabWidget()
+        self.tabs.setObjectName("model_management_tabs")
+        self.content_layout.addWidget(self.tabs)
+
+        # ---- 语音模型标签页 ----
+        self.speech_tab = QWidget()
+        self.speech_layout = create_vbox(margins=(10, 10, 10, 10), spacing=20)
+        self.speech_tab.setLayout(self.speech_layout)
+
         # 推荐模型卡片区域（条件显示）
         self.recommendation_container = QWidget()
         self.recommendation_layout = create_vbox(
@@ -140,11 +169,12 @@ class ModelManagementPage(BaseSettingsPage):
             margins=ZERO_MARGINS,
         )
         self.recommendation_container.setLayout(self.recommendation_layout)
-        self.content_layout.addWidget(self.recommendation_container)
+        self.speech_layout.addWidget(self.recommendation_container)
 
-        # 已下载模型区域
+        # 已下载语音模型区域
         self.downloaded_title = self.add_section_title(
-            self.i18n.t("settings.model_management.downloaded_models")
+            self.i18n.t("settings.model_management.downloaded_models"),
+            layout=self.speech_layout
         )
 
         self.downloaded_models_container = QWidget()
@@ -153,13 +183,14 @@ class ModelManagementPage(BaseSettingsPage):
             margins=ZERO_MARGINS,
         )
         self.downloaded_models_container.setLayout(self.downloaded_models_layout)
-        self.content_layout.addWidget(self.downloaded_models_container)
+        self.speech_layout.addWidget(self.downloaded_models_container)
 
-        self.add_section_spacing()
+        self.add_section_spacing(layout=self.speech_layout)
 
-        # 可下载模型区域
+        # 可下载语音模型区域
         self.available_title = self.add_section_title(
-            self.i18n.t("settings.model_management.available_models")
+            self.i18n.t("settings.model_management.available_models"),
+            layout=self.speech_layout
         )
 
         self.available_models_container = QWidget()
@@ -168,13 +199,42 @@ class ModelManagementPage(BaseSettingsPage):
             margins=ZERO_MARGINS,
         )
         self.available_models_container.setLayout(self.available_models_layout)
-        self.content_layout.addWidget(self.available_models_container)
+        self.speech_layout.addWidget(self.available_models_container)
 
-        # 添加弹性空间
-        self.content_layout.addStretch()
+        self.speech_layout.addStretch()
+        self.tabs.addTab(self.speech_tab, self.i18n.t("settings.model_management.speech_tab"))
+
+        # ---- 翻译模型标签页 ----
+        self.translation_tab = QWidget()
+        self.translation_layout = create_vbox(margins=(10, 10, 10, 10), spacing=20)
+        self.translation_tab.setLayout(self.translation_layout)
+
+        self.translation_models_title = self.add_section_title(
+            self.i18n.t("settings.model_management.translation_models"),
+            layout=self.translation_layout
+        )
+
+        self.translation_models_desc = QLabel(
+            self.i18n.t("settings.model_management.translation_models_desc")
+        )
+        self.translation_models_desc.setWordWrap(True)
+        self.translation_models_desc.setObjectName("description_label")
+        self.translation_layout.addWidget(self.translation_models_desc)
+
+        self.translation_models_container = QWidget()
+        self.translation_models_layout = create_vbox(
+            spacing=self.MODEL_LIST_SPACING,
+            margins=ZERO_MARGINS,
+        )
+        self.translation_models_container.setLayout(self.translation_models_layout)
+        self.translation_layout.addWidget(self.translation_models_container)
+
+        self.translation_layout.addStretch()
+        self.tabs.addTab(self.translation_tab, self.i18n.t("settings.model_management.translation_tab"))
 
         # 刷新模型列表
         self._refresh_model_list()
+        self._refresh_translation_model_list()
 
         logger.debug("Model management UI setup complete")
 
@@ -195,16 +255,30 @@ class ModelManagementPage(BaseSettingsPage):
             )
         if hasattr(self, "available_title"):
             self.available_title.setText(self.i18n.t("settings.model_management.available_models"))
+        if hasattr(self, "translation_models_title"):
+            self.translation_models_title.setText(
+                self.i18n.t("settings.model_management.translation_models")
+            )
+        if hasattr(self, "translation_models_desc"):
+            self.translation_models_desc.setText(
+                self.i18n.t("settings.model_management.translation_models_desc")
+            )
+
+        # 更新标签页标题
+        if hasattr(self, "tabs"):
+            self.tabs.setTabText(0, self.i18n.t("settings.model_management.speech_tab"))
+            self.tabs.setTabText(1, self.i18n.t("settings.model_management.translation_tab"))
 
         # 刷新整个模型列表，这会重新创建所有卡片并使用新的翻译
         self._refresh_model_list()
+        self._refresh_translation_model_list()
 
         logger.debug("Translations updated for model management page")
 
     @Slot()
     def _refresh_model_list(self):
-        """刷新模型列表"""
-        logger.debug("Refreshing model list")
+        """刷新语音模型列表"""
+        logger.debug("Refreshing speech model list")
 
         # 清空现有列表
         self._clear_layout(self.recommendation_layout)
@@ -221,310 +295,47 @@ class ModelManagementPage(BaseSettingsPage):
         # 如果没有已下载的模型，显示推荐卡片
         if not downloaded_models:
             self._create_recommendation_card()
+            self.recommendation_container.setVisible(True)
         else:
             # 隐藏推荐卡片
             self.recommendation_container.setVisible(False)
 
         # 分类显示模型
         for model in all_models:
+            card = self._create_unified_card(model)
             if model.is_downloaded:
-                card = self._create_downloaded_model_card(model)
                 self.downloaded_models_layout.addWidget(card)
-                self.model_cards[model.name] = card
             else:
-                card = self._create_available_model_card(model)
                 self.available_models_layout.addWidget(card)
-                self.model_cards[model.name] = card
+            self.model_cards[model.name] = card
 
         logger.debug(
-            f"Model list refreshed: {len(downloaded_models)} downloaded, "
-            f"{len(all_models) - len(downloaded_models)} available"
+            f"Speech model list refreshed: {len(downloaded_models)} downloaded"
         )
 
-    @staticmethod
-    def _build_bold_font(point_size: int) -> QFont:
-        """Create a bold font with a specific point size."""
-        font = QFont()
-        font.setPointSize(point_size)
-        font.setBold(True)
-        return font
-
-    def _create_model_name_label(
-        self, text: str, *, point_size: int | None = None, role: str | None = None
-    ) -> QLabel:
-        """Create a bold model title label used in model cards."""
-        label = QLabel(text)
-        label.setFont(self._build_bold_font(point_size or self.MODEL_NAME_FONT_SIZE))
-        if role:
-            label.setProperty("role", role)
-        return label
-
-    def _create_downloaded_model_card(self, model: ModelInfo) -> QWidget:
-        """
-        创建已下载模型卡片
-
-        Args:
-            model: 模型信息
-
-        Returns:
-            模型卡片控件
-        """
-        card = QFrame()
-        card.setFrameShape(QFrame.Shape.StyledPanel)
-        card.setObjectName("model-card-downloaded")
-
-        layout = QVBoxLayout(card)
-
-        # 第一行：模型名称和按钮
-        header_layout = create_hbox()
-
-        # 模型名称
-        name_label = self._create_model_name_label(
-            model.full_name,
-            role="model-name-downloaded",
-        )
-        header_layout.addWidget(name_label)
-
-        header_layout.addStretch()
-
-        # 配置按钮
-        config_btn = create_button(self.i18n.t("settings.model_management.configure"))
-        config_btn.setMaximumWidth(self.ACTION_BUTTON_MAX_WIDTH_SMALL)
-        config_btn.clicked.connect(lambda: self._on_config_clicked(model.name))
-        header_layout.addWidget(config_btn)
-
-        # 删除按钮
-        delete_btn = create_button(self.i18n.t("settings.model_management.delete"))
-        delete_btn.setMaximumWidth(self.ACTION_BUTTON_MAX_WIDTH_SMALL)
-        delete_btn.setProperty("role", "model-delete")
-        delete_btn.clicked.connect(lambda: self._on_delete_clicked(model.name))
-
-        # 检查模型是否正在使用（如果 ModelManager 支持此功能）
-        if hasattr(self.model_manager, "is_model_in_use"):
-            if self.model_manager.is_model_in_use(model.name):
-                delete_btn.setEnabled(False)
-                delete_btn.setToolTip(self.i18n.t("settings.model_management.model_in_use"))
-
-        header_layout.addWidget(delete_btn)
-
-        # 查看详情按钮
-        details_btn = create_button(self.i18n.t("settings.model_management.view_details"))
-        details_btn.setMaximumWidth(self.ACTION_BUTTON_MAX_WIDTH_SMALL)
-        details_btn.clicked.connect(lambda: self._on_view_details_clicked(model.name))
-        header_layout.addWidget(details_btn)
-
-        layout.addLayout(header_layout)
-
-        # 第二行：模型特征
-        features_layout = create_hbox()
-
-        # 大小
-        size_text = f"{self.i18n.t('settings.model_management.size')}: " f"{model.size_mb} MB"
-        size_label = QLabel(size_text)
-        features_layout.addWidget(size_label)
-
-        # 速度
-        speed_text = (
-            f"{self.i18n.t('settings.model_management.speed')}: "
-            f"{self._translate_speed(model.speed)}"
-        )
-        speed_label = QLabel(speed_text)
-        features_layout.addWidget(speed_label)
-
-        # 准确度
-        accuracy_text = (
-            f"{self.i18n.t('settings.model_management.accuracy')}: "
-            f"{self._translate_accuracy(model.accuracy)}"
-        )
-        accuracy_label = QLabel(accuracy_text)
-        features_layout.addWidget(accuracy_label)
-
-        features_layout.addStretch()
-
-        layout.addLayout(features_layout)
-
-        # 第三行：使用统计
-        stats_layout = create_hbox()
-
-        # 使用次数
-        usage_text = self.i18n.t("settings.model_management.usage_count", count=model.usage_count)
-        usage_label = QLabel(usage_text)
-        usage_label.setProperty("role", "time-display")
-        stats_layout.addWidget(usage_label)
-
-        # 最后使用时间
-        if model.last_used:
-            last_used_text = self._format_relative_time(model.last_used)
-            last_used_label = QLabel(
-                f"{self.i18n.t('settings.model_management.last_used')}: " f"{last_used_text}"
-            )
-            last_used_label.setProperty("role", "time-display")
-            stats_layout.addWidget(last_used_label)
+    def _create_unified_card(self, model: Union[ModelInfo, TranslationModelInfo]) -> ModelCardWidget:
+        """创建并配置统一的模型卡片组件。"""
+        card = ModelCardWidget(model, self.i18n, self.model_manager)
+        
+        # 连接信号
+        if isinstance(model, TranslationModelInfo):
+            card.download_clicked.connect(self._download_translation_model)
+            card.delete_clicked.connect(self._delete_translation_model)
+            card.details_clicked.connect(self._on_view_translation_details_clicked)
         else:
-            never_used_label = QLabel(self.i18n.t("settings.model_management.never_used"))
-            never_used_label.setProperty("role", "time-display")
-            stats_layout.addWidget(never_used_label)
-
-        stats_layout.addStretch()
-
-        layout.addLayout(stats_layout)
-
+            card.download_clicked.connect(self._on_download_clicked)
+            card.delete_clicked.connect(self._on_delete_clicked)
+            card.details_clicked.connect(self._on_view_details_clicked)
+            
+        card.config_clicked.connect(self._on_config_clicked)
+        card.cancel_download_clicked.connect(self._on_cancel_download_clicked)
+        
         return card
 
-    def _create_available_model_card(self, model: ModelInfo) -> QWidget:
-        """
-        创建可下载模型卡片
 
-        Args:
-            model: 模型信息
 
-        Returns:
-            模型卡片控件
-        """
-        card = QFrame()
-        card.setFrameShape(QFrame.Shape.StyledPanel)
-        card.setObjectName("model-card-available")
 
-        layout = QVBoxLayout(card)
 
-        # 第一行：模型名称和下载按钮
-        header_layout = create_hbox()
-
-        # 模型名称
-        name_label = self._create_model_name_label(model.full_name)
-        header_layout.addWidget(name_label)
-
-        header_layout.addStretch()
-
-        # 下载按钮
-        download_btn = create_button(self.i18n.t("settings.model_management.download"))
-        download_btn.setObjectName(f"download_btn_{model.name}")
-        download_btn.setProperty("role", "model-download")
-        download_btn.setMaximumWidth(self.ACTION_BUTTON_MAX_WIDTH_MEDIUM)
-        download_btn.clicked.connect(lambda: self._on_download_clicked(model.name))
-        header_layout.addWidget(download_btn)
-
-        layout.addLayout(header_layout)
-
-        # 第二行：模型特征
-        features_layout = create_hbox()
-
-        # 大小
-        size_text = f"{self.i18n.t('settings.model_management.size')}: " f"{model.size_mb} MB"
-        size_label = QLabel(size_text)
-        features_layout.addWidget(size_label)
-
-        # 速度
-        speed_text = (
-            f"{self.i18n.t('settings.model_management.speed')}: "
-            f"{self._translate_speed(model.speed)}"
-        )
-        speed_label = QLabel(speed_text)
-        features_layout.addWidget(speed_label)
-
-        # 准确度
-        accuracy_text = (
-            f"{self.i18n.t('settings.model_management.accuracy')}: "
-            f"{self._translate_accuracy(model.accuracy)}"
-        )
-        accuracy_label = QLabel(accuracy_text)
-        features_layout.addWidget(accuracy_label)
-
-        features_layout.addStretch()
-
-        layout.addLayout(features_layout)
-
-        # 第三行：支持的语言
-        lang_layout = create_hbox()
-
-        if "multi" in model.languages:
-            lang_text = self.i18n.t("settings.model_management.multilingual")
-        else:
-            lang_text = self.i18n.t("settings.model_management.english_only")
-
-        lang_label = QLabel(lang_text)
-        lang_label.setProperty("role", "time-display")
-        lang_layout.addWidget(lang_label)
-
-        lang_layout.addStretch()
-
-        layout.addLayout(lang_layout)
-
-        # 进度条（初始隐藏）
-        progress_bar = QProgressBar()
-        progress_bar.setObjectName(f"progress_bar_{model.name}")
-        progress_bar.setVisible(False)
-        progress_bar.setMaximum(100)
-        layout.addWidget(progress_bar)
-
-        # 取消下载按钮（初始隐藏）
-        cancel_btn = create_button(self.i18n.t("settings.model_management.cancel_download"))
-        cancel_btn.setObjectName(f"cancel_btn_{model.name}")
-        cancel_btn.setVisible(False)
-        cancel_btn.setMaximumWidth(self.ACTION_BUTTON_MAX_WIDTH_MEDIUM)
-        cancel_btn.clicked.connect(lambda: self._on_cancel_download_clicked(model.name))
-        layout.addWidget(cancel_btn)
-
-        return card
-
-    def _translate_speed(self, speed: str) -> str:
-        """
-        翻译速度描述
-
-        Args:
-            speed: 速度描述（英文）
-
-        Returns:
-            翻译后的速度描述
-        """
-        speed_map = {
-            "fastest": self.i18n.t("settings.model_management.speed_fastest"),
-            "fast": self.i18n.t("settings.model_management.speed_fast"),
-            "medium": self.i18n.t("settings.model_management.speed_medium"),
-            "slow": self.i18n.t("settings.model_management.speed_slow"),
-        }
-        return speed_map.get(speed, speed)
-
-    def _translate_accuracy(self, accuracy: str) -> str:
-        """
-        翻译准确度描述
-
-        Args:
-            accuracy: 准确度描述（英文）
-
-        Returns:
-            翻译后的准确度描述
-        """
-        accuracy_map = {
-            "low": self.i18n.t("settings.model_management.accuracy_low"),
-            "medium": self.i18n.t("settings.model_management.accuracy_medium"),
-            "high": self.i18n.t("settings.model_management.accuracy_high"),
-        }
-        return accuracy_map.get(accuracy, accuracy)
-
-    def _format_relative_time(self, dt: datetime) -> str:
-        """
-        格式化相对时间
-
-        Args:
-            dt: 日期时间
-
-        Returns:
-            相对时间描述
-        """
-        now = datetime.now()
-        diff = now - dt
-
-        if diff.days > 0:
-            return self.i18n.t("settings.model_management.days_ago", days=diff.days)
-        elif diff.seconds >= 3600:
-            hours = diff.seconds // 3600
-            return self.i18n.t("settings.model_management.hours_ago", hours=hours)
-        elif diff.seconds >= 60:
-            minutes = diff.seconds // 60
-            return self.i18n.t("settings.model_management.minutes_ago", minutes=minutes)
-        else:
-            return self.i18n.t("settings.model_management.just_now")
 
     def _on_config_clicked(self, model_name: str):
         """
@@ -803,38 +614,8 @@ class ModelManagementPage(BaseSettingsPage):
             self.model_manager.cancel_download(model_name)
             logger.info(f"Cancel requested for model download: {model_name}")
 
-    def _reset_download_ui(self, model_name: str) -> None:
-        """恢复下载卡片到初始状态。"""
-        if model_name not in self.model_cards:
-            return
-        card = self.model_cards[model_name]
 
-        download_btn = card.findChild(QPushButton, f"download_btn_{model_name}")
-        if download_btn:
-            download_btn.setEnabled(True)
-            download_btn.setText(self.i18n.t("settings.model_management.download"))
 
-        progress_bar = card.findChild(QProgressBar, f"progress_bar_{model_name}")
-        if progress_bar:
-            progress_bar.setVisible(False)
-            progress_bar.setValue(0)
-
-        cancel_btn = card.findChild(QPushButton, f"cancel_btn_{model_name}")
-        if cancel_btn:
-            cancel_btn.setVisible(False)
-
-    def _clear_layout(self, layout: QVBoxLayout):
-        """
-        清空布局中的所有控件
-
-        Args:
-            layout: 要清空的布局
-        """
-        while layout.count():
-            item = layout.takeAt(0)
-            widget = item.widget()
-            if widget:
-                widget.deleteLater()
 
     def _create_recommendation_card(self):
         """创建推荐模型卡片"""
@@ -963,44 +744,51 @@ class ModelManagementPage(BaseSettingsPage):
         logger.info(f"Downloading recommended model: {model_name}")
         self._on_download_clicked(model_name)
 
+    def _create_model_name_label(
+        self, text: str, point_size: int = 12, role: str = "model-title"
+    ) -> QLabel:
+        """创建统一样式的模型名称标签"""
+        label = QLabel(text)
+        font = QFont()
+        font.setPointSize(point_size)
+        font.setBold(True)
+        label.setFont(font)
+        label.setProperty("role", role)
+        return label
+
+    def _translate_speed(self, speed: str) -> str:
+        """翻译速度描述"""
+        speed_map = {
+            "fastest": self.i18n.t("settings.model_management.speed_fastest"),
+            "fast": self.i18n.t("settings.model_management.speed_fast"),
+            "medium": self.i18n.t("settings.model_management.speed_medium"),
+            "slow": self.i18n.t("settings.model_management.speed_slow"),
+        }
+        return speed_map.get(speed, speed)
+
+    def _translate_accuracy(self, accuracy: str) -> str:
+        """翻译准确度描述"""
+        accuracy_map = {
+            "low": self.i18n.t("settings.model_management.accuracy_low"),
+            "medium": self.i18n.t("settings.model_management.accuracy_medium"),
+            "high": self.i18n.t("settings.model_management.accuracy_high"),
+        }
+        return accuracy_map.get(accuracy, accuracy)
+
     @Slot(str, int, float)
-    def _update_download_progress(self, model_name: str, progress: int, speed: float):
-        """
-        更新下载进度
+    def _update_download_progress(self, model_id: str, progress: int, speed: float):
+        """更新下载进度。支持语音和翻译模型。"""
+        # 在语音模型卡片或翻译模型卡片中查找
+        card = self.model_cards.get(model_id) or self.translation_model_cards.get(model_id)
+        if card and isinstance(card, ModelCardWidget):
+            card.update_progress(progress)
 
-        Args:
-            model_name: 模型名称
-            progress: 进度百分比 (0-100)
-            speed: 下载速度 (MB/s)
-        """
-        logger.debug(f"Download progress for {model_name}: " f"{progress}% at {speed:.2f} MB/s")
-
-        # 获取模型卡片
-        if model_name not in self.model_cards:
-            return
-
-        card = self.model_cards[model_name]
-
-        # 更新进度条
-        progress_bar = card.findChild(QProgressBar, f"progress_bar_{model_name}")
-        if progress_bar:
-            progress_bar.setValue(progress)
-
-            # 设置进度条文本（显示速度和百分比）
-            if speed > 0:
-                progress_bar.setFormat(f"{progress}% ({speed:.1f} MB/s)")
-            else:
-                progress_bar.setFormat(f"{progress}%")
 
     @Slot(str)
     def _on_download_completed(self, model_name: str):
-        """
-        处理下载完成事件
-
-        Args:
-            model_name: 模型名称
-        """
+        """处理下载完成事件"""
         logger.info(f"Download completed for model: {model_name}")
+        # 注意：刷新逻辑由 ModelManager.models_updated 信号触发
 
         # 显示成功通知
         self.show_info(
@@ -1012,21 +800,12 @@ class ModelManagementPage(BaseSettingsPage):
     def _on_download_cancelled(self, model_name: str):
         """处理下载取消事件。"""
         logger.info(f"Download cancelled for model: {model_name}")
-        self._reset_download_ui(model_name)
 
     @Slot(str, str)
     def _on_download_failed(self, model_name: str, error: str):
-        """
-        处理下载失败事件
-
-        Args:
-            model_name: 模型名称
-            error: 错误消息
-        """
+        """处理下载失败事件"""
         logger.error(f"Download failed for {model_name}: {error}")
 
-        # 重置 UI
-        self._reset_download_ui(model_name)
 
         # 显示错误对话框
         error_title = self.i18n.t("settings.model_management.download_error_title")
@@ -1096,18 +875,109 @@ class ModelManagementPage(BaseSettingsPage):
         """保存设置（模型管理页面不需要保存设置）"""
 
 
+
+
+
+
+    # ------------------------------------------------------------------
+    # 翻译模型（Opus-MT）管理方法
+    # ------------------------------------------------------------------
+
+    @Slot()
+    def _refresh_translation_model_list(self):
+        """刷新翻译模型列表"""
+        if not hasattr(self, "translation_models_layout"):
+            return
+
+        logger.debug("Refreshing translation model list")
+        self._clear_layout(self.translation_models_layout)
+        self.translation_model_cards.clear()
+
+        all_models = self.model_manager.get_all_translation_models()
+        for model in all_models:
+            card = self._create_unified_card(model)
+            self.translation_models_layout.addWidget(card)
+            self.translation_model_cards[model.model_id] = card
+
+
+    def _on_view_translation_details_clicked(self, model_id: str):
+        """处理翻译模型查看详情点击"""
+        model = self.model_manager.get_translation_model(model_id)
+        if model:
+            dialog = ModelDetailsDialog(model, self.i18n, self)
+            dialog.exec()
+
+    def _download_translation_model(self, model_id: str) -> None:
+        """触发翻译模型下载（在 QThreadPool 线程中异步运行）。"""
+        from PySide6.QtCore import QRunnable, QThreadPool
+
+        model_info = self.model_manager.get_translation_model(model_id)
+        if not model_info:
+            return
+
+        model_manager = self.model_manager
+
+        def run_download() -> None:
+            import asyncio as _asyncio
+
+            loop = _asyncio.new_event_loop()
+            try:
+                _asyncio.set_event_loop(loop)
+                loop.run_until_complete(model_manager.download_translation_model(model_id))
+            except Exception as exc:  # noqa: BLE001
+                logger.error(
+                    "Translation model download failed in thread for %s: %s",
+                    model_id,
+                    exc,
+                    exc_info=True,
+                )
+            finally:
+                loop.close()
+
+        class _DownloadRunnable(QRunnable):
+            def run(self) -> None:
+                run_download()
+
+        QThreadPool.globalInstance().start(_DownloadRunnable())
+
+    def _delete_translation_model(self, model_id: str) -> None:
+        """确认后删除翻译模型。"""
+        model_info = self.model_manager.get_translation_model(model_id)
+        if not model_info:
+            return
+
+        reply = QMessageBox.question(
+            self,
+            self.i18n.t("settings.model_management.confirm_delete_title"),
+            self.i18n.t(
+                "settings.model_management.confirm_delete_message",
+                model=model_info.display_name,
+            ),
+            QMessageBox.Yes | QMessageBox.No,
+        )
+        if reply == QMessageBox.Yes:
+            success = self.model_manager.delete_translation_model(model_id)
+            if not success:
+                show_error_dialog(
+                    parent=self,
+                    title=self.i18n.t("settings.model_management.validation_error"),
+                    message=self.i18n.t("settings.model_management.delete_failed"),
+                )
+
+
+
 class ModelDetailsDialog(QDialog):
     """模型详情对话框"""
 
     MIN_WIDTH = MODEL_DETAILS_DIALOG_MIN_WIDTH
     MIN_HEIGHT = MODEL_DETAILS_DIALOG_MIN_HEIGHT
 
-    def __init__(self, model: ModelInfo, i18n: I18nQtManager, parent=None):
+    def __init__(self, model: Union[ModelInfo, TranslationModelInfo], i18n: I18nQtManager, parent=None):
         """
         初始化模型详情对话框
 
         Args:
-            model: 模型信息
+            model: 模型信息 (语音或翻译)
             i18n: 国际化管理器
             parent: 父控件
         """
@@ -1118,6 +988,10 @@ class ModelDetailsDialog(QDialog):
 
         self.model = model
         self.i18n = i18n
+        
+        is_translation = isinstance(model, TranslationModelInfo)
+        title = model.display_name if is_translation else model.full_name
+        name_id = model.model_id if is_translation else model.name
 
         self.setWindowTitle(i18n.t("settings.model_management.details_title"))
         self.setMinimumWidth(self.MIN_WIDTH)
@@ -1126,7 +1000,7 @@ class ModelDetailsDialog(QDialog):
         layout = QVBoxLayout(self)
 
         # 标题
-        title_label = QLabel(model.full_name)
+        title_label = QLabel(title)
         title_label.setObjectName("section_title")
         layout.addWidget(title_label)
 
@@ -1142,36 +1016,43 @@ class ModelDetailsDialog(QDialog):
 
         row = 0
 
-        # 模型名称
+        # 模型标识符
         info_layout.addWidget(QLabel(i18n.t("settings.model_management.model_name") + ":"), row, 0)
-        info_layout.addWidget(QLabel(model.name), row, 1)
+        info_layout.addWidget(QLabel(name_id), row, 1)
         row += 1
 
-        # 模型版本（从 huggingface_id 提取）
-        version = "v3"  # 默认版本
-        if "large-v1" in model.name:
-            version = "v1"
-        elif "large-v2" in model.name:
-            version = "v2"
-        elif "large-v3" in model.name:
+        if not is_translation:
+            # 模型版本（仅语音模型显示，尝试从名称提取）
             version = "v3"
+            if "large-v1" in name_id:
+                version = "v1"
+            elif "large-v2" in name_id:
+                version = "v2"
+            elif "large-v3" in name_id:
+                version = "v3"
 
-        info_layout.addWidget(
-            QLabel(i18n.t("settings.model_management.model_version") + ":"), row, 0
-        )
-        info_layout.addWidget(QLabel(version), row, 1)
-        row += 1
+            info_layout.addWidget(QLabel(i18n.t("settings.model_management.model_version") + ":"), row, 0)
+            info_layout.addWidget(QLabel(version), row, 1)
+            row += 1
 
-        # 支持的语言
-        info_layout.addWidget(
-            QLabel(i18n.t("settings.model_management.supported_languages") + ":"), row, 0
-        )
-        if "multi" in model.languages:
-            lang_text = i18n.t("settings.model_management.multilingual")
+            # 支持的语言
+            info_layout.addWidget(
+                QLabel(i18n.t("settings.model_management.supported_languages") + ":"), row, 0
+            )
+            is_multilingual = "multi" in model.languages
+            lang_text = (
+                i18n.t("settings.model_management.multilingual")
+                if is_multilingual
+                else i18n.t("settings.model_management.english_only")
+            )
+
+            info_layout.addWidget(QLabel(lang_text), row, 1)
+            row += 1
         else:
-            lang_text = i18n.t("settings.model_management.english_only")
-        info_layout.addWidget(QLabel(lang_text), row, 1)
-        row += 1
+            # 翻译模型特有信息：语言对
+            info_layout.addWidget(QLabel(i18n.t("settings.model_management.language_pair") + ":"), row, 0)
+            info_layout.addWidget(QLabel(f"{model.source_lang} -> {model.target_lang}"), row, 1)
+            row += 1
 
         # 模型大小
         info_layout.addWidget(QLabel(i18n.t("settings.model_management.model_size") + ":"), row, 0)
@@ -1210,14 +1091,14 @@ class ModelDetailsDialog(QDialog):
             info_layout.addWidget(
                 QLabel(i18n.t("settings.model_management.download_date") + ":"), row, 0
             )
-            date_str = model.download_date.strftime("%Y-%m-%d %H:%M:%S")
+            date_str = format_localized_datetime(model.download_date)
             info_layout.addWidget(QLabel(date_str), row, 1)
             row += 1
 
         # 最后使用日期
         info_layout.addWidget(QLabel(i18n.t("settings.model_management.last_used") + ":"), row, 0)
         if model.last_used:
-            last_used_str = model.last_used.strftime("%Y-%m-%d %H:%M:%S")
+            last_used_str = format_localized_datetime(model.last_used)
             info_layout.addWidget(QLabel(last_used_str), row, 1)
         else:
             info_layout.addWidget(QLabel(i18n.t("settings.model_management.never_used")), row, 1)
@@ -1227,8 +1108,15 @@ class ModelDetailsDialog(QDialog):
         info_layout.addWidget(
             QLabel(i18n.t("settings.model_management.usage_count_label") + ":"), row, 0
         )
-        info_layout.addWidget(QLabel(str(model.usage_count)), row, 1)
+        is_translation = isinstance(model, TranslationModelInfo)
+        usage_count = (
+            getattr(model, "usage_count", 0)
+            if not is_translation
+            else getattr(model, "use_count", 0)
+        )
+        info_layout.addWidget(QLabel(str(usage_count)), row, 1)
         row += 1
+
 
         layout.addLayout(info_layout)
 
@@ -1290,8 +1178,8 @@ class ModelDetailsDialog(QDialog):
         except Exception as e:
             logger.error(f"Error opening file explorer: {e}")
 
-
 class ModelConfigDialog(QDialog):
+
     """模型配置对话框"""
 
     MIN_WIDTH = MODEL_CONFIG_DIALOG_MIN_WIDTH

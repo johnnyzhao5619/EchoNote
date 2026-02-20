@@ -27,6 +27,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, AsyncIterator, Callable, Dict, List, Optional
 
+from utils.time_utils import now_utc
+
 import numpy as np
 
 from config.constants import RECORDING_FORMAT_WAV
@@ -285,7 +287,7 @@ class RealtimeRecorder:
 
         # Reset per-session state.
         self.is_recording = True
-        self.recording_start_time = datetime.now()
+        self.recording_start_time = now_utc()
         self.recording_audio_buffer = []
         self.audio_buffer = AudioBuffer(sample_rate=self.sample_rate)
         self.accumulated_transcription = []
@@ -524,9 +526,16 @@ class RealtimeRecorder:
                 logger.debug(f"Transcription attempt #{transcription_attempts}")
 
                 language = self.current_options.get("language")
-                text = await self.speech_engine.transcribe_stream(
+                result = await self.speech_engine.transcribe_stream(
                     speech_audio, language=language, sample_rate=self.sample_rate
                 )
+
+                if isinstance(result, dict):
+                    text = result.get("text", "")
+                    detected_lang = result.get("language")
+                else:
+                    text = str(result)
+                    detected_lang = None
 
                 if text.strip():
                     if self._is_duplicate_transcription(text, last_transcription):
@@ -536,6 +545,7 @@ class RealtimeRecorder:
                         self._transcription_succeeded = True
                         await stream_queue.put(text)
 
+
                         if self.on_transcription_update:
                             try:
                                 self.on_transcription_update(text)
@@ -544,7 +554,8 @@ class RealtimeRecorder:
 
                         enable_trans = self.current_options.get("enable_translation", False)
                         if enable_trans and translation_queue is not None:
-                            await translation_queue.put(text)
+                            await translation_queue.put({"text": text, "language": detected_lang})
+
 
                         logger.info(f"Transcribed successfully: {text[:50]}...")
                         last_transcription = text
@@ -624,19 +635,35 @@ class RealtimeRecorder:
             while self.is_recording or not queue.empty():
                 try:
                     # Pull transcription output with a short timeout.
-                    text = await asyncio.wait_for(queue.get(), timeout=0.5)
+                    # It's now a dict: {"text": str, "language": str} Or None (shutdown)
+                    data = await asyncio.wait_for(queue.get(), timeout=0.5)
 
-                    if text is None:
+                    if data is None:
                         logger.debug("Received translation shutdown signal")
                         break
+
+                    if isinstance(data, dict):
+                        text = data.get("text", "")
+                        detected_lang = data.get("language")
+                    else:
+                        text = str(data)
+                        detected_lang = None
+
+                    if not text.strip():
+                        continue
 
                     # Perform translation.
                     source_lang = self.current_options.get("language", "auto")
                     target_lang = self.current_options.get("target_language", "en")
 
+                    # If auto is selected and we have a detected language, use it as source.
+                    # This allows MultiModelOpusMTEngine to pick the right model.
+                    effective_source = detected_lang if source_lang == "auto" and detected_lang else source_lang
+
                     translated_text = await self.translation_engine.translate(
-                        text, source_lang=source_lang, target_lang=target_lang
+                        text, source_lang=effective_source, target_lang=target_lang
                     )
+
 
                     if translated_text.strip():
                         # Store translated text for persistence.
@@ -704,7 +731,7 @@ class RealtimeRecorder:
         self._signal_stream_completion(translation_stream_queue)
 
         # Compute session duration.
-        recording_end_time = datetime.now()
+        recording_end_time = now_utc()
         duration = (recording_end_time - self.recording_start_time).total_seconds()
 
         if self.audio_buffer is not None:
@@ -1093,7 +1120,7 @@ class RealtimeRecorder:
         if not self.is_recording or not self.recording_start_time:
             return 0.0
 
-        return (datetime.now() - self.recording_start_time).total_seconds()
+        return (now_utc() - self.recording_start_time).total_seconds()
 
     def get_recording_status(self) -> Dict:
         """Return a snapshot of the current recording status."""

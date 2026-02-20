@@ -19,7 +19,7 @@ from config.constants import (
 from data.database.models import (
     CalendarEvent,
     TranscriptionTask,
-    current_timestamp,
+    current_iso_timestamp,
     generate_uuid,
 )
 
@@ -37,9 +37,9 @@ class TestHelperFunctions:
         assert len(uuid1) == 36
         assert uuid1 != uuid2
 
-    def test_current_timestamp(self):
+    def test_current_iso_timestamp(self):
         """Test timestamp generation."""
-        timestamp = current_timestamp()
+        timestamp = current_iso_timestamp()
 
         assert isinstance(timestamp, str)
         # Should be parseable as ISO format

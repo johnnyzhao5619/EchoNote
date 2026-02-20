@@ -48,6 +48,7 @@ from ui.batch_transcribe.search_widget import SearchWidget
 from ui.batch_transcribe.window_state_manager import WindowStateManager
 from ui.constants import CONTROL_BUTTON_MIN_HEIGHT
 from utils.i18n import I18nQtManager
+from utils.time_utils import format_localized_datetime
 
 logger = logging.getLogger("echonote.ui.transcript_viewer")
 
@@ -483,14 +484,7 @@ class TranscriptViewerDialog(QDialog):
         # Completed time
         completed_at = self.task_data.get("completed_at", "Unknown")
         if completed_at and completed_at != "Unknown":
-            # Format datetime (just show date and time, not full ISO)
-            try:
-                from datetime import datetime
-
-                dt = datetime.fromisoformat(completed_at)
-                completed_text = dt.strftime("%Y-%m-%d %H:%M")
-            except (ValueError, TypeError):
-                completed_text = completed_at
+            completed_text = format_localized_datetime(completed_at)
         else:
             completed_text = "Unknown"
 

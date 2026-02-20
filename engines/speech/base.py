@@ -18,7 +18,7 @@
 import io
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Dict, FrozenSet, Iterable, List, Optional, Tuple
+from typing import Any, Dict, FrozenSet, Iterable, List, Optional, Tuple
 
 import numpy as np
 import soundfile as sf
@@ -259,7 +259,7 @@ class SpeechEngine(ABC):
     @abstractmethod
     async def transcribe_stream(
         self, audio_chunk: np.ndarray, language: Optional[str] = None, **kwargs
-    ) -> str:
+    ) -> Dict[str, Any]:
         """Transcribe an audio chunk during real-time streaming.
 
         Args:
@@ -268,8 +268,9 @@ class SpeechEngine(ABC):
             **kwargs: Engine-specific options (for example, ``sample_rate``).
 
         Returns:
-            str: Transcribed text fragment.
+            Dict[str, Any]: Transcription metadata including 'text' and 'language'.
         """
+
 
     @abstractmethod
     def get_config_schema(self) -> Dict:
