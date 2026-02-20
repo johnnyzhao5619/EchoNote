@@ -22,10 +22,11 @@
 import logging
 from typing import Dict, Union
 
-from ui.qt_imports import (
+from core.qt_imports import (
     QCheckBox,
     QComboBox,
     QDialog,
+    QFont,
     QFormLayout,
     QFrame,
     QLabel,
@@ -65,6 +66,11 @@ from ui.constants import (
     MODEL_MANAGEMENT_MODEL_NAME_FONT_SIZE,
     MODEL_MANAGEMENT_RECOMMENDED_BUTTON_MAX_WIDTH,
     MODEL_MANAGEMENT_SECTION_TITLE_FONT_SIZE,
+    ROLE_AUDIO_FILE,
+    ROLE_CUDA_NOTE,
+    ROLE_MODEL_CONFIG_FIELD_LABEL,
+    ROLE_MODEL_REASON,
+    ROLE_TIME_DISPLAY,
     ZERO_MARGINS,
 )
 from ui.settings.base_page import BaseSettingsPage
@@ -573,7 +579,7 @@ class ModelManagementPage(BaseSettingsPage):
             )
 
         # 在线程池中执行下载
-        from PySide6.QtCore import QRunnable, QThreadPool
+        from core.qt_imports import QRunnable, QThreadPool
 
         class DownloadRunnable(QRunnable):
             def run(self):
@@ -637,7 +643,7 @@ class ModelManagementPage(BaseSettingsPage):
         reason_text = self._get_recommendation_reason(recommended_model_name)
         reason_label = QLabel(reason_text)
         reason_label.setWordWrap(True)
-        reason_label.setProperty("role", "model-reason")
+        reason_label.setProperty("role", ROLE_MODEL_REASON)
         layout.addWidget(reason_label)
 
         # 模型特征
@@ -648,7 +654,7 @@ class ModelManagementPage(BaseSettingsPage):
             f"{self.i18n.t('settings.model_management.size')}: " f"{recommended_model.size_mb} MB"
         )
         size_label = QLabel(size_text)
-        size_label.setProperty("role", "audio-file")
+        size_label.setProperty("role", ROLE_AUDIO_FILE)
         features_layout.addWidget(size_label)
 
         # 速度
@@ -657,7 +663,7 @@ class ModelManagementPage(BaseSettingsPage):
             f"{self._translate_speed(recommended_model.speed)}"
         )
         speed_label = QLabel(speed_text)
-        speed_label.setProperty("role", "audio-file")
+        speed_label.setProperty("role", ROLE_AUDIO_FILE)
         features_layout.addWidget(speed_label)
 
         # 准确度
@@ -666,7 +672,7 @@ class ModelManagementPage(BaseSettingsPage):
             f"{self._translate_accuracy(recommended_model.accuracy)}"
         )
         accuracy_label = QLabel(accuracy_text)
-        accuracy_label.setProperty("role", "audio-file")
+        accuracy_label.setProperty("role", ROLE_AUDIO_FILE)
         features_layout.addWidget(accuracy_label)
 
         features_layout.addStretch()
@@ -888,7 +894,7 @@ class ModelManagementPage(BaseSettingsPage):
 
     def _download_translation_model(self, model_id: str) -> None:
         """触发翻译模型下载（在 QThreadPool 线程中异步运行）。"""
-        from PySide6.QtCore import QRunnable, QThreadPool
+        from core.qt_imports import QRunnable, QThreadPool
 
         model_info = self.model_manager.get_translation_model(model_id)
         if not model_info:
@@ -964,7 +970,7 @@ class ModelDetailsDialog(QDialog):
         super().__init__(parent)
         from pathlib import Path
 
-        from PySide6.QtWidgets import QGridLayout
+        from core.qt_imports import QGridLayout
 
         self.model = model
         self.i18n = i18n
@@ -1050,7 +1056,7 @@ class ModelDetailsDialog(QDialog):
             )
             path_label = QLabel(model.local_path)
             path_label.setWordWrap(True)
-            path_label.setProperty("role", "time-display")
+            path_label.setProperty("role", ROLE_TIME_DISPLAY)
             info_layout.addWidget(path_label, row, 1)
             row += 1
 
@@ -1198,7 +1204,7 @@ class ModelConfigDialog(QDialog):
 
         def _create_form_label(i18n_key: str) -> QLabel:
             label = QLabel(i18n.t(i18n_key) + ":")
-            label.setProperty("role", "model-config-field-label")
+            label.setProperty("role", ROLE_MODEL_CONFIG_FIELD_LABEL)
             return label
 
         # 计算设备选择
@@ -1283,7 +1289,7 @@ class ModelConfigDialog(QDialog):
         if not cuda_available:
             cuda_note = QLabel(i18n.t("settings.model_management.cuda_not_available"))
             cuda_note.setWordWrap(True)
-            cuda_note.setProperty("role", "cuda-note")
+            cuda_note.setProperty("role", ROLE_CUDA_NOTE)
             layout.addWidget(cuda_note)
 
         # 添加弹性空间

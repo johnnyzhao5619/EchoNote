@@ -22,11 +22,29 @@ Provides navigation buttons for switching between different features.
 import logging
 from typing import Dict, Optional
 
-from PySide6.QtWidgets import QSizePolicy, QStyle
-
 from ui.base_widgets import BaseWidget
 from ui.navigation import NAV_ITEMS, NAV_PAGE_ORDER, NavigationItem
-from ui.qt_imports import QPushButton, QSize, QVBoxLayout, QWidget, Signal
+from core.qt_imports import (
+    QButtonGroup,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    Qt,
+    QVBoxLayout,
+    QWidget,
+    Signal,
+    QSizePolicy,
+    QStyle,
+    QSize,
+)
+from ui.constants import (
+    DEFAULT_LAYOUT_SPACING,
+    ROLE_SIDEBAR_NAV_BUTTON,
+    SIDEBAR_BUTTON_ICON_SIZE,
+    SIDEBAR_BUTTON_MIN_HEIGHT,
+    SIDEBAR_CONTAINER_MARGIN,
+    SIDEBAR_WIDTH,
+)
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.sidebar")
@@ -67,12 +85,6 @@ class Sidebar(BaseWidget):
     def setup_ui(self):
         """Set up the sidebar UI."""
         # Set fixed width for sidebar
-        from ui.constants import (
-            DEFAULT_LAYOUT_SPACING,
-            SIDEBAR_BUTTON_ICON_SIZE,
-            SIDEBAR_CONTAINER_MARGIN,
-            SIDEBAR_WIDTH,
-        )
 
         self.setFixedWidth(SIDEBAR_WIDTH)
         self._icon_size = QSize(SIDEBAR_BUTTON_ICON_SIZE, SIDEBAR_BUTTON_ICON_SIZE)
@@ -150,11 +162,8 @@ class Sidebar(BaseWidget):
         # Set button properties
         button.setObjectName(f"nav_button_{item.page_name}")
         button.setCheckable(True)
-        button.setProperty("role", "sidebar-nav-button")
+        button.setProperty("role", ROLE_SIDEBAR_NAV_BUTTON)
         button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        from ui.constants import SIDEBAR_BUTTON_MIN_HEIGHT
-
-        button.setMinimumHeight(SIDEBAR_BUTTON_MIN_HEIGHT)
 
         # Set text from translation
         button.setText(self.i18n.t(item.text_key))

@@ -19,7 +19,7 @@ import logging
 from typing import Any, Dict, Optional
 
 import psutil
-from PySide6.QtCore import QObject, QTimer, Signal
+from core.qt_imports import QObject, QTimer, Signal
 
 logger = logging.getLogger(__name__)
 

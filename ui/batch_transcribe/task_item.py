@@ -22,31 +22,38 @@ Displays individual transcription task information and controls.
 import logging
 from typing import Any, Dict, Optional
 
-# Import base widget
-from ui.base_widgets import BaseWidget, create_hbox
-from ui.constants import TASK_ITEM_MIN_HEIGHT
-from ui.qt_imports import (
-    QAction,
+from core.qt_imports import (
     QHBoxLayout,
     QLabel,
-    QMenu,
     QProgressBar,
     QPushButton,
+    Qt,
     QVBoxLayout,
     QWidget,
     Signal,
+)
+
+# Import base widget
+from ui.base_widgets import BaseWidget, create_hbox
+from ui.constants import (
+    ROLE_TASK_ACTION_CANCEL,
+    ROLE_TASK_ACTION_DELETE,
+    ROLE_TASK_ACTION_EXPORT,
+    ROLE_TASK_ACTION_PAUSE,
+    ROLE_TASK_ACTION_RETRY,
+    ROLE_TASK_ACTION_START,
+    ROLE_TASK_ACTION_VIEW,
+    ROLE_TASK_ERROR,
+    ROLE_TASK_FILENAME,
+    ROLE_TASK_INFO,
+    ROLE_TASK_ITEM,
+    ROLE_TASK_STATUS,
+    TASK_ITEM_MIN_HEIGHT,
 )
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.batch_transcribe.task_item")
 
-TASK_ACTION_ROLE_START = "task-action-start"
-TASK_ACTION_ROLE_PAUSE = "task-action-pause"
-TASK_ACTION_ROLE_CANCEL = "task-action-cancel"
-TASK_ACTION_ROLE_DELETE = "task-action-delete"
-TASK_ACTION_ROLE_VIEW = "task-action-view"
-TASK_ACTION_ROLE_EXPORT = "task-action-export"
-TASK_ACTION_ROLE_RETRY = "task-action-retry"
 
 
 class TaskItem(BaseWidget):
@@ -100,12 +107,12 @@ class TaskItem(BaseWidget):
         layout = QVBoxLayout(self)
 
         # Set semantic properties for theming
-        self.setProperty("role", "task-item")
+        self.setProperty("role", ROLE_TASK_ITEM)
 
         # Create filename and status labels
         self.filename_label = QLabel()
         self.filename_label.setObjectName("filename_label")
-        self.filename_label.setProperty("role", "task-filename")
+        self.filename_label.setProperty("role", ROLE_TASK_FILENAME)
 
         self.status_label = QLabel()
 
@@ -119,7 +126,7 @@ class TaskItem(BaseWidget):
         # Create info label and row
         self.info_label = QLabel()
         self.info_label.setObjectName("info_label")
-        self.info_label.setProperty("role", "task-info")
+        self.info_label.setProperty("role", ROLE_TASK_INFO)
 
         info_layout = create_hbox(spacing=15)
         info_layout.addWidget(self.info_label)
@@ -138,7 +145,7 @@ class TaskItem(BaseWidget):
 
         # Error message (only shown when failed)
         error_label = QLabel()
-        error_label.setProperty("role", "task-error")
+        error_label.setProperty("role", ROLE_TASK_ERROR)
         error_label.setWordWrap(True)
         error_label.setVisible(False)
         layout.addWidget(error_label)
@@ -149,34 +156,34 @@ class TaskItem(BaseWidget):
 
         # Create action buttons
         self.start_btn = QPushButton()
-        self.start_btn.setProperty("role", TASK_ACTION_ROLE_START)
+        self.start_btn.setProperty("role", ROLE_TASK_ACTION_START)
         actions_layout.addWidget(self.start_btn)
 
         self.pause_btn = QPushButton()
-        self.pause_btn.setProperty("role", TASK_ACTION_ROLE_PAUSE)
+        self.pause_btn.setProperty("role", ROLE_TASK_ACTION_PAUSE)
         self.pause_btn.setVisible(False)
         actions_layout.addWidget(self.pause_btn)
 
         self.cancel_btn = QPushButton()
-        self.cancel_btn.setProperty("role", TASK_ACTION_ROLE_CANCEL)
+        self.cancel_btn.setProperty("role", ROLE_TASK_ACTION_CANCEL)
         actions_layout.addWidget(self.cancel_btn)
 
         self.delete_btn = QPushButton()
-        self.delete_btn.setProperty("role", TASK_ACTION_ROLE_DELETE)
+        self.delete_btn.setProperty("role", ROLE_TASK_ACTION_DELETE)
         actions_layout.addWidget(self.delete_btn)
 
         self.view_btn = QPushButton()
-        self.view_btn.setProperty("role", TASK_ACTION_ROLE_VIEW)
+        self.view_btn.setProperty("role", ROLE_TASK_ACTION_VIEW)
         self.view_btn.setVisible(False)
         actions_layout.addWidget(self.view_btn)
 
         self.export_btn = QPushButton()
-        self.export_btn.setProperty("role", TASK_ACTION_ROLE_EXPORT)
+        self.export_btn.setProperty("role", ROLE_TASK_ACTION_EXPORT)
         self.export_btn.setVisible(False)
         actions_layout.addWidget(self.export_btn)
 
         self.retry_btn = QPushButton()
-        self.retry_btn.setProperty("role", TASK_ACTION_ROLE_RETRY)
+        self.retry_btn.setProperty("role", ROLE_TASK_ACTION_RETRY)
         self.retry_btn.setVisible(False)
         actions_layout.addWidget(self.retry_btn)
 
@@ -238,7 +245,7 @@ class TaskItem(BaseWidget):
 
     def sizeHint(self):
         """Return the recommended size for this widget."""
-        from PySide6.QtCore import QSize
+        from core.qt_imports import QSize
 
         # Return a fixed size to ensure consistent layout
         return QSize(800, 150)
@@ -286,7 +293,7 @@ class TaskItem(BaseWidget):
         status_text = self.i18n.t(status_key)
 
         # Set semantic properties for theming
-        self.status_label.setProperty("role", "task-status")
+        self.status_label.setProperty("role", ROLE_TASK_STATUS)
 
         if status == "pending":
             self.status_label.setProperty("state", "pending")

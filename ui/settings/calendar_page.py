@@ -22,13 +22,13 @@ Provides UI for managing external calendar account connections.
 import logging
 from typing import Any, Dict, Tuple
 
-from ui.qt_imports import (
-    QCheckBox,
-    QFormLayout,
-    QGroupBox,
+from core.qt_imports import (
+    QAction,
+    QHBoxLayout,
     QLabel,
     QListWidget,
     QListWidgetItem,
+    QMenu,
     QMessageBox,
     QProgressBar,
     QPushButton,
@@ -40,7 +40,7 @@ from ui.qt_imports import (
     Slot,
 )
 from ui.base_widgets import create_button, create_hbox
-from ui.constants import CALENDAR_ACCOUNTS_LIST_MIN_HEIGHT
+from ui.constants import CALENDAR_ACCOUNTS_LIST_MIN_HEIGHT, ROLE_DESCRIPTION
 from ui.settings.base_page import BaseSettingsPage
 from utils.i18n import I18nQtManager
 
@@ -77,7 +77,7 @@ class CalendarSettingsPage(BaseSettingsPage):
         # Description
         self.desc_label = QLabel(self.i18n.t("settings.calendar.accounts_description"))
         self.desc_label.setWordWrap(True)
-        self.desc_label.setProperty("role", "description")
+        self.desc_label.setProperty("role", ROLE_DESCRIPTION)
         self.content_layout.addWidget(self.desc_label)
 
         self.add_spacing()
@@ -118,7 +118,7 @@ class CalendarSettingsPage(BaseSettingsPage):
         # Sync interval (this would be implemented if needed)
         self.sync_info = QLabel(self.i18n.t("settings.calendar.sync_info"))
         self.sync_info.setWordWrap(True)
-        self.sync_info.setProperty("role", "description")
+        self.sync_info.setProperty("role", ROLE_DESCRIPTION)
         self.content_layout.addWidget(self.sync_info)
 
         # Add stretch at the end

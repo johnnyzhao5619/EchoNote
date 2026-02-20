@@ -32,7 +32,7 @@ from ui.constants import (
     SEARCH_INPUT_MIN_WIDTH,
     SEARCH_MATCH_LABEL_MIN_WIDTH,
 )
-from ui.qt_imports import (
+from core.qt_imports import (
     QCheckBox,
     QColor,
     QHBoxLayout,
@@ -43,6 +43,7 @@ from ui.qt_imports import (
     QTextDocument,
     QTextEdit,
     QTimer,
+    QVBoxLayout,
     QWidget,
     Signal,
 )

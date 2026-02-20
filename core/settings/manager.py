@@ -25,7 +25,7 @@ import logging
 from collections.abc import Mapping
 from typing import Any, Dict, Optional
 
-from PySide6.QtCore import QObject, Signal
+from core.qt_imports import QObject, Signal
 
 from utils.i18n import get_translation_codes
 

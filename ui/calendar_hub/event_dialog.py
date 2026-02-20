@@ -23,19 +23,26 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, Optional
 
-from ui.qt_imports import (
+from core.qt_imports import (
     QCheckBox,
     QComboBox,
     QDate,
     QDateTime,
     QDateTimeEdit,
     QDialog,
+    QFileDialog,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
+    QLabel,
     QLineEdit,
     QLocale,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    Qt,
     QTextEdit,
+    QTime,
     QVBoxLayout,
     QWidget,
     Signal,
@@ -52,6 +59,9 @@ from ui.constants import (
     CALENDAR_EVENT_DESCRIPTION_MAX_HEIGHT,
     CALENDAR_EVENT_DIALOG_MIN_WIDTH,
     PAGE_COMPACT_SPACING,
+    ROLE_DANGER,
+    ROLE_EVENT_DESCRIPTION,
+    ROLE_EVENT_META,
 )
 from utils.i18n import I18nQtManager
 from utils.time_utils import to_local_datetime, to_utc_iso
@@ -170,8 +180,9 @@ class EventDialog(QDialog):
         self.start_time_input.setCalendarPopup(True)
         self.start_time_input.setDateTime(QDateTime.currentDateTime())
 
-        # Use system locale for display format
-        locale = QLocale.system()
+        # Use application locale for display format
+        current_lang = self.i18n.current_language if hasattr(self.i18n, "current_language") else None
+        locale = QLocale(current_lang) if current_lang else QLocale.system()
         self.start_time_input.setLocale(locale)
         self.start_time_input.setDisplayFormat(
             locale.dateTimeFormat(QLocale.FormatType.ShortFormat)
@@ -186,8 +197,6 @@ class EventDialog(QDialog):
         default_end = QDateTime.currentDateTime().addSecs(3600)
         self.end_time_input.setDateTime(default_end)
 
-        # Use system locale for display format
-        locale = QLocale.system()
         self.end_time_input.setLocale(locale)
         self.end_time_input.setDisplayFormat(locale.dateTimeFormat(QLocale.FormatType.ShortFormat))
         form.addRow(self.i18n.t("calendar_hub.event_dialog.end_time_label"), self.end_time_input)
@@ -263,14 +272,9 @@ class EventDialog(QDialog):
 
         self.target_lang_combo = QComboBox()
         self.target_lang_combo.setEnabled(False)
-        self.LANGUAGE_OPTIONS = [
-            ("zh", "realtime_record.available_languages.zh"),
-            ("en", "realtime_record.available_languages.en"),
-            ("fr", "realtime_record.available_languages.fr"),
-            ("ja", "realtime_record.available_languages.ja"),
-            ("ko", "realtime_record.available_languages.ko"),
-        ]
-        for code, label_key in self.LANGUAGE_OPTIONS:
+
+        from utils.i18n import LANGUAGE_OPTION_KEYS
+        for code, label_key in LANGUAGE_OPTION_KEYS:
             self.target_lang_combo.addItem(self.i18n.t(label_key), code)
 
         trans_layout.addWidget(self.target_lang_combo)
@@ -280,7 +284,7 @@ class EventDialog(QDialog):
             self.translation_container.hide()
 
         form.addRow(
-            self.i18n.t("batch_transcribe.translation", default="Translation"),
+            self.i18n.t("realtime_record.translation", default="Translation"),
             self.translation_container,
         )
 
@@ -328,7 +332,7 @@ class EventDialog(QDialog):
         if self.is_edit_mode:
             delete_btn = create_button(self.i18n.t("common.delete"))
             delete_btn.setProperty("variant", "danger")
-            delete_btn.setProperty("role", "danger")
+            delete_btn.setProperty("role", ROLE_DANGER)
             connect_button_with_callback(delete_btn, self._on_delete_clicked)
             buttons_layout.addWidget(delete_btn)
 
@@ -536,8 +540,8 @@ class EventDialog(QDialog):
         data = {
             "title": self.title_input.text().strip(),
             "event_type": event_type,
-            "start_time": to_utc_iso(self.start_time_input.dateTime()),
-            "end_time": to_utc_iso(self.end_time_input.dateTime()),
+            "start_time": to_local_datetime(self.start_time_input.dateTime()),
+            "end_time": to_local_datetime(self.end_time_input.dateTime()),
             "location": self.location_input.text().strip() or None,
             "attendees": attendees if attendees else None,
             "description": self.description_input.toPlainText().strip() or None,
@@ -571,7 +575,7 @@ class EventDialog(QDialog):
             title: Dialog title
             message: Warning message
         """
-        from PySide6.QtWidgets import QMessageBox
+        from core.qt_imports import QMessageBox
 
         msg_box = QMessageBox(self)
         msg_box.setIcon(QMessageBox.Icon.Warning)

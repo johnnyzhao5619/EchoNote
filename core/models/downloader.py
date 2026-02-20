@@ -24,7 +24,7 @@ from threading import Event, Lock
 from typing import Dict, List, Optional, Tuple
 
 import requests
-from PySide6.QtCore import QObject, Signal
+from core.qt_imports import QObject, QTimer, Signal, Slot
 
 from .registry import ModelInfo
 

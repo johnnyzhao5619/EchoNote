@@ -34,8 +34,9 @@ from ui.batch_transcribe.task_item import TaskItem
 from ui.constants import (
     BATCH_SELECTOR_MIN_WIDTH,
     PAGE_COMPACT_SPACING,
+    ROLE_TOOLBAR_SECONDARY_ACTION,
 )
-from ui.qt_imports import (
+from core.qt_imports import (
     QComboBox,
     QFileDialog,
     QFrame,
@@ -81,6 +82,7 @@ class BatchTranscribeWidget(BaseWidget):
         i18n: I18nQtManager,
         model_manager=None,
         parent: Optional[QWidget] = None,
+        allow_deferred_load: bool = True,
     ):
         """
         Initialize batch transcribe widget.
@@ -120,7 +122,10 @@ class BatchTranscribeWidget(BaseWidget):
         self.manager_event.connect(self._handle_manager_event)
 
         # Initial load of tasks and models (delayed to avoid startup crash on macOS)
-        QTimer.singleShot(50, self._initial_load)
+        if allow_deferred_load:
+            QTimer.singleShot(50, self._initial_load)
+        else:
+            self._initial_load()
 
         logger.info(self.i18n.t("logging.batch_transcribe.widget_initialized"))
 
@@ -208,7 +213,7 @@ class BatchTranscribeWidget(BaseWidget):
     ) -> QPushButton:
         """Create and append a standard toolbar action button."""
         button = QPushButton()
-        button.setProperty("role", "toolbar-secondary-action")
+        button.setProperty("role", ROLE_TOOLBAR_SECONDARY_ACTION)
         connect_button_with_callback(button, callback)
         toolbar_layout.addWidget(button)
         return button
@@ -810,7 +815,7 @@ class BatchTranscribeWidget(BaseWidget):
 
             # 1. Register listener (deferred to ensure main loop is ready)
             if self.transcription_manager:
-                self.transcription_manager.add_listener(self._on_manager_event)
+                self.transcription_manager.add_listener(self._on_manager_event_threadsafe)
 
             # 2. Populate models
             if self.model_manager:
@@ -823,7 +828,7 @@ class BatchTranscribeWidget(BaseWidget):
         except Exception as e:
             logger.error(f"Error during initial load: {e}")
 
-    def _on_manager_event(self, event_type: str, data: Dict):
+    def _on_manager_event_threadsafe(self, event_type: str, data: Dict):
         """
         Handle events from transcription manager (thread-safe bridge).
 

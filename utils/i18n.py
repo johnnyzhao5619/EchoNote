@@ -29,8 +29,7 @@ from string import Template
 from typing import Any, Dict, List, Union
 
 try:
-    from PySide6.QtCore import QObject, Signal
-
+    from core.qt_imports import QObject, Signal
     QT_AVAILABLE = True
 except ImportError:
     QT_AVAILABLE = False
@@ -59,6 +58,8 @@ LANGUAGE_LABEL_KEYS = {
     "en_US": "settings.language.english",
     "zh_CN": "settings.language.chinese",
     "fr_FR": "settings.language.french",
+    "ja_JP": "settings.language.japanese",
+    "ko_KR": "settings.language.korean",
 }
 
 

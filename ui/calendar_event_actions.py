@@ -26,7 +26,7 @@ from typing import Any, Callable, Optional
 
 from core.calendar.exceptions import SyncError
 from data.database.models import EventAttachment
-from ui.qt_imports import QFileDialog, QMessageBox
+from core.qt_imports import QFileDialog, QMessageBox
 
 logger = logging.getLogger("echonote.ui.calendar_event_actions")
 

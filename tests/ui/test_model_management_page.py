@@ -55,8 +55,17 @@ def model_manager():
         download_completed=_make_signal_stub(),
         download_cancelled=_make_signal_stub(),
         download_failed=_make_signal_stub(),
+        is_downloading=Mock(return_value=False),
+    )
+    manager.translation_downloader = SimpleNamespace(
+        download_progress=_make_signal_stub(),
+        download_completed=_make_signal_stub(),
+        download_cancelled=_make_signal_stub(),
+        download_failed=_make_signal_stub(),
+        is_downloading=Mock(return_value=False),
     )
     manager.get_all_models = Mock(return_value=[downloaded, available])
+    manager.get_all_translation_models = Mock(return_value=[])
     manager.get_model = Mock(side_effect=lambda name: mapping.get(name))
     manager.recommend_model = Mock(return_value="base")
     manager.is_model_in_use = Mock(return_value=False)

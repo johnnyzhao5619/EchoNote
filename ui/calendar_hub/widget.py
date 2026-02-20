@@ -26,7 +26,7 @@ from datetime import datetime
 from typing import Any, Dict, Optional, Tuple
 from urllib.parse import urlparse
 
-from ui.qt_imports import (
+from core.qt_imports import (
     QButtonGroup,
     QDate,
     QDialog,
@@ -50,14 +50,26 @@ from ui.base_widgets import (
     BaseWidget,
     connect_button_with_callback,
     create_button,
+    create_danger_button,
     create_hbox,
     create_primary_button,
     create_vbox,
 )
 from ui.constants import (
     CALENDAR_ADD_ACCOUNT_DIALOG_MIN_WIDTH,
+    NAV_SYMBOL_NEXT,
+    NAV_SYMBOL_PREV,
     PAGE_COMPACT_SPACING,
     PAGE_DENSE_SPACING,
+    PAGE_LAYOUT_SPACING,
+    ROLE_CALENDAR_NAV_ACTION,
+    ROLE_CALENDAR_PRIMARY_ACTION,
+    ROLE_CALENDAR_UTILITY_ACTION,
+    ROLE_CALENDAR_VIEW_TOGGLE,
+    ROLE_SYNC_STATUS,
+    ROLE_ACCOUNT_BADGE,
+    ROLE_ACCOUNT_DISCONNECT,
+    ROLE_CALENDAR_INDICATOR,
     STATUS_INDICATOR_SYMBOL,
     ZERO_MARGINS,
 )
@@ -170,19 +182,19 @@ class CalendarHubWidget(BaseWidget):
 
         self.month_btn = create_button(self.i18n.t("calendar_hub.view_month"))
         self.month_btn.setCheckable(True)
-        self.month_btn.setProperty("role", "calendar-view-toggle")
+        self.month_btn.setProperty("role", ROLE_CALENDAR_VIEW_TOGGLE)
         view_group.addButton(self.month_btn)
 
         self.week_btn = create_button(self.i18n.t("calendar_hub.view_week"))
         self.week_btn.setCheckable(True)
         self.week_btn.setChecked(self.current_view == "week")
-        self.week_btn.setProperty("role", "calendar-view-toggle")
+        self.week_btn.setProperty("role", ROLE_CALENDAR_VIEW_TOGGLE)
         view_group.addButton(self.week_btn)
 
         self.day_btn = create_button(self.i18n.t("calendar_hub.view_day"))
         self.day_btn.setCheckable(True)
         self.day_btn.setChecked(self.current_view == "day")
-        self.day_btn.setProperty("role", "calendar-view-toggle")
+        self.day_btn.setProperty("role", ROLE_CALENDAR_VIEW_TOGGLE)
         view_group.addButton(self.day_btn)
 
         self.month_btn.setChecked(self.current_view == "month")
@@ -199,14 +211,14 @@ class CalendarHubWidget(BaseWidget):
         toolbar_layout.addSpacing(PAGE_COMPACT_SPACING)
 
         # Date navigation
-        self.prev_btn = create_button("<")
-        self.prev_btn.setProperty("role", "calendar-nav-action")
+        self.prev_btn = create_button(NAV_SYMBOL_PREV)
+        self.prev_btn.setProperty("role", ROLE_CALENDAR_NAV_ACTION)
         self.prev_btn.setToolTip(self.i18n.t("calendar_hub.widget.previous"))
         self.today_btn = create_button(self.i18n.t("calendar_hub.today"))
-        self.today_btn.setProperty("role", "calendar-nav-action")
+        self.today_btn.setProperty("role", ROLE_CALENDAR_NAV_ACTION)
 
-        self.next_btn = create_button(">")
-        self.next_btn.setProperty("role", "calendar-nav-action")
+        self.next_btn = create_button(NAV_SYMBOL_NEXT)
+        self.next_btn.setProperty("role", ROLE_CALENDAR_NAV_ACTION)
         self.next_btn.setToolTip(self.i18n.t("calendar_hub.widget.next"))
 
         # Connect navigation buttons using helper
@@ -229,7 +241,7 @@ class CalendarHubWidget(BaseWidget):
 
         # Create event button
         self.create_event_btn = create_primary_button(self.i18n.t("calendar_hub.create_event"))
-        self.create_event_btn.setProperty("role", "calendar-primary-action")
+        self.create_event_btn.setProperty("role", ROLE_CALENDAR_PRIMARY_ACTION)
         self.create_event_btn.clicked.connect(lambda: self._show_event_dialog())
         toolbar_layout.addWidget(self.create_event_btn)
 
@@ -262,19 +274,19 @@ class CalendarHubWidget(BaseWidget):
 
         # Sync status label
         self.sync_status_label = QLabel("")
-        self.sync_status_label.setProperty("role", "sync-status")
+        self.sync_status_label.setProperty("role", ROLE_SYNC_STATUS)
         accounts_layout.addWidget(self.sync_status_label)
 
         # Sync now button
         self.sync_now_btn = create_button(self.i18n.t("calendar_hub.sync_now"))
-        self.sync_now_btn.setProperty("role", "calendar-utility-action")
+        self.sync_now_btn.setProperty("role", ROLE_CALENDAR_UTILITY_ACTION)
         self.sync_now_btn.setToolTip(self.i18n.t("calendar_hub.sync_now_tooltip"))
         self.sync_now_btn.clicked.connect(self._on_sync_now_clicked)
         accounts_layout.addWidget(self.sync_now_btn)
 
         # Add account button
         self.add_account_btn = create_button(self.i18n.t("calendar_hub.add_account"))
-        self.add_account_btn.setProperty("role", "calendar-utility-action")
+        self.add_account_btn.setProperty("role", ROLE_CALENDAR_UTILITY_ACTION)
         self.add_account_btn.clicked.connect(self.show_add_account_dialog)
         accounts_layout.addWidget(self.add_account_btn)
 
@@ -682,7 +694,7 @@ class CalendarHubWidget(BaseWidget):
 
     def show_add_account_dialog(self):
         """Show dialog to add external calendar account."""
-        from PySide6.QtWidgets import QDialog, QPushButton, QVBoxLayout
+        from core.qt_imports import QDialog, QPushButton, QVBoxLayout
 
         # Create simple provider selection dialog
         dialog = QDialog(self)
@@ -1157,7 +1169,7 @@ class CalendarHubWidget(BaseWidget):
                     child = layout.itemAt(j).widget()
                     if child and child.objectName() == label_name:
                         child.setText(self._format_account_label(provider, email))
-                    elif child and child.property("role") == "account-disconnect":
+                    elif child and child.property("role") == ROLE_ACCOUNT_DISCONNECT:
                         child.setText(self.i18n.t("common.close"))
                 return
 
@@ -1182,13 +1194,13 @@ class CalendarHubWidget(BaseWidget):
         # Create account badge
         badge = QFrame()
         badge.setObjectName(f"account_badge_{provider}")
-        badge.setProperty("role", "account-badge")
+        badge.setProperty("role", ROLE_ACCOUNT_BADGE)
         badge_layout = QHBoxLayout(badge)
 
         # Status indicator
         indicator = QLabel(STATUS_INDICATOR_SYMBOL)
         indicator.setObjectName(f"indicator_{provider}")
-        indicator.setProperty("role", "calendar-indicator")
+        indicator.setProperty("role", ROLE_CALENDAR_INDICATOR)
         indicator.setProperty("provider", provider)
         badge_layout.addWidget(indicator)
 
@@ -1199,7 +1211,7 @@ class CalendarHubWidget(BaseWidget):
 
         # Disconnect button
         disconnect_btn = create_button(self.i18n.t("common.close"))
-        disconnect_btn.setProperty("role", "account-disconnect")
+        disconnect_btn.setProperty("role", ROLE_ACCOUNT_DISCONNECT)
         disconnect_btn.clicked.connect(lambda: self.disconnect_account(provider))
         badge_layout.addWidget(disconnect_btn)
 

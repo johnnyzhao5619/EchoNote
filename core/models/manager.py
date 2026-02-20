@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional, Set
 
 import psutil
-from PySide6.QtCore import QCoreApplication, QObject, QTimer, Signal
+from core.qt_imports import QCoreApplication, QObject, QTimer, Signal
 
 from config.app_config import ConfigManager, get_app_dir
 from core.models.downloader import ModelDownloader

@@ -447,6 +447,7 @@
     "save_error_details": "Échec de l'enregistrement : {error}",
     "save_retry": "Réessayer",
     "export": "Exporter",
+    "export_dialog_title": "Exporter la transcription",
     "export_txt": "Exporter en TXT",
     "export_srt": "Exporter en SRT",
     "export_md": "Exporter en Markdown",

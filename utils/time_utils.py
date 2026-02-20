@@ -19,7 +19,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from PySide6.QtCore import QDateTime, QLocale, Qt
+from core.qt_imports import QDate, QDateTime, QLocale, QTime, Qt
 
 logger = logging.getLogger("echonote.utils.time_utils")
 
@@ -71,21 +71,17 @@ def to_utc_iso(value: Any) -> str:
             dt = to_python()
         else:
             # Fallback for some environments
-            qd = value.date()
-            qt = value.time()
-            dt = datetime(qd.year(), qd.month(), qd.day(), qt.hour(), qt.minute(), qt.second())
-            if value.timeSpec() == Qt.TimeSpec.UTC:
-                dt = dt.replace(tzinfo=timezone.utc)
+            # QDateTime.toPython() returns a naive datetime if the QDateTime is local,
+            # or an aware datetime if the QDateTime is UTC.
+            # We can simplify the logic by letting astimezone(timezone.utc) handle it.
+            dt = value.toPython()
     else:
         logger.warning("Unsupported type for to_utc_iso: %s", type(value))
         return str(value)
 
     if dt:
-        if dt.tzinfo is None:
-            # Assume naive is local time unless it's explicitly UTC
-            dt = dt.astimezone(timezone.utc)
-        else:
-            dt = dt.astimezone(timezone.utc)
+        # Simplify: astimezone(timezone.utc) handles naive (as local) and aware correctly
+        dt = dt.astimezone(timezone.utc)
         return dt.isoformat().replace("+00:00", "Z")
 
     return str(value)
@@ -112,10 +108,6 @@ def to_local_datetime(value: Any) -> datetime:
     else:
         return datetime.now()
 
-    if dt.tzinfo is None:
-        # Naive: assume it's already local or make it local
-        return dt.astimezone()
-
     return dt.astimezone()
 
 
@@ -124,15 +116,17 @@ def format_localized_datetime(
     format_type: QLocale.FormatType = QLocale.FormatType.ShortFormat,
     include_date: bool = True,
     include_time: bool = True,
+    i18n_manager: Optional[Any] = None,
 ) -> str:
     """
-    Format a datetime-like value into a localized string using system locale.
+    Format a datetime-like value into a localized string.
 
     Args:
         value: datetime, QDateTime, or ISO string.
         format_type: QLocale format type (ShortFormat, LongFormat, etc.)
         include_date: Whether to include the date.
         include_time: Whether to include the time.
+        i18n_manager: Optional I18nManager to use its current language.
 
     Returns:
         Localized string.
@@ -140,7 +134,12 @@ def format_localized_datetime(
     try:
         dt_local = to_local_datetime(value)
         qdt = QDateTime(dt_local)
-        locale = QLocale.system()
+
+        # Use i18n_manager to determine the locale, fallback to system locale
+        if i18n_manager and hasattr(i18n_manager, "current_language"):
+            locale = QLocale(i18n_manager.current_language)
+        else:
+            locale = QLocale.system()
 
         if include_date and include_time:
             return locale.toString(qdt, format_type)

@@ -147,10 +147,7 @@ def initialize_database(config, security_manager):
     # Check if schema needs initialization
     schema_version = db.get_version()
     if schema_version == 0:
-        logger.info("Initializing database schema...")
         db.initialize_schema()
-        db.set_version(1)
-        logger.info("Database schema initialized")
     else:
         logger.info(f"Database schema version: {schema_version}")
 

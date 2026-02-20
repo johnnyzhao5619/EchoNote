@@ -112,10 +112,6 @@ class TranscriptionTask:
                 output_path, error_message, created_at, started_at, completed_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
-        self.created_at = to_utc_iso(self.created_at)
-        self.started_at = to_utc_iso(self.started_at)
-        self.completed_at = to_utc_iso(self.completed_at)
-
         params = (
             self.id,
             self.file_path,
@@ -129,9 +125,9 @@ class TranscriptionTask:
             self.output_format,
             self.output_path,
             self.error_message,
-            self.created_at,
-            self.started_at,
-            self.completed_at,
+            to_utc_iso(self.created_at),
+            to_utc_iso(self.started_at),
+            to_utc_iso(self.completed_at),
         )
         db_connection.execute(query, params, commit=True)
         logger.debug(f"Saved transcription task: {self.id}")
@@ -236,25 +232,10 @@ class CalendarEvent:
         """Save or update event in database."""
         self.updated_at = current_iso_timestamp()
 
-        self.start_time = to_utc_iso(self.start_time)
-        self.end_time = to_utc_iso(self.end_time)
-        self.created_at = to_utc_iso(self.created_at)
-        self.updated_at = to_utc_iso(self.updated_at)
-
-        attendees_value = self.attendees
-        if attendees_value is None:
-            attendees_value = []
-        elif isinstance(attendees_value, (set, tuple)):
-            attendees_value = list(attendees_value)
-        elif not isinstance(attendees_value, list):
-            attendees_value = [attendees_value]
-
-        self.attendees = attendees_value
-
+        attendees_json = json.dumps(self.attendees if isinstance(self.attendees, list) else [])
         reminder_use_default_value = (
             None if self.reminder_use_default is None else int(self.reminder_use_default)
         )
-        attendees_json = json.dumps(self.attendees)
 
         query = """
             INSERT INTO calendar_events (
@@ -284,8 +265,8 @@ class CalendarEvent:
             self.id,
             self.title,
             self.event_type,
-            self.start_time,
-            self.end_time,
+            to_utc_iso(self.start_time),
+            to_utc_iso(self.end_time),
             self.location,
             attendees_json,
             self.description,
@@ -295,8 +276,8 @@ class CalendarEvent:
             self.source,
             self.external_id,
             int(self.is_readonly),
-            self.created_at,
-            self.updated_at,
+            to_utc_iso(self.created_at),
+            to_utc_iso(self.updated_at),
         )
         db_connection.execute(query, params, commit=True)
         logger.debug(f"Saved calendar event: {self.id}")
@@ -596,7 +577,7 @@ class EventAttachment:
         attachment_conditions = ["attachment_type IN ('transcript', 'translation')"]
         attachment_params: List[Any] = []
 
-        subquery = "SELECT DISTINCT event_id FROM event_attachments " "WHERE " + " AND ".join(
+        subquery = "SELECT DISTINCT event_id FROM event_attachments WHERE " + " AND ".join(
             attachment_conditions
         )
 
@@ -677,7 +658,6 @@ class AutoTaskConfig:
 
     def save(self, db_connection):
         """Save configuration in database."""
-        self.created_at = to_utc_iso(self.created_at)
         query = """
             INSERT OR REPLACE INTO auto_task_configs (
                 id, event_id, enable_transcription, enable_recording,
@@ -693,7 +673,7 @@ class AutoTaskConfig:
             self.transcription_language,
             int(self.enable_translation),
             self.translation_target_language,
-            self.created_at,
+            to_utc_iso(self.created_at),
         )
         db_connection.execute(query, params, commit=True)
         logger.debug(f"Saved auto task config: {self.id}")
@@ -912,8 +892,6 @@ class ModelUsageStats:
 
     def save(self, db_connection):
         """Save or update model usage stats in database."""
-        self.updated_at = current_iso_timestamp()
-
         query = """
             INSERT OR REPLACE INTO model_usage_stats (
                 id, model_name, usage_count, last_used,
@@ -924,10 +902,10 @@ class ModelUsageStats:
             self.id,
             self.model_name,
             self.usage_count,
-            self.last_used,
+            to_utc_iso(self.last_used),
             self.total_transcription_duration,
-            self.created_at,
-            self.updated_at,
+            to_utc_iso(self.created_at),
+            to_utc_iso(current_iso_timestamp()),
         )
         db_connection.execute(query, params, commit=True)
         logger.debug(f"Saved model usage stats: {self.model_name}")

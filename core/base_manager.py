@@ -23,7 +23,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 
-from PySide6.QtCore import QObject
+from core.qt_imports import QObject
 
 
 class BaseManager(QObject, ABC):

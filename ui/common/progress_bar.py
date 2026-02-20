@@ -22,8 +22,8 @@ Provides a customizable progress bar with percentage display.
 import logging
 from typing import Optional
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QLabel, QProgressBar, QVBoxLayout, QWidget
+from core.qt_imports import Qt, Signal
+from core.qt_imports import QLabel, QProgressBar, QVBoxLayout, QWidget
 
 from ui.base_widgets import BaseWidget, create_hbox
 from ui.constants import ZERO_MARGINS

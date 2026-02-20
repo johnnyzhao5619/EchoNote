@@ -22,16 +22,20 @@ Provides UI for configuring batch transcription settings.
 import logging
 from pathlib import Path
 from typing import Any, Dict, Tuple
-from ui.qt_imports import (
+from core.qt_imports import (
+    QCheckBox,
     QComboBox,
     QFileDialog,
     QFormLayout,
     QGroupBox,
+    QHBoxLayout,
     QLabel,
     QLineEdit,
     QPushButton,
     QSpinBox,
     QVBoxLayout,
+    QWidget,
+    Signal,
 )
 
 from config.constants import (
@@ -39,13 +43,23 @@ from config.constants import (
     ENGINE_FASTER_WHISPER,
     ENGINE_GOOGLE,
     ENGINE_OPENAI,
-    STANDARD_LABEL_WIDTH,
     SUPPORTED_COMPUTE_TYPES,
     SUPPORTED_TRANSCRIPTION_ENGINES,
     SUPPORTED_TRANSCRIPTION_FORMATS,
 )
 from core.models.registry import get_default_model_names
 from ui.base_widgets import create_button, create_hbox, create_vbox
+from ui.constants import (
+    ROLE_AUTO_START_DESC,
+    ROLE_DEVICE_INFO,
+    ROLE_FFMPEG_STATUS,
+    ROLE_SETTINGS_CONFIG_GROUP,
+    ROLE_SETTINGS_CONFIG_GROUP_NESTED,
+    ROLE_SETTINGS_INLINE_ACTION,
+    ROLE_TIME_DISPLAY,
+    ROLE_USAGE_STATS,
+    STANDARD_LABEL_WIDTH,
+)
 from ui.settings.base_page import BaseSettingsPage, PostSaveMessage
 from utils.i18n import I18nQtManager
 from utils.time_utils import now_local
@@ -132,13 +146,13 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         self.ffmpeg_status_text = QLabel()
         if ffmpeg_checker.is_ffmpeg_available() and ffmpeg_checker.is_ffprobe_available():
             self.ffmpeg_status_text.setText(self.i18n.t("settings.transcription.ffmpeg_installed"))
-            self.ffmpeg_status_text.setProperty("role", "ffmpeg-status")
+            self.ffmpeg_status_text.setProperty("role", ROLE_FFMPEG_STATUS)
             self.ffmpeg_status_text.setProperty("state", "success")
         else:
             self.ffmpeg_status_text.setText(
                 self.i18n.t("settings.transcription.ffmpeg_not_installed")
             )
-            self.ffmpeg_status_text.setProperty("role", "ffmpeg-status")
+            self.ffmpeg_status_text.setProperty("role", ROLE_FFMPEG_STATUS)
             self.ffmpeg_status_text.setProperty("state", "missing")
 
         ffmpeg_status_layout.addWidget(self.ffmpeg_status_label)
@@ -148,7 +162,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         self.ffmpeg_install_btn = create_button(
             self.i18n.t("settings.transcription.ffmpeg_view_guide")
         )
-        self.ffmpeg_install_btn.setProperty("role", "settings-inline-action")
+        self.ffmpeg_install_btn.setProperty("role", ROLE_SETTINGS_INLINE_ACTION)
         self.ffmpeg_install_btn.clicked.connect(self._on_show_ffmpeg_guide)
         ffmpeg_status_layout.addWidget(self.ffmpeg_install_btn)
 
@@ -158,7 +172,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         # FFmpeg info
         self.ffmpeg_info = QLabel(self.i18n.t("settings.transcription.ffmpeg_info"))
         self.ffmpeg_info.setWordWrap(True)
-        self.ffmpeg_info.setProperty("role", "device-info")
+        self.ffmpeg_info.setProperty("role", ROLE_DEVICE_INFO)
         self.content_layout.addWidget(self.ffmpeg_info)
 
         self.add_section_spacing()
@@ -170,7 +184,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         self.path_edit = QLineEdit()
         self.path_edit.textChanged.connect(self._emit_changed)
         self.browse_button = create_button(self.i18n.t("settings.transcription.browse"))
-        self.browse_button.setProperty("role", "settings-inline-action")
+        self.browse_button.setProperty("role", ROLE_SETTINGS_INLINE_ACTION)
         self.browse_button.clicked.connect(self._on_browse_clicked)
         path_layout.addWidget(self.path_label)
         path_layout.addWidget(self.path_edit, stretch=1)
@@ -204,7 +218,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         """Create engine-specific configuration sections."""
         # Faster-Whisper configuration
         self.whisper_group = QGroupBox(self.i18n.t("settings.transcription.whisper_config"))
-        self.whisper_group.setProperty("role", "settings-config-group")
+        self.whisper_group.setProperty("role", ROLE_SETTINGS_CONFIG_GROUP)
         whisper_layout = QFormLayout()
 
         # Model size
@@ -224,7 +238,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         device_layout = create_vbox()
         device_layout.addWidget(self.device_combo)
         self.device_info_label = QLabel()
-        self.device_info_label.setProperty("role", "device-info")
+        self.device_info_label.setProperty("role", ROLE_DEVICE_INFO)
         self.device_info_label.setWordWrap(True)
         device_layout.addWidget(self.device_info_label)
 
@@ -245,13 +259,13 @@ class TranscriptionSettingsPage(BaseSettingsPage):
 
         # Cloud engine configuration (will be shown/hidden based on selection)
         self.cloud_group = QGroupBox(self.i18n.t("settings.transcription.cloud_config"))
-        self.cloud_group.setProperty("role", "settings-config-group")
+        self.cloud_group.setProperty("role", ROLE_SETTINGS_CONFIG_GROUP)
         cloud_layout = create_vbox()
 
         # Note about API keys
         self.note_label = QLabel(self.i18n.t("settings.transcription.api_key_note"))
         self.note_label.setWordWrap(True)
-        self.note_label.setProperty("role", "auto-start-desc")
+        self.note_label.setProperty("role", ROLE_AUTO_START_DESC)
         cloud_layout.addWidget(self.note_label)
 
         # API Key configuration section
@@ -263,7 +277,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         self.refresh_usage_button = create_button(
             self.i18n.t("settings.transcription.refresh_usage")
         )
-        self.refresh_usage_button.setProperty("role", "settings-inline-action")
+        self.refresh_usage_button.setProperty("role", ROLE_SETTINGS_INLINE_ACTION)
         self.refresh_usage_button.clicked.connect(self._load_usage_statistics)
         refresh_layout.addWidget(self.refresh_usage_button)
         cloud_layout.addLayout(refresh_layout)
@@ -338,11 +352,11 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         Args:
             parent_layout: Parent layout to add widgets to
         """
-        # Lazy load removed - now at module level via ui.qt_imports
+        # Lazy load removed - now at module level via core.qt_imports
 
         # OpenAI API Key
         self.openai_group = QGroupBox(self.i18n.t("settings.transcription.cloud_api_openai"))
-        self.openai_group.setProperty("role", "settings-config-group-nested")
+        self.openai_group.setProperty("role", ROLE_SETTINGS_CONFIG_GROUP_NESTED)
         openai_layout = QFormLayout()
 
         self.openai_key_edit = QLineEdit()
@@ -375,7 +389,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
 
         # Usage statistics
         self.openai_usage_label = QLabel(self.i18n.t("settings.transcription.no_usage_data"))
-        self.openai_usage_label.setProperty("role", "time-display")
+        self.openai_usage_label.setProperty("role", ROLE_TIME_DISPLAY)
         self.openai_monthly_usage_label = QLabel(
             self.i18n.t("settings.transcription.monthly_usage")
         )
@@ -386,7 +400,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
 
         # Google API Key
         self.google_group = QGroupBox(self.i18n.t("settings.transcription.cloud_api_google"))
-        self.google_group.setProperty("role", "settings-config-group-nested")
+        self.google_group.setProperty("role", ROLE_SETTINGS_CONFIG_GROUP_NESTED)
         google_layout = QFormLayout()
 
         self.google_key_edit = QLineEdit()
@@ -415,7 +429,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         google_layout.addRow(self.google_api_key_label, google_key_layout)
 
         self.google_usage_label = QLabel(self.i18n.t("settings.transcription.no_usage_data"))
-        self.google_usage_label.setProperty("role", "time-display")
+        self.google_usage_label.setProperty("role", ROLE_TIME_DISPLAY)
         self.google_monthly_usage_label = QLabel(
             self.i18n.t("settings.transcription.monthly_usage")
         )
@@ -426,7 +440,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
 
         # Azure API Key
         self.azure_group = QGroupBox(self.i18n.t("settings.transcription.cloud_api_azure"))
-        self.azure_group.setProperty("role", "settings-config-group-nested")
+        self.azure_group.setProperty("role", ROLE_SETTINGS_CONFIG_GROUP_NESTED)
         azure_layout = QFormLayout()
 
         self.azure_key_edit = QLineEdit()
@@ -464,7 +478,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         azure_layout.addRow(self.azure_region_label, self.azure_region_edit)
 
         self.azure_usage_label = QLabel(self.i18n.t("settings.transcription.no_usage_data"))
-        self.azure_usage_label.setProperty("role", "time-display")
+        self.azure_usage_label.setProperty("role", ROLE_TIME_DISPLAY)
         self.azure_monthly_usage_label = QLabel(self.i18n.t("settings.transcription.monthly_usage"))
         azure_layout.addRow(self.azure_monthly_usage_label, self.azure_usage_label)
 
@@ -474,7 +488,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
     def _create_inline_action_button(self, text: str) -> QPushButton:
         """Create compact inline action button with a shared semantic role."""
         button = create_button(text)
-        button.setProperty("role", "settings-inline-action")
+        button.setProperty("role", ROLE_SETTINGS_INLINE_ACTION)
         return button
 
     def _toggle_password_visibility(self, line_edit: QLineEdit, button: QPushButton):
@@ -499,7 +513,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         """
         import asyncio
 
-        from PySide6.QtWidgets import QApplication, QMessageBox
+        from core.qt_imports import QApplication, QMessageBox
 
         # Get API key
         if provider == ENGINE_OPENAI:
@@ -621,10 +635,10 @@ class TranscriptionSettingsPage(BaseSettingsPage):
                         cost=f"{cost:.2f}",
                     )
                     label.setText(usage_text)
-                    label.setProperty("role", "usage-stats")
+                    label.setProperty("role", ROLE_USAGE_STATS)
                 else:
                     label.setText(self.i18n.t("settings.transcription.no_usage_data"))
-                    label.setProperty("role", "time-display")
+                    label.setProperty("role", ROLE_TIME_DISPLAY)
 
             logger.debug("Usage statistics loaded successfully")
 
@@ -718,13 +732,13 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         # Refresh status after dialog closes
         if ffmpeg_checker.is_ffmpeg_available() and ffmpeg_checker.is_ffprobe_available():
             self.ffmpeg_status_text.setText(self.i18n.t("settings.transcription.ffmpeg_installed"))
-            self.ffmpeg_status_text.setProperty("role", "ffmpeg-status")
+            self.ffmpeg_status_text.setProperty("role", ROLE_FFMPEG_STATUS)
             self.ffmpeg_status_text.setProperty("state", "success")
         else:
             self.ffmpeg_status_text.setText(
                 self.i18n.t("settings.transcription.ffmpeg_not_installed")
             )
-            self.ffmpeg_status_text.setProperty("role", "ffmpeg-status")
+            self.ffmpeg_status_text.setProperty("role", ROLE_FFMPEG_STATUS)
             self.ffmpeg_status_text.setProperty("state", "missing")
 
         logger.info(self.i18n.t("logging.settings.transcription_page.showed_ffmpeg_guide"))

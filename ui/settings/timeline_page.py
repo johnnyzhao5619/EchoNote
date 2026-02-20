@@ -22,7 +22,7 @@ Provides UI for configuring timeline view and auto-task settings.
 import logging
 from typing import Tuple
 
-from ui.qt_imports import (
+from core.qt_imports import (
     QCheckBox,
     QComboBox,
     QFormLayout,
@@ -31,13 +31,13 @@ from ui.qt_imports import (
     QVBoxLayout,
 )
 from config.constants import (
-    STANDARD_LABEL_WIDTH,
     TIMELINE_AUTO_STOP_GRACE_MAX_MINUTES,
     TIMELINE_REMINDER_MINUTES_OPTIONS,
     TIMELINE_STOP_CONFIRMATION_DELAY_MAX_MINUTES,
 )
 from ui.base_widgets import create_hbox
 from ui.settings.base_page import BaseSettingsPage
+from ui.constants import ROLE_AUTO_START_DESC, STANDARD_LABEL_WIDTH
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.settings.timeline")
@@ -143,7 +143,7 @@ class TimelineSettingsPage(BaseSettingsPage):
             self.i18n.t("settings.timeline.auto_stop_grace_description")
         )
         self.auto_stop_grace_desc.setWordWrap(True)
-        self.auto_stop_grace_desc.setProperty("role", "auto-start-desc")
+        self.auto_stop_grace_desc.setProperty("role", ROLE_AUTO_START_DESC)
         self.content_layout.addWidget(self.auto_stop_grace_desc)
 
         self.stop_confirmation_delay_spin = QSpinBox()
@@ -161,7 +161,7 @@ class TimelineSettingsPage(BaseSettingsPage):
             self.i18n.t("settings.timeline.stop_confirmation_delay_description")
         )
         self.stop_confirmation_delay_desc.setWordWrap(True)
-        self.stop_confirmation_delay_desc.setProperty("role", "auto-start-desc")
+        self.stop_confirmation_delay_desc.setProperty("role", ROLE_AUTO_START_DESC)
         self.content_layout.addWidget(self.stop_confirmation_delay_desc)
 
         self.add_section_spacing()
@@ -177,7 +177,7 @@ class TimelineSettingsPage(BaseSettingsPage):
         # Description
         self.auto_start_desc = QLabel(self.i18n.t("settings.timeline.auto_start_description"))
         self.auto_start_desc.setWordWrap(True)
-        self.auto_start_desc.setProperty("role", "auto-start-desc")
+        self.auto_start_desc.setProperty("role", ROLE_AUTO_START_DESC)
         self.content_layout.addWidget(self.auto_start_desc)
 
         # Add stretch at the end

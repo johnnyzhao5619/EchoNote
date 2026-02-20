@@ -124,11 +124,18 @@ class FirstRunSetup:
                 return False
 
             # Import here to avoid circular dependencies
-            from PySide6.QtWidgets import (
+            from core.qt_imports import (
+                QApplication,
+                QCheckBox,
+                QComboBox,
                 QDialog,
+                QFont,
                 QHBoxLayout,
                 QLabel,
+                QLineEdit,
+                QMessageBox,
                 QPushButton,
+                Qt,
                 QVBoxLayout,
                 QWidget,
             )
@@ -246,7 +253,7 @@ class FirstRunSetup:
                     f"User chose to download recommended model: " f"{recommended_model_name}"
                 )
                 # Start download in a separate thread with its own event loop
-                from PySide6.QtCore import QRunnable, QThreadPool
+                from core.qt_imports import QRunnable, QThreadPool
 
                 def run_download():
                     """在新线程中运行下载"""
@@ -322,7 +329,10 @@ class FirstRunSetup:
 
             db_encryption_key = security_manager.encryption_key[:32].hex()
             db = DatabaseConnection(str(db_path), encryption_key=db_encryption_key)
-            db.initialize_schema()
+
+            # Unified initialization logic handles versioning
+            if db.get_version() == 0:
+                db.initialize_schema()
 
             encryption_active = db.is_encryption_enabled()
             if not encryption_active:
@@ -619,7 +629,7 @@ class FirstRunWizard:
                     self.status_label.setText(self.i18n.t("wizard.model.downloading"))
 
                     # Start download in thread
-                    from PySide6.QtCore import QRunnable, QThreadPool
+                    from core.qt_imports import QRunnable, QThreadPool
 
                     def run_download():
                         """Run download in thread."""
@@ -627,7 +637,7 @@ class FirstRunWizard:
                         def _on_success():
                             self.download_completed = True
                             # Update UI in main thread
-                            from PySide6.QtCore import QMetaObject, Qt
+                            from core.qt_imports import QMetaObject, Qt
 
                             QMetaObject.invokeMethod(
                                 self, "_on_download_complete", Qt.ConnectionType.QueuedConnection
@@ -635,7 +645,7 @@ class FirstRunWizard:
 
                         def _on_error(exc: Exception):
                             # Update UI in main thread
-                            from PySide6.QtCore import Q_ARG, QMetaObject, Qt
+                            from core.qt_imports import Q_ARG, QMetaObject, Qt
 
                             QMetaObject.invokeMethod(
                                 self,

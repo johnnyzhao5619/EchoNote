@@ -22,9 +22,23 @@ Provides functions for consistent styling, animations, and responsive layouts.
 import logging
 from typing import Optional
 
-from PySide6.QtCore import QEasingCurve, QPropertyAnimation, QSize, Qt, QTimer
-from PySide6.QtGui import QFont
-from PySide6.QtWidgets import QFrame, QGraphicsOpacityEffect, QLabel, QWidget
+from core.qt_imports import (
+    QApplication,
+    QEasingCurve,
+    QFont,
+    QFrame,
+    QGraphicsOpacityEffect,
+    QHBoxLayout,
+    QLabel,
+    QMessageBox,
+    QPropertyAnimation,
+    QPushButton,
+    QSize,
+    Qt,
+    QTimer,
+    QVBoxLayout,
+    QWidget,
+)
 
 logger = logging.getLogger("echonote.utils.ui_helpers")
 
@@ -168,8 +182,6 @@ class UIHelper:
         Returns:
             Empty state widget
         """
-        from PySide6.QtWidgets import QVBoxLayout
-
         widget = QWidget()
         layout = QVBoxLayout(widget)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -211,8 +223,6 @@ class UIHelper:
             base_width: Base width
             base_height: Base height
         """
-        from PySide6.QtWidgets import QApplication
-
         screen = QApplication.primaryScreen()
         if screen:
             screen_size = screen.size()
@@ -336,8 +346,6 @@ def create_icon_button(icon_text: str, tooltip: str = ""):
     Returns:
         Icon button
     """
-    from PySide6.QtWidgets import QPushButton
-
     button = QPushButton(icon_text)
     button.setFixedSize(QSize(40, 40))
 
@@ -379,8 +387,6 @@ def show_success_message(parent: QWidget, message: str, i18n=None):
         message: Success message
         i18n: Optional i18n manager for translations
     """
-    from PySide6.QtWidgets import QMessageBox
-
     msg_box = QMessageBox(parent)
     msg_box.setIcon(QMessageBox.Icon.Information)
     msg_box.setWindowTitle(i18n.t("common.success") if i18n else "Success")
@@ -415,8 +421,6 @@ def confirm_action(parent: QWidget, title: str, message: str) -> bool:
     Returns:
         True if user confirmed
     """
-    from PySide6.QtWidgets import QMessageBox
-
     reply = QMessageBox.question(
         parent,
         title,

@@ -21,8 +21,8 @@ Extracted from transcript_viewer.py to reduce class size and improve separation 
 
 import logging
 
-from PySide6.QtCore import QSettings, QSize
-from PySide6.QtWidgets import QApplication
+from core.qt_imports import QObject, QPoint, QRect, QSettings, QSize, Qt
+from core.qt_imports import QApplication
 
 logger = logging.getLogger("echonote.ui.window_state_manager")
 

@@ -27,25 +27,32 @@ import threading
 from concurrent.futures import Future, TimeoutError
 from typing import Any, Dict, Optional
 
-from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal, Slot
-from PySide6.QtWidgets import (
+from core.qt_imports import (
     QCheckBox,
     QComboBox,
     QHBoxLayout,
     QLabel,
     QListWidget,
+    QObject,
     QPlainTextEdit,
     QPushButton,
     QSlider,
+    QTabWidget,
+    Qt,
+    QThread,
+    QTimer,
     QVBoxLayout,
     QWidget,
+    Signal,
+    Slot,
 )
 
 from config.constants import (
-    GAIN_SLIDER_DEFAULT,
-    GAIN_SLIDER_DIVISOR,
-    GAIN_SLIDER_MAX,
-    GAIN_SLIDER_MIN,
+    DEFAULT_TRANSLATION_TARGET_LANGUAGE,
+    RECORDING_FORMAT_WAV,
+    TRANSLATION_ENGINE_NONE,
+    TRANSLATION_ENGINE_OPUS_MT,
+    TRANSLATION_LANGUAGE_AUTO,
 )
 from core.realtime.audio_routing import (
     detect_app_scoped_system_audio_device,
@@ -66,6 +73,7 @@ from ui.constants import (
     PAGE_COMPACT_SPACING,
     PAGE_DENSE_SPACING,
     REALTIME_BUTTON_MIN_WIDTH,
+    REALTIME_RECORD_BUTTON_MIN_WIDTH,
     REALTIME_COMBO_MIN_WIDTH,
     REALTIME_FORM_HORIZONTAL_SPACING,
     REALTIME_FORM_MARGINS,
@@ -75,10 +83,21 @@ from ui.constants import (
     REALTIME_LABEL_WIDTH_LARGE,
     REALTIME_LABEL_WIDTH_MEDIUM,
     REALTIME_LANGUAGE_COMBO_MIN_WIDTH,
-    REALTIME_RECORD_BUTTON_MIN_WIDTH,
     REALTIME_TEXT_TOOLBAR_META_SPACING,
     REALTIME_VISUALIZER_MAX_HEIGHT,
     REALTIME_VISUALIZER_MIN_HEIGHT,
+    GAIN_SLIDER_DEFAULT,
+    GAIN_SLIDER_DIVISOR,
+    GAIN_SLIDER_MAX,
+    GAIN_SLIDER_MIN,
+    ROLE_DEVICE_INFO,
+    ROLE_FEEDBACK,
+    ROLE_REALTIME_DURATION,
+    ROLE_REALTIME_FIELD_CONTROL,
+    ROLE_REALTIME_MARKER_ACTION,
+    ROLE_REALTIME_RECORD_ACTION,
+    ROLE_SETTINGS_INLINE,
+    ROLE_WARNING_LARGE,
     STATUS_INDICATOR_SYMBOL,
     ZERO_MARGINS,
     format_gain_display,
@@ -185,7 +204,7 @@ class RealtimeRecordWidget(BaseWidget):
         self._buffer_lock = threading.Lock()
 
         # Preferences
-        self._recording_format = "wav"
+        self._recording_format = RECORDING_FORMAT_WAV
         self._auto_save_enabled = True
         self._default_input_source = "default"
         self._default_gain = 1.0
@@ -274,7 +293,7 @@ class RealtimeRecordWidget(BaseWidget):
         if self.settings_manager and hasattr(self.settings_manager, "get_realtime_preferences"):
             try:
                 preferences = self.settings_manager.get_realtime_preferences()
-                self._recording_format = preferences.get("recording_format", "wav")
+                self._recording_format = preferences.get("recording_format", RECORDING_FORMAT_WAV)
                 self._auto_save_enabled = bool(preferences.get("auto_save", True))
                 default_input_source = preferences.get("default_input_source", "default")
                 if default_input_source in (None, "", "default"):
@@ -323,9 +342,9 @@ class RealtimeRecordWidget(BaseWidget):
                 )
 
                 # 检查翻译引擎配置是否变更
-                new_translation_engine = preferences.get("translation_engine", "none")
-                new_source = preferences.get("translation_source_lang", "auto")
-                new_target = preferences.get("translation_target_lang", "en")
+                new_translation_engine = preferences.get("translation_engine", TRANSLATION_ENGINE_NONE)
+                new_source = preferences.get("translation_source_lang", TRANSLATION_LANGUAGE_AUTO)
+                new_target = preferences.get("translation_target_lang", DEFAULT_TRANSLATION_TARGET_LANGUAGE)
 
                 # 如果配置变更，尝试通知引擎代理进行重载
                 if (
@@ -350,7 +369,7 @@ class RealtimeRecordWidget(BaseWidget):
                 logger.warning("Failed to refresh realtime preferences: %s", exc, exc_info=True)
 
         # Fallback defaults
-        self._recording_format = "wav"
+        self._recording_format = RECORDING_FORMAT_WAV
         self._auto_save_enabled = True
         self._default_input_source = "default"
         self._default_gain = 1.0
@@ -409,8 +428,6 @@ class RealtimeRecordWidget(BaseWidget):
 
     def setup_ui(self):
         """Initialize the UI layout."""
-        from PySide6.QtWidgets import QTabWidget
-
         main_layout = self.create_page_layout()
 
         # Header
@@ -662,7 +679,7 @@ class RealtimeRecordWidget(BaseWidget):
 
     def _copy_text(self, text_type: str):
         """Copy text to clipboard."""
-        from PySide6.QtWidgets import QApplication
+        from core.qt_imports import QApplication
 
         if text_type == "transcription":
             text = self.transcription_text.toPlainText()
@@ -693,13 +710,13 @@ class RealtimeRecordWidget(BaseWidget):
 
         self.duration_value_label = QLabel(DEFAULT_DURATION_DISPLAY)
         self.duration_value_label.setObjectName("duration_display")
-        self.duration_value_label.setProperty("role", "realtime-duration")
+        self.duration_value_label.setProperty("role", ROLE_REALTIME_DURATION)
         self.duration_value_label.setMinimumHeight(CONTROL_BUTTON_MIN_HEIGHT)
         self.duration_value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.duration_value_label)
 
         self.add_marker_button = create_secondary_button(self.i18n.t("realtime_record.add_marker"))
-        self.add_marker_button.setProperty("role", "realtime-marker-action")
+        self.add_marker_button.setProperty("role", ROLE_REALTIME_MARKER_ACTION)
         self.add_marker_button.setMinimumHeight(CONTROL_BUTTON_MIN_HEIGHT)
         self.add_marker_button.setMinimumWidth(REALTIME_BUTTON_MIN_WIDTH)
         self.add_marker_button.setEnabled(False)
@@ -707,7 +724,7 @@ class RealtimeRecordWidget(BaseWidget):
         layout.addWidget(self.add_marker_button)
 
         self.record_button = QPushButton()
-        self.record_button.setProperty("role", "realtime-record-action")
+        self.record_button.setProperty("role", ROLE_REALTIME_RECORD_ACTION)
         self.record_button.setProperty("recording", False)
         self.record_button.setMinimumHeight(CONTROL_BUTTON_MIN_HEIGHT)
         self.record_button.setMinimumWidth(REALTIME_RECORD_BUTTON_MIN_WIDTH)
@@ -718,7 +735,7 @@ class RealtimeRecordWidget(BaseWidget):
 
     def _create_settings_section(self) -> QWidget:
         """Create settings control section."""
-        from PySide6.QtWidgets import QFormLayout, QFrame
+        from core.qt_imports import QFormLayout, QFrame
 
         container = QFrame()
         container.setObjectName("settings_frame")
@@ -732,7 +749,7 @@ class RealtimeRecordWidget(BaseWidget):
 
         def create_inline_container() -> tuple[QWidget, QHBoxLayout]:
             inline_container = QWidget()
-            inline_container.setProperty("role", "settings-inline")
+            inline_container.setProperty("role", ROLE_SETTINGS_INLINE)
             inline_layout = QHBoxLayout(inline_container)
             inline_layout.setContentsMargins(*ZERO_MARGINS)
             inline_layout.setSpacing(PAGE_DENSE_SPACING)
@@ -747,7 +764,7 @@ class RealtimeRecordWidget(BaseWidget):
         device_label.setMinimumWidth(REALTIME_LABEL_WIDTH_LARGE)
         device_layout.addWidget(device_label)
         self.input_combo = QComboBox()
-        self.input_combo.setProperty("role", "realtime-field-control")
+        self.input_combo.setProperty("role", ROLE_REALTIME_FIELD_CONTROL)
         self.input_combo.setMinimumWidth(REALTIME_COMBO_MIN_WIDTH)
         self._populate_input_devices()
         self.input_combo.currentIndexChanged.connect(self._on_input_device_changed)
@@ -781,7 +798,7 @@ class RealtimeRecordWidget(BaseWidget):
 
         self.capture_plan_label = QLabel()
         self.capture_plan_label.setObjectName("capture_plan_label")
-        self.capture_plan_label.setProperty("role", "device-info")
+        self.capture_plan_label.setProperty("role", ROLE_DEVICE_INFO)
         self.capture_plan_label.setWordWrap(True)
         form.addRow(self.capture_plan_label)
 
@@ -795,7 +812,7 @@ class RealtimeRecordWidget(BaseWidget):
             model_label.setMinimumWidth(REALTIME_LABEL_WIDTH_LARGE)
             model_layout.addWidget(model_label)
             self.model_combo = QComboBox()
-            self.model_combo.setProperty("role", "realtime-field-control")
+            self.model_combo.setProperty("role", ROLE_REALTIME_FIELD_CONTROL)
             self.model_combo.setMinimumWidth(REALTIME_COMBO_MIN_WIDTH)
             model_layout.addWidget(self.model_combo)
             row2.addWidget(model_container)
@@ -807,7 +824,7 @@ class RealtimeRecordWidget(BaseWidget):
         source_label.setMinimumWidth(REALTIME_LABEL_WIDTH_MEDIUM)
         source_layout.addWidget(source_label)
         self.source_lang_combo = QComboBox()
-        self.source_lang_combo.setProperty("role", "realtime-field-control")
+        self.source_lang_combo.setProperty("role", ROLE_REALTIME_FIELD_CONTROL)
         self.source_lang_combo.setMinimumWidth(REALTIME_LANGUAGE_COMBO_MIN_WIDTH)
         for code, label_key in self.LANGUAGE_OPTIONS:
             self.source_lang_combo.addItem(self.i18n.t(label_key), code)
@@ -839,7 +856,7 @@ class RealtimeRecordWidget(BaseWidget):
         target_label.setMinimumWidth(REALTIME_LABEL_WIDTH_MEDIUM)
         target_layout.addWidget(target_label)
         self.target_lang_combo = QComboBox()
-        self.target_lang_combo.setProperty("role", "realtime-field-control")
+        self.target_lang_combo.setProperty("role", ROLE_REALTIME_FIELD_CONTROL)
         self.target_lang_combo.setMinimumWidth(REALTIME_LANGUAGE_COMBO_MIN_WIDTH)
         self.target_lang_combo.setEnabled(False)
         for code, label_key in self.LANGUAGE_OPTIONS:
@@ -949,7 +966,7 @@ class RealtimeRecordWidget(BaseWidget):
                     device.get("name", "Unknown"),
                     is_loopback,
                     is_system_audio,
-                    app_scoped_source or "none",
+                    app_scoped_source or TRANSLATION_ENGINE_NONE,
                 )
 
             logger.info(f"Populated {len(devices)} input devices")
@@ -1317,7 +1334,7 @@ class RealtimeRecordWidget(BaseWidget):
             self._download_guide_widget.show()
             return
 
-        from PySide6.QtWidgets import QFrame, QLabel
+        from core.qt_imports import QFrame, QLabel
 
         guide_widget = QFrame()
         guide_widget.setObjectName("download_guide")
@@ -1325,7 +1342,7 @@ class RealtimeRecordWidget(BaseWidget):
         guide_layout = QHBoxLayout(guide_widget)
 
         warning_label = QLabel(self.i18n.t("common.warning"))
-        warning_label.setProperty("role", "warning-large")
+        warning_label.setProperty("role", ROLE_WARNING_LARGE)
         self._download_warning_label = warning_label
         guide_layout.addWidget(warning_label)
 
@@ -1469,16 +1486,16 @@ class RealtimeRecordWidget(BaseWidget):
             if not self.recorder.translation_engine:
                 # 获取当前选中的引擎
                 preferences = self.settings_manager.get_realtime_preferences()
-                engine_type = preferences.get("translation_engine", "none")
+                engine_type = preferences.get("translation_engine", TRANSLATION_ENGINE_NONE)
 
-                if engine_type == "none":
+                if engine_type == TRANSLATION_ENGINE_NONE:
                     placeholder = (
                         self.i18n.t("realtime_record.translation_disabled_placeholder")
                         or "Translation disabled"
                     )
-                elif engine_type == "opus-mt":
-                    source = preferences.get("translation_source_lang", "auto")
-                    target = preferences.get("translation_target_lang", "en")
+                elif engine_type == TRANSLATION_ENGINE_OPUS_MT:
+                    source = preferences.get("translation_source_lang", TRANSLATION_LANGUAGE_AUTO)
+                    target = preferences.get("translation_target_lang", DEFAULT_TRANSLATION_TARGET_LANGUAGE)
                     placeholder = (
                         self.i18n.t(
                             "realtime_record.opus_mt_not_ready_placeholder",
@@ -1632,7 +1649,7 @@ class RealtimeRecordWidget(BaseWidget):
             self.feedback_label.clear()
             self.feedback_label.setVisible(False)
             return
-        self.feedback_label.setProperty("role", "feedback")
+        self.feedback_label.setProperty("role", ROLE_FEEDBACK)
         self.feedback_label.setProperty("state", level)
         self.feedback_label.setText(message)
         self.feedback_label.setVisible(True)
@@ -1874,7 +1891,7 @@ class RealtimeRecordWidget(BaseWidget):
         if enable_translation and not self.recorder.translation_engine:
             if self.settings_manager:
                 logger.info("Translation enabled but engine is 'none'; auto-switching to 'opus-mt'")
-                self.settings_manager.update_setting("realtime.translation_engine", "opus-mt")
+                self.settings_manager.update_setting("realtime.translation_engine", TRANSLATION_ENGINE_OPUS_MT)
                 # Reload engine in recorder
                 try:
                     # MainWindow handles major engine reloads, but we can try basic injection
@@ -2069,7 +2086,7 @@ class RealtimeRecordWidget(BaseWidget):
                 # Fetch language selection
                 if hasattr(self, "source_lang_combo"):
                     lang = self.source_lang_combo.currentData()
-                    if lang and lang != "auto":
+                    if lang and lang != TRANSLATION_LANGUAGE_AUTO:
                         options["language"] = lang
 
                 self.transcription_manager.add_task(file_path=save_path, options=options)
@@ -2099,7 +2116,7 @@ class RealtimeRecordWidget(BaseWidget):
                 logger.warning("Failed to refresh calendar after recording: %s", exc)
 
     def _export_transcription(self):
-        from PySide6.QtWidgets import QFileDialog
+        from core.qt_imports import QFileDialog
 
         text = self.recorder.get_accumulated_transcription()
         if not text:
@@ -2121,7 +2138,7 @@ class RealtimeRecordWidget(BaseWidget):
                 self._show_error(self.i18n.t("realtime_record.export_failed", error=str(e)))
 
     def _export_translation(self):
-        from PySide6.QtWidgets import QFileDialog
+        from core.qt_imports import QFileDialog
 
         text = self.recorder.get_accumulated_translation()
         if not text:
@@ -2191,6 +2208,7 @@ class RealtimeRecordWidget(BaseWidget):
 
             if hasattr(self, "_worker") and self._worker:
                 self._worker.stop()
+                self._worker = None
                 self._async_loop = None
 
             self._cleanup_done = True

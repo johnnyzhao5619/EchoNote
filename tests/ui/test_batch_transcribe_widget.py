@@ -32,6 +32,7 @@ class TestBatchTranscribeWidget:
                 transcription_manager=mock_transcription_manager,
                 i18n=mock_i18n,
                 model_manager=mock_model_manager,
+                allow_deferred_load=False,
             )
         return widget
 

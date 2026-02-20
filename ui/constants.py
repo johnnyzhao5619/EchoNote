@@ -33,10 +33,10 @@ BATCH_SELECTOR_MIN_WIDTH = 138
 # Notification constants
 NOTIFICATION_RESET_DELAY_MS = 2000
 
-# Layout constants
-DEFAULT_SPACING = 8
+# Layout constants (Standard 8px grid)
+LAYOUT_SPACING = 8
 DEFAULT_MARGINS = (12, 12, 12, 12)
-DEFAULT_LAYOUT_SPACING = DEFAULT_SPACING
+DEFAULT_LAYOUT_SPACING = LAYOUT_SPACING
 ZERO_SPACING = 0
 ZERO_MARGINS = (0, 0, 0, 0)
 
@@ -56,7 +56,7 @@ SHELL_STATUS_REFRESH_INTERVAL_MS = 2000
 
 # Unified page density constants
 PAGE_CONTENT_MARGINS = (10, 8, 10, 8)
-PAGE_LAYOUT_SPACING = 8
+PAGE_LAYOUT_SPACING = LAYOUT_SPACING
 PAGE_COMPACT_SPACING = 6
 PAGE_DENSE_SPACING = 4
 
@@ -143,6 +143,125 @@ PAGINATION_THRESHOLD = 0.8
 # Theme constants
 # HIGHLIGHT_COLORS and TIMELINE_SEARCH_HIGHLIGHT_COLOR moved to ThemeManager
 
+# Role constants for semantic styling
+ROLE_TIMELINE_SEARCH_INPUT = "timeline-search-input"
+ROLE_TIMELINE_SEARCH_ACTION = "timeline-search-action"
+ROLE_TIMELINE_FILTER_CONTROL = "timeline-filter-control"
+ROLE_CURRENT_TIME_LINE = "current-time-line"
+ROLE_CURRENT_TIME = "current-time"
+ROLE_EVENT_TITLE = "event-title"
+ROLE_EVENT_META = "event-meta"
+ROLE_EVENT_TYPE_BADGE = "event-type-badge"
+ROLE_EVENT_INDICATOR = "event-indicator"
+ROLE_EVENT_DESCRIPTION = "event-description"
+ROLE_DANGER = "danger"
+ROLE_NO_ARTIFACTS = "no-artifacts"
+ROLE_SYNC_STATUS = "sync-status"
+ROLE_CALENDAR_VIEW_TOGGLE = "calendar-view-toggle"
+ROLE_CALENDAR_NAV_ACTION = "calendar-nav-action"
+ROLE_CALENDAR_PRIMARY_ACTION = "calendar-primary-action"
+ROLE_CALENDAR_UTILITY_ACTION = "calendar-utility-action"
+
+# Timeline Action Roles
+ROLE_TIMELINE_RECORDING_ACTION = "timeline-recording-action"
+ROLE_TIMELINE_TRANSCRIPT_ACTION = "timeline-transcript-action"
+ROLE_TIMELINE_TRANSLATION_ACTION = "timeline-translation-action"
+ROLE_TIMELINE_SECONDARY_TRANSCRIBE_ACTION = "timeline-secondary-transcribe-action"
+ROLE_TIMELINE_COPY_ACTION = "timeline-copy-action"
+ROLE_TIMELINE_EXPORT_ACTION = "timeline-export-action"
+
+# Dialog and Generic Action Roles
+ROLE_DIALOG_PRIMARY_ACTION = "dialog-primary-action"
+ROLE_DIALOG_SECONDARY_ACTION = "dialog-secondary-action"
+ROLE_DIALOG_NAV_ACTION = "dialog-nav-action"
+ROLE_TOOLBAR_SECONDARY_ACTION = "toolbar-secondary-action"
+
+# Transcript Roles
+ROLE_TRANSCRIPT_FILE = "transcript-file"
+ROLE_AUDIO_PLAYER_TRANSCRIPT_TITLE = "audio-player-transcript-title"
+ROLE_AUDIO_PLAYER_TRANSCRIPT_TEXT = "audio-player-transcript-text"
+ROLE_AUDIO_PLAYER_TRANSCRIPT_TOGGLE = "audio-player-transcript-toggle"
+ROLE_AUDIO_PLAYER_PROGRESS = "audio-player-progress"
+ROLE_AUDIO_PLAYER_TIME = "audio-player-time"
+ROLE_AUDIO_PLAYER_VOLUME = "audio-player-volume"
+
+# Calendar Roles
+ROLE_EVENT_CARD = "event-card"
+ROLE_EVENT_TIME = "event-time"
+ROLE_CALENDAR_HEADER = "calendar-header"
+ROLE_CALENDAR_DAY_HEADER = "calendar-day-header"
+ROLE_CALENDAR_DAY_CELL = "calendar-day-cell"
+ROLE_CALENDAR_DAY_NUMBER = "calendar-day-number"
+ROLE_MORE_EVENTS = "more-events"
+ROLE_CALENDAR_WEEK_HEADER = "calendar-week-header"
+ROLE_CALENDAR_DAY_COLUMN = "calendar-day-column"
+ROLE_CALENDAR_EVENTS_CONTAINER = "calendar-events-container"
+ROLE_NO_EVENTS = "no-events"
+
+# Account and OAuth Roles
+ROLE_OAUTH_STATUS = "oauth-status"
+ROLE_ACCOUNT_BADGE = "account-badge"
+ROLE_CALENDAR_INDICATOR = "calendar-indicator"
+ROLE_ACCOUNT_DISCONNECT = "account-disconnect"
+
+# Batch Task Roles
+ROLE_TASK_ITEM = "task-item"
+ROLE_TASK_FILENAME = "task-filename"
+ROLE_TASK_INFO = "task-info"
+ROLE_TASK_ERROR = "task-error"
+ROLE_TASK_STATUS = "task-status"
+ROLE_TASK_PERCENT = "task-percent"
+
+# Task Action Roles
+ROLE_TASK_ACTION_START = "task-action-start"
+ROLE_TASK_ACTION_PAUSE = "task-action-pause"
+ROLE_TASK_ACTION_CANCEL = "task-action-cancel"
+ROLE_TASK_ACTION_DELETE = "task-action-delete"
+ROLE_TASK_ACTION_VIEW = "task-action-view"
+ROLE_TASK_ACTION_EXPORT = "task-action-export"
+ROLE_TASK_ACTION_RETRY = "task-action-retry"
+
+# Settings Roles
+ROLE_AUTO_START_DESC = "auto-start-desc"
+ROLE_DESCRIPTION = "description"
+ROLE_MODEL_REASON = "model-reason"
+ROLE_MODEL_DELETE = "model-delete"
+ROLE_MODEL_DOWNLOAD = "model-download"
+ROLE_TIME_DISPLAY = "time-display"
+ROLE_MODEL_CONFIG_FIELD_LABEL = "model-config-field-label"
+ROLE_CUDA_NOTE = "cuda-note"
+ROLE_FFMPEG_STATUS = "ffmpeg-status"
+ROLE_DEVICE_INFO = "device-info"
+ROLE_SETTINGS_RESET_ACTION = "settings-reset-action"
+ROLE_SETTINGS_CANCEL_ACTION = "settings-cancel-action"
+ROLE_SETTINGS_SAVE_ACTION = "settings-save-action"
+ROLE_SETTINGS_NAV = "settings-nav"
+ROLE_AUDIO_PLAYER_CONTROL = "audio-player-control"
+ROLE_AUDIO_PLAYER_PRIMARY = "audio-player-primary"
+ROLE_SIDEBAR_NAV_BUTTON = "sidebar-nav-button"
+
+# Realtime Record Roles
+ROLE_REALTIME_DURATION = "realtime-duration"
+ROLE_REALTIME_MARKER_ACTION = "realtime-marker-action"
+ROLE_REALTIME_RECORD_ACTION = "realtime-record-action"
+ROLE_REALTIME_FIELD_CONTROL = "realtime-field-control"
+ROLE_FEEDBACK = "feedback"
+
+# Advanced Settings Roles
+ROLE_SETTINGS_INLINE = "settings-inline"
+ROLE_SETTINGS_INLINE_ACTION = "settings-inline-action"
+ROLE_SETTINGS_CONFIG_GROUP = "settings-config-group"
+ROLE_SETTINGS_CONFIG_GROUP_NESTED = "settings-config-group-nested"
+ROLE_USAGE_STATS = "usage-stats"
+ROLE_WARNING_LARGE = "warning-large"
+
+# Audio Roles
+ROLE_AUDIO_FILE = "audio-file"
+
+# Navigation symbols
+NAV_SYMBOL_PREV = "<"
+NAV_SYMBOL_NEXT = ">"
+
 # Common display text
 STATUS_INDICATOR_SYMBOL = "\u25cf"
 DEFAULT_DURATION_DISPLAY = "00:00:00"
@@ -180,3 +299,11 @@ TASK_ITEM_MIN_HEIGHT = 150
 
 # Layout constants (extended)
 LABEL_MIN_WIDTH = 120
+STANDARD_LABEL_WIDTH = 200  # Standard width for form labels
+
+# Gain slider constants (for realtime settings)
+GAIN_SLIDER_MIN = 10  # 0.1 * 100 (minimum gain multiplier)
+GAIN_SLIDER_MAX = 200  # 2.0 * 100 (maximum gain multiplier)
+GAIN_SLIDER_DEFAULT = 100  # 1.0 * 100 (default gain multiplier)
+GAIN_SLIDER_TICK_INTERVAL = 10  # Tick every 0.1x
+GAIN_SLIDER_DIVISOR = 100.0  # Convert slider value to float

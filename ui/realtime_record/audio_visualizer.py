@@ -23,8 +23,13 @@ import logging
 from collections import deque
 
 import numpy as np
-from PySide6.QtCore import QRect, QTimer
-from PySide6.QtGui import QColor, QPainter, QPen
+from core.qt_imports import (
+    QColor,
+    QPainter,
+    QPen,
+    QRect,
+    QTimer,
+)
 
 from ui.base_widgets import BaseWidget
 from ui.common.theme import ThemeManager

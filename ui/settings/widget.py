@@ -23,13 +23,14 @@ for configuring all application features.
 import logging
 from typing import Any, Dict
 
-from ui.qt_imports import (
+from core.qt_imports import (
     QFrame,
+    QHBoxLayout,
     QLabel,
     QListWidget,
     QListWidgetItem,
     QMessageBox,
-    QPushButton,
+    QScrollArea,
     QStackedWidget,
     Qt,
     QVBoxLayout,
@@ -41,6 +42,10 @@ from ui.base_widgets import BaseWidget, create_hbox, create_primary_button, crea
 from ui.constants import (
     PAGE_COMPACT_SPACING,
     PAGE_LAYOUT_SPACING,
+    ROLE_SETTINGS_CANCEL_ACTION,
+    ROLE_SETTINGS_NAV,
+    ROLE_SETTINGS_RESET_ACTION,
+    ROLE_SETTINGS_SAVE_ACTION,
     SETTINGS_NAV_WIDTH,
 )
 from ui.settings.base_page import PostSaveMessage
@@ -135,19 +140,19 @@ class SettingsWidget(BaseWidget):
 
         # Reset button
         self.reset_button = create_secondary_button(self.i18n.t("settings.reset"))
-        self.reset_button.setProperty("role", "settings-reset-action")
+        self.reset_button.setProperty("role", ROLE_SETTINGS_RESET_ACTION)
         self.reset_button.clicked.connect(self._on_reset_clicked)
         button_layout.addWidget(self.reset_button)
 
         # Cancel button
         self.cancel_button = create_secondary_button(self.i18n.t("settings.cancel"))
-        self.cancel_button.setProperty("role", "settings-cancel-action")
+        self.cancel_button.setProperty("role", ROLE_SETTINGS_CANCEL_ACTION)
         self.cancel_button.clicked.connect(self._on_cancel_clicked)
         button_layout.addWidget(self.cancel_button)
 
         # Save button
         self.save_button = create_primary_button(self.i18n.t("settings.save"))
-        self.save_button.setProperty("role", "settings-save-action")
+        self.save_button.setProperty("role", ROLE_SETTINGS_SAVE_ACTION)
         self.save_button.clicked.connect(self._on_save_clicked)
         self.save_button.setDefault(True)
         button_layout.addWidget(self.save_button)
@@ -165,7 +170,7 @@ class SettingsWidget(BaseWidget):
         """
         category_list = QListWidget()
         category_list.setFixedWidth(SETTINGS_NAV_WIDTH)
-        category_list.setProperty("role", "settings-nav")
+        category_list.setProperty("role", ROLE_SETTINGS_NAV)
 
         # Define categories based on available pages/managers
         categories = [

@@ -23,18 +23,23 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from PySide6.QtCore import QSize, Qt, QUrl, Signal
-from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
-from PySide6.QtWidgets import (
+from core.qt_imports import (
+    QAudioOutput,
     QDialog,
     QHBoxLayout,
     QLabel,
+    QMediaPlayer,
     QMessageBox,
     QPushButton,
     QSlider,
+    QSize,
     QStyle,
+    QTextEdit,
+    Qt,
+    QUrl,
     QVBoxLayout,
     QWidget,
+    Signal,
 )
 
 from ui.base_widgets import (
@@ -47,10 +52,10 @@ from ui.base_widgets import (
 from ui.constants import (
     AUDIO_PLAYER_CONTENT_MARGIN,
     AUDIO_PLAYER_CONTENT_SPACING,
+    AUDIO_PLAYER_CONTROLS_SPACING,
     AUDIO_PLAYER_CONTROL_BAR_SPACING,
     AUDIO_PLAYER_CONTROL_BUTTON_SIZE,
     AUDIO_PLAYER_CONTROL_ICON_SIZE,
-    AUDIO_PLAYER_CONTROLS_SPACING,
     AUDIO_PLAYER_DIALOG_MARGIN,
     AUDIO_PLAYER_DIALOG_MIN_HEIGHT,
     AUDIO_PLAYER_DIALOG_MIN_WIDTH,
@@ -61,6 +66,14 @@ from ui.constants import (
     AUDIO_PLAYER_TRANSCRIPT_AREA_HEIGHT,
     AUDIO_PLAYER_TRANSCRIPT_BOTTOM_MARGIN,
     AUDIO_PLAYER_VOLUME_SLIDER_WIDTH,
+    ROLE_AUDIO_PLAYER_CONTROL,
+    ROLE_AUDIO_PLAYER_PRIMARY,
+    ROLE_AUDIO_PLAYER_PROGRESS,
+    ROLE_AUDIO_PLAYER_TIME,
+    ROLE_AUDIO_PLAYER_TRANSCRIPT_TEXT,
+    ROLE_AUDIO_PLAYER_TRANSCRIPT_TITLE,
+    ROLE_AUDIO_PLAYER_TRANSCRIPT_TOGGLE,
+    ROLE_AUDIO_PLAYER_VOLUME,
 )
 from utils.i18n import I18nQtManager
 
@@ -189,7 +202,6 @@ class AudioPlayer(BaseWidget):
 
     def _create_transcript_area(self) -> QWidget:
         """创建转录文本显示区域 - 替代封面位置，固定高度避免堆叠."""
-        from PySide6.QtWidgets import QTextEdit
 
         container = QWidget()
         container.setObjectName("transcript_container")
@@ -206,14 +218,14 @@ class AudioPlayer(BaseWidget):
         # 标题
         self.transcript_title_label = QLabel(self.i18n.t("timeline.audio_player.transcript"))
         self.transcript_title_label.setObjectName("transcript_title")
-        self.transcript_title_label.setProperty("role", "audio-player-transcript-title")
+        self.transcript_title_label.setProperty("role", ROLE_AUDIO_PLAYER_TRANSCRIPT_TITLE)
         self.transcript_title_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(self.transcript_title_label)
 
         # 文本显示区域
         self.transcript_text = QTextEdit()
         self.transcript_text.setObjectName("transcript_text")
-        self.transcript_text.setProperty("role", "audio-player-transcript-text")
+        self.transcript_text.setProperty("role", ROLE_AUDIO_PLAYER_TRANSCRIPT_TEXT)
         self.transcript_text.setReadOnly(True)
         self.transcript_text.setPlaceholderText(self.i18n.t("timeline.audio_player.no_transcript"))
         layout.addWidget(self.transcript_text)
@@ -221,7 +233,7 @@ class AudioPlayer(BaseWidget):
         # 格式切换按钮（仅在有segments时显示）
         self.format_toggle_button = QPushButton()
         self.format_toggle_button.setObjectName("transcript_format_toggle")
-        self.format_toggle_button.setProperty("role", "audio-player-transcript-toggle")
+        self.format_toggle_button.setProperty("role", ROLE_AUDIO_PLAYER_TRANSCRIPT_TOGGLE)
         connect_button_with_callback(self.format_toggle_button, self._toggle_transcript_format)
         self.format_toggle_button.setVisible(False)  # 默认隐藏
         layout.addWidget(self.format_toggle_button)
@@ -248,7 +260,7 @@ class AudioPlayer(BaseWidget):
         progress_layout = create_vbox(spacing=AUDIO_PLAYER_CONTENT_SPACING)
 
         self.progress_slider = QSlider(Qt.Orientation.Horizontal)
-        self.progress_slider.setProperty("role", "audio-player-progress")
+        self.progress_slider.setProperty("role", ROLE_AUDIO_PLAYER_PROGRESS)
         self.progress_slider.setRange(0, 0)
         self.progress_slider.setEnabled(False)
         self.progress_slider.sliderPressed.connect(self._on_slider_pressed)
@@ -260,13 +272,13 @@ class AudioPlayer(BaseWidget):
         time_layout = create_hbox(spacing=0)
 
         self.current_time_label = QLabel(self._initial_time_text)
-        self.current_time_label.setProperty("role", "audio-player-time")
+        self.current_time_label.setProperty("role", ROLE_AUDIO_PLAYER_TIME)
         time_layout.addWidget(self.current_time_label)
 
         time_layout.addStretch()
 
         self.total_time_label = QLabel(self._initial_time_text)
-        self.total_time_label.setProperty("role", "audio-player-time")
+        self.total_time_label.setProperty("role", ROLE_AUDIO_PLAYER_TIME)
         time_layout.addWidget(self.total_time_label)
 
         progress_layout.addLayout(time_layout)
@@ -280,13 +292,13 @@ class AudioPlayer(BaseWidget):
         # 左侧：音量控制
         self.volume_button = self._create_icon_button(
             self._toggle_mute,
-            role_name="audio-player-control",
+            role_name=ROLE_AUDIO_PLAYER_CONTROL,
             is_primary=False,
         )
         controls_layout.addWidget(self.volume_button, alignment=Qt.AlignmentFlag.AlignVCenter)
 
         self.volume_slider = QSlider(Qt.Orientation.Horizontal)
-        self.volume_slider.setProperty("role", "audio-player-volume")
+        self.volume_slider.setProperty("role", ROLE_AUDIO_PLAYER_VOLUME)
         self.volume_slider.setRange(0, 100)
         self.volume_slider.setValue(self.DEFAULT_VOLUME)
         self.volume_slider.setFixedWidth(AUDIO_PLAYER_VOLUME_SLIDER_WIDTH)
@@ -299,13 +311,13 @@ class AudioPlayer(BaseWidget):
         # 中间：播放按钮
         self.play_button = self._create_icon_button(
             self.toggle_playback,
-            role_name="audio-player-primary",
+            role_name=ROLE_AUDIO_PLAYER_PRIMARY,
             is_primary=True,
         )
         controls_layout.addWidget(self.play_button, alignment=Qt.AlignmentFlag.AlignVCenter)
         self.stop_button = self._create_icon_button(
             self.stop_playback,
-            role_name="audio-player-control",
+            role_name=ROLE_AUDIO_PLAYER_CONTROL,
             is_primary=False,
         )
         controls_layout.addWidget(self.stop_button, alignment=Qt.AlignmentFlag.AlignVCenter)
@@ -316,7 +328,7 @@ class AudioPlayer(BaseWidget):
         # 右侧：转录按钮
         self.show_transcript_button = self._create_icon_button(
             self._toggle_transcript_visibility,
-            role_name="audio-player-control",
+            role_name=ROLE_AUDIO_PLAYER_CONTROL,
             is_primary=False,
             checkable=True,
         )

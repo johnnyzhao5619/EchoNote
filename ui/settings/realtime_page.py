@@ -24,7 +24,7 @@ import shutil
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
-from ui.qt_imports import (
+from core.qt_imports import (
     QCheckBox,
     QComboBox,
     QDoubleSpinBox,
@@ -44,21 +44,26 @@ from ui.base_widgets import (
 )
 
 from config.constants import (
-    GAIN_SLIDER_DEFAULT,
-    GAIN_SLIDER_DIVISOR,
-    GAIN_SLIDER_MAX,
-    GAIN_SLIDER_MIN,
-    GAIN_SLIDER_TICK_INTERVAL,
     RECORDING_FORMAT_MP3,
     RECORDING_FORMAT_WAV,
-    STANDARD_LABEL_WIDTH,
     SUPPORTED_REALTIME_TRANSLATION_ENGINES,
     SUPPORTED_RECORDING_FORMATS,
     TRANSLATION_ENGINE_NONE,
     TRANSLATION_ENGINE_OPUS_MT,
 )
 from ui.base_widgets import create_button, create_hbox, create_vbox
-from ui.constants import SETTINGS_GAIN_VALUE_LABEL_MIN_WIDTH, format_gain_display
+from ui.constants import (
+    GAIN_SLIDER_DEFAULT,
+    GAIN_SLIDER_DIVISOR,
+    GAIN_SLIDER_MAX,
+    GAIN_SLIDER_MIN,
+    GAIN_SLIDER_TICK_INTERVAL,
+    ROLE_DEVICE_INFO,
+    ROLE_FFMPEG_STATUS,
+    SETTINGS_GAIN_VALUE_LABEL_MIN_WIDTH,
+    STANDARD_LABEL_WIDTH,
+    format_gain_display,
+)
 from ui.settings.base_page import BaseSettingsPage
 from utils.i18n import I18nQtManager
 
@@ -158,7 +163,7 @@ class RealtimeSettingsPage(BaseSettingsPage):
         self.loopback_status_label.setMinimumWidth(STANDARD_LABEL_WIDTH)
 
         self.loopback_status_text = QLabel()
-        self.loopback_status_text.setProperty("role", "ffmpeg-status")
+        self.loopback_status_text.setProperty("role", ROLE_FFMPEG_STATUS)
         self.loopback_status_text.setProperty("state", "missing")
 
         self.loopback_setup_btn = create_button(
@@ -174,7 +179,7 @@ class RealtimeSettingsPage(BaseSettingsPage):
 
         self.loopback_info_label = QLabel()
         self.loopback_info_label.setWordWrap(True)
-        self.loopback_info_label.setProperty("role", "device-info")
+        self.loopback_info_label.setProperty("role", ROLE_DEVICE_INFO)
         self.content_layout.addWidget(self.loopback_info_label)
         self._refresh_loopback_status()
 
@@ -206,7 +211,7 @@ class RealtimeSettingsPage(BaseSettingsPage):
 
         self.format_hint_label = QLabel()
         self.format_hint_label.setWordWrap(True)
-        self.format_hint_label.setProperty("role", "device-info")
+        self.format_hint_label.setProperty("role", ROLE_DEVICE_INFO)
         self._update_format_hint_text()
         self.content_layout.addWidget(self.format_hint_label)
 
@@ -265,7 +270,7 @@ class RealtimeSettingsPage(BaseSettingsPage):
         self._opus_mt_section.addLayout(src_tgt_layout)
 
         self.opus_mt_status_label = QLabel()
-        self.opus_mt_status_label.setProperty("role", "device-info")
+        self.opus_mt_status_label.setProperty("role", ROLE_DEVICE_INFO)
         self.opus_mt_status_label.setWordWrap(True)
         self._opus_mt_section.addWidget(self.opus_mt_status_label)
 

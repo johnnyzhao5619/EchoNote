@@ -23,7 +23,7 @@ to reduce code duplication and ensure consistent behavior across the UI layer.
 import logging
 from typing import Any, Callable, Optional
 
-from ui.qt_imports import QPushButton, QTimer
+from core.qt_imports import QPushButton, QTimer
 
 logger = logging.getLogger(__name__)
 

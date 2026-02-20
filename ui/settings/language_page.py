@@ -22,13 +22,16 @@ Provides UI for configuring language preferences.
 import logging
 from typing import Tuple
 
-from ui.qt_imports import (
+from core.qt_imports import (
+    QButtonGroup,
     QComboBox,
     QFormLayout,
     QLabel,
+    QRadioButton,
     QVBoxLayout,
 )
 from ui.settings.base_page import BaseSettingsPage
+from ui.constants import ROLE_AUTO_START_DESC
 from utils.i18n import I18nQtManager, get_language_display_name, get_translation_codes
 
 logger = logging.getLogger("echonote.ui.settings.language")
@@ -71,7 +74,7 @@ class LanguageSettingsPage(BaseSettingsPage):
         # Language info
         self.info_label = QLabel(self.i18n.t("settings.language.change_info"))
         self.info_label.setWordWrap(True)
-        self.info_label.setProperty("role", "auto-start-desc")
+        self.info_label.setProperty("role", ROLE_AUTO_START_DESC)
         self.content_layout.addWidget(self.info_label)
 
         # Add stretch at the end

@@ -23,9 +23,19 @@ keyboard navigation, screen reader support, and focus management.
 import logging
 from typing import List, Optional
 
-from PySide6.QtCore import QEvent, Qt
-from PySide6.QtGui import QKeyEvent
-from PySide6.QtWidgets import QComboBox, QLineEdit, QPushButton, QTextEdit, QWidget
+from core.qt_imports import (
+    QComboBox,
+    QEvent,
+    QKeyEvent,
+    QLineEdit,
+    QObject,
+    QPushButton,
+    Qt,
+    QTextEdit,
+    QWidget,
+    Signal,
+    Slot,
+)
 
 logger = logging.getLogger("echonote.utils.accessibility")
 
@@ -144,7 +154,7 @@ class AccessibilityHelper:
         widget.setAccessibleDescription(message)
 
         # Reset after a short delay
-        from PySide6.QtCore import QTimer
+        from core.qt_imports import QTimer
 
         from config.constants import ACCESSIBILITY_ANNOUNCEMENT_DELAY_MS
 

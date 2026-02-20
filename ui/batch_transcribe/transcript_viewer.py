@@ -25,28 +25,36 @@ import os
 import shutil
 from typing import Any, Optional
 
-from PySide6.QtCore import QSize, Qt, QTimer
-from PySide6.QtGui import QAction, QKeySequence, QShortcut
-from PySide6.QtWidgets import (
+from core.qt_imports import (
+    QAction,
     QApplication,
     QDialog,
     QFileDialog,
     QFrame,
     QHBoxLayout,
+    QKeySequence,
     QLabel,
     QMenu,
     QMessageBox,
     QProgressDialog,
     QPushButton,
+    QShortcut,
+    QSize,
     QTextEdit,
+    QTimer,
     QVBoxLayout,
+    QWidget,
+    Qt,
 )
 
 from data.database.models import TranscriptionTask
 from ui.base_widgets import connect_button_with_callback, create_hbox
 from ui.batch_transcribe.search_widget import SearchWidget
 from ui.batch_transcribe.window_state_manager import WindowStateManager
-from ui.constants import CONTROL_BUTTON_MIN_HEIGHT
+from ui.constants import (
+    CONTROL_BUTTON_MIN_HEIGHT,
+    ROLE_TRANSCRIPT_FILE,
+)
 from utils.i18n import I18nQtManager
 from utils.time_utils import format_localized_datetime
 
@@ -314,7 +322,7 @@ class TranscriptViewerDialog(QDialog):
 
         # File name (larger font)
         self.file_name_label = QLabel()
-        self.file_name_label.setProperty("role", "transcript-file")
+        self.file_name_label.setProperty("role", ROLE_TRANSCRIPT_FILE)
         layout.addWidget(self.file_name_label)
 
         # Metadata row 1: Duration, Language
@@ -696,7 +704,7 @@ class TranscriptViewerDialog(QDialog):
         # Open file dialog
         file_path, _ = QFileDialog.getSaveFileName(
             self,
-            self.i18n.t("viewer.export_title"),
+            self.i18n.t("viewer.export_dialog_title"),
             default_name,
             f"{format.upper()} (*.{extension})",
         )
@@ -756,10 +764,10 @@ class TranscriptViewerDialog(QDialog):
 
         # Update metadata labels
         self._update_metadata_content()
-        self.duration_label.setText(f"{self.i18n.t('viewer.duration')}: {self.duration_value}")
-        self.language_label.setText(f"{self.i18n.t('viewer.language')}: {self.language_value}")
-        self.engine_label.setText(f"{self.i18n.t('viewer.engine')}: {self.engine_value}")
-        self.completed_label.setText(f"{self.i18n.t('viewer.completed')}: {self.completed_value}")
+        self.duration_label.setText(f"{self.i18n.t('viewer.metadata.duration')}: {self.duration_value}")
+        self.language_label.setText(f"{self.i18n.t('viewer.metadata.language')}: {self.language_value}")
+        self.engine_label.setText(f"{self.i18n.t('viewer.metadata.engine')}: {self.engine_value}")
+        self.completed_label.setText(f"{self.i18n.t('viewer.metadata.completed')}: {self.completed_value}")
 
     def _on_setting_changed(self, key: str, value: Any):
         """Handle setting changes."""

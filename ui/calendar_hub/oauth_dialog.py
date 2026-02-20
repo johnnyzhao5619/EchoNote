@@ -29,15 +29,19 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Optional, Tuple
 from urllib.parse import parse_qs, urlparse
 
-from ui.qt_imports import (
+from core.qt_imports import (
     QDialog,
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMessageBox,
+    QProgressBar,
     QPushButton,
     Qt,
+    QTextEdit,
     QTimer,
     QVBoxLayout,
+    QWidget,
     Signal,
 )
 
@@ -49,6 +53,7 @@ from ui.base_widgets import (
 )
 from ui.constants import (
     CALENDAR_OAUTH_DIALOG_MIN_WIDTH,
+    ROLE_OAUTH_STATUS,
     CALENDAR_OAUTH_INSTRUCTIONS_MAX_HEIGHT,
     CALENDAR_OAUTH_RESULT_DIALOG_MIN_WIDTH,
 )
@@ -217,7 +222,7 @@ class OAuthDialog(QDialog):
         # Status label
         self.status_label = QLabel(self.i18n.t("calendar_hub.oauth_dialog.ready_to_authorize"))
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.status_label.setProperty("role", "oauth-status")
+        self.status_label.setProperty("role", ROLE_OAUTH_STATUS)
         layout.addWidget(self.status_label)
 
         # Buttons
@@ -495,7 +500,7 @@ class OAuthDialog(QDialog):
                     self.status_label.setText(
                         self.i18n.t("calendar_hub.oauth_dialog.authorization_failed")
                     )
-                    self.status_label.setProperty("role", "oauth-status")
+                    self.status_label.setProperty("role", ROLE_OAUTH_STATUS)
                     self.status_label.setProperty("state", "error")
                     self._show_error(mismatch_message)
                     self.authorization_failed.emit(mismatch_message)
@@ -512,7 +517,7 @@ class OAuthDialog(QDialog):
                 self.status_label.setText(
                     self.i18n.t("calendar_hub.oauth_dialog.authorization_successful")
                 )
-                self.status_label.setProperty("role", "oauth-status")
+                self.status_label.setProperty("role", ROLE_OAUTH_STATUS)
                 self.status_label.setProperty("state", "success")
 
                 # Emit signal
@@ -529,7 +534,7 @@ class OAuthDialog(QDialog):
                 self.status_label.setText(
                     self.i18n.t("calendar_hub.oauth_dialog.authorization_failed", error=error_msg)
                 )
-                self.status_label.setProperty("role", "oauth-status")
+                self.status_label.setProperty("role", ROLE_OAUTH_STATUS)
                 self.status_label.setProperty("state", "error")
 
                 # Emit signal
@@ -664,7 +669,7 @@ class OAuthResultDialog(QDialog):
         status_text = self.i18n.t("common.success") if self.success else self.i18n.t("common.error")
         icon_label = QLabel(f"<h2>{status_text}</h2>")
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        icon_label.setProperty("role", "oauth-status")
+        icon_label.setProperty("role", ROLE_OAUTH_STATUS)
         icon_label.setProperty("state", "success" if self.success else "error")
         layout.addWidget(icon_label)
 

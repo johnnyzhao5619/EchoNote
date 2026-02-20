@@ -21,9 +21,16 @@ Displays a splash screen with progress updates during initialization.
 
 import logging
 
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QFont, QPainter, QPixmap
-from PySide6.QtWidgets import QSplashScreen
+from core.qt_imports import (
+    QApplication,
+    QFont,
+    QFontMetrics,
+    QPainter,
+    QPixmap,
+    QSplashScreen,
+    Qt,
+    QTimer,
+)
 
 from config.constants import SPLASH_SCREEN_DELAY_MS
 from ui.common.theme import ThemeManager
@@ -162,8 +169,6 @@ class SplashScreen(QSplashScreen):
         painter.setFont(percent_font)
 
         # Calculate text width for right alignment
-        from PySide6.QtGui import QFontMetrics
-
         metrics = QFontMetrics(percent_font)
         text_width = metrics.horizontalAdvance(percent_text)
 
@@ -188,8 +193,6 @@ class SplashScreen(QSplashScreen):
         self.repaint()
 
         # Process events to keep UI responsive
-        from PySide6.QtWidgets import QApplication
-
         QApplication.processEvents()
 
         logger.debug(f"Splash progress: {message} ({self._progress_percent}%)")

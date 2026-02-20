@@ -24,7 +24,13 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, Coroutine, Optional
 
-from PySide6.QtCore import QObject, Signal
+from core.qt_imports import (
+    QObject,
+    QRunnable,
+    QThreadPool,
+    Signal,
+    Slot,
+)
 
 logger = logging.getLogger("echonote.utils.qt_async")
 

@@ -23,21 +23,43 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QColor, QTextCharFormat, QTextCursor
-from PySide6.QtWidgets import (
+from core.qt_imports import (
+    QAction,
+    QApplication,
+    QColor,
     QDialog,
     QFileDialog,
+    QFrame,
+    QHBoxLayout,
+    QKeySequence,
     QLabel,
     QLineEdit,
+    QMenu,
+    QMessageBox,
+    QPlainTextEdit,
+    QPushButton,
+    QScrollArea,
+    QShortcut,
+    QSize,
+    Qt,
+    QTextCharFormat,
+    QTextCursor,
     QTextEdit,
+    QTimer,
     QVBoxLayout,
     QWidget,
+    Signal,
 )
 
 from ui.base_widgets import BaseWidget, connect_button_with_callback, create_button, create_hbox
 from ui.common.theme import ThemeManager
 from ui.constants import (
+    ROLE_DIALOG_NAV_ACTION,
+    ROLE_DIALOG_PRIMARY_ACTION,
+    ROLE_DIALOG_SECONDARY_ACTION,
+    ROLE_TIMELINE_COPY_ACTION,
+    ROLE_TIMELINE_EXPORT_ACTION,
+    ROLE_TRANSCRIPT_FILE,
     TIMELINE_DIALOG_BUTTON_MARGINS,
     TIMELINE_SEARCH_NAV_BUTTON_MAX_WIDTH,
     TIMELINE_TRANSCRIPT_DIALOG_MIN_HEIGHT,
@@ -106,7 +128,7 @@ class TranscriptViewer(BaseWidget):
         # File name label
         file_name = Path(self.file_path).name
         self.file_label = QLabel(file_name)
-        self.file_label.setProperty("role", "transcript-file")
+        self.file_label.setProperty("role", ROLE_TRANSCRIPT_FILE)
         layout.addWidget(self.file_label)
 
         # Search bar
@@ -118,13 +140,13 @@ class TranscriptViewer(BaseWidget):
         search_layout.addWidget(self.search_input, stretch=1)
 
         self.search_button = create_button(self.i18n.t("transcript.search"))
-        self.search_button.setProperty("role", "dialog-secondary-action")
+        self.search_button.setProperty("role", ROLE_DIALOG_SECONDARY_ACTION)
         connect_button_with_callback(self.search_button, self._on_search)
         search_layout.addWidget(self.search_button)
 
         # Previous/Next match buttons
         self.prev_button = create_button(self.i18n.t("transcript.previous_match_button"))
-        self.prev_button.setProperty("role", "dialog-nav-action")
+        self.prev_button.setProperty("role", ROLE_DIALOG_NAV_ACTION)
         self.prev_button.setToolTip(self.i18n.t("transcript.previous_match_tooltip"))
         self.prev_button.setMaximumWidth(TIMELINE_SEARCH_NAV_BUTTON_MAX_WIDTH)
         connect_button_with_callback(self.prev_button, self._on_previous_match)
@@ -132,7 +154,7 @@ class TranscriptViewer(BaseWidget):
         search_layout.addWidget(self.prev_button)
 
         self.next_button = create_button(self.i18n.t("transcript.next_match_button"))
-        self.next_button.setProperty("role", "dialog-nav-action")
+        self.next_button.setProperty("role", ROLE_DIALOG_NAV_ACTION)
         self.next_button.setToolTip(self.i18n.t("transcript.next_match_tooltip"))
         self.next_button.setMaximumWidth(TIMELINE_SEARCH_NAV_BUTTON_MAX_WIDTH)
         connect_button_with_callback(self.next_button, self._on_next_match)
@@ -140,7 +162,7 @@ class TranscriptViewer(BaseWidget):
         search_layout.addWidget(self.next_button)
 
         self.clear_search_button = create_button(self.i18n.t("transcript.clear_search"))
-        self.clear_search_button.setProperty("role", "dialog-secondary-action")
+        self.clear_search_button.setProperty("role", ROLE_DIALOG_SECONDARY_ACTION)
         connect_button_with_callback(self.clear_search_button, self._on_clear_search)
         search_layout.addWidget(self.clear_search_button)
 
@@ -158,13 +180,13 @@ class TranscriptViewer(BaseWidget):
 
         self.copy_button = create_button(self.i18n.t("transcript.copy_all"))
         connect_button_with_callback(self.copy_button, self._on_copy_all)
-        self.copy_button.setProperty("role", "timeline-copy-action")
+        self.copy_button.setProperty("role", ROLE_TIMELINE_COPY_ACTION)
         # Styling is handled by theme files (dark.qss / light.qss)
         button_layout.addWidget(self.copy_button)
 
         self.export_button = create_button(self.i18n.t("transcript.export"))
         connect_button_with_callback(self.export_button, self._on_export)
-        self.export_button.setProperty("role", "timeline-export-action")
+        self.export_button.setProperty("role", ROLE_TIMELINE_EXPORT_ACTION)
         # Styling is handled by theme files (dark.qss / light.qss)
         button_layout.addWidget(self.export_button)
 
@@ -307,7 +329,7 @@ class TranscriptViewer(BaseWidget):
 
     def _on_copy_all(self):
         """Handle copy all button click."""
-        from PySide6.QtWidgets import QApplication
+        from core.qt_imports import QApplication
 
         clipboard = QApplication.clipboard()
         clipboard.setText(self.transcript_text)
@@ -318,7 +340,7 @@ class TranscriptViewer(BaseWidget):
         self.copy_button.setText(self.i18n.t("transcript.copied"))
 
         # Reset button text after 2 seconds
-        from PySide6.QtCore import QTimer
+        from core.qt_imports import QTimer
 
         QTimer.singleShot(
             2000, lambda: self.copy_button.setText(self.i18n.t("transcript.copy_all"))
@@ -429,7 +451,7 @@ class TranscriptViewerDialog(QDialog):
 
         self.close_button = create_button(i18n.t("common.close"))
         connect_button_with_callback(self.close_button, self.close)
-        self.close_button.setProperty("role", "dialog-primary-action")
+        self.close_button.setProperty("role", ROLE_DIALOG_PRIMARY_ACTION)
         button_layout.addWidget(self.close_button)
 
         layout.addLayout(button_layout)

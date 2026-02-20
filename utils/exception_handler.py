@@ -62,7 +62,7 @@ def exception_hook(exctype, value, tb):
 
     # Try to show error dialog if PySide6 is available
     try:
-        from PySide6.QtWidgets import QApplication
+        from core.qt_imports import QApplication, QMessageBox, Qt, Signal, Slot
 
         from ui.common.error_dialog import show_error_dialog
 

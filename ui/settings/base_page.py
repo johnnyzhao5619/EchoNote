@@ -22,9 +22,12 @@ Provides common functionality for all settings pages.
 import logging
 from typing import Tuple, TypedDict
 
-from ui.qt_imports import (
+from core.qt_imports import (
+    QHBoxLayout,
     QLabel,
+    QPushButton,
     QScrollArea,
+    Qt,
     QVBoxLayout,
     QWidget,
     Signal,

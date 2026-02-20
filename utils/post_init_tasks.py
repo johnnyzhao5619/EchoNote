@@ -119,7 +119,7 @@ def check_model_availability(config, model_manager, i18n, main_window):
         # If user chose to download later, show a reminder in the main window
         if not user_downloaded:
             logger.info("User chose to download later, showing reminder...")
-            from PySide6.QtWidgets import QMessageBox
+            from core.qt_imports import QMessageBox
 
             QMessageBox.warning(
                 main_window,

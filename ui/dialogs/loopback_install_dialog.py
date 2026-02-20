@@ -19,7 +19,7 @@ import logging
 import platform
 from typing import Optional
 
-from PySide6.QtWidgets import QCheckBox, QDialog, QLabel, QMessageBox, QTextEdit, QVBoxLayout
+from core.qt_imports import QCheckBox, QDialog, QLabel, QMessageBox, QTextEdit, QVBoxLayout
 
 from ui.base_widgets import connect_button_with_callback, create_button, create_hbox
 from ui.constants import (
@@ -83,7 +83,7 @@ class LoopbackInstallDialog(QDialog):
         layout.addWidget(desc_label)
 
         instructions_label = QLabel(self.i18n.t("loopback.installation_instructions"))
-        instructions_label.setProperty("role", "audio-file")
+        instructions_label.setProperty("role", ROLE_AUDIO_FILE)
         layout.addWidget(instructions_label)
 
         instructions_text = QTextEdit()

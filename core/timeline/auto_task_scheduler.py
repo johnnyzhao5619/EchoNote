@@ -646,8 +646,7 @@ class AutoTaskScheduler:
     ) -> Tuple[Optional[Dict[str, Any]], Optional[Exception]]:
         """Execute callback on UI thread and wait for completion."""
         try:
-            from PySide6.QtCore import QObject, Signal, Slot
-            from PySide6.QtWidgets import QApplication
+            from core.qt_imports import QApplication, QInputDialog, QMessageBox, QObject, Signal, Slot
         except Exception as exc:  # noqa: BLE001
             return None, exc
 

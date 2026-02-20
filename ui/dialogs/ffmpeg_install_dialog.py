@@ -23,10 +23,14 @@ import logging
 import platform
 from typing import Optional
 
-from PySide6.QtWidgets import (
+from core.qt_imports import (
     QCheckBox,
     QDialog,
+    QHBoxLayout,
     QLabel,
+    QPushButton,
+    QScrollArea,
+    Qt,
     QTextEdit,
     QVBoxLayout,
 )
@@ -118,7 +122,7 @@ class FFmpegInstallDialog(QDialog):
 
         # Instructions text area
         instructions_label = QLabel(self.i18n.t("ffmpeg.installation_instructions"))
-        instructions_label.setProperty("role", "audio-file")
+        instructions_label.setProperty("role", ROLE_AUDIO_FILE)
         layout.addWidget(instructions_label)
 
         instructions_text = QTextEdit()

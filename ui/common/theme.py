@@ -23,7 +23,7 @@ between QSS stylesheets and custom-painted widgets.
 import logging
 from typing import Dict, Optional
 
-from PySide6.QtGui import QColor
+from core.qt_imports import QColor
 
 logger = logging.getLogger(__name__)
 

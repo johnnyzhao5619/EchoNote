@@ -23,7 +23,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
-from ui.qt_imports import (
+from core.qt_imports import (
     QBrush,
     QColor,
     QDate,
@@ -43,12 +43,25 @@ from ui.qt_imports import (
     Signal,
 )
 
-from ui.base_widgets import BaseWidget
+from ui.base_widgets import BaseWidget, BaseEventCard
 from ui.constants import (
     CALENDAR_DAY_CELL_MIN_HEIGHT,
     CALENDAR_GRID_CELL_SPACING,
     PAGE_COMPACT_SPACING,
     PAGE_DENSE_SPACING,
+    ROLE_CALENDAR_DAY_CELL,
+    ROLE_CALENDAR_DAY_COLUMN,
+    ROLE_CALENDAR_DAY_HEADER,
+    ROLE_CALENDAR_DAY_NUMBER,
+    ROLE_CALENDAR_EVENTS_CONTAINER,
+    ROLE_CALENDAR_HEADER,
+    ROLE_CALENDAR_WEEK_HEADER,
+    ROLE_EVENT_CARD,
+    ROLE_EVENT_INDICATOR,
+    ROLE_EVENT_TIME,
+    ROLE_EVENT_TITLE,
+    ROLE_MORE_EVENTS,
+    ROLE_NO_EVENTS,
     STATUS_INDICATOR_SYMBOL,
     ZERO_MARGINS,
 )
@@ -156,35 +169,29 @@ class ClickableDayWidget(QWidget):
         self.clicked.emit(self.date)
 
 
-class EventCard(QFrame):
+class EventCard(BaseEventCard):
     """
     Visual representation of a calendar event.
     """
 
     clicked = Signal(str)  # event_id
 
-    def __init__(self, calendar_event: Any, parent: Optional[QWidget] = None):
+    def __init__(self, calendar_event: Any, i18n: I18nQtManager, parent: Optional[QWidget] = None):
         """
         Initialize event card.
 
         Args:
             calendar_event: CalendarEvent instance
+            i18n: Internationalization manager
             parent: Parent widget
         """
-        super().__init__(parent)
-        self.calendar_event = calendar_event
-
+        super().__init__(calendar_event, i18n, parent)
         self.setup_ui()
 
     def setup_ui(self):
         """Set up event card UI."""
-        self.setObjectName("event_card")
-        self.setFrameStyle(QFrame.Shape.StyledPanel)
+        self.setup_base_ui()
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-
-        # Set semantic properties for theming
-        self.setProperty("role", "event-card")
-        self.setProperty("source", self.calendar_event.source)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(
@@ -192,25 +199,30 @@ class EventCard(QFrame):
         )
         layout.setSpacing(PAGE_DENSE_SPACING)
 
-        # Event title
-        title_label = QLabel(self.calendar_event.title)
-        title_label.setWordWrap(True)
-        title_label.setProperty("role", "event-title")
-        layout.addWidget(title_label)
+        # Title
+        self.title_label = QLabel(self.calendar_event.title)
+        self.title_label.setProperty("role", ROLE_EVENT_TITLE)
+        self.title_label.setWordWrap(True)
+        layout.addWidget(self.title_label)
 
-        # Event time (localized)
+        # Time
+        self.time_label = QLabel(self._get_formatted_time_short())
+        self.time_label.setProperty("role", ROLE_EVENT_TIME)
+        layout.addWidget(self.time_label)
+
+    def _get_formatted_time_short(self) -> str:
+        """Get shortened localized time string."""
         bounds = _event_bounds(self.calendar_event)
         if bounds is not None:
             start_dt, end_dt = bounds
-            time_text = f"{format_localized_datetime(start_dt, include_date=False)} - {format_localized_datetime(end_dt, include_date=False)}"
-        else:
-            start_value = getattr(self.calendar_event, "start_time", "")
-            end_value = getattr(self.calendar_event, "end_time", "")
-            time_text = f"{start_value} - {end_value}"
+            return f"{format_localized_datetime(start_dt, include_date=False)} - {format_localized_datetime(end_dt, include_date=False)}"
+        return f"{self.calendar_event.start_time} - {self.calendar_event.end_time}"
 
-        time_label = QLabel(time_text)
-        time_label.setProperty("role", "event-time")
-        layout.addWidget(time_label)
+    def update_translations(self):
+        """Update labels on language change."""
+        super().update_translations()
+        if self.time_label:
+            self.time_label.setText(self._get_formatted_time_short())
 
     def mousePressEvent(self, mouse_event):
         """Handle mouse press event."""
@@ -257,7 +269,7 @@ class MonthView(BaseWidget):
         # Month/year header
         self.header_label = QLabel()
         self.header_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.header_label.setProperty("role", "calendar-header")
+        self.header_label.setProperty("role", ROLE_CALENDAR_HEADER)
         layout.addWidget(self.header_label)
 
         # Calendar grid
@@ -270,7 +282,7 @@ class MonthView(BaseWidget):
         for col, day_name in enumerate(day_names):
             header = QLabel(day_name)
             header.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            header.setProperty("role", "calendar-day-header")
+            header.setProperty("role", ROLE_CALENDAR_DAY_HEADER)
             self.calendar_grid.addWidget(header, 0, col)
 
         # Add calendar cells (will be populated by refresh_view)
@@ -363,7 +375,7 @@ class MonthView(BaseWidget):
         cell.clicked.connect(self.date_clicked.emit)
         cell.setFrameStyle(QFrame.Shape.Box)
         cell.setMinimumHeight(CALENDAR_DAY_CELL_MIN_HEIGHT)
-        cell.setProperty("role", "calendar-day-cell")
+        cell.setProperty("role", ROLE_CALENDAR_DAY_CELL)
 
         layout = QVBoxLayout(cell)
         layout.setContentsMargins(
@@ -374,7 +386,7 @@ class MonthView(BaseWidget):
         # Day number
         day_label = QLabel(str(day_date.day))
         day_label.setAlignment(Qt.AlignmentFlag.AlignRight)
-        day_label.setProperty("role", "calendar-day-number")
+        day_label.setProperty("role", ROLE_CALENDAR_DAY_NUMBER)
         layout.addWidget(day_label)
 
         # Event indicators (show up to 3 events)
@@ -383,7 +395,7 @@ class MonthView(BaseWidget):
             indicator.setFlat(True)
             indicator.setCursor(Qt.CursorShape.PointingHandCursor)
             indicator.setToolTip(getattr(calendar_event, "title", ""))
-            indicator.setProperty("role", "event-indicator")
+            indicator.setProperty("role", ROLE_EVENT_INDICATOR)
             indicator.setProperty("source", calendar_event.source)
             indicator.clicked.connect(
                 lambda _checked=False, event_id=calendar_event.id: self.event_clicked.emit(event_id)
@@ -393,7 +405,7 @@ class MonthView(BaseWidget):
         # Show "+N more" if there are more events
         if len(events) > 3:
             more_label = QLabel(_format_more_events_text(self.i18n, len(events) - 3))
-            more_label.setProperty("role", "more-events")
+            more_label.setProperty("role", ROLE_MORE_EVENTS)
             layout.addWidget(more_label)
 
         layout.addStretch()
@@ -481,7 +493,7 @@ class WeekView(BaseWidget):
         # Week header
         self.header_label = QLabel()
         self.header_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.header_label.setProperty("role", "calendar-header")
+        self.header_label.setProperty("role", ROLE_CALENDAR_HEADER)
         layout.addWidget(self.header_label)
 
         # Scroll area for week grid
@@ -530,7 +542,7 @@ class WeekView(BaseWidget):
             date = week_start + timedelta(days=col)
             header = QLabel(f"{day_name}\n{date.day}")
             header.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            header.setProperty("role", "calendar-week-header")
+            header.setProperty("role", ROLE_CALENDAR_WEEK_HEADER)
             self.week_grid.addWidget(header, 0, col)
 
         # Load events for the week
@@ -576,7 +588,7 @@ class WeekView(BaseWidget):
         """
         column = ClickableDayWidget(day_date)
         column.clicked.connect(self.date_clicked.emit)
-        column.setProperty("role", "calendar-day-column")
+        column.setProperty("role", ROLE_CALENDAR_DAY_COLUMN)
         layout = QVBoxLayout(column)
         layout.setContentsMargins(*ZERO_MARGINS)
         layout.setSpacing(PAGE_DENSE_SPACING)
@@ -585,7 +597,7 @@ class WeekView(BaseWidget):
 
         # Add event cards
         for calendar_event in sorted_events:
-            card = EventCard(calendar_event)
+            card = EventCard(calendar_event, self.i18n)
             card.clicked.connect(self.event_clicked.emit)
             layout.addWidget(card)
 
@@ -667,7 +679,7 @@ class DayView(BaseWidget):
         # Day header
         self.header_label = QLabel()
         self.header_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.header_label.setProperty("role", "calendar-header")
+        self.header_label.setProperty("role", ROLE_CALENDAR_HEADER)
         layout.addWidget(self.header_label)
 
         # Scroll area for events
@@ -676,7 +688,7 @@ class DayView(BaseWidget):
 
         # Events container
         self.events_container = QWidget()
-        self.events_container.setProperty("role", "calendar-events-container")
+        self.events_container.setProperty("role", ROLE_CALENDAR_EVENTS_CONTAINER)
         self.events_layout = QVBoxLayout(self.events_container)
         self.events_layout.setContentsMargins(
             PAGE_COMPACT_SPACING,
@@ -717,14 +729,14 @@ class DayView(BaseWidget):
         # Add event cards
         if sorted_events:
             for calendar_event in sorted_events:
-                card = EventCard(calendar_event)
+                card = EventCard(calendar_event, self.i18n)
                 card.clicked.connect(self.event_clicked.emit)
                 self.events_layout.addWidget(card)
         else:
             # No events message
             no_events_label = QLabel(self.i18n.t("calendar_hub.calendar_view.no_events"))
             no_events_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            no_events_label.setProperty("role", "no-events")
+            no_events_label.setProperty("role", ROLE_NO_EVENTS)
             self.events_layout.addWidget(no_events_label)
 
         self.events_layout.addStretch()

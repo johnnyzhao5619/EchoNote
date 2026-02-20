@@ -22,10 +22,7 @@ Displays event information with different layouts for past and future events.
 import logging
 from typing import Any, Dict, Optional
 
-from PySide6.QtCore import Signal
-
-# QColor, QPalette imports removed - using semantic styling instead
-from PySide6.QtWidgets import (
+from core.qt_imports import (
     QCheckBox,
     QComboBox,
     QFrame,
@@ -34,15 +31,34 @@ from PySide6.QtWidgets import (
     QPushButton,
     QVBoxLayout,
     QWidget,
+    Signal,
 )
 
 from config.constants import (
     CALENDAR_API_TIMEOUT_SECONDS,
     OUTLOOK_CALENDAR_MAX_PAGE_SIZE,
 )
-from ui.base_widgets import create_button, create_hbox, create_vbox
+from ui.base_widgets import (
+    BaseEventCard,
+    create_button,
+    create_hbox,
+    create_vbox,
+    create_danger_button,
+)
 from ui.constants import (
     PAGE_DENSE_SPACING,
+    ROLE_CURRENT_TIME,
+    ROLE_CURRENT_TIME_LINE,
+    ROLE_EVENT_DESCRIPTION,
+    ROLE_EVENT_INDICATOR,
+    ROLE_EVENT_META,
+    ROLE_EVENT_TITLE,
+    ROLE_EVENT_TYPE_BADGE,
+    ROLE_NO_ARTIFACTS,
+    ROLE_TIMELINE_RECORDING_ACTION,
+    ROLE_TIMELINE_SECONDARY_TRANSCRIBE_ACTION,
+    ROLE_TIMELINE_TRANSCRIPT_ACTION,
+    ROLE_TIMELINE_TRANSLATION_ACTION,
     TIMELINE_CURRENT_TIME_LINE_HEIGHT,
     TIMELINE_TRANSLATION_COMBO_MIN_WIDTH,
     ZERO_MARGINS,
@@ -76,20 +92,20 @@ class CurrentTimeIndicator(QFrame):
         left_line = QFrame()
         left_line.setFrameShape(QFrame.Shape.HLine)
         left_line.setFrameShadow(QFrame.Shadow.Plain)
-        left_line.setProperty("role", "current-time-line")
+        left_line.setProperty("role", ROLE_CURRENT_TIME_LINE)
         left_line.setFixedHeight(TIMELINE_CURRENT_TIME_LINE_HEIGHT)
         layout.addWidget(left_line, stretch=1)
 
         # Label
         label = QLabel(self.i18n.t("timeline.current_time"))
-        label.setProperty("role", "current-time")
+        label.setProperty("role", ROLE_CURRENT_TIME)
         layout.addWidget(label)
 
         # Right line (red dashed)
         right_line = QFrame()
         right_line.setFrameShape(QFrame.Shape.HLine)
         right_line.setFrameShadow(QFrame.Shadow.Plain)
-        right_line.setProperty("role", "current-time-line")
+        right_line.setProperty("role", ROLE_CURRENT_TIME_LINE)
         right_line.setFixedHeight(TIMELINE_CURRENT_TIME_LINE_HEIGHT)
         layout.addWidget(right_line, stretch=1)
 
@@ -102,7 +118,7 @@ class CurrentTimeIndicator(QFrame):
                 break
 
 
-class EventCard(QFrame):
+class EventCard(BaseEventCard):
     """
     Event card widget for timeline.
 
@@ -116,18 +132,6 @@ class EventCard(QFrame):
     view_translation = Signal(str)  # file_path
     delete_requested = Signal(str)  # event_id
     secondary_transcribe_requested = Signal(str, str)  # event_id, recording_path
-
-    EVENT_TYPE_TRANSLATION_MAP = {
-        "event": "timeline.filter_event",
-        "task": "timeline.filter_task",
-        "appointment": "timeline.filter_appointment",
-    }
-
-    SOURCE_TRANSLATION_MAP = {
-        "local": "timeline.source_local",
-        "google": "timeline.source_google",
-        "outlook": "timeline.source_outlook",
-    }
 
     def __init__(
         self,
@@ -146,20 +150,21 @@ class EventCard(QFrame):
             i18n: Internationalization manager
             parent: Parent widget
         """
-        super().__init__(parent)
+        super().__init__(event_data["event"], i18n, parent)
 
         self.event_data = event_data
-        self.calendar_event = event_data["event"]
         self.is_future = is_future
-        self.i18n = i18n
 
         self.artifacts = event_data.get("artifacts", {})
 
-        # Badge label references for translation updates
-        self.type_badge_label = None
-        self.source_badge_label = None
+        # Additional badge/control labels
+        self.recording_btn = None
+        self.secondary_transcribe_btn = None
+        self.transcript_btn = None
         self.translation_btn = None
         self.translation_checkbox = None
+        self.recording_checkbox = None
+        self.transcription_checkbox = None
         self.translation_language_label = None
         self.translation_language_combo = None
         self.delete_btn = None
@@ -167,26 +172,21 @@ class EventCard(QFrame):
         # Setup UI
         self.setup_ui()
 
-        logger.debug(f"Event card created: {self.calendar_event.id}")
+        logger.debug(f"Timeline event card created: {self.calendar_event.id}")
 
     def setup_ui(self):
         """Set up the card UI."""
-        # Card styling
-        self.setFrameShape(QFrame.Shape.StyledPanel)
-        self.setFrameShadow(QFrame.Shadow.Raised)
-        self.setObjectName("event_card")
-        # Styling is handled by theme files (dark.qss / light.qss)
+        self.setup_base_ui()
 
         # Main layout
         layout = QVBoxLayout(self)
         layout.setContentsMargins(*ZERO_MARGINS)
         layout.setSpacing(PAGE_DENSE_SPACING)
 
-        # Header with title and time
-        header_layout = self.create_header()
-        layout.addLayout(header_layout)
+        # Header with title, time, badges
+        self.create_common_header(layout)
 
-        # Event details
+        # Event details (Location, Attendees, Description)
         details_layout = self.create_details()
         layout.addLayout(details_layout)
 
@@ -198,63 +198,6 @@ class EventCard(QFrame):
 
         layout.addLayout(actions_layout)
 
-    def create_header(self) -> QVBoxLayout:
-        """
-        Create card header with title and time.
-
-        Returns:
-            Header layout
-        """
-        header_layout = create_vbox(spacing=PAGE_DENSE_SPACING)
-
-        # Title
-        title_label = QLabel(self.calendar_event.title)
-        title_label.setProperty("role", "event-title")
-        title_label.setWordWrap(True)
-        header_layout.addWidget(title_label)
-
-        # Time and type
-        time_layout = create_hbox()
-
-        # Format time
-        start_value = self.calendar_event.start_time
-        end_value = self.calendar_event.end_time
-
-        try:
-            start_time = to_local_datetime(start_value)
-            end_time = to_local_datetime(end_value)
-        except Exception as exc:  # pragma: no cover - defensive log
-            logger.warning(
-                "Failed to localize event time for %s: %s",
-                getattr(self.calendar_event, "id", "<unknown>"),
-                exc,
-            )
-            time_str = f"{start_value} - {end_value}"
-        else:
-            time_str = f"{format_localized_datetime(start_time)} - {format_localized_datetime(end_time, include_date=False)}"
-
-        time_label = QLabel(time_str)
-        time_label.setObjectName("time_label")
-        time_label.setProperty("role", "event-meta")
-        time_layout.addWidget(time_label)
-
-        # Event type badge
-        type_badge = QLabel(self._get_event_type_badge_text())
-        type_badge.setProperty("role", "event-type-badge")
-        self.type_badge_label = type_badge
-        time_layout.addWidget(type_badge)
-
-        # Source badge - use semantic properties for theming
-        source_badge = QLabel(self._get_source_badge_text())
-        source_badge.setProperty("role", "event-indicator")
-        source_badge.setProperty("source", self.calendar_event.source)
-        self.source_badge_label = source_badge
-        time_layout.addWidget(source_badge)
-
-        time_layout.addStretch()
-        header_layout.addLayout(time_layout)
-
-        return header_layout
 
     def create_details(self) -> QVBoxLayout:
         """
@@ -270,7 +213,7 @@ class EventCard(QFrame):
             location_layout = create_hbox()
             location_label = QLabel(self.calendar_event.location)
             location_label.setObjectName("detail_label")
-            location_label.setProperty("role", "event-meta")
+            location_label.setProperty("role", ROLE_EVENT_META)
             location_layout.addWidget(location_label)
             location_layout.addStretch()
 
@@ -285,7 +228,7 @@ class EventCard(QFrame):
 
             attendees_label = QLabel(attendees_text)
             attendees_label.setObjectName("detail_label")
-            attendees_label.setProperty("role", "event-meta")
+            attendees_label.setProperty("role", ROLE_EVENT_META)
             attendees_layout.addWidget(attendees_label)
             attendees_layout.addStretch()
 
@@ -297,7 +240,7 @@ class EventCard(QFrame):
             if len(self.calendar_event.description) > 100:
                 desc_label.setText(desc_label.text() + "...")
             desc_label.setObjectName("description_label")
-            desc_label.setProperty("role", "event-description")
+            desc_label.setProperty("role", ROLE_EVENT_DESCRIPTION)
             desc_label.setWordWrap(True)
             details_layout.addWidget(desc_label)
 
@@ -381,39 +324,35 @@ class EventCard(QFrame):
         if has_recording:
             self.recording_btn = create_button(self.i18n.t("timeline.play_recording"))
             self.recording_btn.clicked.connect(self._on_play_recording)
-            self.recording_btn.setProperty("role", "timeline-recording-action")
+            self.recording_btn.setProperty("role", ROLE_TIMELINE_RECORDING_ACTION)
             # Styling is handled by theme files (dark.qss / light.qss)
             actions_layout.addWidget(self.recording_btn)
-
-            # Secondary Transcription button
-            self.secondary_transcribe_btn = create_button(
-                self.i18n.t("timeline.secondary_transcribe")
-            )
+            
+        if has_transcript:
+            self.secondary_transcribe_btn = create_button(self.i18n.t("timeline.secondary_transcribe"))
             self.secondary_transcribe_btn.clicked.connect(self._on_secondary_transcribe)
             self.secondary_transcribe_btn.setProperty(
-                "role", "timeline-secondary-transcribe-action"
+                "role", ROLE_TIMELINE_SECONDARY_TRANSCRIBE_ACTION
             )
             actions_layout.addWidget(self.secondary_transcribe_btn)
 
-        # Transcript button
-        if has_transcript:
             self.transcript_btn = create_button(self.i18n.t("timeline.view_transcript"))
             self.transcript_btn.clicked.connect(self._on_view_transcript)
-            self.transcript_btn.setProperty("role", "timeline-transcript-action")
+            self.transcript_btn.setProperty("role", ROLE_TIMELINE_TRANSCRIPT_ACTION)
             # Styling is handled by theme files (dark.qss / light.qss)
             actions_layout.addWidget(self.transcript_btn)
 
         if has_translation:
             self.translation_btn = create_button(self.i18n.t("timeline.view_translation"))
             self.translation_btn.clicked.connect(self._on_view_translation)
-            self.translation_btn.setProperty("role", "timeline-translation-action")
+            self.translation_btn.setProperty("role", ROLE_TIMELINE_TRANSLATION_ACTION)
             actions_layout.addWidget(self.translation_btn)
 
         # Show message if no artifacts
         if not (has_recording or has_transcript or has_translation):
             no_artifacts_label = QLabel(self.i18n.t("timeline.no_artifacts"))
             no_artifacts_label.setObjectName("no_artifacts_label")
-            no_artifacts_label.setProperty("role", "no-artifacts")
+            no_artifacts_label.setProperty("role", ROLE_NO_ARTIFACTS)
             actions_layout.addWidget(no_artifacts_label)
 
         self._add_delete_action(actions_layout)
@@ -423,9 +362,7 @@ class EventCard(QFrame):
 
     def _add_delete_action(self, actions_layout: QHBoxLayout) -> None:
         """Append a delete action button to the card action row."""
-        self.delete_btn = create_button(self.i18n.t("common.delete"))
-        self.delete_btn.setProperty("variant", "danger")
-        self.delete_btn.setProperty("role", "danger")
+        self.delete_btn = create_danger_button(self.i18n.t("common.delete"))
         self.delete_btn.clicked.connect(self._on_delete_clicked)
         actions_layout.addWidget(self.delete_btn)
 
@@ -568,24 +505,21 @@ class EventCard(QFrame):
 
     def update_translations(self):
         """Update UI text when language changes."""
-        if getattr(self, "type_badge_label", None):
-            self.type_badge_label.setText(self._get_event_type_badge_text())
-        if getattr(self, "source_badge_label", None):
-            self.source_badge_label.setText(self._get_source_badge_text())
+        super().update_translations()
 
         if self.is_future:
             # Update checkboxes
-            if hasattr(self, "transcription_checkbox"):
+            if self.transcription_checkbox:
                 self.transcription_checkbox.setText(self.i18n.t("timeline.enable_transcription"))
-            if hasattr(self, "recording_checkbox"):
+            if self.recording_checkbox:
                 self.recording_checkbox.setText(self.i18n.t("timeline.enable_recording"))
-            if getattr(self, "translation_checkbox", None):
+            if self.translation_checkbox:
                 self.translation_checkbox.setText(self.i18n.t("timeline.enable_translation"))
-            if getattr(self, "translation_language_label", None):
+            if self.translation_language_label:
                 self.translation_language_label.setText(
                     self.i18n.t("timeline.translation_target_label")
                 )
-            if getattr(self, "translation_language_combo", None):
+            if self.translation_language_combo:
                 current_code = self.translation_language_combo.currentData()
                 self.translation_language_combo.blockSignals(True)
                 self.translation_language_combo.clear()
@@ -598,13 +532,13 @@ class EventCard(QFrame):
                 self.translation_language_combo.blockSignals(False)
         else:
             # Update buttons
-            if hasattr(self, "recording_btn"):
+            if self.recording_btn:
                 self.recording_btn.setText(self.i18n.t("timeline.play_recording"))
-            if hasattr(self, "transcript_btn"):
+            if self.transcript_btn:
                 self.transcript_btn.setText(self.i18n.t("timeline.view_transcript"))
-            if getattr(self, "translation_btn", None):
+            if self.translation_btn:
                 self.translation_btn.setText(self.i18n.t("timeline.view_translation"))
-            if hasattr(self, "secondary_transcribe_btn"):
+            if self.secondary_transcribe_btn:
                 self.secondary_transcribe_btn.setText(self.i18n.t("timeline.secondary_transcribe"))
 
             # Update no artifacts label
@@ -613,21 +547,5 @@ class EventCard(QFrame):
                     child.setText(self.i18n.t("timeline.no_artifacts"))
                     break
 
-        if getattr(self, "delete_btn", None):
+        if self.delete_btn:
             self.delete_btn.setText(self.i18n.t("common.delete"))
-
-    def _get_event_type_badge_text(self) -> str:
-        """Return translated text for the event type badge."""
-        event_type = getattr(self.calendar_event, "event_type", "") or ""
-        translation_key = self.EVENT_TYPE_TRANSLATION_MAP.get(event_type.lower())
-        if translation_key:
-            return self.i18n.t(translation_key)
-        return event_type
-
-    def _get_source_badge_text(self) -> str:
-        """Return translated text for the source badge."""
-        source = getattr(self.calendar_event, "source", "") or ""
-        translation_key = self.SOURCE_TRANSLATION_MAP.get(source.lower())
-        if translation_key:
-            return self.i18n.t(translation_key)
-        return source.capitalize() if source else ""

@@ -24,7 +24,7 @@ import logging
 import math
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, cast
 
-from ui.qt_imports import (
+from core.qt_imports import (
     QComboBox,
     QDate,
     QDateEdit,
@@ -50,7 +50,15 @@ if TYPE_CHECKING:
 
 from core.calendar.constants import CalendarSource, EventType
 from ui.base_widgets import BaseWidget, create_button, create_hbox, create_vbox
-from ui.constants import PAGE_COMPACT_SPACING, PAGE_LAYOUT_SPACING, ZERO_MARGINS
+from ui.constants import (
+    PAGE_COMPACT_SPACING,
+    PAGE_LAYOUT_SPACING,
+    ROLE_TIMELINE_FILTER_CONTROL,
+    ROLE_TIMELINE_SEARCH_ACTION,
+    ROLE_TIMELINE_SEARCH_INPUT,
+    ZERO_MARGINS,
+)
+from ui.utils import calculate_date_range_defaults, normalize_day_span
 from utils.i18n import I18nQtManager
 from utils.time_utils import now_local, to_local_datetime, to_utc_iso
 
@@ -189,7 +197,7 @@ class TimelineWidget(BaseWidget):
 
         # Search box
         self.search_input = QLineEdit()
-        self.search_input.setProperty("role", "timeline-search-input")
+        self.search_input.setProperty("role", ROLE_TIMELINE_SEARCH_INPUT)
         self.search_input.setPlaceholderText(self.i18n.t("timeline.search_placeholder"))
         self.search_input.setClearButtonEnabled(True)
         self.search_input.returnPressed.connect(self._on_search)
@@ -197,7 +205,7 @@ class TimelineWidget(BaseWidget):
 
         # Search button
         self.search_button = create_button(self.i18n.t("timeline.search"))
-        self.search_button.setProperty("role", "timeline-search-action")
+        self.search_button.setProperty("role", ROLE_TIMELINE_SEARCH_ACTION)
         connect_button_with_callback(self.search_button, self._on_search)
         search_row.addWidget(self.search_button)
 
@@ -211,7 +219,7 @@ class TimelineWidget(BaseWidget):
         filter_row.addWidget(self.date_range_label)
 
         self.start_date_edit = QDateEdit()
-        self.start_date_edit.setProperty("role", "timeline-filter-control")
+        self.start_date_edit.setProperty("role", ROLE_TIMELINE_FILTER_CONTROL)
         self.start_date_edit.setCalendarPopup(True)
         filter_row.addWidget(self.start_date_edit)
 
@@ -219,7 +227,7 @@ class TimelineWidget(BaseWidget):
         filter_row.addWidget(self.date_range_separator)
 
         self.end_date_edit = QDateEdit()
-        self.end_date_edit.setProperty("role", "timeline-filter-control")
+        self.end_date_edit.setProperty("role", ROLE_TIMELINE_FILTER_CONTROL)
         self.end_date_edit.setCalendarPopup(True)
         self.sync_date_filters_with_preferences()
 
@@ -229,7 +237,7 @@ class TimelineWidget(BaseWidget):
 
         # Filter by event type
         self.type_filter = QComboBox()
-        self.type_filter.setProperty("role", "timeline-filter-control")
+        self.type_filter.setProperty("role", ROLE_TIMELINE_FILTER_CONTROL)
         self._populate_filter_combo(
             self.type_filter,
             self._EVENT_TYPE_FILTER_OPTIONS,
@@ -239,7 +247,7 @@ class TimelineWidget(BaseWidget):
 
         # Filter by source
         self.source_filter = QComboBox()
-        self.source_filter.setProperty("role", "timeline-filter-control")
+        self.source_filter.setProperty("role", ROLE_TIMELINE_FILTER_CONTROL)
         self._populate_filter_combo(
             self.source_filter,
             self._SOURCE_FILTER_OPTIONS,
@@ -271,24 +279,12 @@ class TimelineWidget(BaseWidget):
             combo.blockSignals(previous_state)
 
     def _normalize_day_span(self, value: Any) -> int:
-        """Return a non-negative integer day span derived from ``value``."""
-        try:
-            numeric = float(value)
-        except (TypeError, ValueError):
-            return 0
-
-        normalized = math.floor(numeric)
-        return max(normalized, 0)
+        """Return a non-negative integer day span derived from value."""
+        return normalize_day_span(value)
 
     def _calculate_date_range_defaults(self) -> tuple[QDate, QDate]:
         """Compute default start/end dates derived from user preferences."""
-        current_date = QDate.currentDate()
-        past_days = self._normalize_day_span(self.past_days)
-        future_days = self._normalize_day_span(self.future_days)
-
-        start_date = current_date.addDays(-past_days) if past_days else current_date
-        end_date = current_date.addDays(future_days) if future_days else current_date
-        return start_date, end_date
+        return calculate_date_range_defaults(self.past_days, self.future_days)
 
     def sync_date_filters_with_preferences(self) -> None:
         """Update date range widgets so they match the configured preferences."""
@@ -930,9 +926,7 @@ class TimelineWidget(BaseWidget):
         except Exception as exc:
             logger.exception("Failed to create audio player dialog for %s", file_path)
             title = self.i18n.t("timeline.audio_player_open_failed_title")
-            message = self.i18n.t("timeline.audio_player_open_failed_message").format(
-                error=str(exc)
-            )
+            message = self.i18n.t("timeline.audio_player_open_failed_message", error=str(exc))
             self.show_error(title, message)
             return
 

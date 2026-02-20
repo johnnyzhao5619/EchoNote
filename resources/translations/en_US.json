@@ -447,6 +447,7 @@
     "save_error_details": "Save failed: {error}",
     "save_retry": "Retry",
     "export": "Export",
+    "export_dialog_title": "Export Transcript",
     "export_txt": "Export as TXT",
     "export_srt": "Export as SRT",
     "export_md": "Export as Markdown",

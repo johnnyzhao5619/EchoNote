@@ -41,10 +41,11 @@ from ui.constants import (
     ZERO_SPACING,
 )
 from ui.navigation import NAV_ITEMS, NAV_PAGE_ORDER
-from ui.qt_imports import (
+from core.qt_imports import (
     QApplication,
     QCloseEvent,
     QHBoxLayout,
+    QIcon,
     QKeySequence,
     QLabel,
     QLineEdit,
@@ -128,8 +129,6 @@ class MainWindow(QMainWindow):
 
         # Set application icon
         import os
-
-        from PySide6.QtGui import QIcon
 
         icon_path = os.path.join("resources", "icons", "echonote.png")
         if os.path.exists(icon_path):
@@ -419,8 +418,6 @@ class MainWindow(QMainWindow):
             page_name: Name of the page
             error_msg: Error message to display
         """
-        from PySide6.QtWidgets import QLabel, QVBoxLayout
-
         placeholder = QWidget()
         layout = QVBoxLayout(placeholder)
 
@@ -777,8 +774,6 @@ class MainWindow(QMainWindow):
                 task_count = self._get_running_task_count()
 
                 # Show confirmation dialog
-                from PySide6.QtWidgets import QMessageBox
-
                 # Build message with task count
                 if task_count > 0:
                     message = self.i18n.t(

@@ -5,7 +5,7 @@ import logging
 from datetime import datetime
 from typing import Union
 
-from ui.qt_imports import (
+from core.qt_imports import (
     QFont,
     QFrame,
     QLabel,
@@ -25,6 +25,9 @@ from ui.base_widgets import (
 from ui.constants import (
     MODEL_MANAGEMENT_ACTION_BUTTON_MAX_WIDTH_MEDIUM,
     MODEL_MANAGEMENT_MODEL_NAME_FONT_SIZE,
+    ROLE_MODEL_DELETE,
+    ROLE_MODEL_DOWNLOAD,
+    ROLE_TIME_DISPLAY,
 )
 from utils.i18n import I18nQtManager
 from utils.time_utils import now_utc
@@ -131,7 +134,7 @@ class ModelCardWidget(QFrame):
                 self.actions_layout.addWidget(config_btn)
 
             delete_btn = create_button(self.i18n.t("settings.model_management.delete"))
-            delete_btn.setProperty("role", "model-delete")
+            delete_btn.setProperty("role", ROLE_MODEL_DELETE)
             delete_btn.clicked.connect(lambda: self.delete_clicked.emit(self.model_id))
 
             # 语音模型忙碌检查
@@ -146,6 +149,8 @@ class ModelCardWidget(QFrame):
             self.actions_layout.addWidget(details_btn)
         else:
             download_btn = create_primary_button(self.i18n.t("settings.model_management.download"))
+            download_btn.setObjectName(f"download_btn_{self.model_id}")
+            download_btn.setProperty("role", ROLE_MODEL_DOWNLOAD)
             download_btn.clicked.connect(lambda: self.download_clicked.emit(self.model_id))
 
             # 检查是否正在下载
@@ -195,7 +200,7 @@ class ModelCardWidget(QFrame):
             )
             usage_text = self.i18n.t("settings.model_management.usage_count", count=usage_count)
             stats_label = QLabel(usage_text)
-            stats_label.setProperty("role", "time-display")
+            stats_label.setProperty("role", ROLE_TIME_DISPLAY)
             self.stats_layout.addWidget(stats_label)
 
             last_used = self.model.last_used
@@ -207,7 +212,7 @@ class ModelCardWidget(QFrame):
             else:
                 time_label = QLabel(self.i18n.t("settings.model_management.never_used"))
 
-            time_label.setProperty("role", "time-display")
+            time_label.setProperty("role", ROLE_TIME_DISPLAY)
             self.stats_layout.addWidget(time_label)
             self.stats_layout.addStretch()
 

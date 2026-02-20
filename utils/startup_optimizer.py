@@ -24,7 +24,7 @@ import logging
 import time
 from typing import Any, Callable, Optional
 
-from PySide6.QtCore import QThread, Signal
+from core.qt_imports import QThread, Signal, QLocale, QSettings, QTimer
 
 logger = logging.getLogger(__name__)
 

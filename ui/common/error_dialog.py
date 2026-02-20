@@ -22,16 +22,18 @@ Provides a dialog for displaying error messages with details and copy functional
 import logging
 from typing import Optional
 
-from PySide6.QtCore import QTimer
-
 from ui.base_widgets import connect_button_with_callback, create_hbox
 from ui.constants import ERROR_DIALOG_DETAILS_MAX_HEIGHT, ERROR_DIALOG_MIN_WIDTH
-from ui.qt_imports import (
-    QApplication,
+from core.qt_imports import (
+    QApplication, # QApplication is used in _copy_to_clipboard, so it must be kept.
     QDialog,
+    QHBoxLayout, # Added by instruction, though not used in original code
     QLabel,
     QPushButton,
-    QTextEdit,
+    QScrollArea, # Added by instruction, though not used in original code
+    Qt,          # Added by instruction, though not used in original code
+    QTextEdit,   # QTextEdit is used in setup_ui, so it must be kept.
+    QTimer,
     QVBoxLayout,
     QWidget,
 )

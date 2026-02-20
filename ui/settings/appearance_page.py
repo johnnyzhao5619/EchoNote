@@ -22,18 +22,21 @@ Provides UI for configuring theme settings.
 import logging
 from typing import Any, Dict, Tuple
 
-from PySide6.QtCore import Qt
-from ui.qt_imports import (
+from core.qt_imports import Qt
+from core.qt_imports import (
+    QButtonGroup,
     QComboBox,
     QFormLayout,
     QFrame,
     QLabel,
+    QRadioButton,
     QVBoxLayout,
 )
 
 from ui.common.theme import ThemeManager
 from ui.constants import SETTINGS_PREVIEW_MIN_HEIGHT
 from ui.settings.base_page import BaseSettingsPage
+from ui.constants import ROLE_AUTO_START_DESC
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.settings.appearance")
@@ -100,7 +103,7 @@ class AppearanceSettingsPage(BaseSettingsPage):
         # Theme info
         self.info_label = QLabel(self.i18n.t("settings.appearance.theme_info"))
         self.info_label.setWordWrap(True)
-        self.info_label.setProperty("role", "auto-start-desc")
+        self.info_label.setProperty("role", ROLE_AUTO_START_DESC)
         self.content_layout.addWidget(self.info_label)
 
         # Add stretch at the end

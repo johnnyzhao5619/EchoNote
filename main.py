@@ -59,8 +59,12 @@ def main():
 
         # Initialize PySide6 application FIRST (needed for splash screen)
         logger.info("Initializing PySide6 application...")
-        from PySide6.QtCore import Qt
-        from PySide6.QtWidgets import QApplication
+        from core.qt_imports import (
+            QApplication,
+            QLocale,
+            QTimer,
+            Qt,
+        )
 
         # Enable high DPI scaling
         QApplication.setHighDpiScaleFactorRoundingPolicy(
@@ -195,11 +199,13 @@ def main():
         logger.info("Initializing file manager...")
         from pathlib import Path
 
-        from config.constants import DEFAULT_RECORDINGS_PATH
+        from config.constants import get_i18n_default_recordings_path
         from data.storage.file_manager import FileManager
 
-        recordings_path = config.get("realtime.recording_save_path", DEFAULT_RECORDINGS_PATH)
-        default_base_dir = str(Path(DEFAULT_RECORDINGS_PATH).expanduser().parent)
+        # Use internationalized default path
+        default_recordings_path = get_i18n_default_recordings_path(i18n)
+        recordings_path = config.get("realtime.recording_save_path", default_recordings_path)
+        default_base_dir = str(Path(default_recordings_path).expanduser().parent)
         file_manager = FileManager(base_dir=default_base_dir, recordings_dir=recordings_path)
         managers["file_manager"] = file_manager
         logger.info("File manager initialized")
@@ -539,7 +545,7 @@ def main():
         return exit_code
 
     except Exception as e:
-        print(f"Fatal error during application startup: {e}")
+        logger.error(f"Fatal error during application startup: {e}")
         import traceback
 
         traceback.print_exc()

@@ -277,7 +277,7 @@ class DatabaseConnection:
 
     def initialize_schema(self, schema_path: Optional[str] = None):
         """
-        Initialize database schema from SQL file.
+        Initialize database schema from SQL file and set version.
 
         Args:
             schema_path: Path to schema.sql file. If None, uses default location.
@@ -297,7 +297,9 @@ class DatabaseConnection:
             schema_sql = f.read()
 
         self.execute_script(schema_sql, commit=True)
-        logger.info("Database schema initialized successfully")
+        # Ensure the schema_version is set to 2 matching schema.sql
+        self.set_version(2)
+        logger.info("Database schema initialized successfully to version 2")
 
     def get_version(self) -> int:
         """
