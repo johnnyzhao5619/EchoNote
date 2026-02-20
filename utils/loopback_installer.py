@@ -47,7 +47,9 @@ class LoopbackInstaller:
 
     CASK_NAME = "blackhole-2ch"
     WINDOWS_VBCABLE_PAGE_URL = "https://vb-audio.com/Cable/"
-    WINDOWS_VBCABLE_FALLBACK_URL = "https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack45.zip"
+    WINDOWS_VBCABLE_FALLBACK_URL = (
+        "https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack45.zip"
+    )
     WINDOWS_VBCABLE_URL_PATTERN = re.compile(
         r"https?://download\.vb-audio\.com/[^\"'\s>]*VBCABLE_Driver_Pack\d+\.zip",
         re.IGNORECASE,

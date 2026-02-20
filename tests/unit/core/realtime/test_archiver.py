@@ -47,17 +47,17 @@ class TestSessionArchiver:
         audio_buffer = [np.zeros(1000, dtype=np.float32)]
         start_time = datetime(2023, 1, 1, 12, 0, 0)
 
-        with patch("core.realtime.archiver.tempfile.NamedTemporaryFile") as mock_temp, \
-             patch("builtins.open", new_callable=MagicMock) as mock_open, \
-             patch("os.unlink") as mock_unlink:
-            
+        with (
+            patch("core.realtime.archiver.tempfile.NamedTemporaryFile") as mock_temp,
+            patch("builtins.open", new_callable=MagicMock) as mock_open,
+            patch("os.unlink") as mock_unlink,
+        ):
+
             mock_temp.return_value.__enter__.return_value.name = "/tmp/recording.wav"
             mock_file_manager.ensure_directory.return_value = "/final/path"
             mock_file_manager.save_file.return_value = "/final/path/file.wav"
 
-            path = await archiver.save_recording(
-                audio_buffer, start_time, 16000, format="wav"
-            )
+            path = await archiver.save_recording(audio_buffer, start_time, 16000, format="wav")
 
             assert path == "/final/path/file.wav"
             mock_file_manager.save_file.assert_called_once()
@@ -74,11 +74,11 @@ class TestSessionArchiver:
         """Test saving text content."""
         lines = ["Hello", "World"]
         start_time = datetime(2023, 1, 1, 12, 0, 0)
-        
+
         path = await archiver.save_text(
             lines, start_time, prefix="transcript", subdirectory="Transcripts"
         )
-        
+
         assert path == "/final/path/file.txt"
         mock_file_manager.save_text_file.assert_called()
         args = mock_file_manager.save_text_file.call_args
@@ -89,32 +89,32 @@ class TestSessionArchiver:
         """Test saving markers."""
         markers = [{"index": 1, "offset": 10.5, "label": "Test"}]
         start_time = datetime(2023, 1, 1, 12, 0, 0)
-        
+
         path = await archiver.save_markers(markers, start_time)
-        
+
         assert path == "/final/path/file.txt"
         mock_file_manager.save_text_file.assert_called()
-        
+
     @pytest.mark.asyncio
     async def test_save_recording_mp3_conversion(self, archiver, mock_file_manager):
         """Test saving as MP3 with conversion."""
         audio_buffer = [np.zeros(1000, dtype=np.float32)]
         start_time = datetime(2023, 1, 1, 12, 0, 0)
 
-        with patch("core.realtime.archiver.tempfile.NamedTemporaryFile") as mock_temp, \
-             patch("soundfile.write"), \
-             patch("shutil.which", return_value="/usr/bin/ffmpeg"), \
-             patch("subprocess.run") as mock_run, \
-             patch("builtins.open", new_callable=MagicMock), \
-             patch("os.unlink"):
-            
+        with (
+            patch("core.realtime.archiver.tempfile.NamedTemporaryFile") as mock_temp,
+            patch("soundfile.write"),
+            patch("shutil.which", return_value="/usr/bin/ffmpeg"),
+            patch("subprocess.run") as mock_run,
+            patch("builtins.open", new_callable=MagicMock),
+            patch("os.unlink"),
+        ):
+
             mock_temp.return_value.__enter__.return_value.name = "/tmp/recording.wav"
             mock_file_manager.ensure_directory.return_value = "/final/path"
             mock_file_manager.save_file.return_value = "/final/path/file.wav"
 
-            path = await archiver.save_recording(
-                audio_buffer, start_time, 16000, format="mp3"
-            )
+            path = await archiver.save_recording(audio_buffer, start_time, 16000, format="mp3")
 
             assert path == "/final/path/file.wav"
             mock_run.assert_called_once()
@@ -155,9 +155,12 @@ class TestSessionArchiver:
         }
         start_time = datetime(2023, 1, 1, 12, 0, 0)
 
-        with patch.object(
-            archiver, "_run_in_executor", new=AsyncMock(return_value="/final/path/file.wav")
-        ) as mock_exec, patch("os.unlink") as mock_unlink:
+        with (
+            patch.object(
+                archiver, "_run_in_executor", new=AsyncMock(return_value="/final/path/file.wav")
+            ) as mock_exec,
+            patch("os.unlink") as mock_unlink,
+        ):
             path = await archiver.save_recording(audio_buffer, start_time, 16000, format="wav")
 
         assert path == "/final/path/file.wav"

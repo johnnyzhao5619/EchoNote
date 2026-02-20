@@ -176,8 +176,10 @@ class TestRealtimeRecorderInitialization:
         self, mock_speech_engine, mock_translation_engine, mock_db, mock_file_manager
     ):
         audio_capture = MockAudioCapture(sample_rate=44100)
-        with patch("core.realtime.recorder.SessionArchiver"), \
-             patch("core.realtime.recorder.CalendarIntegration"):
+        with (
+            patch("core.realtime.recorder.SessionArchiver"),
+            patch("core.realtime.recorder.CalendarIntegration"),
+        ):
             recorder = RealtimeRecorder(
                 audio_capture=audio_capture,
                 speech_engine=mock_speech_engine,
@@ -186,7 +188,7 @@ class TestRealtimeRecorderInitialization:
                 file_manager=mock_file_manager,
             )
         assert recorder.sample_rate == 44100
-        
+
     def test_set_callbacks(self, recorder):
         transcription_cb = Mock()
         translation_cb = Mock()
@@ -221,17 +223,17 @@ class TestRealtimeRecorderLifecycle:
     @pytest.mark.asyncio
     async def test_stop_recording_basic(self, recorder, event_loop):
         await recorder.start_recording(event_loop=event_loop)
-        
+
         # Simulate some data
         recorder.accumulated_transcription.append("Test")
         recorder.recording_audio_buffer.append(np.zeros(10))
-        
+
         result = await recorder.stop_recording()
-        
+
         assert not recorder.is_recording
         assert not recorder.audio_capture.is_capturing
         assert "duration" in result
-        
+
         recorder.session_archiver.save_recording.assert_called()
         recorder.session_archiver.save_text.assert_called()
         recorder.calendar_integration.create_event.assert_called()
@@ -240,12 +242,12 @@ class TestRealtimeRecorderLifecycle:
     async def test_stop_recording_saves_files(self, recorder, event_loop):
         options = {"save_recording": True, "save_transcript": True, "create_calendar_event": True}
         await recorder.start_recording(options=options, event_loop=event_loop)
-        
+
         recorder.recording_audio_buffer.append(np.zeros(10))
         recorder.accumulated_transcription.append("Test")
-        
+
         result = await recorder.stop_recording()
-        
+
         assert result["recording_path"] == "/path/to/recording.wav"
         assert result["transcript_path"] == "/path/to/transcript.txt"
         assert result["event_id"] == "event_123"
@@ -265,8 +267,10 @@ class TestRealtimeRecorderLifecycle:
         self, mock_speech_engine, mock_translation_engine, mock_db, mock_file_manager, event_loop
     ):
         """Test starting recording without audio capture raises error."""
-        with patch("core.realtime.recorder.SessionArchiver"), \
-             patch("core.realtime.recorder.CalendarIntegration"):
+        with (
+            patch("core.realtime.recorder.SessionArchiver"),
+            patch("core.realtime.recorder.CalendarIntegration"),
+        ):
             recorder = RealtimeRecorder(
                 audio_capture=None,
                 speech_engine=mock_speech_engine,
@@ -279,7 +283,9 @@ class TestRealtimeRecorderLifecycle:
             await recorder.start_recording(event_loop=event_loop)
 
     @pytest.mark.asyncio
-    async def test_start_recording_applies_selected_model(self, recorder, mock_speech_engine, event_loop):
+    async def test_start_recording_applies_selected_model(
+        self, recorder, mock_speech_engine, event_loop
+    ):
         model_info = Mock()
         model_info.is_downloaded = True
         mock_speech_engine.model_manager.get_model = Mock(return_value=model_info)
@@ -330,7 +336,9 @@ class TestRealtimeRecorderLifecycle:
     @pytest.mark.asyncio
     async def test_start_recording_tracks_meeting_audio_input_metadata(self, recorder, event_loop):
         recorder.audio_capture.get_input_devices = Mock(
-            return_value=[{"index": 6, "name": "Microsoft Teams Audio", "default_sample_rate": 48000}]
+            return_value=[
+                {"index": 6, "name": "Microsoft Teams Audio", "default_sample_rate": 48000}
+            ]
         )
 
         await recorder.start_recording(input_source=6, event_loop=event_loop)
@@ -350,10 +358,10 @@ class TestRealtimeRecorderAudioProcessing:
         recorder.is_recording = True
         recorder._event_loop = asyncio.new_event_loop()
         recorder.transcription_queue = asyncio.Queue()
-        
+
         audio_chunk = np.random.rand(1600).astype(np.float32)
         recorder._audio_callback(audio_chunk)
-        
+
         assert len(recorder.recording_audio_buffer) == 1
         assert np.array_equal(recorder.recording_audio_buffer[0], audio_chunk)
 
@@ -419,15 +427,15 @@ class TestRealtimeRecorderTranscription:
     async def test_transcription_callback(self, recorder, event_loop):
         results = []
         recorder.set_callbacks(on_transcription=lambda t: results.append(t))
-        
+
         await recorder.start_recording(event_loop=event_loop)
-        
+
         if recorder.on_transcription_update:
             recorder.on_transcription_update("Test")
-            
+
         await recorder.stop_recording()
         assert results == ["Test"]
-        
+
     @pytest.mark.asyncio
     async def test_accumulated_transcription(self, recorder, event_loop):
         """Test accumulated transcription storage."""
@@ -448,9 +456,9 @@ class TestRealtimeRecorderTranslation:
     async def test_translation_flow(self, recorder, event_loop):
         options = {"enable_translation": True, "target_language": "fr"}
         await recorder.start_recording(options=options, event_loop=event_loop)
-        
+
         assert recorder.translation_task is not None
-        
+
         await recorder.stop_recording()
 
 
@@ -458,13 +466,13 @@ class TestRealtimeRecorderMarkers:
     @pytest.mark.asyncio
     async def test_add_marker(self, recorder, event_loop):
         await recorder.start_recording(event_loop=event_loop)
-        
+
         marker = recorder.add_marker("Test Marker")
         assert marker["label"] == "Test Marker"
         assert marker["index"] == 1
-        
+
         await recorder.stop_recording()
-        
+
         recorder.session_archiver.save_markers.assert_called()
 
 
@@ -505,11 +513,11 @@ class TestRealtimeRecorderUtilities:
         # Mock event loop to use run_nowait or process simple tasks
         # But _drain_queue is sync? No, check implementation.
         # It's likely using `queue.get_nowait()` in a loop.
-        
+
         # Wait, usually _drain_queue is a helper to empty a queue.
         # Check if it needs async loop running?
         # queue.put_nowait works without loop running if queue created.
-        
+
         recorder._drain_queue(queue)
 
         assert queue.empty()

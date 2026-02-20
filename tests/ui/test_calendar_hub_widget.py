@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 """UI tests for calendar hub semantic style hooks."""
 
-import pytest
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import pytest
 from PySide6.QtWidgets import QDialog
 
 from ui.calendar_hub.widget import CalendarHubWidget

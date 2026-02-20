@@ -5,8 +5,10 @@ Constants for Calendar Hub.
 Defines event types, sources, and sync status to avoid hardcoded strings.
 """
 
+
 class EventType:
     """Enumeration of supported event types."""
+
     EVENT = "Event"
     TASK = "Task"
     APPOINTMENT = "Appointment"
@@ -19,6 +21,7 @@ class EventType:
 
 class CalendarSource:
     """Enumeration of calendar event sources."""
+
     LOCAL = "local"
     GOOGLE = "google"
     OUTLOOK = "outlook"
@@ -31,6 +34,7 @@ class CalendarSource:
 
 class SyncStatus:
     """Enumeration of synchronization statuses."""
+
     SUCCESS = "success"
     FAILED = "failed"
     PARTIAL = "partial"

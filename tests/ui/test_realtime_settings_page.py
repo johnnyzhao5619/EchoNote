@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """Tests for realtime settings page behavior."""
 
-import pytest
 from unittest.mock import Mock, patch
+
+import pytest
 
 from ui.settings.realtime_page import RealtimeSettingsPage
 

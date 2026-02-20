@@ -2,6 +2,7 @@
 """Tests for realtime settings behavior in SettingsManager."""
 
 from typing import Any
+
 from core.settings.manager import SettingsManager
 
 

@@ -23,16 +23,17 @@ content area for different features.
 import logging
 from typing import Any, Callable, Dict, Optional
 
+from ui.common.theme import ThemeManager
 from ui.constants import (
     APP_SEARCH_MAX_WIDTH,
     APP_SEARCH_MIN_WIDTH,
-    APP_TOP_BAR_CONTROL_HEIGHT,
     APP_SHELL_CONTENT_MARGINS,
-    APP_TOP_BAR_HINT_WIDTH,
     APP_STATUS_BAR_HEIGHT,
     APP_STATUS_BAR_MARGINS,
     APP_STATUS_BAR_SPACING,
+    APP_TOP_BAR_CONTROL_HEIGHT,
     APP_TOP_BAR_HEIGHT,
+    APP_TOP_BAR_HINT_WIDTH,
     APP_TOP_BAR_MARGINS,
     APP_TOP_BAR_SPACING,
     SHELL_STATUS_REFRESH_INTERVAL_MS,
@@ -58,7 +59,6 @@ from ui.qt_imports import (
     QVBoxLayout,
     QWidget,
 )
-from ui.common.theme import ThemeManager
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.main_window")
@@ -127,8 +127,9 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(1024, 768)
 
         # Set application icon
-        from PySide6.QtGui import QIcon
         import os
+
+        from PySide6.QtGui import QIcon
 
         icon_path = os.path.join("resources", "icons", "echonote.png")
         if os.path.exists(icon_path):
@@ -528,7 +529,9 @@ class MainWindow(QMainWindow):
             ]
             if any(query_normalized == candidate for candidate in candidates):
                 return category_id
-            if contains_match is None and any(query_normalized in candidate for candidate in candidates):
+            if contains_match is None and any(
+                query_normalized in candidate for candidate in candidates
+            ):
                 contains_match = category_id
 
         return contains_match
@@ -1071,7 +1074,9 @@ class MainWindow(QMainWindow):
                 f"Ctrl+{item.shortcut_index}",
                 lambda p=item.page_name: self.switch_page(p),
             )
-            logger.debug("Added keyboard shortcut Ctrl+%s for %s", item.shortcut_index, item.page_name)
+            logger.debug(
+                "Added keyboard shortcut Ctrl+%s for %s", item.shortcut_index, item.page_name
+            )
 
         # Settings shortcut (Ctrl+,)
         self._bind_shortcut("Ctrl+,", lambda: self.switch_page("settings"))

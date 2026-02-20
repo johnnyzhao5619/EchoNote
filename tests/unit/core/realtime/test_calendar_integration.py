@@ -21,6 +21,7 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
+
 from core.realtime.integration import CalendarIntegration
 
 
@@ -48,41 +49,41 @@ class TestCalendarIntegration:
         mock_event_instance = MagicMock()
         mock_event_instance.id = "test_event_123"
         mock_event_cls.return_value = mock_event_instance
-        
+
         mock_attachment_cls = MagicMock()
-        
+
         mock_models.CalendarEvent = mock_event_cls
         mock_models.EventAttachment = mock_attachment_cls
 
-        # Mock datetime to ensure stable timestamps if needed, 
+        # Mock datetime to ensure stable timestamps if needed,
         # but here we just need the import to work.
-        
+
         result_data = {
             "start_time": "2023-01-01T12:00:00",
             "end_time": "2023-01-01T13:00:00",
             "duration": 3600.0,
             "transcript_path": "/path/to/transcript.txt",
             "translation_path": "/path/to/translation.txt",
-            "recording_path": "/path/to/audio.wav"
+            "recording_path": "/path/to/audio.wav",
         }
 
         # Patch sys.modules to inject our mock models
         with patch.dict("sys.modules", {"data.database.models": mock_models}):
             with patch("os.path.exists", return_value=True):
-                 with patch("os.path.getsize", return_value=1024):
+                with patch("os.path.getsize", return_value=1024):
                     event_id = await calendar_integration.create_event(result_data)
-        
+
         assert event_id == "test_event_123"
-        
+
         # Verify Event creation
         mock_event_cls.assert_called_once()
         call_kwargs = mock_event_cls.call_args[1]
         assert call_kwargs["start_time"] == "2023-01-01T12:00:00"
         assert call_kwargs["end_time"] == "2023-01-01T13:00:00"
-        
+
         # Verify Event save
         mock_event_instance.save.assert_called_once_with(mock_db)
-        
+
         # Verify Attachments
         # We expect 3 attachments (recording, transcript, translation)
         assert mock_attachment_cls.call_count == 3
@@ -100,6 +101,8 @@ class TestCalendarIntegration:
         mock_models.CalendarEvent = mock_event_cls
 
         with patch.dict("sys.modules", {"data.database.models": mock_models}):
-             event_id = await calendar_integration.create_event({"start_time": "2023-01-01T12:00:00"})
-        
+            event_id = await calendar_integration.create_event(
+                {"start_time": "2023-01-01T12:00:00"}
+            )
+
         assert event_id == ""

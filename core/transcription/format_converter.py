@@ -72,25 +72,25 @@ class FormatConverter:
             return self._to_srt(segments)
         elif output_format == "md":
             return self._to_md(segments)
-        
+
         return ""
 
     def _validate_internal_format(self, internal_format: dict) -> None:
         """
         Validate the internal format dictionary.
-        
+
         Args:
             internal_format: Dictionary to validate
-            
+
         Raises:
             ValueError: If validation fails
         """
         if not internal_format:
             raise ValueError("Input data is empty")
-            
+
         if not isinstance(internal_format, dict):
             raise ValueError("Input must be a dictionary")
-            
+
         if "segments" not in internal_format:
             raise ValueError("Input missing 'segments' key")
 
@@ -190,17 +190,17 @@ class FormatConverter:
     def _format_timestamp_srt(self, seconds: float) -> str:
         """
         Format timestamp for SRT format (HH:MM:SS,mmm).
-        
+
         Args:
             seconds: Time in seconds
-            
+
         Returns:
             Formatted timestamp string
         """
         # Handle invalid input
         if seconds < 0:
             seconds = 0.0
-            
+
         hours = int(seconds // 3600)
         minutes = int((seconds % 3600) // 60)
         secs = int(seconds % 60)
@@ -211,17 +211,17 @@ class FormatConverter:
     def _format_timestamp_md(self, seconds: float) -> str:
         """
         Format timestamp for Markdown format (HH:MM:SS).
-        
+
         Args:
             seconds: Time in seconds
-            
+
         Returns:
             Formatted timestamp string
         """
         # Handle invalid input
         if seconds < 0:
             seconds = 0.0
-            
+
         hours = int(seconds // 3600)
         minutes = int((seconds % 3600) // 60)
         secs = int(seconds % 60)

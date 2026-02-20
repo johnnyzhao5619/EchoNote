@@ -25,12 +25,12 @@ import logging
 logger = logging.getLogger("echonote.app_initializer")
 
 from config.constants import (
-    ENGINE_FASTER_WHISPER,
-    ENGINE_OPENAI,
-    ENGINE_GOOGLE,
     ENGINE_AZURE,
-    TRANSLATION_ENGINE_NONE,
+    ENGINE_FASTER_WHISPER,
+    ENGINE_GOOGLE,
+    ENGINE_OPENAI,
     TRANSLATION_ENGINE_GOOGLE,
+    TRANSLATION_ENGINE_NONE,
 )
 
 
@@ -68,7 +68,9 @@ def create_auto_task_scheduler(
     )
 
 
-def create_calendar_auto_task_scheduler(calendar_manager, transcription_manager, polling_interval_minutes=15):
+def create_calendar_auto_task_scheduler(
+    calendar_manager, transcription_manager, polling_interval_minutes=15
+):
     """Create calendar auto task scheduler for post-event transcription tasks."""
     from core.calendar.auto_task_scheduler import CalendarAutoTaskScheduler
 
@@ -194,7 +196,10 @@ def initialize_speech_engine(config, model_manager, secrets_manager=None, db_con
 
                 logger.info("Loading OpenAI speech engine from configuration")
                 return OpenAIEngine(api_key=api_key, db_connection=db_connection)
-            logger.warning("OpenAI engine selected but API key is missing; falling back to %s", ENGINE_FASTER_WHISPER)
+            logger.warning(
+                "OpenAI engine selected but API key is missing; falling back to %s",
+                ENGINE_FASTER_WHISPER,
+            )
 
         elif engine_name == ENGINE_GOOGLE:
             api_key = secrets_manager.get_api_key("google") if secrets_manager else None
@@ -203,7 +208,10 @@ def initialize_speech_engine(config, model_manager, secrets_manager=None, db_con
 
                 logger.info("Loading Google speech engine from configuration")
                 return GoogleEngine(api_key=api_key)
-            logger.warning("Google engine selected but API key is missing; falling back to %s", ENGINE_FASTER_WHISPER)
+            logger.warning(
+                "Google engine selected but API key is missing; falling back to %s",
+                ENGINE_FASTER_WHISPER,
+            )
 
         elif engine_name == ENGINE_AZURE:
             api_key = secrets_manager.get_api_key("azure") if secrets_manager else None
@@ -233,7 +241,11 @@ def initialize_translation_engine(config, secrets_manager=None):
     def create_translation_engine():
         try:
             logger.info("Loading translation engine...")
-            selected_engine = str(config.get("realtime.translation_engine", TRANSLATION_ENGINE_GOOGLE)).strip().lower()
+            selected_engine = (
+                str(config.get("realtime.translation_engine", TRANSLATION_ENGINE_GOOGLE))
+                .strip()
+                .lower()
+            )
             if selected_engine == TRANSLATION_ENGINE_NONE:
                 logger.info("Translation engine disabled by realtime settings")
                 return None
@@ -309,7 +321,7 @@ def initialize_calendar_adapters(config, oauth_manager, secrets_manager=None):
         # Fallback to secrets manager if config is empty
         if not google_client_id and secrets_manager:
             google_client_id = secrets_manager.get_secret("calendar_google_client_id")
-        
+
         if not google_client_secret and secrets_manager:
             google_client_secret = secrets_manager.get_secret("calendar_google_client_secret")
 
@@ -338,7 +350,7 @@ def initialize_calendar_adapters(config, oauth_manager, secrets_manager=None):
         # Fallback to secrets manager if config is empty
         if not outlook_client_id and secrets_manager:
             outlook_client_id = secrets_manager.get_secret("calendar_outlook_client_id")
-        
+
         if not outlook_client_secret and secrets_manager:
             outlook_client_secret = secrets_manager.get_secret("calendar_outlook_client_secret")
 

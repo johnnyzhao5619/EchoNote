@@ -433,7 +433,7 @@ SUPPORTED_RECORDING_FORMATS = [
 # Translation Engines (Realtime)
 TRANSLATION_ENGINE_NONE = "none"
 # Note: Google Translate typically used for lightweight realtime translation
-TRANSLATION_ENGINE_GOOGLE = "google" 
+TRANSLATION_ENGINE_GOOGLE = "google"
 
 SUPPORTED_REALTIME_TRANSLATION_ENGINES = [
     TRANSLATION_ENGINE_NONE,

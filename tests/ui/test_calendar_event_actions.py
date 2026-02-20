@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 """Tests for shared calendar event actions."""
 
-import pytest
 from types import SimpleNamespace
 from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 
 from ui.calendar_event_actions import confirm_and_delete_event
 

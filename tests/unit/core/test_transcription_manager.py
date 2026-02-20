@@ -14,16 +14,16 @@ from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 
+from config.constants import (
+    TASK_STATUS_CANCELLED,
+    TASK_STATUS_COMPLETED,
+    TASK_STATUS_FAILED,
+    TASK_STATUS_PENDING,
+    TASK_STATUS_PROCESSING,
+)
 from core.transcription.manager import TaskNotFoundError, TranscriptionManager
 from core.transcription.task_queue import TaskStatus
 from data.database.models import TranscriptionTask
-from config.constants import (
-    TASK_STATUS_PENDING,
-    TASK_STATUS_PROCESSING,
-    TASK_STATUS_COMPLETED,
-    TASK_STATUS_FAILED,
-    TASK_STATUS_CANCELLED,
-)
 
 
 class MockDatabaseConnection:
@@ -227,7 +227,9 @@ class TestTranscriptionManager:
         assert manager._task_engine_options[task_id]["model_path"] == "/tmp/model.bin"
 
     @pytest.mark.asyncio
-    async def test_process_task_forwards_engine_runtime_options(self, manager, temp_audio_file, temp_dir):
+    async def test_process_task_forwards_engine_runtime_options(
+        self, manager, temp_audio_file, temp_dir
+    ):
         """Runtime options should be forwarded to speech engine invocation."""
         task_id = manager.add_task(
             str(temp_audio_file),
@@ -557,7 +559,9 @@ class TestTranscriptionManager:
         engine.get_name.return_value = "wrapper-engine"
         engine._loader = _Loader()
 
-        manager = TranscriptionManager(mock_db, engine, {"transcription": {"save_path": str(temp_dir)}})
+        manager = TranscriptionManager(
+            mock_db, engine, {"transcription": {"save_path": str(temp_dir)}}
+        )
         assert manager.reload_engine() is True
         assert engine._loader.reload_calls == 1
 

@@ -144,7 +144,7 @@ PAGINATION_THRESHOLD = 0.8
 # HIGHLIGHT_COLORS and TIMELINE_SEARCH_HIGHLIGHT_COLOR moved to ThemeManager
 
 # Common display text
-STATUS_INDICATOR_SYMBOL = "\u25CF"
+STATUS_INDICATOR_SYMBOL = "\u25cf"
 DEFAULT_DURATION_DISPLAY = "00:00:00"
 GAIN_DISPLAY_FORMAT = "{:.1f}x"
 
@@ -152,6 +152,7 @@ GAIN_DISPLAY_FORMAT = "{:.1f}x"
 def format_gain_display(gain: float) -> str:
     """Format gain multiplier text consistently across UI pages."""
     return GAIN_DISPLAY_FORMAT.format(gain)
+
 
 # Sidebar constants
 SIDEBAR_WIDTH = 212

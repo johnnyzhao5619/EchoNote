@@ -49,11 +49,11 @@ if TYPE_CHECKING:
     from ui.timeline.audio_player import AudioPlayerDialog
     from ui.timeline.transcript_viewer import TranscriptViewerDialog
 
+from core.calendar.constants import CalendarSource, EventType
 from core.timeline.manager import to_local_naive
 from ui.base_widgets import BaseWidget, create_button, create_hbox, create_vbox
 from ui.constants import PAGE_COMPACT_SPACING, PAGE_LAYOUT_SPACING, ZERO_MARGINS
 from utils.i18n import I18nQtManager
-from core.calendar.constants import EventType, CalendarSource
 
 if TYPE_CHECKING:  # pragma: no cover - imported for type checking only
     from ui.timeline.event_card import EventCard
@@ -1020,10 +1020,16 @@ class TimelineWidget(BaseWidget):
         # Use event-specific language if available in auto-task config
         try:
             config = self.timeline_manager.get_auto_task(event_id)
-            if config and config.get("transcription_language") and config["transcription_language"] != "auto":
+            if (
+                config
+                and config.get("transcription_language")
+                and config["transcription_language"] != "auto"
+            ):
                 options["language"] = config["transcription_language"]
         except Exception as e:
-            logger.warning(f"Failed to fetch auto-task config for event {event_id}, using default: {e}")
+            logger.warning(
+                f"Failed to fetch auto-task config for event {event_id}, using default: {e}"
+            )
 
         self.transcription_manager.add_task(recording_path, options=options)
 

@@ -20,7 +20,7 @@ Provides common functionality for all settings pages.
 """
 
 import logging
-from typing import TypedDict, Tuple
+from typing import Tuple, TypedDict
 
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QLabel, QScrollArea, QWidget

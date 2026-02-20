@@ -2,6 +2,7 @@
 """UI tests for timeline transcript viewer semantic style hooks."""
 
 import pytest
+
 from ui.timeline.transcript_viewer import TranscriptViewer, TranscriptViewerDialog
 
 pytestmark = pytest.mark.ui

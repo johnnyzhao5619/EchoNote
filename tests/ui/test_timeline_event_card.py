@@ -28,9 +28,7 @@ def test_event_card_title_uses_semantic_role(qapp, mock_i18n):
     card = EventCard({"event": event, "artifacts": {}}, is_future=False, i18n=mock_i18n)
 
     title_labels = [
-        label
-        for label in card.findChildren(QLabel)
-        if label.property("role") == "event-title"
+        label for label in card.findChildren(QLabel) if label.property("role") == "event-title"
     ]
     assert len(title_labels) == 1
     assert title_labels[0].text() == "Design Review"
@@ -83,7 +81,9 @@ def test_event_card_meta_labels_use_semantic_role(qapp, mock_i18n):
     )
     card = EventCard({"event": event, "artifacts": {}}, is_future=False, i18n=mock_i18n)
 
-    meta_labels = [label for label in card.findChildren(QLabel) if label.property("role") == "event-meta"]
+    meta_labels = [
+        label for label in card.findChildren(QLabel) if label.property("role") == "event-meta"
+    ]
     assert len(meta_labels) >= 2
 
 

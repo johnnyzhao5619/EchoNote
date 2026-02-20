@@ -25,7 +25,9 @@ def test_timeline_widget_delete_event_uses_shared_flow(qapp, mock_i18n, mock_set
     event.id = "event-1"
     timeline_manager.calendar_manager.get_event.return_value = event
 
-    with patch("ui.calendar_event_actions.confirm_and_delete_event", return_value=True) as mock_flow:
+    with patch(
+        "ui.calendar_event_actions.confirm_and_delete_event", return_value=True
+    ) as mock_flow:
         widget._on_delete_event_requested("event-1")
 
     assert mock_flow.call_count == 1

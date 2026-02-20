@@ -36,8 +36,8 @@ from PySide6.QtWidgets import (
 
 from ui.base_widgets import BaseWidget
 from ui.constants import (
-    CALENDAR_GRID_CELL_SPACING,
     CALENDAR_DAY_CELL_MIN_HEIGHT,
+    CALENDAR_GRID_CELL_SPACING,
     PAGE_COMPACT_SPACING,
     PAGE_DENSE_SPACING,
     STATUS_INDICATOR_SYMBOL,
@@ -132,6 +132,7 @@ def _load_events_safe(calendar_manager: Any, start_date: datetime, end_date: dat
 
 class ClickableDayFrame(QFrame):
     """A calendar day cell (MonthView) that can be clicked."""
+
     clicked = Signal(datetime)
 
     def __init__(self, date: datetime, parent=None):
@@ -146,6 +147,7 @@ class ClickableDayFrame(QFrame):
 
 class ClickableDayWidget(QWidget):
     """A calendar day column (WeekView) that can be clicked."""
+
     clicked = Signal(datetime)
 
     def __init__(self, date: datetime, parent=None):
@@ -368,7 +370,9 @@ class MonthView(BaseWidget):
         cell.setProperty("role", "calendar-day-cell")
 
         layout = QVBoxLayout(cell)
-        layout.setContentsMargins(PAGE_DENSE_SPACING, PAGE_DENSE_SPACING, PAGE_DENSE_SPACING, PAGE_DENSE_SPACING)
+        layout.setContentsMargins(
+            PAGE_DENSE_SPACING, PAGE_DENSE_SPACING, PAGE_DENSE_SPACING, PAGE_DENSE_SPACING
+        )
         layout.setSpacing(PAGE_DENSE_SPACING)
 
         # Day number
@@ -504,18 +508,16 @@ class WeekView(BaseWidget):
     def refresh_view(self):
         """Refresh the week view with current week data."""
         # Get week start (Monday)
-        week_start = (
-            self.current_date - timedelta(days=self.current_date.weekday())
-        ).replace(hour=0, minute=0, second=0, microsecond=0)
+        week_start = (self.current_date - timedelta(days=self.current_date.weekday())).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
         week_end = week_start + timedelta(days=7)
         week_end_display = week_end - timedelta(days=1)
         locale = _get_ui_locale(self.i18n)
 
         # Update header
         start_qdate = QDate(week_start.year, week_start.month, week_start.day)
-        end_qdate = QDate(
-            week_end_display.year, week_end_display.month, week_end_display.day
-        )
+        end_qdate = QDate(week_end_display.year, week_end_display.month, week_end_display.day)
         self.header_label.setText(
             f"{locale.toString(start_qdate, 'MMM dd')} - {locale.toString(end_qdate, 'MMM dd, yyyy')}"
         )

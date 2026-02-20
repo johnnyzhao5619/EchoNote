@@ -38,13 +38,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from core.calendar.constants import EventType
 from ui.base_widgets import (
     connect_button_with_callback,
     create_button,
     create_hbox,
     create_primary_button,
 )
-from core.calendar.constants import EventType
 from ui.constants import CALENDAR_EVENT_DESCRIPTION_MAX_HEIGHT, CALENDAR_EVENT_DIALOG_MIN_WIDTH
 from utils.i18n import I18nQtManager
 
@@ -215,7 +215,10 @@ class EventDialog(QDialog):
 
         # Auto-transcribe (optional)
         self.auto_transcribe_checkbox = QCheckBox(
-            self.i18n.t("calendar_hub.event_dialog.auto_transcribe", default="Auto-transcribe when event ends")
+            self.i18n.t(
+                "calendar_hub.event_dialog.auto_transcribe",
+                default="Auto-transcribe when event ends",
+            )
         )
         if self.is_past:
             self.auto_transcribe_checkbox.hide()
@@ -267,9 +270,13 @@ class EventDialog(QDialog):
             # Check if we should show secondary transcription button
             if self.allow_retranscribe:
                 retranscribe_btn = create_button(
-                    self.i18n.t("timeline.secondary_transcribe", default="Secondary Transcription (HQ)")
+                    self.i18n.t(
+                        "timeline.secondary_transcribe", default="Secondary Transcription (HQ)"
+                    )
                 )
-                connect_button_with_callback(retranscribe_btn, self._on_secondary_transcribe_clicked)
+                connect_button_with_callback(
+                    retranscribe_btn, self._on_secondary_transcribe_clicked
+                )
                 buttons_layout.addWidget(retranscribe_btn)
 
         buttons_layout.addStretch()

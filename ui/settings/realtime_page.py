@@ -42,13 +42,13 @@ from config.constants import (
     GAIN_SLIDER_MAX,
     GAIN_SLIDER_MIN,
     GAIN_SLIDER_TICK_INTERVAL,
-    STANDARD_LABEL_WIDTH,
-    SUPPORTED_RECORDING_FORMATS,
-    SUPPORTED_REALTIME_TRANSLATION_ENGINES,
-    RECORDING_FORMAT_WAV,
     RECORDING_FORMAT_MP3,
-    TRANSLATION_ENGINE_NONE,
+    RECORDING_FORMAT_WAV,
+    STANDARD_LABEL_WIDTH,
+    SUPPORTED_REALTIME_TRANSLATION_ENGINES,
+    SUPPORTED_RECORDING_FORMATS,
     TRANSLATION_ENGINE_GOOGLE,
+    TRANSLATION_ENGINE_NONE,
 )
 from ui.base_widgets import create_button, create_hbox, create_vbox
 from ui.constants import SETTINGS_GAIN_VALUE_LABEL_MIN_WIDTH, format_gain_display
@@ -99,7 +99,9 @@ class RealtimeSettingsPage(BaseSettingsPage):
     def setup_ui(self):
         """Set up the realtime settings UI."""
         # Audio input section
-        self.audio_input_title = self.add_section_title(self.i18n.t("settings.realtime.audio_input"))
+        self.audio_input_title = self.add_section_title(
+            self.i18n.t("settings.realtime.audio_input")
+        )
 
         # Default input source
         source_layout = create_hbox()
@@ -128,7 +130,9 @@ class RealtimeSettingsPage(BaseSettingsPage):
         self.gain_slider.setTickInterval(GAIN_SLIDER_TICK_INTERVAL)
         self.gain_slider.valueChanged.connect(self._on_gain_changed)
 
-        self.gain_value_label = QLabel(format_gain_display(GAIN_SLIDER_DEFAULT / GAIN_SLIDER_DIVISOR))
+        self.gain_value_label = QLabel(
+            format_gain_display(GAIN_SLIDER_DEFAULT / GAIN_SLIDER_DIVISOR)
+        )
         self.gain_value_label.setMinimumWidth(SETTINGS_GAIN_VALUE_LABEL_MIN_WIDTH)
 
         self.gain_min_label = QLabel(format_gain_display(GAIN_SLIDER_MIN / GAIN_SLIDER_DIVISOR))
@@ -150,7 +154,9 @@ class RealtimeSettingsPage(BaseSettingsPage):
         self.loopback_status_text.setProperty("role", "ffmpeg-status")
         self.loopback_status_text.setProperty("state", "missing")
 
-        self.loopback_setup_btn = create_button(self.i18n.t("settings.realtime.loopback_view_guide"))
+        self.loopback_setup_btn = create_button(
+            self.i18n.t("settings.realtime.loopback_view_guide")
+        )
         self.loopback_setup_btn.clicked.connect(self._on_show_loopback_guide)
 
         loopback_status_layout.addWidget(self.loopback_status_label)
@@ -218,7 +224,9 @@ class RealtimeSettingsPage(BaseSettingsPage):
         self.add_section_spacing()
 
         # Translation settings section
-        self.translation_title = self.add_section_title(self.i18n.t("settings.realtime.translation"))
+        self.translation_title = self.add_section_title(
+            self.i18n.t("settings.realtime.translation")
+        )
 
         # Translation engine
         translation_layout = create_hbox()
@@ -261,9 +269,7 @@ class RealtimeSettingsPage(BaseSettingsPage):
         self.content_layout.addLayout(vad_layout)
 
         silence_layout = create_hbox()
-        self.silence_duration_label = QLabel(
-            self.i18n.t("settings.realtime.silence_duration_ms")
-        )
+        self.silence_duration_label = QLabel(self.i18n.t("settings.realtime.silence_duration_ms"))
         self.silence_duration_label.setMinimumWidth(STANDARD_LABEL_WIDTH)
         self.silence_duration_spin = QSpinBox()
         self.silence_duration_spin.setRange(SILENCE_DURATION_MS_MIN, SILENCE_DURATION_MS_MAX)
@@ -275,9 +281,7 @@ class RealtimeSettingsPage(BaseSettingsPage):
         self.content_layout.addLayout(silence_layout)
 
         min_audio_layout = create_hbox()
-        self.min_audio_duration_label = QLabel(
-            self.i18n.t("settings.realtime.min_audio_duration")
-        )
+        self.min_audio_duration_label = QLabel(self.i18n.t("settings.realtime.min_audio_duration"))
         self.min_audio_duration_label.setMinimumWidth(STANDARD_LABEL_WIDTH)
         self.min_audio_duration_spin = QDoubleSpinBox()
         self.min_audio_duration_spin.setRange(
@@ -618,8 +622,12 @@ class RealtimeSettingsPage(BaseSettingsPage):
         if not hasattr(self, "translation_combo"):
             return
         self.translation_combo.clear()
-        self.translation_combo.addItem(self.i18n.t("settings.realtime.no_translation"), TRANSLATION_ENGINE_NONE)
-        self.translation_combo.addItem(self.i18n.t("settings.realtime.google_translate"), TRANSLATION_ENGINE_GOOGLE)
+        self.translation_combo.addItem(
+            self.i18n.t("settings.realtime.no_translation"), TRANSLATION_ENGINE_NONE
+        )
+        self.translation_combo.addItem(
+            self.i18n.t("settings.realtime.google_translate"), TRANSLATION_ENGINE_GOOGLE
+        )
 
     def _detect_mp3_support(self) -> bool:
         try:

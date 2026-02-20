@@ -233,7 +233,9 @@ class AudioVisualizer(BaseWidget):
         self.volume_bar_color = tm.get_color("success")
         self.volume_bar_high_color = tm.get_color("warning")
         self.volume_bar_peak_color = tm.get_color("error")
-        self.background_color = tm.get_color("surface") # Or background? Surface is better for cards/areas
+        self.background_color = tm.get_color(
+            "surface"
+        )  # Or background? Surface is better for cards/areas
         self.grid_color = tm.get_color("border")
         self.update()
 

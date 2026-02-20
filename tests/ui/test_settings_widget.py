@@ -3,9 +3,9 @@
 Tests for settings widget.
 """
 
-import pytest
 from unittest.mock import MagicMock, Mock, patch
 
+import pytest
 from PySide6.QtCore import Qt
 
 from ui.constants import SETTINGS_NAV_WIDTH

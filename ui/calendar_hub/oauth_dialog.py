@@ -301,9 +301,7 @@ class OAuthDialog(QDialog):
             handler_cls.i18n = self.i18n
 
             # Create server
-            self.callback_server = HTTPServer(
-                (self.callback_host, self.callback_port), handler_cls
-            )
+            self.callback_server = HTTPServer((self.callback_host, self.callback_port), handler_cls)
             # Keep request loop interruptible so cancellation can stop quickly.
             self.callback_server.timeout = 0.5
 

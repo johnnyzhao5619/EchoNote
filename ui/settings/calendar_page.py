@@ -61,7 +61,9 @@ class CalendarSettingsPage(BaseSettingsPage):
     def setup_ui(self):
         """Set up the calendar settings UI."""
         # Connected accounts section
-        self.accounts_title = self.add_section_title(self.i18n.t("settings.calendar.connected_accounts"))
+        self.accounts_title = self.add_section_title(
+            self.i18n.t("settings.calendar.connected_accounts")
+        )
 
         # Description
         self.desc_label = QLabel(self.i18n.t("settings.calendar.accounts_description"))

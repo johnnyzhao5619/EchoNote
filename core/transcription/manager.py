@@ -129,7 +129,10 @@ class TranscriptionManager:
         )
 
         from config.constants import DEFAULT_OUTPUT_FORMAT
-        self._default_output_format = self.config.get("default_output_format", DEFAULT_OUTPUT_FORMAT)
+
+        self._default_output_format = self.config.get(
+            "default_output_format", DEFAULT_OUTPUT_FORMAT
+        )
 
         # Initialize format converter
         self.format_converter = FormatConverter()
@@ -159,27 +162,27 @@ class TranscriptionManager:
     def add_listener(self, callback: Callable[[str, Dict[str, Any]], None]):
         """
         Register a global event listener.
-        
+
         Args:
             callback: Function(event_type: str, data: dict)
         """
         if callback not in self.event_listeners:
             self.event_listeners.append(callback)
-            
+
     def remove_listener(self, callback: Callable[[str, Dict[str, Any]], None]):
         """
         Unregister a global event listener.
-        
+
         Args:
             callback: Function to remove
         """
         if callback in self.event_listeners:
             self.event_listeners.remove(callback)
-            
+
     def _notify_listeners(self, event_type: str, data: Dict[str, Any]):
         """
         Notify all listeners of an event.
-        
+
         Args:
             event_type: Type of event (task_added, task_updated, task_deleted)
             data: Event data
@@ -733,6 +736,7 @@ class TranscriptionManager:
 
             # Update status to processing
             from config.constants import TASK_STATUS_PROCESSING
+
             task.status = TASK_STATUS_PROCESSING
             task.started_at = datetime.now().isoformat()
             task.progress = 0.0
@@ -750,7 +754,7 @@ class TranscriptionManager:
                     # Update task progress directly in DB to avoid object overhead
                     query = "UPDATE transcription_tasks SET progress = ? WHERE id = ?"
                     self.db.execute(query, (progress, task_id), commit=True)
-                    
+
                     # Notify listeners
                     self._update_progress(task_id, progress, "Transcribing")
                 except Exception as e:
@@ -761,7 +765,7 @@ class TranscriptionManager:
             # Also update database for 10% progress
             task.progress = 10.0
             task.save(self.db)
-            
+
             logger.info(f"Calling speech_engine.transcribe_file for task {task_id}")
             ensure_not_cancelled("before starting transcription")
 
@@ -770,19 +774,19 @@ class TranscriptionManager:
             replace_realtime = engine_kwargs.pop("replace_realtime", False)
             event_id = engine_kwargs.pop("event_id", None)
             engine_kwargs["progress_callback"] = progress_callback
-            
+
             # Execute transcription
             result = await self.speech_engine.transcribe_file(
                 task.file_path, language=task.language, **engine_kwargs
             )
-            
+
             ensure_not_cancelled("after completing transcription")
             logger.info(f"Transcription completed for task {task_id}, processing results")
 
             # Save results
             ensure_not_cancelled("before saving results")
             self._update_progress(task_id, 90.0, "Saving results")
-            
+
             # Use helper to save internal result
             self._save_internal_result(task_id, result)
 
@@ -791,14 +795,14 @@ class TranscriptionManager:
                     audio_path = Path(task.file_path)
                     json_path = audio_path.with_suffix(".json")
                     txt_path = audio_path.with_suffix(".txt")
-                    
+
                     with open(json_path, "w", encoding="utf-8") as f:
                         json.dump(result, f, ensure_ascii=False, indent=2)
-                        
+
                     if "text" in result:
                         with open(txt_path, "w", encoding="utf-8") as f:
                             f.write(result["text"])
-                            
+
                     logger.info(f"Replaced realtime transcripts at {json_path}")
                 except Exception as e:
                     logger.error(f"Failed to replace realtime transcripts: {e}", exc_info=True)
@@ -820,12 +824,13 @@ class TranscriptionManager:
             logger.info(f"Task {task_id} cancelled")
             # Update status to cancelled
             from config.constants import TASK_STATUS_CANCELLED
+
             if task:
                 task.status = TASK_STATUS_CANCELLED
                 task.save(self.db)
                 self._notify_listeners("task_updated", task.to_dict())
                 self._notify_listeners("task_cancelled", {"id": task_id})
-            
+
             # Use helper to ensure consistent cleanup if needed
             self._cleanup_after_cancellation(task_id)
 
@@ -833,6 +838,7 @@ class TranscriptionManager:
             logger.error(f"Error processing task {task_id}: {e}", exc_info=True)
             # Update status to failed
             from config.constants import TASK_STATUS_FAILED
+
             if task:
                 task.status = TASK_STATUS_FAILED
                 task.error_message = str(e)
@@ -843,7 +849,7 @@ class TranscriptionManager:
     def _save_internal_result(self, task_id: str, result: Dict[str, Any]) -> None:
         """
         Save transcription result to internal storage with secure permissions.
-        
+
         Args:
             task_id: Task identifier
             result: Transcription result dictionary
@@ -864,7 +870,7 @@ class TranscriptionManager:
     def _finalize_task_completion(self, task: TranscriptionTask, result: Dict[str, Any]) -> None:
         """
         Handle task completion steps: update metadata, status, and trigger export.
-        
+
         Args:
             task: Task object
             result: Transcription result dictionary
@@ -874,6 +880,7 @@ class TranscriptionManager:
             task.audio_duration = result["duration"]
 
         from config.constants import TASK_STATUS_COMPLETED
+
         # Update status
         task.status = TASK_STATUS_COMPLETED
         task.completed_at = datetime.now().isoformat()
@@ -898,7 +905,7 @@ class TranscriptionManager:
             self.export_result(task.id, default_format, task.output_path)
         except Exception as e:
             logger.error(f"Failed to auto-export task {task.id}: {e}", exc_info=True)
-            
+
             # Fallback export to application-managed directory.
             try:
                 fallback_dir = get_app_dir() / "exports"
@@ -907,9 +914,9 @@ class TranscriptionManager:
                 default_format = self._default_output_format
                 if task.output_format:
                     default_format = task.output_format
-                    
+
                 fallback_output = fallback_dir / f"{Path(task.file_path).stem}.{default_format}"
-                
+
                 self.export_result(
                     task.id,
                     output_format=default_format,
@@ -927,7 +934,7 @@ class TranscriptionManager:
                     fallback_error,
                     exc_info=True,
                 )
-            
+
             # We don't fail the task if export fails, but we log it
 
     def _cleanup_after_cancellation(self, task_id: str) -> None:
@@ -935,8 +942,6 @@ class TranscriptionManager:
         if task_id in self._task_engine_options:
             del self._task_engine_options[task_id]
             self._persist_task_engine_options()
-
-
 
     def get_task_status(self, task_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -985,6 +990,7 @@ class TranscriptionManager:
             return False
 
         import asyncio
+
         from config.constants import TASK_STATUS_CANCELLED
 
         # Cancel in queue (schedule in background event loop)
@@ -1050,8 +1056,6 @@ class TranscriptionManager:
         else:
             logger.warning("Task queue not running, cannot retry task")
             return False
-
-
 
     def get_all_tasks(self, status: Optional[str] = None) -> List[Dict[str, Any]]:
         """
@@ -1136,13 +1140,13 @@ class TranscriptionManager:
     def get_task_content(self, task_id: str) -> Dict[str, Any]:
         """
         Retrieve the internal structured content of a completed task.
-        
+
         Args:
             task_id: Task identifier
-            
+
         Returns:
             Dictionary containing the task content
-            
+
         Raises:
             TaskNotFoundError: If task or its content file is not found
             ValueError: If content is invalid
@@ -1154,7 +1158,7 @@ class TranscriptionManager:
             if not task:
                 raise TaskNotFoundError(f"Task {task_id} not found")
             raise TaskNotFoundError(f"Content file for task {task_id} not found at {internal_path}")
-            
+
         try:
             with open(internal_path, "r", encoding="utf-8") as f:
                 content = json.load(f)
@@ -1169,15 +1173,15 @@ class TranscriptionManager:
     def export_result(self, task_id: str, output_format: str, output_path: str) -> str:
         """
         Export task result to a specific format and path.
-        
+
         Args:
             task_id: Task identifier
             output_format: Target format (txt, srt, md)
             output_path: Destination file path
-            
+
         Returns:
             Path to the exported file
-            
+
         Raises:
             TaskNotFoundError: If task content is missing
             ValueError: If format is unsupported
@@ -1197,18 +1201,18 @@ class TranscriptionManager:
         except TaskNotFoundError:
             # Re-raise with context
             raise TaskNotFoundError(f"Cannot export task {task_id}: content not found")
-            
+
         # Convert content
         try:
             formatted_content = self.format_converter.convert(content, output_format)
         except ValueError as e:
             logger.error(f"Format conversion failed for task {task_id}: {e}")
             raise
-            
+
         # Ensure directory exists
         path_obj = Path(output_path)
         path_obj.parent.mkdir(parents=True, exist_ok=True)
-        
+
         # Write to file
         try:
             with open(output_path, "w", encoding="utf-8") as f:
@@ -1216,7 +1220,7 @@ class TranscriptionManager:
         except Exception as e:
             logger.error(f"Failed to write exported file to {output_path}: {e}")
             raise IOError(f"Failed to write export file: {e}")
-            
+
         logger.info(f"Exported task {task_id} to {output_format.upper()} at {output_path}")
         return output_path
 
@@ -1253,12 +1257,12 @@ class TranscriptionManager:
         # Notify global listeners
         try:
             self._notify_listeners(
-                "task_updated", 
-                {"id": task_id, "progress": progress, "status": "processing", "message": message}
+                "task_updated",
+                {"id": task_id, "progress": progress, "status": "processing", "message": message},
             )
         except Exception:
             pass
-            
+
         logger.debug(f"Task {task_id} progress: {progress:.1f}% - {message}")
 
     def _translate(self, key: str, default: Optional[str] = None, **kwargs) -> str:

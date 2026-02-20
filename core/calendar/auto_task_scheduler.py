@@ -26,11 +26,12 @@ from datetime import datetime, timezone
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.date import DateTrigger
 
-from data.database.models import AutoTaskConfig, CalendarEvent, EventAttachment
 from core.calendar.manager import CalendarManager
 from core.transcription.manager import TranscriptionManager
+from data.database.models import AutoTaskConfig, CalendarEvent, EventAttachment
 
 logger = logging.getLogger("echonote.calendar.auto_task_scheduler")
+
 
 def to_local_naive(dt) -> datetime:
     """Helper to convert to naive local datetime, similarly to timeline manager."""
@@ -45,10 +46,11 @@ def to_local_naive(dt) -> datetime:
         return dt
     return datetime.now().replace(tzinfo=None)
 
+
 class CalendarAutoTaskScheduler:
     """
     Automatic task scheduler for backend post-event tasks like batch transcription.
-    
+
     Responsibilities:
     - Add precise DateTrigger jobs for when events end.
     - Fallback polling for missed events (e.g. app was closed).
@@ -85,10 +87,10 @@ class CalendarAutoTaskScheduler:
 
             self.scheduler.start()
             self.is_running = True
-            
+
             # Initial poll on start
             self._poll_for_auto_tasks()
-            
+
             logger.info("CalendarAutoTaskScheduler started")
         except Exception as e:
             logger.error(f"Failed to start CalendarAutoTaskScheduler: {e}")
@@ -132,7 +134,7 @@ class CalendarAutoTaskScheduler:
                 replace_existing=True,
             )
             logger.info(f"Scheduled auto transcription for event {event.id} at {end_time}")
-            
+
         except Exception as e:
             logger.error(f"Failed to schedule precise task for event {event.id}: {e}")
 
@@ -143,28 +145,28 @@ class CalendarAutoTaskScheduler:
         """
         try:
             logger.debug("Polling for missed calendar auto tasks...")
-            
+
             # Find configurations with transcription enabled
             configs = self.calendar_manager.db.execute(
                 "SELECT * FROM auto_task_configs WHERE enable_transcription = 1"
             )
-            
+
             if not configs:
                 return
-                
+
             now = to_local_naive(datetime.now())
-            
+
             for row in configs:
                 config = AutoTaskConfig.from_db_row(row)
                 event = CalendarEvent.get_by_id(self.calendar_manager.db, config.event_id)
                 if not event:
                     continue
-                    
+
                 end_time = to_local_naive(event.end_time)
                 # If event has ended
                 if end_time <= now:
                     self._process_event(event.id)
-                    
+
         except Exception as e:
             logger.error(f"Error polling for missed calendar auto tasks: {e}")
 
@@ -196,7 +198,9 @@ class CalendarAutoTaskScheduler:
                 return
 
             if has_transcript:
-                logger.debug(f"Event {event_id} already has a transcript, bypassing auto-transcribe.")
+                logger.debug(
+                    f"Event {event_id} already has a transcript, bypassing auto-transcribe."
+                )
                 self._disable_auto_transcribe(config)
                 return
 
@@ -207,7 +211,7 @@ class CalendarAutoTaskScheduler:
                 options["language"] = config.transcription_language
 
             self.transcription_manager.add_task(recording_path, options=options)
-            
+
             # Note: We do not disable the config yet; we disable it so it only runs once here.
             # But the user might attach a new recording later. For now, disable it so we don't
             # endlessly poll and submit the same audio repeatedly.
@@ -222,4 +226,6 @@ class CalendarAutoTaskScheduler:
             config.enable_transcription = False
             config.save(self.calendar_manager.db)
         except Exception as e:
-            logger.error(f"Failed to disable auto-transcribe config for event {config.event_id}: {e}")
+            logger.error(
+                f"Failed to disable auto-transcribe config for event {config.event_id}: {e}"
+            )

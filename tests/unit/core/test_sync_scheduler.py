@@ -122,6 +122,7 @@ class TestSyncSchedulerManualSync:
         # Should log warning but not raise
         sync_scheduler.sync_now()
 
+
 class TestSyncSchedulerSyncAll:
     """Test sync all functionality."""
 

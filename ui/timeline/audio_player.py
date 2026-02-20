@@ -32,9 +32,9 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSlider,
+    QStyle,
     QVBoxLayout,
     QWidget,
-    QStyle,
 )
 
 from ui.base_widgets import (
@@ -45,11 +45,11 @@ from ui.base_widgets import (
     create_vbox,
 )
 from ui.constants import (
-    AUDIO_PLAYER_CONTROL_BUTTON_SIZE,
-    AUDIO_PLAYER_CONTROL_ICON_SIZE,
     AUDIO_PLAYER_CONTENT_MARGIN,
     AUDIO_PLAYER_CONTENT_SPACING,
     AUDIO_PLAYER_CONTROL_BAR_SPACING,
+    AUDIO_PLAYER_CONTROL_BUTTON_SIZE,
+    AUDIO_PLAYER_CONTROL_ICON_SIZE,
     AUDIO_PLAYER_CONTROLS_SPACING,
     AUDIO_PLAYER_DIALOG_MARGIN,
     AUDIO_PLAYER_DIALOG_MIN_HEIGHT,
@@ -482,12 +482,12 @@ class AudioPlayer(BaseWidget):
             if explicit_path.suffix.lower() == ".json":
                 if load_json(explicit_path):
                     pass
-                elif load_text(explicit_path): # Fallback just in case text masquerades as json
+                elif load_text(explicit_path):  # Fallback just in case text masquerades as json
                     pass
             else:
                 if load_text(explicit_path):
                     pass
-                elif load_json(explicit_path): # Fallback
+                elif load_json(explicit_path):  # Fallback
                     pass
 
         # If not found yet, try guessing based on audio path
@@ -756,7 +756,9 @@ class AudioPlayer(BaseWidget):
                 QStyle.StandardPixmap.SP_MediaPause,
                 is_primary=True,
             )
-            self.play_button.setAccessibleName(self.i18n.t("timeline.audio_player.pause_button_label"))
+            self.play_button.setAccessibleName(
+                self.i18n.t("timeline.audio_player.pause_button_label")
+            )
             button_tooltip = self.i18n.t("timeline.audio_player.pause_tooltip")
         else:
             self._set_button_icon(
@@ -764,7 +766,9 @@ class AudioPlayer(BaseWidget):
                 QStyle.StandardPixmap.SP_MediaPlay,
                 is_primary=True,
             )
-            self.play_button.setAccessibleName(self.i18n.t("timeline.audio_player.play_button_label"))
+            self.play_button.setAccessibleName(
+                self.i18n.t("timeline.audio_player.play_button_label")
+            )
             button_tooltip = self.i18n.t("timeline.audio_player.play_tooltip")
 
         self._set_button_icon(
@@ -779,7 +783,9 @@ class AudioPlayer(BaseWidget):
             QStyle.StandardPixmap.SP_FileDialogDetailedView,
             is_primary=False,
         )
-        self.show_transcript_button.setAccessibleName(self.i18n.t("timeline.audio_player.transcript"))
+        self.show_transcript_button.setAccessibleName(
+            self.i18n.t("timeline.audio_player.transcript")
+        )
         self.show_transcript_button.setToolTip(self.i18n.t("timeline.audio_player.transcript"))
         self.play_button.setToolTip(button_tooltip)
         self._update_volume_button_icon()
@@ -865,7 +871,13 @@ class AudioPlayer(BaseWidget):
 class AudioPlayerDialog(QDialog):
     """Dialog wrapper for audio player."""
 
-    def __init__(self, file_path: str, i18n: I18nQtManager, parent: Optional[QWidget] = None, transcript_path: Optional[str] = None):
+    def __init__(
+        self,
+        file_path: str,
+        i18n: I18nQtManager,
+        parent: Optional[QWidget] = None,
+        transcript_path: Optional[str] = None,
+    ):
         """
         Initialize audio player dialog.
 

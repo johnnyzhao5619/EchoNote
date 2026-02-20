@@ -64,12 +64,8 @@ APP_SCOPED_SYSTEM_AUDIO_KEYWORDS = {
         "google meet",
         "meet audio",
     ),
-    "Webex": (
-        "webex",
-    ),
-    "Discord": (
-        "discord",
-    ),
+    "Webex": ("webex",),
+    "Discord": ("discord",),
 }
 
 

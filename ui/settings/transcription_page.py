@@ -37,14 +37,14 @@ from PySide6.QtWidgets import (
 )
 
 from config.constants import (
-    SUPPORTED_TRANSCRIPTION_FORMATS,
-    SUPPORTED_TRANSCRIPTION_ENGINES,
-    SUPPORTED_COMPUTE_TYPES,
-    STANDARD_LABEL_WIDTH,
-    ENGINE_FASTER_WHISPER,
-    ENGINE_OPENAI,
-    ENGINE_GOOGLE,
     ENGINE_AZURE,
+    ENGINE_FASTER_WHISPER,
+    ENGINE_GOOGLE,
+    ENGINE_OPENAI,
+    STANDARD_LABEL_WIDTH,
+    SUPPORTED_COMPUTE_TYPES,
+    SUPPORTED_TRANSCRIPTION_ENGINES,
+    SUPPORTED_TRANSCRIPTION_FORMATS,
 )
 from core.models.registry import get_default_model_names
 from ui.base_widgets import create_button, create_hbox, create_vbox
@@ -116,7 +116,9 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         self.add_section_spacing()
 
         # FFmpeg status section
-        self.ffmpeg_title = self.add_section_title(self.i18n.t("settings.transcription.ffmpeg_status"))
+        self.ffmpeg_title = self.add_section_title(
+            self.i18n.t("settings.transcription.ffmpeg_status")
+        )
 
         # FFmpeg status display
         ffmpeg_status_layout = create_hbox()
@@ -894,7 +896,9 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         if "transcription_manager" in self.managers:
             try:
                 self.managers["transcription_manager"].update_max_concurrent(new_max_concurrent)
-                logger.info("Updated transcription manager max_concurrent to %s", new_max_concurrent)
+                logger.info(
+                    "Updated transcription manager max_concurrent to %s", new_max_concurrent
+                )
             except Exception as exc:  # noqa: BLE001
                 logger.error("Failed to update transcription manager max_concurrent: %s", exc)
 

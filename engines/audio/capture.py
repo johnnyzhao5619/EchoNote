@@ -260,9 +260,7 @@ class AudioCapture:
                         try:
                             self.error_callback(error_message)
                         except Exception as callback_exc:  # noqa: BLE001
-                            logger.warning(
-                                "Audio capture error callback failed: %s", callback_exc
-                            )
+                            logger.warning("Audio capture error callback failed: %s", callback_exc)
                     self.is_capturing = False
                     break
 

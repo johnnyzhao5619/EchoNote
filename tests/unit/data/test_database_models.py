@@ -10,17 +10,17 @@ from unittest.mock import MagicMock, Mock
 
 import pytest
 
+from config.constants import (
+    DEFAULT_TRANSCRIPTION_ENGINE,
+    ENGINE_FASTER_WHISPER,
+    TASK_STATUS_COMPLETED,
+    TASK_STATUS_PENDING,
+)
 from data.database.models import (
     CalendarEvent,
     TranscriptionTask,
     current_timestamp,
     generate_uuid,
-)
-from config.constants import (
-    TASK_STATUS_PENDING,
-    TASK_STATUS_COMPLETED,
-    DEFAULT_TRANSCRIPTION_ENGINE,
-    ENGINE_FASTER_WHISPER,
 )
 
 

@@ -40,6 +40,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from core.calendar.constants import CalendarSource
+from core.calendar.exceptions import SyncError
 from ui.base_widgets import (
     BaseWidget,
     connect_button_with_callback,
@@ -56,8 +58,6 @@ from ui.constants import (
     ZERO_MARGINS,
 )
 from utils.i18n import I18nQtManager
-from core.calendar.constants import CalendarSource
-from core.calendar.exceptions import SyncError
 
 logger = logging.getLogger("echonote.ui.calendar_hub")
 
@@ -436,7 +436,7 @@ class CalendarHubWidget(BaseWidget):
     def _on_calendar_date_clicked(self, date: datetime):
         """
         Handle clicking on an empty date cell to create a new event.
-        
+
         Args:
             date: The datetime that was clicked
         """
@@ -458,6 +458,7 @@ class CalendarHubWidget(BaseWidget):
             auto_transcribe = False
             try:
                 from data.database.models import AutoTaskConfig
+
                 config = AutoTaskConfig.get_by_event_id(self.calendar_manager.db, event.id)
                 if config:
                     auto_transcribe = config.enable_transcription
@@ -479,6 +480,7 @@ class CalendarHubWidget(BaseWidget):
         elif default_date:
             now = datetime.now()
             from datetime import timedelta
+
             if default_date.date() == now.date():
                 start_dt = now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
             else:
@@ -499,6 +501,7 @@ class CalendarHubWidget(BaseWidget):
         if event:
             try:
                 from data.database.models import EventAttachment
+
                 attachments = EventAttachment.get_by_event_id(self.calendar_manager.db, event.id)
                 for attachment in attachments:
                     if attachment.attachment_type == "recording":
@@ -513,7 +516,9 @@ class CalendarHubWidget(BaseWidget):
                         allow_retranscribe = True
 
             except Exception as e:
-                logger.warning(f"Failed to fetch attachments or parse time for event {event.id}: {e}")
+                logger.warning(
+                    f"Failed to fetch attachments or parse time for event {event.id}: {e}"
+                )
         elif default_date:
             # Check if default_date is in the past for new events
             # default_date is typically naive from what I saw in calendar_view
@@ -531,7 +536,9 @@ class CalendarHubWidget(BaseWidget):
 
         if allow_retranscribe and recording_path:
             dialog.secondary_transcribe_requested.connect(
-                lambda p=recording_path, eid=event.id: self._on_secondary_transcribe_requested(eid, p)
+                lambda p=recording_path, eid=event.id: self._on_secondary_transcribe_requested(
+                    eid, p
+                )
             )
 
         if dialog.exec() == QDialog.DialogCode.Accepted:
@@ -553,7 +560,7 @@ class CalendarHubWidget(BaseWidget):
                     logger.warning(f"Event saved with sync errors: {e}")
                     self.show_warning(
                         self.i18n.t("common.warning"),
-                        self.i18n.t("calendar.warning.sync_failed", error=str(e))
+                        self.i18n.t("calendar.warning.sync_failed", error=str(e)),
                     )
                 except Exception as e:
                     logger.error(f"Error saving event: {e}")
@@ -1324,7 +1331,9 @@ class CalendarHubWidget(BaseWidget):
 
         self.manual_sync_finished.emit(success_count, error_count, fatal_error)
 
-    def _on_manual_sync_finished(self, success_count: int, error_count: int, fatal_error: str) -> None:
+    def _on_manual_sync_finished(
+        self, success_count: int, error_count: int, fatal_error: str
+    ) -> None:
         """Handle manual sync completion in the UI thread."""
         try:
             if fatal_error:
@@ -1470,7 +1479,9 @@ class CalendarHubWidget(BaseWidget):
             logger.error("Transcription manager not available for re-transcription")
             return
 
-        logger.info(f"Submitting high-quality re-transcription from Calendar Hub for event {event_id}")
+        logger.info(
+            f"Submitting high-quality re-transcription from Calendar Hub for event {event_id}"
+        )
         options = {
             "event_id": event_id,
             "replace_realtime": True,

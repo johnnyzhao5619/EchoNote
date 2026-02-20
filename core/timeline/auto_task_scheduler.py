@@ -702,7 +702,9 @@ class AutoTaskScheduler:
         next_prompt_at: datetime,
     ) -> None:
         """Inform user that stop has been deferred and will be confirmed again."""
-        title = self.i18n.t("auto_task.stop_confirmation.delayed_title", app_name=self.i18n.t("app.name"))
+        title = self.i18n.t(
+            "auto_task.stop_confirmation.delayed_title", app_name=self.i18n.t("app.name")
+        )
         message = self.i18n.t(
             "auto_task.stop_confirmation.delayed_message",
             event_title=event.title,

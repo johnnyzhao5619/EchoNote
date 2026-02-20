@@ -386,7 +386,9 @@ class EventCard(QFrame):
                 self.i18n.t("timeline.secondary_transcribe")
             )
             self.secondary_transcribe_btn.clicked.connect(self._on_secondary_transcribe)
-            self.secondary_transcribe_btn.setProperty("role", "timeline-secondary-transcribe-action")
+            self.secondary_transcribe_btn.setProperty(
+                "role", "timeline-secondary-transcribe-action"
+            )
             actions_layout.addWidget(self.secondary_transcribe_btn)
 
         # Transcript button

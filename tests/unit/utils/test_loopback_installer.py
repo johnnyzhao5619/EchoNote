@@ -4,7 +4,7 @@
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from utils.loopback_installer import LoopbackInstallResult, LoopbackInstaller
+from utils.loopback_installer import LoopbackInstaller, LoopbackInstallResult
 
 
 def test_supports_one_click_install_on_macos_with_required_tools():
@@ -118,7 +118,9 @@ def test_install_loopback_input_windows_success_sets_reboot_flag(tmp_path):
     with (
         patch("platform.system", return_value="Windows"),
         patch.object(installer, "_powershell_executable", return_value="powershell"),
-        patch.object(installer, "_resolve_windows_vbcable_url", return_value="https://example.com/a.zip"),
+        patch.object(
+            installer, "_resolve_windows_vbcable_url", return_value="https://example.com/a.zip"
+        ),
         patch("urllib.request.urlretrieve", return_value=(str(tmp_path / "a.zip"), None)),
         patch("zipfile.ZipFile") as zip_cls,
         patch.object(installer, "_find_windows_setup_executable", return_value=setup_exe),
@@ -157,7 +159,11 @@ def test_install_loopback_input_linux_configures_virtual_sink():
     installer = LoopbackInstaller()
     with (
         patch("platform.system", return_value="Linux"),
-        patch.object(installer, "_ensure_linux_pactl_available", return_value=LoopbackInstallResult(success=True, message="")),
+        patch.object(
+            installer,
+            "_ensure_linux_pactl_available",
+            return_value=LoopbackInstallResult(success=True, message=""),
+        ),
         patch.object(installer, "_linux_sink_exists", return_value=False),
         patch("subprocess.run", return_value=Mock(returncode=0, stdout="52\n", stderr="")),
     ):
@@ -171,7 +177,11 @@ def test_install_loopback_input_linux_skips_when_already_configured():
     installer = LoopbackInstaller()
     with (
         patch("platform.system", return_value="Linux"),
-        patch.object(installer, "_ensure_linux_pactl_available", return_value=LoopbackInstallResult(success=True, message="")),
+        patch.object(
+            installer,
+            "_ensure_linux_pactl_available",
+            return_value=LoopbackInstallResult(success=True, message=""),
+        ),
         patch.object(installer, "_linux_sink_exists", return_value=True),
     ):
         result = installer.install_loopback_input()

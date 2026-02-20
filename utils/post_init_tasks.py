@@ -91,9 +91,9 @@ def check_loopback_availability(
 def check_model_availability(config, model_manager, i18n, main_window):
     """Check model availability and show recommendation dialog if needed."""
     logger.info("Checking if model recommendation is needed...")
-    default_engine = str(
-        config.get("transcription.default_engine", ENGINE_FASTER_WHISPER)
-    ).strip().lower()
+    default_engine = (
+        str(config.get("transcription.default_engine", ENGINE_FASTER_WHISPER)).strip().lower()
+    )
     if default_engine != ENGINE_FASTER_WHISPER:
         logger.info(
             "Default speech engine is '%s'; skipping local model recommendation",
@@ -174,7 +174,9 @@ def start_background_services(managers, config, db, logger):
     if "calendar_auto_task_scheduler" in managers and managers["calendar_auto_task_scheduler"]:
         try:
             logger.info("Starting calendar auto task scheduler...")
-            managers["calendar_manager"].set_calendar_auto_task_scheduler(managers["calendar_auto_task_scheduler"])
+            managers["calendar_manager"].set_calendar_auto_task_scheduler(
+                managers["calendar_auto_task_scheduler"]
+            )
             managers["calendar_auto_task_scheduler"].start()
         except Exception as e:
             logger.error(f"Could not start calendar auto task scheduler: {e}")

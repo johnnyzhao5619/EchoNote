@@ -130,7 +130,9 @@ class SessionArchiver:
                 "temp_wav_path": temp_wav_path,
                 "base_filename": base_filename,
             }
-            logger.info("Streaming recording failover enabled with preserved prefix: %s", temp_wav_path)
+            logger.info(
+                "Streaming recording failover enabled with preserved prefix: %s", temp_wav_path
+            )
             return True
 
     def append_recording_chunk(self, audio_chunk: np.ndarray) -> bool:
@@ -412,7 +414,9 @@ class SessionArchiver:
                 filename = self.file_manager.create_unique_filename(
                     base_filename, "wav", subdirectory="Recordings"
                 )
-                final_path = self.file_manager.save_file(content, filename, subdirectory="Recordings")
+                final_path = self.file_manager.save_file(
+                    content, filename, subdirectory="Recordings"
+                )
                 logger.info("Recording saved as WAV: %s", final_path)
                 return final_path
 
@@ -472,9 +476,7 @@ class SessionArchiver:
         timestamp = start_time.strftime("%Y%m%d_%H%M%S")
         base_filename = f"markers_{timestamp}"
 
-        return await self._run_in_executor(
-            self._save_markers_sync, payload, base_filename
-        )
+        return await self._run_in_executor(self._save_markers_sync, payload, base_filename)
 
     def _save_markers_sync(self, payload: Dict[str, Any], base_filename: str) -> str:
         try:
@@ -482,9 +484,7 @@ class SessionArchiver:
             filename = self.file_manager.create_unique_filename(
                 base_filename, "json", subdirectory="Markers"
             )
-            final_path = self.file_manager.save_text_file(
-                content, filename, subdirectory="Markers"
-            )
+            final_path = self.file_manager.save_text_file(content, filename, subdirectory="Markers")
             logger.info(f"Markers saved: {final_path}")
             return final_path
         except Exception as e:
@@ -498,6 +498,4 @@ class SessionArchiver:
     def _convert_wav_to_mp3(self, wav_path: str, mp3_path: str) -> None:
         """Convert WAV to MP3 using FFmpeg."""
         command = ["ffmpeg", "-y", "-i", wav_path, "-codec:a", "libmp3lame", mp3_path]
-        subprocess.run(
-            command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )
+        subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)

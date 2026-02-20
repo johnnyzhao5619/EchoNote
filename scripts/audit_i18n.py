@@ -15,7 +15,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-
 BASE_LOCALE = "en_US"
 TARGET_LOCALES = ("zh_CN", "fr_FR")
 

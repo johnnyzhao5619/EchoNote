@@ -178,9 +178,9 @@ class CalendarIntegration:
         transcript_preview = recording_result.get("transcript_preview") or self._read_text_preview(
             transcript_path
         )
-        translation_preview = recording_result.get("translation_preview") or self._read_text_preview(
-            translation_path
-        )
+        translation_preview = recording_result.get(
+            "translation_preview"
+        ) or self._read_text_preview(translation_path)
 
         lines = [
             self._translate(

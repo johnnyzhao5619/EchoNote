@@ -11,10 +11,15 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from core.calendar.manager import CalendarManager
-from data.database.models import CalendarEvent, CalendarEventLink, CalendarSyncStatus, EventAttachment
 from core.calendar.constants import CalendarSource, EventType
 from core.calendar.exceptions import EventNotFoundError
+from core.calendar.manager import CalendarManager
+from data.database.models import (
+    CalendarEvent,
+    CalendarEventLink,
+    CalendarSyncStatus,
+    EventAttachment,
+)
 
 
 class MockDatabaseConnection:
@@ -409,9 +414,15 @@ class TestCalendarManagerGetEvents:
         start_date = "2025-11-01T00:00:00"
         end_date = "2025-11-30T23:59:59"
 
-        mock_event1 = Mock(id="event_1", event_type=EventType.EVENT, title="Team Meeting", description="")
-        mock_event2 = Mock(id="event_2", event_type=EventType.TASK, title="Code Review", description="")
-        mock_event3 = Mock(id="event_3", event_type=EventType.EVENT, title="Planning", description="")
+        mock_event1 = Mock(
+            id="event_1", event_type=EventType.EVENT, title="Team Meeting", description=""
+        )
+        mock_event2 = Mock(
+            id="event_2", event_type=EventType.TASK, title="Code Review", description=""
+        )
+        mock_event3 = Mock(
+            id="event_3", event_type=EventType.EVENT, title="Planning", description=""
+        )
 
         with patch.object(
             CalendarEvent, "get_by_time_range", return_value=[mock_event1, mock_event2, mock_event3]

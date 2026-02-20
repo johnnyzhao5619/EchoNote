@@ -24,15 +24,15 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
+from core.calendar.constants import CalendarSource, EventType, SyncStatus
+from core.calendar.exceptions import CalendarError, EventNotFoundError, SyncError
 from data.database.models import (
+    AutoTaskConfig,
     CalendarEvent,
     CalendarEventLink,
     CalendarSyncStatus,
     EventAttachment,
-    AutoTaskConfig,
 )
-from core.calendar.constants import CalendarSource, EventType, SyncStatus
-from core.calendar.exceptions import CalendarError, EventNotFoundError, SyncError
 from data.storage.file_manager import FileManager
 
 logger = logging.getLogger("echonote.calendar.manager")
@@ -156,8 +156,7 @@ class CalendarManager:
             # Save auto task config if provided
             if "auto_transcribe" in event_data:
                 config = AutoTaskConfig(
-                    event_id=event.id,
-                    enable_transcription=bool(event_data["auto_transcribe"])
+                    event_id=event.id, enable_transcription=bool(event_data["auto_transcribe"])
                 )
                 config.save(self.db)
                 if self.calendar_auto_task_scheduler:
@@ -234,8 +233,7 @@ class CalendarManager:
                     config.enable_transcription = bool(event_data["auto_transcribe"])
                 else:
                     config = AutoTaskConfig(
-                        event_id=event.id,
-                        enable_transcription=bool(event_data["auto_transcribe"])
+                        event_id=event.id, enable_transcription=bool(event_data["auto_transcribe"])
                     )
                 config.save(self.db)
                 if self.calendar_auto_task_scheduler:
@@ -285,7 +283,7 @@ class CalendarManager:
                 failed_msg = ", ".join(sorted(set(sync_failures)))
                 raise SyncError(
                     f"Local event updated, but sync failed for: {failed_msg}",
-                    failed_providers=sync_failures
+                    failed_providers=sync_failures,
                 )
 
         except Exception as e:
@@ -346,7 +344,7 @@ class CalendarManager:
                 failed_msg = ", ".join(sorted(set(sync_failures)))
                 raise SyncError(
                     f"Local deletion blocked. Sync failed for: {failed_msg}",
-                    failed_providers=sync_failures
+                    failed_providers=sync_failures,
                 )
 
             if links:
@@ -1014,9 +1012,7 @@ class CalendarManager:
             return
 
         if not getattr(adapter, "refresh_token", None):
-            logger.warning(
-                "Adapter %s has no refresh_token; skipping token refresh", provider
-            )
+            logger.warning("Adapter %s has no refresh_token; skipping token refresh", provider)
             return
 
         try:
@@ -1039,9 +1035,7 @@ class CalendarManager:
                         if expires_at_dt.tzinfo
                         else datetime.now()
                     )
-                    resolved = max(
-                        int((expires_at_dt - current_time).total_seconds()), 0
-                    )
+                    resolved = max(int((expires_at_dt - current_time).total_seconds()), 0)
                     logger.debug(
                         "Derived expires_in=%s from expires_at during %s for %s",
                         resolved,
@@ -1086,14 +1080,10 @@ class CalendarManager:
                     "expires_at": refreshed.get("expires_at"),
                 }
 
-            token_data = self.oauth_manager.refresh_token_if_needed(
-                provider, refresh_callback
-            )
+            token_data = self.oauth_manager.refresh_token_if_needed(provider, refresh_callback)
 
             if refresh_result and refresh_result.get("access_token"):
-                expires_in_for_update = _resolve_expires_in(
-                    refresh_result, "post-refresh update"
-                )
+                expires_in_for_update = _resolve_expires_in(refresh_result, "post-refresh update")
                 self.oauth_manager.update_access_token(
                     provider,
                     refresh_result.get("access_token"),
@@ -1114,8 +1104,7 @@ class CalendarManager:
             if (
                 token_before_refresh
                 and token_data
-                and token_data.get("access_token")
-                != token_before_refresh.get("access_token")
+                and token_data.get("access_token") != token_before_refresh.get("access_token")
             ):
                 logger.info("Access token for %s refreshed successfully", provider)
 

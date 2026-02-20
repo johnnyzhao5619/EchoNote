@@ -18,13 +18,14 @@ Unit tests for RealtimeConfig.
 """
 
 from pathlib import Path
+
 from core.realtime.config import RealtimeConfig
 
 
 def test_realtime_config_defaults():
     """Test default values of RealtimeConfig."""
     config = RealtimeConfig()
-    
+
     assert config.sample_rate == 16000
     assert config.channels == 1
     assert config.vad_threshold == 0.5
@@ -32,7 +33,7 @@ def test_realtime_config_defaults():
     assert config.min_audio_duration == 3.0
     assert config.translation_task_timeout == 5.0
     assert config.translation_task_shutdown_timeout == 2.0
-    
+
     # Check default paths
     expected_base = Path.home() / "Documents" / "EchoNote"
     assert config.base_recording_dir == expected_base
@@ -45,12 +46,8 @@ def test_realtime_config_defaults():
 def test_realtime_config_overrides():
     """Test overriding values in RealtimeConfig."""
     custom_path = Path("/tmp/echonote_test")
-    config = RealtimeConfig(
-        sample_rate=44100,
-        vad_threshold=0.5,
-        base_recording_dir=custom_path
-    )
-    
+    config = RealtimeConfig(sample_rate=44100, vad_threshold=0.5, base_recording_dir=custom_path)
+
     assert config.sample_rate == 44100
     assert config.vad_threshold == 0.5
     assert config.base_recording_dir == custom_path

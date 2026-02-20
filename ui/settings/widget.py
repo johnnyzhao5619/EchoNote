@@ -431,9 +431,7 @@ class SettingsWidget(BaseWidget):
             rollback_succeeded = self._rollback_settings(settings_snapshot)
             error_message = self.i18n.t("settings.error.save_failed", error=str(e))
             if not rollback_succeeded:
-                error_message = (
-                    f"{error_message}\n{self.i18n.t('settings.error.rollback_failed')}"
-                )
+                error_message = f"{error_message}\n{self.i18n.t('settings.error.rollback_failed')}"
             self.show_error(
                 self.i18n.t("settings.error.title"),
                 error_message,
@@ -471,9 +469,7 @@ class SettingsWidget(BaseWidget):
             if isinstance(language, str) and hasattr(self.i18n, "change_language"):
                 self.i18n.change_language(language)
         except Exception as exc:  # noqa: BLE001
-            logger.warning(
-                "Failed to apply language after saving settings: %s", exc, exc_info=True
-            )
+            logger.warning("Failed to apply language after saving settings: %s", exc, exc_info=True)
 
     def _run_page_post_save_hooks(self) -> bool:
         """Run optional page post-save hooks and return whether warnings were shown."""

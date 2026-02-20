@@ -22,6 +22,12 @@
 import logging
 from typing import Any, Callable, Optional
 
+from ui.constants import (
+    DEFAULT_LAYOUT_SPACING,
+    PAGE_CONTENT_MARGINS,
+    PAGE_LAYOUT_SPACING,
+    ZERO_MARGINS,
+)
 from ui.qt_imports import (
     QHBoxLayout,
     QLabel,
@@ -30,16 +36,8 @@ from ui.qt_imports import (
     QVBoxLayout,
     QWidget,
 )
-from ui.constants import (
-    DEFAULT_LAYOUT_SPACING,
-    PAGE_CONTENT_MARGINS,
-    PAGE_LAYOUT_SPACING,
-    ZERO_MARGINS,
-)
-from ui.signal_helpers import (
-    connect_button_with_callback as connect_button_signal,
-    safe_disconnect as safe_disconnect_signal,
-)
+from ui.signal_helpers import connect_button_with_callback as connect_button_signal
+from ui.signal_helpers import safe_disconnect as safe_disconnect_signal
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger(__name__)
@@ -347,6 +345,7 @@ class LayoutHelper:
         layout.setSpacing(spacing)
         layout.setContentsMargins(*margins)
         return layout
+
 
 class SignalHelper:
     """信号辅助工具类

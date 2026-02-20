@@ -41,7 +41,7 @@ def _build_i18n():
             "sidebar.settings": "Settings",
             "settings.category.appearance": "Appearance",
             "app_shell.search_result": "Opened {page}",
-            "app_shell.search_no_match": "No page matched \"{query}\"",
+            "app_shell.search_no_match": 'No page matched "{query}"',
         }
         template = mapping.get(key, key)
         try:
@@ -54,11 +54,11 @@ def _build_i18n():
 
 
 def _bind_search_methods(fake_window):
-    fake_window._resolve_settings_category = (
-        lambda query: MainWindow._resolve_settings_category(fake_window, query)
+    fake_window._resolve_settings_category = lambda query: MainWindow._resolve_settings_category(
+        fake_window, query
     )
-    fake_window._resolve_search_target = (
-        lambda query: MainWindow._resolve_search_target(fake_window, query)
+    fake_window._resolve_search_target = lambda query: MainWindow._resolve_search_target(
+        fake_window, query
     )
     fake_window._get_page_title = lambda page: MainWindow._get_page_title(fake_window, page)
 

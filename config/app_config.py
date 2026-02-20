@@ -323,7 +323,7 @@ class ConfigManager:
                 return self._validate_resource_monitor_setting(setting, value)
             elif category == "ui":
                 return self._validate_ui_setting(setting, value)
-            
+
             return True
         except Exception as e:
             logger.error(f"Validation error for {key}: {e}")
@@ -331,12 +331,12 @@ class ConfigManager:
 
     def _validate_transcription_setting(self, setting: str, value: Any) -> bool:
         from config.constants import (
-            SUPPORTED_TRANSCRIPTION_FORMATS,
             SUPPORTED_TRANSCRIPTION_ENGINES,
+            SUPPORTED_TRANSCRIPTION_FORMATS,
         )
 
         if setting == "default_output_format":
-             return value in SUPPORTED_TRANSCRIPTION_FORMATS
+            return value in SUPPORTED_TRANSCRIPTION_FORMATS
         elif setting == "max_concurrent_tasks":
             return isinstance(value, int) and 1 <= value <= 5
         elif setting == "default_engine":
@@ -345,9 +345,10 @@ class ConfigManager:
             return isinstance(value, str) and len(value.strip()) > 0
         elif setting == "faster_whisper.model_size":
             from core.models.registry import get_default_model_names
+
             return isinstance(value, str) and value in get_default_model_names()
         elif setting == "faster_whisper.model_dir":
-             return isinstance(value, str)
+            return isinstance(value, str)
         # Task queue settings
         elif setting.startswith("task_queue."):
             sub = setting.split(".", 1)[1]
@@ -361,41 +362,41 @@ class ConfigManager:
 
     def _validate_realtime_setting(self, setting: str, value: Any) -> bool:
         from config.constants import (
-            SUPPORTED_RECORDING_FORMATS,
             SUPPORTED_REALTIME_TRANSLATION_ENGINES,
+            SUPPORTED_RECORDING_FORMATS,
         )
 
         if setting == "recording_format":
-             return value in SUPPORTED_RECORDING_FORMATS
+            return value in SUPPORTED_RECORDING_FORMATS
         elif setting == "auto_save":
             return isinstance(value, bool)
         elif setting == "default_input_source":
-             # 'default' or valid device ID (string)
+            # 'default' or valid device ID (string)
             return isinstance(value, str)
         elif setting == "default_gain":
-             # 0.1 to 10.0
-             return isinstance(value, (int, float)) and 0.0 <= value <= 10.0
+            # 0.1 to 10.0
+            return isinstance(value, (int, float)) and 0.0 <= value <= 10.0
         elif setting == "translation_engine":
-             return value in SUPPORTED_REALTIME_TRANSLATION_ENGINES
+            return value in SUPPORTED_REALTIME_TRANSLATION_ENGINES
         elif setting == "vad_threshold":
-             return isinstance(value, (int, float)) and 0.0 <= value <= 1.0
+            return isinstance(value, (int, float)) and 0.0 <= value <= 1.0
         elif setting == "silence_duration_ms":
-             return isinstance(value, int) and value >= 0
+            return isinstance(value, int) and value >= 0
         elif setting == "min_audio_duration":
-             return isinstance(value, (int, float)) and value >= 0
+            return isinstance(value, (int, float)) and value >= 0
         elif setting == "save_transcript" or setting == "create_calendar_event":
-             return isinstance(value, bool)
+            return isinstance(value, bool)
         elif setting == "recording_save_path":
-             return isinstance(value, str)
+            return isinstance(value, str)
         return True
 
     def _validate_calendar_setting(self, setting: str, value: Any) -> bool:
         if setting == "default_view":
             return value in ["month", "week", "day"]
         elif setting == "sync_interval_minutes":
-             return isinstance(value, int) and value >= 1
+            return isinstance(value, int) and value >= 1
         elif setting.startswith("colors."):
-             return isinstance(value, str) and value.startswith("#") and len(value) == 7
+            return isinstance(value, str) and value.startswith("#") and len(value) == 7
         return True
 
     def _validate_timeline_setting(self, setting: str, value: Any) -> bool:
@@ -425,7 +426,7 @@ class ConfigManager:
         if setting == "low_memory_mb":
             return isinstance(value, (int, float)) and 64 <= float(value) <= 1048576
         elif setting == "high_cpu_percent":
-             return isinstance(value, (int, float)) and 1 <= float(value) <= 100
+            return isinstance(value, (int, float)) and 1 <= float(value) <= 100
         return True
 
     def _validate_ui_setting(self, setting: str, value: Any) -> bool:

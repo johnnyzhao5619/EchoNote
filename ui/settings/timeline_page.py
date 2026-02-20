@@ -101,14 +101,18 @@ class TimelineSettingsPage(BaseSettingsPage):
         self.add_section_spacing()
 
         # Notification settings section
-        self.notifications_title = self.add_section_title(self.i18n.t("settings.timeline.notifications"))
+        self.notifications_title = self.add_section_title(
+            self.i18n.t("settings.timeline.notifications")
+        )
 
         # Reminder time
         reminder_layout = create_hbox()
         self.reminder_label = QLabel(self.i18n.t("settings.timeline.reminder_time"))
         self.reminder_label.setMinimumWidth(STANDARD_LABEL_WIDTH)
         self.reminder_combo = QComboBox()
-        self.reminder_combo.addItems([str(minutes) for minutes in TIMELINE_REMINDER_MINUTES_OPTIONS])
+        self.reminder_combo.addItems(
+            [str(minutes) for minutes in TIMELINE_REMINDER_MINUTES_OPTIONS]
+        )
         self.reminder_combo.currentTextChanged.connect(self._emit_changed)
         self.reminder_suffix = QLabel(self.i18n.t("settings.timeline.minutes"))
         reminder_layout.addWidget(self.reminder_label)

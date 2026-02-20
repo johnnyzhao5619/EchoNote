@@ -29,16 +29,16 @@ from typing import Any, AsyncIterator, Callable, Dict, List, Optional
 
 import numpy as np
 
-from core.realtime.audio_buffer import AudioBuffer
-from core.realtime.config import RealtimeConfig
+from config.constants import RECORDING_FORMAT_WAV
 from core.realtime.archiver import SessionArchiver
+from core.realtime.audio_buffer import AudioBuffer
 from core.realtime.audio_routing import (
     detect_app_scoped_system_audio_device,
     is_loopback_device_name,
     is_system_audio_device_name,
 )
+from core.realtime.config import RealtimeConfig
 from core.realtime.integration import CalendarIntegration
-from config.constants import RECORDING_FORMAT_WAV
 
 logger = logging.getLogger(__name__)
 
@@ -79,13 +79,14 @@ class RealtimeRecorder:
         self.db = db_connection
         # file_manager is used by session_archiver
         self.i18n = i18n
-        
+
         if config:
             self.config = config
         else:
             # Load defaults from centralized configuration
             try:
                 from config.app_config import ConfigManager
+
                 config_manager = ConfigManager()
                 realtime_settings = config_manager.get("realtime", {})
                 self.config = RealtimeConfig.from_dict(realtime_settings)
@@ -242,7 +243,9 @@ class RealtimeRecorder:
             self.current_options.get("enable_translation", False)
             and not self.current_options["enable_transcription"]
         ):
-            logger.warning("Translation requires transcription; disabling translation for this session")
+            logger.warning(
+                "Translation requires transcription; disabling translation for this session"
+            )
             self.current_options["enable_translation"] = False
         self._transcription_enabled = self.current_options["enable_transcription"]
         self._apply_session_model_selection()
@@ -337,7 +340,10 @@ class RealtimeRecorder:
                 self.processing_task = None
 
             # Launch translation worker when enabled.
-            if self.current_options.get("enable_translation", False) and self._transcription_enabled:
+            if (
+                self.current_options.get("enable_translation", False)
+                and self._transcription_enabled
+            ):
                 self.translation_task = asyncio.create_task(self._process_translation_stream())
         except Exception as exc:
             logger.error("Failed to start real-time recording: %s", exc, exc_info=True)
@@ -445,9 +451,7 @@ class RealtimeRecorder:
 
         # VAD Configuration
         vad = None
-        vad_threshold = self.current_options.get(
-            "vad_threshold", self.config.vad_threshold
-        )
+        vad_threshold = self.current_options.get("vad_threshold", self.config.vad_threshold)
         silence_duration_ms = self.current_options.get(
             "silence_duration_ms", self.config.silence_duration_ms
         )
@@ -502,7 +506,7 @@ class RealtimeRecorder:
             if vad is not None:
                 try:
                     speech_timestamps = vad.detect_speech(window_audio, sample_rate)
-                    
+
                     if speech_timestamps:
                         speech_audio = vad.extract_speech(
                             window_audio, speech_timestamps, sample_rate=sample_rate
@@ -724,9 +728,7 @@ class RealtimeRecorder:
         result["audio_chunks_received"] = audio_chunks_received
         result["audio_max_abs_level"] = audio_max_abs_level
         result["audio_last_rms"] = audio_last_rms
-        result["audio_input_silent"] = (
-            audio_chunks_received > 0 and audio_max_abs_level <= 1e-8
-        )
+        result["audio_input_silent"] = audio_chunks_received > 0 and audio_max_abs_level <= 1e-8
         transcript_preview = self._build_text_preview(self.accumulated_transcription)
         if transcript_preview:
             result["transcript_preview"] = transcript_preview
@@ -899,7 +901,9 @@ class RealtimeRecorder:
             try:
                 engine._apply_runtime_model_selection(selected_model, model_path)
             except Exception as exc:  # noqa: BLE001
-                raise RuntimeError(f"Failed to activate selected model '{selected_model}': {exc}") from exc
+                raise RuntimeError(
+                    f"Failed to activate selected model '{selected_model}': {exc}"
+                ) from exc
             logger.info("Activated session model: %s", selected_model)
             return
 
@@ -916,7 +920,9 @@ class RealtimeRecorder:
             try:
                 model_info = manager.get_model(selected_model)
             except Exception as exc:  # noqa: BLE001
-                raise RuntimeError(f"Failed to resolve selected model '{selected_model}': {exc}") from exc
+                raise RuntimeError(
+                    f"Failed to resolve selected model '{selected_model}': {exc}"
+                ) from exc
             if not model_info or not getattr(model_info, "is_downloaded", False):
                 raise RuntimeError(
                     f"Selected model '{selected_model}' is not downloaded. "
@@ -936,7 +942,9 @@ class RealtimeRecorder:
             if hasattr(engine, "_refresh_model_status"):
                 engine._refresh_model_status()
         except Exception as exc:  # noqa: BLE001
-            raise RuntimeError(f"Failed to activate selected model '{selected_model}': {exc}") from exc
+            raise RuntimeError(
+                f"Failed to activate selected model '{selected_model}': {exc}"
+            ) from exc
 
         logger.info("Activated session model: %s", selected_model)
 
@@ -1118,9 +1126,7 @@ class RealtimeRecorder:
             "audio_chunks_received": audio_chunks_received,
             "audio_max_abs_level": audio_max_abs_level,
             "audio_last_rms": audio_last_rms,
-            "audio_input_silent": (
-                audio_chunks_received > 0 and audio_max_abs_level <= 1e-8
-            ),
+            "audio_input_silent": (audio_chunks_received > 0 and audio_max_abs_level <= 1e-8),
         }
 
     def get_accumulated_transcription(self) -> str:
@@ -1268,7 +1274,9 @@ class RealtimeRecorder:
             try:
                 self.on_error(self._capture_error_message)
             except Exception as callback_exc:  # noqa: BLE001
-                logger.warning("Error callback failed while reporting capture error: %s", callback_exc)
+                logger.warning(
+                    "Error callback failed while reporting capture error: %s", callback_exc
+                )
 
     def set_calendar_manager(self, calendar_manager) -> None:
         """Inject calendar manager for event creation integration."""

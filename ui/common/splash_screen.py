@@ -142,9 +142,7 @@ class SplashScreen(QSplashScreen):
 
         # Draw progress bar
         # Reserve space for percentage text (60px)
-        bar_width = (
-            self.width - (2 * SPLASH_HORIZONTAL_MARGIN) - SPLASH_PERCENT_RESERVED_WIDTH
-        )
+        bar_width = self.width - (2 * SPLASH_HORIZONTAL_MARGIN) - SPLASH_PERCENT_RESERVED_WIDTH
         bar_height = SPLASH_BAR_HEIGHT
         bar_x = SPLASH_HORIZONTAL_MARGIN
         bar_y = self.height - 40
@@ -170,7 +168,9 @@ class SplashScreen(QSplashScreen):
         text_width = metrics.horizontalAdvance(percent_text)
 
         # Draw percentage at the right edge
-        painter.drawText(self.width - text_width - SPLASH_HORIZONTAL_MARGIN, bar_y + 15, percent_text)
+        painter.drawText(
+            self.width - text_width - SPLASH_HORIZONTAL_MARGIN, bar_y + 15, percent_text
+        )
 
     def show_progress(self, message: str, percent: int = None):
         """

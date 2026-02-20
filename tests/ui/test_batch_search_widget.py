@@ -18,4 +18,3 @@ def test_search_widget_buttons_use_semantic_roles(qapp, mock_i18n):
     assert widget.prev_button.property("role") == "search-nav-action"
     assert widget.next_button.property("role") == "search-nav-action"
     assert widget.close_button.property("role") == "search-close-action"
-

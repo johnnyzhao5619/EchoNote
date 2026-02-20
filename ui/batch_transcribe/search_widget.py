@@ -25,6 +25,7 @@ import re
 from typing import List, Optional
 
 from ui.base_widgets import BaseWidget, create_button
+from ui.common.theme import ThemeManager
 from ui.constants import (
     LARGE_DOCUMENT_THRESHOLD,
     SEARCH_DEBOUNCE_DELAY_MS,
@@ -50,7 +51,6 @@ from ui.signal_helpers import (
     connect_text_changed,
 )
 from utils.i18n import I18nQtManager
-from ui.common.theme import ThemeManager
 
 logger = logging.getLogger("echonote.ui.search_widget")
 

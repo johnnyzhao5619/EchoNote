@@ -22,6 +22,7 @@ between QSS stylesheets and custom-painted widgets.
 
 import logging
 from typing import Dict, Optional
+
 from PySide6.QtGui import QColor
 
 logger = logging.getLogger(__name__)
@@ -116,7 +117,7 @@ class ThemeManager:
     def set_theme(self, theme_name: str):
         """
         Set the current active theme.
-        
+
         Args:
             theme_name: 'light' or 'dark'. If 'system', it should be resolved
                        to 'light' or 'dark' before calling this method.
@@ -130,11 +131,11 @@ class ThemeManager:
     def get_color(self, color_name: str, theme: Optional[str] = None) -> QColor:
         """
         Get a QColor object for a semantic color name.
-        
+
         Args:
             color_name: Name of the color (e.g., 'primary', 'background')
             theme: Optional override for theme name
-            
+
         Returns:
             QColor object corresponding to the color
         """

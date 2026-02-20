@@ -23,7 +23,7 @@ transcription results with full i18n and theme support.
 import logging
 import os
 import shutil
-from typing import Optional, Any
+from typing import Any, Optional
 
 from PySide6.QtCore import QSize, Qt, QTimer
 from PySide6.QtGui import QAction, QKeySequence, QShortcut
@@ -188,13 +188,15 @@ class TranscriptViewerDialog(QDialog):
         """Load transcript content from internal storage."""
         try:
             content_data = self.transcription_manager.get_task_content(self.task_id)
-            
+
             # Format content for display (using TXT format logic for now)
-            formatted_text = self.transcription_manager.format_converter.convert(content_data, "txt")
-            
+            formatted_text = self.transcription_manager.format_converter.convert(
+                content_data, "txt"
+            )
+
             self._set_text_content_optimized(formatted_text)
             self.transcript_content = formatted_text
-            
+
         except Exception as e:
             logger.error(f"Failed to load task content: {e}")
             self._show_error_and_close(self.i18n.t("viewer.file_read_error_details", error=str(e)))
@@ -676,7 +678,7 @@ class TranscriptViewerDialog(QDialog):
             self.search_widget.hide_search()
         else:
             self.search_widget.show_search()
-    
+
     def _text_context_menu_event(self, event):
         """Handle context menu event for text edit."""
         menu = self.text_edit.createStandardContextMenu()
@@ -692,11 +694,11 @@ class TranscriptViewerDialog(QDialog):
         # Generate default export path
         original_name = self.task_data.get("file_name", "transcript")
         base_name = os.path.splitext(original_name)[0]
-        
+
         # Infer extension from format
         extension = format.lower()
         default_name = f"{base_name}.{extension}"
-        
+
         # Open file dialog
         file_path, _ = QFileDialog.getSaveFileName(
             self,
@@ -704,25 +706,21 @@ class TranscriptViewerDialog(QDialog):
             default_name,
             f"{format.upper()} (*.{extension})",
         )
-        
+
         if not file_path:
             return
-            
+
         try:
             # Use manager to export (which uses structured data)
             self.transcription_manager.export_result(self.task_id, format, file_path)
-            
+
             self.show_info(
-                self.i18n.t("common.success"), 
-                self.i18n.t("viewer.export_success", path=file_path)
+                self.i18n.t("common.success"), self.i18n.t("viewer.export_success", path=file_path)
             )
-            
+
         except Exception as e:
             logger.error(f"Export failed: {e}")
-            self.show_error(
-                self.i18n.t("viewer.export_error"), 
-                str(e)
-            )
+            self.show_error(self.i18n.t("viewer.export_error"), str(e))
 
     def show_info(self, title: str, message: str):
         """Show info message box."""
@@ -731,7 +729,7 @@ class TranscriptViewerDialog(QDialog):
     def show_error(self, title: str, message: str):
         """Show error message box."""
         QMessageBox.critical(self, title, message)
-    
+
     def _show_error_and_close(self, message: str):
         """Show error and close dialog."""
         self.show_error(self.i18n.t("common.error"), message)
@@ -741,7 +739,7 @@ class TranscriptViewerDialog(QDialog):
         """Update interface language."""
         # Window title
         self.setWindowTitle(self.i18n.t("viewer.title", filename=self.task_data["file_name"]))
-        
+
         # Toolbar buttons
         if self.edit_button:
             self.edit_button.setText(
@@ -753,7 +751,7 @@ class TranscriptViewerDialog(QDialog):
             self.export_button.setText(self.i18n.t("viewer.export"))
         if self.search_button:
             self.search_button.setText(self.i18n.t("viewer.search"))
-            
+
         # Export menu actions
         if hasattr(self, "export_txt_action"):
             self.export_txt_action.setText(self.i18n.t("viewer.export_txt"))
@@ -761,7 +759,7 @@ class TranscriptViewerDialog(QDialog):
             self.export_srt_action.setText(self.i18n.t("viewer.export_srt"))
         if hasattr(self, "export_md_action"):
             self.export_md_action.setText(self.i18n.t("viewer.export_md"))
-            
+
         # Update metadata labels
         self._update_metadata_content()
         self.duration_label.setText(f"{self.i18n.t('viewer.duration')}: {self.duration_value}")
@@ -771,7 +769,7 @@ class TranscriptViewerDialog(QDialog):
 
     def _on_setting_changed(self, key: str, value: Any):
         """Handle setting changes."""
-        # For now, we only care about theme changes which might be handled globally 
+        # For now, we only care about theme changes which might be handled globally
         # or by the SearchWidget, but we can add specific handling here if needed.
         pass
 
@@ -781,12 +779,12 @@ class TranscriptViewerDialog(QDialog):
             text = self.text_edit.toPlainText()
             clipboard = QApplication.clipboard()
             clipboard.setText(text)
-            
+
             # Show temporary feedback
             original_text = self.copy_button.text()
             self.copy_button.setText(self.i18n.t("common.copied"))
             self.copy_button.setEnabled(False)
-            
+
             QTimer.singleShot(2000, lambda: self._reset_copy_button(original_text))
 
     def _reset_copy_button(self, text: str):

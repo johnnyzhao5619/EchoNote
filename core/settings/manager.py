@@ -26,6 +26,7 @@ from collections.abc import Mapping
 from typing import Any, Dict, Optional
 
 from PySide6.QtCore import QObject, Signal
+
 from utils.i18n import get_translation_codes
 
 logger = logging.getLogger(__name__)
@@ -104,7 +105,7 @@ class SettingsManager(QObject):
         """Return realtime recording preferences with defaults applied."""
         # Get defaults from configuration schema
         realtime_defaults = self._default_config.get("realtime", {})
-        
+
         from config.constants import (
             RECORDING_FORMAT_WAV,
             TRANSLATION_ENGINE_GOOGLE,
@@ -116,7 +117,9 @@ class SettingsManager(QObject):
             "auto_save": realtime_defaults.get("auto_save", True),
             "default_input_source": realtime_defaults.get("default_input_source", "default"),
             "default_gain": realtime_defaults.get("default_gain", 1.0),
-            "translation_engine": realtime_defaults.get("translation_engine", TRANSLATION_ENGINE_GOOGLE),
+            "translation_engine": realtime_defaults.get(
+                "translation_engine", TRANSLATION_ENGINE_GOOGLE
+            ),
             "vad_threshold": realtime_defaults.get("vad_threshold", 0.5),
             "silence_duration_ms": realtime_defaults.get("silence_duration_ms", 2000),
             "min_audio_duration": realtime_defaults.get("min_audio_duration", 3.0),
@@ -128,7 +131,7 @@ class SettingsManager(QObject):
         current_settings = self.config_manager.get("realtime", {})
         if current_settings:
             preferences.update(current_settings)
-            
+
         return preferences
 
     def set_setting(self, key: str, value: Any) -> bool:

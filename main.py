@@ -76,8 +76,9 @@ def main():
         app.setStyle("Fusion")
 
         # Set application icon
-        from PySide6.QtGui import QIcon
         import os
+
+        from PySide6.QtGui import QIcon
 
         icon_path = os.path.join("resources", "icons", "echonote.png")
         if os.path.exists(icon_path):
@@ -440,7 +441,11 @@ def main():
             DEFAULT_STOP_CONFIRMATION_DELAY_MINUTES,
         )
 
-        from utils.app_initializer import create_auto_task_scheduler, create_sync_scheduler, create_calendar_auto_task_scheduler
+        from utils.app_initializer import (
+            create_auto_task_scheduler,
+            create_calendar_auto_task_scheduler,
+            create_sync_scheduler,
+        )
 
         bg_init_functions = [
             (

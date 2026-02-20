@@ -28,8 +28,11 @@ from pathlib import Path
 from typing import Any
 
 from ui.common.theme import ThemeManager
-from ui.constants import APP_TOP_BAR_CONTROL_HEIGHT, CONTROL_BUTTON_MIN_HEIGHT, REALTIME_BUTTON_MIN_WIDTH
-
+from ui.constants import (
+    APP_TOP_BAR_CONTROL_HEIGHT,
+    CONTROL_BUTTON_MIN_HEIGHT,
+    REALTIME_BUTTON_MIN_WIDTH,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 UI_DIR = PROJECT_ROOT / "ui"
@@ -161,9 +164,9 @@ def test_ui_roles_are_covered_by_each_theme_qss():
     for theme_name in theme_names:
         qss_roles = set(ROLE_SELECTOR_PATTERN.findall(_read_theme_text(theme_name)))
         missing_roles = sorted(ui_roles - qss_roles)
-        assert not missing_roles, (
-            f"Theme '{theme_name}' is missing semantic role selectors: {missing_roles}"
-        )
+        assert (
+            not missing_roles
+        ), f"Theme '{theme_name}' is missing semantic role selectors: {missing_roles}"
 
 
 def test_all_themes_share_identical_role_sets():
@@ -175,9 +178,9 @@ def test_all_themes_share_identical_role_sets():
     first_name = theme_names[0]
     baseline = role_sets[first_name]
     for name in theme_names[1:]:
-        assert role_sets[name] == baseline, (
-            f"Role set drift detected between '{first_name}' and '{name}'."
-        )
+        assert (
+            role_sets[name] == baseline
+        ), f"Role set drift detected between '{first_name}' and '{name}'."
 
 
 def test_theme_manager_and_qss_outline_are_consistent():
@@ -186,17 +189,17 @@ def test_theme_manager_and_qss_outline_are_consistent():
     manager_themes = {name for name in ThemeManager.THEMES if name != "system"}
     palette_themes = set(ThemeManager.PALETTES.keys())
 
-    assert qss_themes == manager_themes, (
-        "ThemeManager.THEMES (excluding system) must match theme_outline themes."
-    )
+    assert (
+        qss_themes == manager_themes
+    ), "ThemeManager.THEMES (excluding system) must match theme_outline themes."
     assert qss_themes <= palette_themes, "Every QSS theme must have a ThemeManager palette."
 
     first_theme = next(iter(sorted(qss_themes)))
     baseline_keys = set(ThemeManager.PALETTES[first_theme].keys())
     for theme_name in sorted(qss_themes):
-        assert set(ThemeManager.PALETTES[theme_name].keys()) == baseline_keys, (
-            f"Palette token mismatch in theme '{theme_name}'."
-        )
+        assert (
+            set(ThemeManager.PALETTES[theme_name].keys()) == baseline_keys
+        ), f"Palette token mismatch in theme '{theme_name}'."
 
 
 def test_core_selector_has_single_definition_per_theme():
@@ -205,12 +208,12 @@ def test_core_selector_has_single_definition_per_theme():
 
     for theme_name in theme_names:
         text = _read_theme_text(theme_name)
-        assert len(re.findall(r"(?m)^QPushButton\s*\{", text)) == 1, (
-            f"Theme '{theme_name}' must keep a single global QPushButton definition."
-        )
-        assert "QLineEdit, QTextEdit, QPlainTextEdit {" not in text, (
-            f"Theme '{theme_name}' should avoid legacy duplicate text-input baseline block."
-        )
+        assert (
+            len(re.findall(r"(?m)^QPushButton\s*\{", text)) == 1
+        ), f"Theme '{theme_name}' must keep a single global QPushButton definition."
+        assert (
+            "QLineEdit, QTextEdit, QPlainTextEdit {" not in text
+        ), f"Theme '{theme_name}' should avoid legacy duplicate text-input baseline block."
 
 
 def test_density_contract_for_core_controls():
@@ -230,8 +233,12 @@ def test_density_contract_for_core_controls():
         assert _get_css_property(duration_block, "min-height") == f"{CONTROL_BUTTON_MIN_HEIGHT}px"
 
         top_search_block = _extract_selector_block(text, "QLineEdit#top_bar_search")
-        assert _get_css_property(top_search_block, "min-height") == f"{APP_TOP_BAR_CONTROL_HEIGHT}px"
-        assert _get_css_property(top_search_block, "max-height") == f"{APP_TOP_BAR_CONTROL_HEIGHT}px"
+        assert (
+            _get_css_property(top_search_block, "min-height") == f"{APP_TOP_BAR_CONTROL_HEIGHT}px"
+        )
+        assert (
+            _get_css_property(top_search_block, "max-height") == f"{APP_TOP_BAR_CONTROL_HEIGHT}px"
+        )
 
         hint_block = _extract_selector_block(text, "QLabel#top_bar_hint")
         assert _get_css_property(hint_block, "min-height") == f"{APP_TOP_BAR_CONTROL_HEIGHT}px"
@@ -246,7 +253,7 @@ def test_duplicated_semantic_blocks_are_deduplicated():
         'QFrame[role="batch-viewer-toolbar"] QPushButton[role="batch-viewer-copy-action"]',
         'QFrame[role="batch-viewer-toolbar"] QPushButton[role="batch-viewer-export-action"]',
         'QPushButton[role="model-delete"]',
-        'QPushButton#clear_markers_button',
+        "QPushButton#clear_markers_button",
         'QLabel[role="time-display"]',
         'QWidget[role="task-item"]',
         'QPushButton[role="settings-cancel-action"]',
@@ -259,9 +266,9 @@ def test_duplicated_semantic_blocks_are_deduplicated():
     for theme_name in theme_names:
         text = _read_theme_text(theme_name)
         for selector in single_source_selectors:
-            assert _count_selector_blocks(text, selector) <= 1, (
-                f"Theme '{theme_name}' should not define '{selector}' more than once."
-            )
+            assert (
+                _count_selector_blocks(text, selector) <= 1
+            ), f"Theme '{theme_name}' should not define '{selector}' more than once."
 
 
 def test_theme_qss_has_no_duplicate_selectors():

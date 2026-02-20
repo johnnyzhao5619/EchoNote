@@ -3,10 +3,10 @@
 Tests for calendar dialog layout constants.
 """
 
-import pytest
 from datetime import datetime
 from unittest.mock import Mock
 
+import pytest
 from PySide6.QtCore import QDate, QDateTime, QTime
 from PySide6.QtWidgets import QTextEdit
 

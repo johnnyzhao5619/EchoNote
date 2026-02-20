@@ -8,7 +8,9 @@ from unittest.mock import Mock, patch
 from core.models.manager import ModelManager
 
 
-def _build_config(models_dir: Path, default_engine: str = "faster-whisper", model_size: str = "base"):
+def _build_config(
+    models_dir: Path, default_engine: str = "faster-whisper", model_size: str = "base"
+):
     config = Mock()
 
     def _get(key, default=None):

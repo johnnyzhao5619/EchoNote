@@ -3,8 +3,8 @@
 
 from unittest.mock import Mock, patch
 
-from utils.post_init_tasks import check_loopback_availability, check_model_availability
 from config.constants import ENGINE_FASTER_WHISPER
+from utils.post_init_tasks import check_loopback_availability, check_model_availability
 
 
 def _build_config(default_engine: str):
@@ -25,7 +25,9 @@ def test_check_model_availability_skips_when_download_active():
     model_manager.get_downloaded_models.return_value = []
     model_manager.has_active_downloads.return_value = True
 
-    with patch("utils.first_run_setup.FirstRunSetup.show_model_recommendation_dialog") as show_dialog:
+    with patch(
+        "utils.first_run_setup.FirstRunSetup.show_model_recommendation_dialog"
+    ) as show_dialog:
         check_model_availability(config, model_manager, Mock(), Mock())
 
     show_dialog.assert_not_called()

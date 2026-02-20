@@ -77,8 +77,8 @@ from ui.constants import (
     REALTIME_LANGUAGE_COMBO_MIN_WIDTH,
     REALTIME_RECORD_BUTTON_MIN_WIDTH,
     REALTIME_TEXT_TOOLBAR_META_SPACING,
-    REALTIME_VISUALIZER_MIN_HEIGHT,
     REALTIME_VISUALIZER_MAX_HEIGHT,
+    REALTIME_VISUALIZER_MIN_HEIGHT,
     STATUS_INDICATOR_SYMBOL,
     ZERO_MARGINS,
     format_gain_display,
@@ -614,7 +614,9 @@ class RealtimeRecordWidget(BaseWidget):
         status_bar = QWidget()
         status_bar.setObjectName("status_bar")
         status_layout = QHBoxLayout(status_bar)
-        status_layout.setContentsMargins(PAGE_COMPACT_SPACING, PAGE_DENSE_SPACING, PAGE_COMPACT_SPACING, PAGE_DENSE_SPACING)
+        status_layout.setContentsMargins(
+            PAGE_COMPACT_SPACING, PAGE_DENSE_SPACING, PAGE_COMPACT_SPACING, PAGE_DENSE_SPACING
+        )
         status_layout.setSpacing(PAGE_DENSE_SPACING)
 
         self.status_indicator = QLabel(STATUS_INDICATOR_SYMBOL)
@@ -739,7 +741,9 @@ class RealtimeRecordWidget(BaseWidget):
         self.gain_slider.setMaximumWidth(REALTIME_GAIN_SLIDER_MAX_WIDTH)
         self.gain_slider.valueChanged.connect(self._on_gain_changed)
         gain_layout.addWidget(self.gain_slider)
-        self.gain_value_label = QLabel(format_gain_display(GAIN_SLIDER_DEFAULT / GAIN_SLIDER_DIVISOR))
+        self.gain_value_label = QLabel(
+            format_gain_display(GAIN_SLIDER_DEFAULT / GAIN_SLIDER_DIVISOR)
+        )
         self.gain_value_label.setObjectName("gain_value_label")
         self.gain_value_label.setMinimumWidth(REALTIME_GAIN_VALUE_MIN_WIDTH)
         gain_layout.addWidget(self.gain_value_label)
@@ -825,7 +829,10 @@ class RealtimeRecordWidget(BaseWidget):
         # Row 4: Secondary Transcription (High Quality)
         row4 = create_hbox(spacing=PAGE_COMPACT_SPACING)
         self.secondary_transcription_checkbox = QCheckBox(
-            self.i18n.t("realtime_record.secondary_transcription", default="Secondary Transcription (High Quality)")
+            self.i18n.t(
+                "realtime_record.secondary_transcription",
+                default="Secondary Transcription (High Quality)",
+            )
         )
         self.secondary_transcription_checkbox.setObjectName("form_checkbox")
         row4.addWidget(self.secondary_transcription_checkbox)
@@ -1453,7 +1460,9 @@ class RealtimeRecordWidget(BaseWidget):
                 self.transcription_word_count, self.transcription_text.toPlainText()
             )
         if hasattr(self, "translation_word_count") and hasattr(self, "translation_text"):
-            self._set_word_count_label(self.translation_word_count, self.translation_text.toPlainText())
+            self._set_word_count_label(
+                self.translation_word_count, self.translation_text.toPlainText()
+            )
 
     def _on_transcription(self, text: str):
         self.signals.transcription_updated.emit(text)
@@ -1501,7 +1510,9 @@ class RealtimeRecordWidget(BaseWidget):
             else:
                 self.translation_text.appendPlainText(text)
             self.translation_text.blockSignals(False)
-            self._set_word_count_label(self.translation_word_count, self.translation_text.toPlainText())
+            self._set_word_count_label(
+                self.translation_word_count, self.translation_text.toPlainText()
+            )
             scrollbar = self.translation_text.verticalScrollBar()
             if scrollbar:
                 scrollbar.setValue(scrollbar.maximum())
@@ -1960,24 +1971,23 @@ class RealtimeRecordWidget(BaseWidget):
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Failed to send success notification: %s", exc, exc_info=True)
 
-        if save_path and self.transcription_manager and getattr(self, "secondary_transcription_checkbox", None) and self.secondary_transcription_checkbox.isChecked():
+        if (
+            save_path
+            and self.transcription_manager
+            and getattr(self, "secondary_transcription_checkbox", None)
+            and self.secondary_transcription_checkbox.isChecked()
+        ):
             try:
                 # Add a high-quality transcription task with replace_realtime flag
-                options = {
-                    "replace_realtime": True,
-                    "event_id": event_id
-                }
-                
+                options = {"replace_realtime": True, "event_id": event_id}
+
                 # Fetch language selection
                 if hasattr(self, "source_lang_combo"):
                     lang = self.source_lang_combo.currentData()
                     if lang and lang != "auto":
                         options["language"] = lang
-                        
-                self.transcription_manager.add_task(
-                    file_path=save_path,
-                    options=options
-                )
+
+                self.transcription_manager.add_task(file_path=save_path, options=options)
                 logger.info(f"Queued secondary transcription for {save_path}")
             except Exception as e:
                 logger.error(f"Failed to queue secondary transcription: {e}")

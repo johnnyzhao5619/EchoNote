@@ -3,8 +3,9 @@
 Tests for batch transcript viewer semantic style hooks.
 """
 
-import pytest
 from unittest.mock import Mock
+
+import pytest
 
 from ui.batch_transcribe.transcript_viewer import TranscriptViewerDialog
 

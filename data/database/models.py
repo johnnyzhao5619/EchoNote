@@ -25,12 +25,13 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, time, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
-from data.database.encryption_helper import decrypt_sensitive_field, encrypt_sensitive_field
-from core.calendar.constants import CalendarSource, EventType
+
 from config.constants import (
     DEFAULT_TRANSCRIPTION_ENGINE,
     TASK_STATUS_PENDING,
 )
+from core.calendar.constants import CalendarSource, EventType
+from data.database.encryption_helper import decrypt_sensitive_field, encrypt_sensitive_field
 
 logger = logging.getLogger("echonote.database.models")
 

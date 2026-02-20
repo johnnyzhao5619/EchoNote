@@ -111,7 +111,9 @@ def _build_export_payload(event: Any, calendar_manager: Any) -> dict:
     }
 
 
-def _export_event_snapshot(parent: Any, i18n: Any, calendar_manager: Any, event: Any) -> Optional[str]:
+def _export_event_snapshot(
+    parent: Any, i18n: Any, calendar_manager: Any, event: Any
+) -> Optional[str]:
     title = str(getattr(event, "title", "") or "")
     event_id = str(getattr(event, "id", "") or "")
     file_component = _safe_file_component(title) if title else "event"

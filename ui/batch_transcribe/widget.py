@@ -565,14 +565,14 @@ class BatchTranscribeWidget(BaseWidget):
         if self.model_manager and hasattr(self, "model_combo"):
             selected_model = self.model_combo.currentText()
 
-            if selected_model and selected_model != self.i18n.t("batch_transcribe.no_models_available"):
+            if selected_model and selected_model != self.i18n.t(
+                "batch_transcribe.no_models_available"
+            ):
                 model_info = self.model_manager.get_model(selected_model)
 
                 if not model_info or not model_info.is_downloaded:
                     raise ValueError(
-                        self.i18n.t(
-                            "batch_transcribe.model_not_available", model=selected_model
-                        )
+                        self.i18n.t("batch_transcribe.model_not_available", model=selected_model)
                     )
 
                 options["model_name"] = selected_model
@@ -817,9 +817,9 @@ class BatchTranscribeWidget(BaseWidget):
     def _on_manager_event_threadsafe(self, event_type: str, data: Dict):
         """
         Handle manager event from background thread.
-        
+
         Emits signal to handle event on main UI thread.
-        
+
         Args:
             event_type: Type of event
             data: Event data
@@ -832,7 +832,7 @@ class BatchTranscribeWidget(BaseWidget):
     def _handle_manager_event(self, event_type: str, data: Dict):
         """
         Handle manager event on main thread.
-        
+
         Args:
             event_type: Type of event
             data: Event data
@@ -843,7 +843,7 @@ class BatchTranscribeWidget(BaseWidget):
                 if task_id not in self.task_items:
                     self._add_task_item(data)
                     self._update_queue_label()
-                    
+
             elif event_type == "task_updated":
                 task_id = data["id"]
                 if task_id in self.task_items:
@@ -852,18 +852,18 @@ class BatchTranscribeWidget(BaseWidget):
                     # Might happen if we missed the add event or it was filtered
                     # We can try to fetch the full task data or ignore
                     pass
-                    
+
             elif event_type == "task_deleted":
                 task_id = data["id"]
                 self._remove_task_item(task_id)
                 self._update_queue_label()
-                
+
             elif event_type == "processing_paused":
                 self._set_tasks_pause_state(True)
-                
+
             elif event_type == "processing_resumed":
                 self._set_tasks_pause_state(False)
-                
+
         except Exception as e:
             logger.error(f"Error handling manager event {event_type}: {e}")
 
