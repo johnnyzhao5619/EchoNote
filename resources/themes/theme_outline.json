@@ -64,6 +64,7 @@
         "QDateEdit[role=\"timeline-filter-control\"]",
         "QComboBox[role=\"timeline-filter-control\"]",
         "QPushButton[role=\"timeline-recording-action\"]",
+        "QPushButton[role=\"timeline-secondary-transcribe-action\"]",
         "QPushButton[role=\"timeline-transcript-action\"]",
         "QPushButton[role=\"timeline-translation-action\"]",
         "QLabel[role=\"current-time\"]",
@@ -76,7 +77,10 @@
         "QLabel[role=\"realtime-duration\"]",
         "QPushButton[role=\"realtime-marker-action\"]",
         "QPushButton[role=\"realtime-record-action\"]",
-        "QComboBox[role=\"realtime-field-control\"]"
+        "QComboBox[role=\"realtime-field-control\"]",
+        "QWidget[role=\"realtime-floating-overlay\"]",
+        "QLabel[role=\"realtime-floating-title\"]",
+        "QLabel[role=\"realtime-floating-status\"]"
       ]
     },
     {
@@ -94,6 +98,13 @@
     {
       "id": "audio_player",
       "selectors": [
+        "QWidget[role=\"audio-player-surface\"]",
+        "QLabel[role=\"audio-player-title\"]",
+        "QLabel[role=\"audio-player-subtitle\"]",
+        "QLabel[role=\"audio-player-mode-caption\"]",
+        "QPushButton[role=\"audio-player-mode-action\"]",
+        "QWidget[role=\"audio-player-transcript-panel\"]",
+        "QFrame[role=\"audio-player-divider\"]",
         "QPushButton[role=\"audio-player-primary\"]",
         "QPushButton[role=\"audio-player-control\"]",
         "QSlider[role=\"audio-player-progress\"]",

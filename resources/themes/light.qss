@@ -1294,19 +1294,43 @@ QLabel[role="badge"] {
 
 /* Calendar Event Indicator Colors */
 QLabel[role="event-indicator"][source="local"] {
-    color: #2196F3;
+    color: #1554cf;
+    background-color: #e8f1ff;
+    border: 1px solid #c8daf8;
+    border-radius: 10px;
+    padding: 2px 8px;
+    font-size: 10px;
+    font-weight: 600;
 }
 
 QLabel[role="event-indicator"][source="google"] {
-    color: #EA4335;
+    color: #b93328;
+    background-color: #ffe9e7;
+    border: 1px solid #f2c4be;
+    border-radius: 10px;
+    padding: 2px 8px;
+    font-size: 10px;
+    font-weight: 600;
 }
 
 QLabel[role="event-indicator"][source="outlook"] {
-    color: #FF6F00;
+    color: #b45a00;
+    background-color: #fff1df;
+    border: 1px solid #f3d2ad;
+    border-radius: 10px;
+    padding: 2px 8px;
+    font-size: 10px;
+    font-weight: 600;
 }
 
 QLabel[role="event-indicator"][source="unknown"] {
-    color: #666666;
+    color: #5f6b7a;
+    background-color: #f2f5fa;
+    border: 1px solid #d6deea;
+    border-radius: 10px;
+    padding: 2px 8px;
+    font-size: 10px;
+    font-weight: 600;
 }
 
 /* Timeline Event Card Colors */
@@ -1381,11 +1405,30 @@ QLabel[role="oauth-status"][state="success"] {
 
 /* 播放器主容器 */
 QWidget#audio_player {
-    background-color: #ffffff;
+    background-color: #f4f6fb;
 }
 
-/* 播放器标题 */
-QLabel#player_title {
+QWidget[role="audio-player-surface"] {
+    background-color: #ffffff;
+    border: 1px solid #d6deea;
+    border-radius: 12px;
+}
+
+QFrame[role="audio-player-divider"] {
+    border: none;
+    border-top: 1px solid #e3e8f2;
+    margin: 2px 0 0 0;
+}
+
+/* 播放器标题与副标题 */
+QLabel[role="audio-player-subtitle"] {
+    color: #5c6f8f;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.4px;
+}
+
+QLabel[role="audio-player-title"] {
     color: #212529;
     font-size: 16px;
     font-weight: 600;
@@ -1399,19 +1442,14 @@ QWidget#player_control_bar {
     background-color: transparent;
 }
 
-/* 播放器内所有QWidget容器都透明 - 覆盖全局QWidget样式 */
-QWidget#audio_player QWidget {
-    background-color: transparent;
-}
-
 /* 转录文本容器 */
-QWidget#transcript_container {
+QWidget[role="audio-player-transcript-panel"] {
     background-color: #f3f2f1;
-    border-bottom: 1px solid #e1dfdd;
+    border: 1px solid #d8dee9;
+    border-radius: 10px;
 }
 
 /* 转录标题 */
-QLabel#transcript_title,
 QLabel[role="audio-player-transcript-title"] {
     color: #495057;
     font-size: 13px;
@@ -1419,8 +1457,41 @@ QLabel[role="audio-player-transcript-title"] {
     background-color: transparent;
 }
 
+QLabel[role="audio-player-mode-caption"] {
+    color: #5c6f8f;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+QPushButton[role="audio-player-mode-action"] {
+    min-height: 28px;
+    min-width: 72px;
+    padding: 4px 10px;
+    border-radius: 9px;
+    background-color: #f7faff;
+    border: 1px solid #b8cae4;
+    color: #2b3f63;
+}
+
+QPushButton[role="audio-player-mode-action"]:hover {
+    background-color: #edf3fe;
+    border-color: #9eb6da;
+    color: #1d3863;
+}
+
+QPushButton[role="audio-player-mode-action"]:checked {
+    background-color: #1d63e9;
+    border-color: #1d63e9;
+    color: #ffffff;
+}
+
+QPushButton[role="audio-player-mode-action"]:checked:hover {
+    background-color: #1554cf;
+    border-color: #1554cf;
+    color: #ffffff;
+}
+
 /* 转录文本编辑器 */
-QTextEdit#transcript_text,
 QTextEdit[role="audio-player-transcript-text"] {
     background-color: #ffffff;
     color: #212529;
@@ -1434,12 +1505,10 @@ QTextEdit[role="audio-player-transcript-text"] {
     selection-color: #1976D2;
 }
 
-QTextEdit#transcript_text:focus,
 QTextEdit[role="audio-player-transcript-text"]:focus {
     border: 1px solid #2196F3;
 }
 
-QPushButton#transcript_format_toggle,
 QPushButton[role="audio-player-transcript-toggle"] {
     background-color: #ffffff;
     color: #495057;
@@ -1450,7 +1519,6 @@ QPushButton[role="audio-player-transcript-toggle"] {
     font-weight: 600;
 }
 
-QPushButton#transcript_format_toggle:hover,
 QPushButton[role="audio-player-transcript-toggle"]:hover {
     background-color: #f3f2f1;
     border: 1px solid #2196F3;
@@ -2126,6 +2194,18 @@ QPushButton[role="dialog-nav-action"] {
     padding: 4px 8px;
 }
 
+QPushButton[role="dialog-nav-action"]:checked {
+    background-color: #1d63e9;
+    border-color: #1d63e9;
+    color: #ffffff;
+}
+
+QPushButton[role="dialog-nav-action"]:checked:hover {
+    background-color: #1554cf;
+    border-color: #1554cf;
+    color: #ffffff;
+}
+
 QPushButton[variant="danger"],
 QPushButton[role="danger"],
 QPushButton[role="model-delete"],
@@ -2342,6 +2422,34 @@ QComboBox[role="realtime-field-control"] {
     padding: 3px 8px;
 }
 
+QWidget[role="realtime-floating-overlay"] {
+    background-color: #ffffff;
+    border: 1px solid #d0deef;
+    border-radius: 12px;
+}
+
+QLabel[role="realtime-floating-title"] {
+    color: #1f2f45;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+QLabel[role="realtime-floating-status"] {
+    color: #2a4f7d;
+    background-color: #edf4ff;
+    border: 1px solid #c7daf8;
+    border-radius: 10px;
+    padding: 2px 8px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+QLabel[role="realtime-floating-status"][state="recording"] {
+    color: #ffffff;
+    background-color: #2f9e55;
+    border-color: #2f9e55;
+}
+
 QWidget[role="task-item"] QPushButton[role="task-action-start"] {
     background-color: #1d63e9;
     color: #ffffff;
@@ -2419,6 +2527,7 @@ QPushButton[role="timeline-copy-action"]:pressed {
 }
 
 QPushButton[role="timeline-transcript-action"],
+QPushButton[role="timeline-secondary-transcribe-action"],
 QPushButton[role="timeline-export-action"] {
     background-color: #edf8ef;
     border: 1px solid #2e9e5b;
@@ -2426,6 +2535,7 @@ QPushButton[role="timeline-export-action"] {
 }
 
 QPushButton[role="timeline-transcript-action"]:hover,
+QPushButton[role="timeline-secondary-transcribe-action"]:hover,
 QPushButton[role="timeline-export-action"]:hover {
     background-color: #dff3e3;
     border-color: #24834a;
@@ -2433,6 +2543,7 @@ QPushButton[role="timeline-export-action"]:hover {
 }
 
 QPushButton[role="timeline-transcript-action"]:pressed,
+QPushButton[role="timeline-secondary-transcribe-action"]:pressed,
 QPushButton[role="timeline-export-action"]:pressed {
     background-color: #d3ecd9;
     border-color: #1f723f;

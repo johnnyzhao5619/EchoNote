@@ -59,9 +59,14 @@ from ui.constants import (
     CALENDAR_EVENT_DESCRIPTION_MAX_HEIGHT,
     CALENDAR_EVENT_DIALOG_MIN_WIDTH,
     PAGE_COMPACT_SPACING,
+    ROLE_DIALOG_PRIMARY_ACTION,
+    ROLE_DIALOG_SECONDARY_ACTION,
     ROLE_DANGER,
     ROLE_EVENT_DESCRIPTION,
     ROLE_EVENT_META,
+    ROLE_TIMELINE_SECONDARY_TRANSCRIBE_ACTION,
+    ROLE_TIMELINE_TRANSCRIPT_ACTION,
+    ROLE_TIMELINE_TRANSLATION_ACTION,
 )
 from utils.i18n import I18nQtManager
 from utils.time_utils import to_local_datetime, to_utc_iso
@@ -77,6 +82,8 @@ class EventDialog(QDialog):
     """
 
     secondary_transcribe_requested = Signal(object)
+    view_text_requested = Signal(object)
+    translate_transcript_requested = Signal()
 
     def __init__(
         self,
@@ -87,6 +94,8 @@ class EventDialog(QDialog):
         allow_retranscribe: bool = False,
         is_past: bool = False,
         is_translation_available: bool = True,
+        transcript_path: Optional[str] = None,
+        translation_path: Optional[str] = None,
     ):
         """
         Initialize event dialog.
@@ -107,6 +116,8 @@ class EventDialog(QDialog):
         self.allow_retranscribe = allow_retranscribe
         self.is_past = is_past
         self.is_translation_available = is_translation_available
+        self.transcript_path = transcript_path or ""
+        self.translation_path = translation_path or ""
 
         # Result data
         self.result_data: Optional[Dict[str, Any]] = None
@@ -280,13 +291,11 @@ class EventDialog(QDialog):
         trans_layout.addWidget(self.target_lang_combo)
         trans_layout.addStretch()
 
-        if self.is_past:
-            self.translation_container.hide()
-
-        form.addRow(
-            self.i18n.t("realtime_record.translation", default="Translation"),
-            self.translation_container,
-        )
+        if not self.is_past:
+            form.addRow(
+                self.i18n.t("realtime_record.translation", default="Translation"),
+                self.translation_container,
+            )
 
         return form
 
@@ -343,15 +352,41 @@ class EventDialog(QDialog):
                         "timeline.secondary_transcribe", default="Secondary Transcription (HQ)"
                     )
                 )
+                retranscribe_btn.setProperty("role", ROLE_TIMELINE_SECONDARY_TRANSCRIBE_ACTION)
                 connect_button_with_callback(
                     retranscribe_btn, self._on_secondary_transcribe_clicked
                 )
                 buttons_layout.addWidget(retranscribe_btn)
 
+            if self.transcript_path or self.translation_path:
+                view_text_btn = create_button(
+                    self.i18n.t(
+                        "calendar_hub.event_dialog.view_transcript_translation",
+                        default="View Transcript/Translation",
+                    )
+                )
+                view_text_btn.setProperty("role", ROLE_TIMELINE_TRANSCRIPT_ACTION)
+                connect_button_with_callback(view_text_btn, self._on_view_text_clicked)
+                buttons_layout.addWidget(view_text_btn)
+
+                if self.transcript_path and self.is_translation_available:
+                    translate_btn = create_button(
+                        self.i18n.t(
+                            "timeline.translate_transcript",
+                            default="Translate Transcript",
+                        )
+                    )
+                    translate_btn.setProperty("role", ROLE_TIMELINE_TRANSLATION_ACTION)
+                    connect_button_with_callback(
+                        translate_btn, self._on_translate_transcript_clicked
+                    )
+                    buttons_layout.addWidget(translate_btn)
+
         buttons_layout.addStretch()
 
         # Cancel button
         cancel_btn = create_button(self.i18n.t("common.cancel"))
+        cancel_btn.setProperty("role", ROLE_DIALOG_SECONDARY_ACTION)
         connect_button_with_callback(cancel_btn, self.reject)
         buttons_layout.addWidget(cancel_btn)
 
@@ -362,6 +397,7 @@ class EventDialog(QDialog):
             else self.i18n.t("calendar_hub.create_event")
         )
         save_btn = create_primary_button(save_text)
+        save_btn.setProperty("role", ROLE_DIALOG_PRIMARY_ACTION)
         connect_button_with_callback(save_btn, self._on_save_clicked)
         buttons_layout.addWidget(save_btn)
 
@@ -461,6 +497,14 @@ class EventDialog(QDialog):
         data = self._collect_form_data()
         self.secondary_transcribe_requested.emit(data)
         self.accept()
+
+    def _on_view_text_clicked(self):
+        """Open transcript/translation viewer without leaving dialog."""
+        self.view_text_requested.emit(self)
+
+    def _on_translate_transcript_clicked(self):
+        """Request transcript translation for current event."""
+        self.translate_transcript_requested.emit()
 
     def is_delete_requested(self) -> bool:
         """Return whether user requested deleting the current event."""

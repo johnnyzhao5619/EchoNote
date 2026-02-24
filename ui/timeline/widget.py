@@ -19,9 +19,11 @@ Timeline widget for EchoNote.
 Displays a vertical timeline of past and future events with search and filtering.
 """
 
+import asyncio
 import importlib
 import logging
 import math
+import threading
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, cast
 
 from core.qt_imports import (
@@ -46,7 +48,7 @@ from ui.signal_helpers import (
 
 if TYPE_CHECKING:
     from ui.timeline.audio_player import AudioPlayerDialog
-    from ui.timeline.transcript_viewer import TranscriptViewerDialog
+    from ui.common.transcript_translation_viewer import TranscriptTranslationViewerDialog
 
 from core.calendar.constants import CalendarSource, EventType
 from ui.base_widgets import BaseWidget, create_button, create_hbox, create_vbox
@@ -82,11 +84,12 @@ class TimelineWidget(BaseWidget):
     # Signals
     event_selected = Signal(str)  # event_id
     auto_task_changed = Signal(str, dict)  # event_id, config
+    FILTER_EVENT_TYPE_UPCOMING = "__upcoming__"
     _EVENT_TYPE_FILTER_OPTIONS = (
         ("timeline.filter_all", None),
         ("timeline.filter_event", EventType.EVENT),
         ("timeline.filter_task", EventType.TASK),
-        ("timeline.filter_appointment", EventType.APPOINTMENT),
+        ("timeline.filter_appointment", FILTER_EVENT_TYPE_UPCOMING),
     )
     _SOURCE_FILTER_OPTIONS = (
         ("timeline.source_all", None),
@@ -128,7 +131,7 @@ class TimelineWidget(BaseWidget):
         self.has_more = True
         self.event_cards: List[QWidget] = []
         self._audio_player_dialogs: Dict[str, "AudioPlayerDialog"] = {}
-        self._text_viewer_dialogs: Dict[str, "TranscriptViewerDialog"] = {}
+        self._text_viewer_dialogs: Dict[str, "TranscriptTranslationViewerDialog"] = {}
 
         # Current filters
         self.current_query = ""
@@ -636,6 +639,7 @@ class TimelineWidget(BaseWidget):
         card.view_recording.connect(self._on_view_recording)
         card.view_transcript.connect(self._on_view_transcript)
         card.view_translation.connect(self._on_view_translation)
+        card.translate_transcript_requested.connect(self._on_translate_transcript_requested)
         card.delete_requested.connect(self._on_delete_event_requested)
         card.secondary_transcribe_requested.connect(self._on_secondary_transcribe_requested)
 
@@ -910,6 +914,14 @@ class TimelineWidget(BaseWidget):
             existing_dialog = self._audio_player_dialogs.get(file_path)
 
             if existing_dialog:
+                transcript_path = None
+                translation_path = None
+                if event_id:
+                    card = self.get_event_card_by_id(event_id)
+                    if card:
+                        transcript_path = card.artifacts.get("transcript")
+                        translation_path = card.artifacts.get("translation")
+                existing_dialog.player.load_file(file_path, transcript_path, translation_path)
                 existing_dialog.show()
                 existing_dialog.raise_()
                 existing_dialog.activateWindow()
@@ -917,12 +929,14 @@ class TimelineWidget(BaseWidget):
                 return
 
             transcript_path = None
+            translation_path = None
             if event_id:
                 card = self.get_event_card_by_id(event_id)
                 if card:
                     transcript_path = card.artifacts.get("transcript")
+                    translation_path = card.artifacts.get("translation")
 
-            dialog = AudioPlayerDialog(file_path, self.i18n, self, transcript_path)
+            dialog = AudioPlayerDialog(file_path, self.i18n, self, transcript_path, translation_path)
         except Exception as exc:
             logger.exception("Failed to create audio player dialog for %s", file_path)
             title = self.i18n.t("timeline.audio_player_open_failed_title")
@@ -956,22 +970,39 @@ class TimelineWidget(BaseWidget):
             )
             self.show_error(title, message)
 
-    def _open_text_viewer(self, file_path: str, title_key: str):
-        """Open a text viewer dialog for timeline artifacts."""
-        from ui.timeline.transcript_viewer import TranscriptViewerDialog
+    def _open_text_viewer(
+        self,
+        *,
+        transcript_path: Optional[str],
+        translation_path: Optional[str],
+        initial_mode: str,
+        title_key: str,
+    ):
+        """Open unified transcript/translation dialog for timeline artifacts."""
+        from ui.common.transcript_translation_viewer import TranscriptTranslationViewerDialog
 
         try:
-            cache_key = str(file_path)
+            cache_key = f"{transcript_path or ''}|{translation_path or ''}"
             existing_dialog = self._text_viewer_dialogs.get(cache_key)
 
             if existing_dialog:
+                existing_dialog.viewer.set_view_mode(initial_mode)
+                existing_dialog._title_key = title_key
+                existing_dialog.setWindowTitle(self.i18n.t(title_key))
                 existing_dialog.show()
                 existing_dialog.raise_()
                 existing_dialog.activateWindow()
                 logger.info(f"Activated text viewer for {cache_key}")
                 return
 
-            dialog = TranscriptViewerDialog(cache_key, self.i18n, self, title_key=title_key)
+            dialog = TranscriptTranslationViewerDialog(
+                i18n=self.i18n,
+                transcript_path=transcript_path,
+                translation_path=translation_path,
+                initial_mode=initial_mode,
+                title_key=title_key,
+                parent=self,
+            )
             self._text_viewer_dialogs[cache_key] = dialog
 
             def _cleanup_dialog(*_):
@@ -990,13 +1021,131 @@ class TimelineWidget(BaseWidget):
         except Exception as e:
             logger.error(f"Failed to open text viewer: {e}")
 
+    def _resolve_artifact_pair_from_path(
+        self, file_path: str, *, preferred_mode: str
+    ) -> tuple[Optional[str], Optional[str]]:
+        """Resolve transcript/translation pair from existing event cards."""
+        for card in self.event_cards:
+            artifacts = getattr(card, "artifacts", None)
+            if not isinstance(artifacts, dict):
+                continue
+            transcript_path = artifacts.get("transcript")
+            translation_path = artifacts.get("translation")
+            if file_path in {transcript_path, translation_path}:
+                return transcript_path, translation_path
+
+        if preferred_mode == "translation":
+            return None, file_path
+        return file_path, None
+
     def _on_view_transcript(self, file_path: str):
         """Handle view transcript request."""
-        self._open_text_viewer(file_path, "transcript.viewer_title")
+        transcript_path, translation_path = self._resolve_artifact_pair_from_path(
+            file_path, preferred_mode="transcript"
+        )
+        initial_mode = "compare" if transcript_path and translation_path else "transcript"
+        self._open_text_viewer(
+            transcript_path=transcript_path,
+            translation_path=translation_path,
+            initial_mode=initial_mode,
+            title_key="transcript.viewer_title",
+        )
 
     def _on_view_translation(self, file_path: str):
         """Handle view translation request."""
-        self._open_text_viewer(file_path, "timeline.translation_viewer_title")
+        transcript_path, translation_path = self._resolve_artifact_pair_from_path(
+            file_path, preferred_mode="translation"
+        )
+        self._open_text_viewer(
+            transcript_path=transcript_path,
+            translation_path=translation_path,
+            initial_mode="translation",
+            title_key="timeline.translation_viewer_title",
+        )
+
+    def _on_translate_transcript_requested(self, event_id: str, transcript_path: str):
+        """Translate transcript text and persist translation attachment for event."""
+        if not self.transcription_manager:
+            return
+        if not transcript_path:
+            return
+
+        translation_engine = getattr(self.transcription_manager, "translation_engine", None)
+        if translation_engine is None:
+            self.show_warning(
+                self.i18n.t("common.warning"),
+                self.i18n.t("timeline.translation_not_available"),
+            )
+            return
+
+        target_lang = "en"
+        source_lang = "auto"
+        manager = self.settings_manager
+        if manager and hasattr(manager, "get_realtime_translation_preferences"):
+            try:
+                translation_preferences = manager.get_realtime_translation_preferences()
+                if isinstance(translation_preferences, dict):
+                    target_lang = translation_preferences.get("translation_target_lang") or target_lang
+                    source_lang = translation_preferences.get("translation_source_lang") or source_lang
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Failed to load translation preferences: %s", exc)
+
+        self._update_shell_message(self.i18n.t("timeline.translation_started"))
+
+        def _worker() -> None:
+            try:
+                translated_path = asyncio.run(
+                    self.transcription_manager.translate_transcript_file(
+                        transcript_path,
+                        source_lang=source_lang,
+                        target_lang=target_lang,
+                        event_id=event_id,
+                    )
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.error("Translate transcript failed for event %s: %s", event_id, exc, exc_info=True)
+                error_text = str(exc)
+                QTimer.singleShot(0, lambda err=error_text: self._on_translation_failed(err))
+                return
+
+            QTimer.singleShot(
+                0,
+                lambda: self._on_translation_finished(
+                    transcript_path=transcript_path,
+                    translation_path=translated_path,
+                ),
+            )
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _on_translation_finished(self, *, transcript_path: str, translation_path: str) -> None:
+        """UI-thread callback after transcript translation completes."""
+        self._refresh_timeline(reset=True)
+        self.show_info(self.i18n.t("common.success"), self.i18n.t("timeline.translation_saved"))
+        self._open_text_viewer(
+            transcript_path=transcript_path,
+            translation_path=translation_path,
+            initial_mode="compare",
+            title_key="timeline.translation_viewer_title",
+        )
+        self._update_shell_message("")
+
+    def _on_translation_failed(self, error: str) -> None:
+        """UI-thread callback after transcript translation failure."""
+        self._update_shell_message("")
+        self.show_error(
+            self.i18n.t("common.error"),
+            self.i18n.t("timeline.translation_failed", error=error),
+        )
+
+    def _update_shell_message(self, message: str) -> None:
+        """Show a short status message on shell footer when available."""
+        main_window = self.window()
+        if main_window is not None and hasattr(main_window, "_set_shell_message"):
+            try:
+                main_window._set_shell_message(message)
+            except Exception:
+                pass
 
     def _on_secondary_transcribe_requested(self, event_id: str, recording_path: str):
         """Handle request for high-quality secondary transcription of an existing event."""

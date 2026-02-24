@@ -51,6 +51,7 @@ class TestCalendarIntegration:
         mock_event_cls.return_value = mock_event_instance
 
         mock_attachment_cls = MagicMock()
+        mock_attachment_cls.upsert_for_event_type = MagicMock()
 
         mock_models.CalendarEvent = mock_event_cls
         mock_models.EventAttachment = mock_attachment_cls
@@ -85,10 +86,8 @@ class TestCalendarIntegration:
         mock_event_instance.save.assert_called_once_with(mock_db)
 
         # Verify Attachments
-        # We expect 3 attachments (recording, transcript, translation)
-        assert mock_attachment_cls.call_count == 3
-        # Verify save called for attachments
-        assert mock_attachment_cls.return_value.save.call_count == 3
+        # We expect 3 upsert calls (recording, transcript, translation)
+        assert mock_attachment_cls.upsert_for_event_type.call_count == 3
 
     @pytest.mark.asyncio
     async def test_create_event_db_failure(self, calendar_integration, mock_db):

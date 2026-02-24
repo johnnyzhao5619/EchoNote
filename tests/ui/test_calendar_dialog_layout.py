@@ -8,7 +8,7 @@ from unittest.mock import Mock
 
 import pytest
 from PySide6.QtCore import QDate, QDateTime, QTime
-from PySide6.QtWidgets import QTextEdit
+from PySide6.QtWidgets import QPushButton, QTextEdit
 
 from ui.calendar_hub.event_dialog import EventDialog
 from ui.calendar_hub.oauth_dialog import OAuthDialog
@@ -69,3 +69,59 @@ def test_event_dialog_validate_form_checks_time_order_without_crash(qapp, mock_i
 
     assert dialog._validate_form() is False
     dialog.show_warning.assert_called_once()
+
+
+def test_event_dialog_shows_transcript_actions_for_edit_mode(qapp, mock_i18n):
+    dialog = EventDialog(
+        i18n=mock_i18n,
+        connected_accounts={},
+        event_data={"id": "evt-1", "title": "Demo Event"},
+        transcript_path="/tmp/demo_transcript.txt",
+        is_translation_available=True,
+    )
+
+    button_texts = {btn.text() for btn in dialog.findChildren(QPushButton)}
+    assert "calendar_hub.event_dialog.view_transcript_translation" in button_texts
+    assert "timeline.translate_transcript" in button_texts
+
+
+def test_event_dialog_transcript_actions_emit_signals(qapp, mock_i18n):
+    dialog = EventDialog(
+        i18n=mock_i18n,
+        connected_accounts={},
+        event_data={"id": "evt-2", "title": "Demo Event"},
+        transcript_path="/tmp/demo_transcript.txt",
+        is_translation_available=True,
+    )
+
+    received = {"view": 0, "translate": 0}
+    dialog.view_text_requested.connect(
+        lambda _requester: received.__setitem__("view", received["view"] + 1)
+    )
+    dialog.translate_transcript_requested.connect(
+        lambda: received.__setitem__("translate", received["translate"] + 1)
+    )
+
+    for btn in dialog.findChildren(QPushButton):
+        if btn.text() == "calendar_hub.event_dialog.view_transcript_translation":
+            btn.click()
+        if btn.text() == "timeline.translate_transcript":
+            btn.click()
+
+    assert received["view"] == 1
+    assert received["translate"] == 1
+
+
+def test_event_dialog_shows_view_only_when_only_translation_exists(qapp, mock_i18n):
+    dialog = EventDialog(
+        i18n=mock_i18n,
+        connected_accounts={},
+        event_data={"id": "evt-3", "title": "Demo Event"},
+        transcript_path="",
+        translation_path="/tmp/demo_translation.txt",
+        is_translation_available=True,
+    )
+
+    button_texts = {btn.text() for btn in dialog.findChildren(QPushButton)}
+    assert "calendar_hub.event_dialog.view_transcript_translation" in button_texts
+    assert "timeline.translate_transcript" not in button_texts

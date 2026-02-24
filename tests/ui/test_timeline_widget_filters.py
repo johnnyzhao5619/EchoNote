@@ -41,7 +41,7 @@ def test_filter_options_initialized(widget):
     assert widget.type_filter.itemData(0) is None
     assert widget.type_filter.itemData(1) == EventType.EVENT
     assert widget.type_filter.itemData(2) == EventType.TASK
-    assert widget.type_filter.itemData(3) == EventType.APPOINTMENT
+    assert widget.type_filter.itemData(3) == TimelineWidget.FILTER_EVENT_TYPE_UPCOMING
 
     assert widget.source_filter.count() == 4
     assert widget.source_filter.itemData(0) is None

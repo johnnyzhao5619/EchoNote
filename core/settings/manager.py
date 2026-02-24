@@ -107,8 +107,10 @@ class SettingsManager(QObject):
         realtime_defaults = self._default_config.get("realtime", {})
 
         from config.constants import (
+            DEFAULT_TRANSLATION_TARGET_LANGUAGE,
             RECORDING_FORMAT_WAV,
-            TRANSLATION_ENGINE_GOOGLE,
+            TRANSLATION_ENGINE_NONE,
+            TRANSLATION_LANGUAGE_AUTO,
         )
 
         # Start with defaults
@@ -118,13 +120,25 @@ class SettingsManager(QObject):
             "default_input_source": realtime_defaults.get("default_input_source", "default"),
             "default_gain": realtime_defaults.get("default_gain", 1.0),
             "translation_engine": realtime_defaults.get(
-                "translation_engine", TRANSLATION_ENGINE_GOOGLE
+                "translation_engine", TRANSLATION_ENGINE_NONE
+            ),
+            "translation_source_lang": realtime_defaults.get(
+                "translation_source_lang", TRANSLATION_LANGUAGE_AUTO
+            ),
+            "translation_target_lang": realtime_defaults.get(
+                "translation_target_lang", DEFAULT_TRANSLATION_TARGET_LANGUAGE
             ),
             "vad_threshold": realtime_defaults.get("vad_threshold", 0.5),
             "silence_duration_ms": realtime_defaults.get("silence_duration_ms", 2000),
             "min_audio_duration": realtime_defaults.get("min_audio_duration", 3.0),
             "save_transcript": realtime_defaults.get("save_transcript", True),
             "create_calendar_event": realtime_defaults.get("create_calendar_event", True),
+            "floating_window_enabled": bool(
+                realtime_defaults.get("floating_window_enabled", False)
+            ),
+            "hide_main_window_when_floating": bool(
+                realtime_defaults.get("hide_main_window_when_floating", False)
+            ),
         }
 
         # Override with current settings
@@ -133,6 +147,31 @@ class SettingsManager(QObject):
             preferences.update(current_settings)
 
         return preferences
+
+    def get_realtime_translation_preferences(self) -> Dict[str, Any]:
+        """Return realtime translation preferences with defaults applied."""
+        from config.constants import (
+            DEFAULT_TRANSLATION_TARGET_LANGUAGE,
+            TRANSLATION_ENGINE_NONE,
+            TRANSLATION_LANGUAGE_AUTO,
+        )
+
+        preferences = self.get_realtime_preferences()
+        return {
+            "translation_engine": preferences.get("translation_engine", TRANSLATION_ENGINE_NONE),
+            "translation_source_lang": preferences.get(
+                "translation_source_lang", TRANSLATION_LANGUAGE_AUTO
+            )
+            or TRANSLATION_LANGUAGE_AUTO,
+            "translation_target_lang": preferences.get(
+                "translation_target_lang", DEFAULT_TRANSLATION_TARGET_LANGUAGE
+            )
+            or DEFAULT_TRANSLATION_TARGET_LANGUAGE,
+            "floating_window_enabled": bool(preferences.get("floating_window_enabled", False)),
+            "hide_main_window_when_floating": bool(
+                preferences.get("hide_main_window_when_floating", False)
+            ),
+        }
 
     def set_setting(self, key: str, value: Any) -> bool:
         """

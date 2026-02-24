@@ -31,7 +31,8 @@ from core.qt_imports import QFileDialog, QMessageBox
 logger = logging.getLogger("echonote.ui.calendar_event_actions")
 
 _ACTION_CANCEL = "cancel"
-_ACTION_DELETE = "delete"
+_ACTION_DELETE_EVENT_ONLY = "delete_event_only"
+_ACTION_DELETE_WITH_ARTIFACTS = "delete_with_artifacts"
 _ACTION_EXPORT_AND_DELETE = "export_and_delete"
 
 
@@ -150,8 +151,12 @@ def _choose_delete_action(parent: Any, i18n: Any, event: Any) -> str:
         i18n.t("calendar.delete.export_then_delete"),
         QMessageBox.ButtonRole.ActionRole,
     )
-    delete_btn = dialog.addButton(
-        i18n.t("calendar.delete.delete_now"),
+    delete_event_only_btn = dialog.addButton(
+        i18n.t("calendar.delete.delete_event_only"),
+        QMessageBox.ButtonRole.ActionRole,
+    )
+    delete_with_artifacts_btn = dialog.addButton(
+        i18n.t("calendar.delete.delete_with_artifacts"),
         QMessageBox.ButtonRole.DestructiveRole,
     )
     cancel_btn = dialog.addButton(i18n.t("common.cancel"), QMessageBox.ButtonRole.RejectRole)
@@ -161,8 +166,10 @@ def _choose_delete_action(parent: Any, i18n: Any, event: Any) -> str:
     clicked = dialog.clickedButton()
     if clicked is export_btn:
         return _ACTION_EXPORT_AND_DELETE
-    if clicked is delete_btn:
-        return _ACTION_DELETE
+    if clicked is delete_event_only_btn:
+        return _ACTION_DELETE_EVENT_ONLY
+    if clicked is delete_with_artifacts_btn:
+        return _ACTION_DELETE_WITH_ARTIFACTS
     return _ACTION_CANCEL
 
 
@@ -232,7 +239,10 @@ def confirm_and_delete_event(
         return False
 
     try:
-        calendar_manager.delete_event(event_id)
+        if action == _ACTION_DELETE_EVENT_ONLY:
+            calendar_manager.delete_event(event_id, delete_artifacts=False)
+        else:
+            calendar_manager.delete_event(event_id, delete_artifacts=True)
     except ValueError as exc:
         error_text = str(exc)
         if "Cannot delete readonly event" in error_text:

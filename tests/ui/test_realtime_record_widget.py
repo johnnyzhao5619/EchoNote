@@ -128,6 +128,38 @@ class TestRealtimeRecordWidget:
         assert widget._cleanup_in_progress is False
         assert widget._cleanup_done is False
 
+    def test_widget_applies_floating_preferences(self, widget):
+        """Floating window settings should be loaded from unified preferences."""
+        widget.settings_manager.get_realtime_preferences.return_value = {
+            "recording_format": "wav",
+            "auto_save": True,
+            "default_input_source": "default",
+            "default_gain": 1.0,
+            "save_transcript": True,
+            "create_calendar_event": True,
+        }
+        widget.settings_manager.get_realtime_translation_preferences.return_value = {
+            "translation_engine": "none",
+            "translation_source_lang": "auto",
+            "translation_target_lang": "en",
+            "floating_window_enabled": True,
+            "hide_main_window_when_floating": True,
+        }
+
+        widget._refresh_recording_preferences()
+
+        assert widget._floating_window_enabled is True
+        assert widget._hide_main_window_when_floating is True
+
+    def test_widget_creates_floating_overlay_when_enabled(self, widget):
+        """Enabled floating mode should build an overlay widget with semantic role."""
+        widget._floating_window_enabled = True
+
+        widget._sync_floating_overlay_visibility()
+
+        assert widget._floating_overlay is not None
+        assert widget._floating_overlay.property("role") == "realtime-floating-overlay"
+
 
 class TestRealtimeRecordWidgetWithoutAudio:
     """Tests for RealtimeRecordWidget without audio capture."""

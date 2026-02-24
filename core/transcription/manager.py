@@ -34,6 +34,7 @@ from core.transcription.format_converter import FormatConverter
 from core.transcription.task_queue import TaskQueue, TaskStatus
 from data.database.connection import DatabaseConnection
 from data.database.models import (
+    EventAttachment,
     TranscriptionTask,
     current_iso_timestamp,
 )
@@ -788,16 +789,25 @@ class TranscriptionManager:
             logger.info(f"Calling speech_engine.transcribe_file for task {task_id}")
             ensure_not_cancelled("before starting transcription")
 
-            # Prepare engine options
-            engine_kwargs = dict(self._task_engine_options.get(task_id, {}))
-            replace_realtime = engine_kwargs.pop("replace_realtime", False)
+            # Prepare engine/runtime options
+            runtime_options = dict(self._task_engine_options.get(task_id, {}))
+            replace_realtime = bool(runtime_options.pop("replace_realtime", False))
+            event_id = runtime_options.get("event_id")
+
+            # Only pass speech-engine-specific options to transcription engine.
+            engine_kwargs = dict(runtime_options)
             engine_kwargs.pop("event_id", None)
+            engine_kwargs.pop("enable_translation", None)
+            engine_kwargs.pop("translation_source_lang", None)
+            engine_kwargs.pop("translation_target_lang", None)
+            engine_kwargs.pop("target_language", None)
             engine_kwargs["progress_callback"] = progress_callback
 
             # Execute transcription
             result = await self.speech_engine.transcribe_file(
                 task.file_path, language=task.language, **engine_kwargs
             )
+            transcript_text = self._extract_transcript_text(result)
 
             ensure_not_cancelled("after completing transcription")
             logger.info(f"Transcription completed for task {task_id}, processing results")
@@ -811,18 +821,29 @@ class TranscriptionManager:
 
             if replace_realtime:
                 try:
-                    audio_path = Path(task.file_path)
-                    json_path = audio_path.with_suffix(".json")
-                    txt_path = audio_path.with_suffix(".txt")
+                    txt_path = self._resolve_realtime_transcript_path(task, event_id)
+                    json_path = txt_path.with_suffix(".json")
 
                     with open(json_path, "w", encoding="utf-8") as f:
                         json.dump(result, f, ensure_ascii=False, indent=2)
 
-                    if "text" in result:
+                    if transcript_text:
                         with open(txt_path, "w", encoding="utf-8") as f:
-                            f.write(result["text"])
+                            f.write(transcript_text)
 
-                    logger.info(f"Replaced realtime transcripts at {json_path}")
+                    if event_id:
+                        file_size = None
+                        if txt_path.exists():
+                            file_size = txt_path.stat().st_size
+                        EventAttachment.upsert_for_event_type(
+                            db_connection=self.db,
+                            event_id=event_id,
+                            attachment_type="transcript",
+                            file_path=str(txt_path),
+                            file_size=file_size,
+                        )
+
+                    logger.info("Replaced realtime transcripts at %s", json_path)
                 except Exception as e:
                     logger.error(f"Failed to replace realtime transcripts: {e}", exc_info=True)
 
@@ -830,10 +851,21 @@ class TranscriptionManager:
             ensure_not_cancelled("before marking task as completed")
             self._finalize_task_completion(task, result)
 
-            # Optional: translate transcription result
-            if self.translation_engine and engine_kwargs.get("enable_translation"):
+            # Optional: translate transcription result.
+            # For secondary re-transcription, if a translation attachment already exists,
+            # always retranslate against the refreshed transcript and overwrite it.
+            should_translate = bool(runtime_options.get("enable_translation"))
+            if (
+                not should_translate
+                and replace_realtime
+                and event_id
+                and self._event_has_attachment_type(event_id, "translation")
+            ):
+                should_translate = True
+
+            if self.translation_engine and should_translate:
                 try:
-                    await self._translate_and_save(task, result.get("text", ""), engine_kwargs)
+                    await self._translate_and_save(task, transcript_text, runtime_options)
                 except Exception as trans_exc:
                     logger.error(
                         "Translation failed for task %s: %s", task_id, trans_exc, exc_info=True
@@ -966,6 +998,26 @@ class TranscriptionManager:
 
             # We don't fail the task if export fails, but we log it
 
+    @staticmethod
+    def _extract_transcript_text(result: Dict[str, Any]) -> str:
+        """Normalize transcript text from engine payload."""
+        text = result.get("text")
+        if isinstance(text, str) and text.strip():
+            return text
+
+        segments = result.get("segments")
+        if not isinstance(segments, list):
+            return ""
+
+        collected: list[str] = []
+        for segment in segments:
+            if not isinstance(segment, dict):
+                continue
+            segment_text = segment.get("text")
+            if isinstance(segment_text, str) and segment_text.strip():
+                collected.append(segment_text.strip())
+        return "\n".join(collected).strip()
+
     async def _translate_and_save(
         self, task: TranscriptionTask, text: str, options: Dict[str, Any]
     ) -> None:
@@ -977,42 +1029,158 @@ class TranscriptionManager:
         if not text.strip():
             return
 
-        source_lang = options.get("translation_source_lang", "auto")
-        target_lang = options.get("translation_target_lang", "en")
+        source_lang = options.get("translation_source_lang") or "auto"
+        target_lang = options.get("translation_target_lang") or options.get("target_language") or "en"
         event_id = options.get("event_id")
 
         logger.info("Translating task %s (%s→%s)", task.id, source_lang, target_lang)
-        translated_text = await self.translation_engine.translate(text, source_lang, target_lang)
+        translated_text = await self._translate_text(
+            text=text,
+            source_lang=source_lang,
+            target_lang=target_lang,
+        )
 
         if not translated_text:
             return
 
-        # 确定翻译文件保存路径
         audio_path = Path(task.file_path)
         output_format = task.output_format or "txt"
-        translation_filename = f"{audio_path.stem}_translation_{target_lang}.{output_format}"
-        translation_path = audio_path.parent / translation_filename
-
-        with open(translation_path, "w", encoding="utf-8") as f:
-            f.write(translated_text)
+        translation_path = self._resolve_translation_output_path(
+            base_path=audio_path,
+            target_lang=target_lang,
+            event_id=event_id,
+            extension=output_format,
+        )
+        self._write_translation_file(translation_path, translated_text)
 
         logger.info("Translation saved to %s", translation_path)
 
-        # 若与日历事件关联，写入 event_attachments
-        if event_id:
-            try:
-                from data.database.models import EventAttachment
+        self._upsert_translation_attachment(event_id=event_id, translation_path=translation_path)
 
-                attachment = EventAttachment(
-                    event_id=event_id,
-                    file_path=str(translation_path),
-                    file_name=translation_filename,
-                    attachment_type="translation",
-                )
-                attachment.save(self.db)
-                logger.info("Translation attachment saved for event %s", event_id)
-            except Exception as exc:
-                logger.warning("Failed to save translation attachment: %s", exc)
+    async def translate_transcript_file(
+        self,
+        transcript_path: str,
+        *,
+        source_lang: str = "auto",
+        target_lang: str = "en",
+        event_id: Optional[str] = None,
+    ) -> str:
+        """Translate a transcript text file and persist translation output.
+
+        Args:
+            transcript_path: Source transcript file path.
+            source_lang: Source language hint (default ``auto``).
+            target_lang: Target language code (default ``en``).
+            event_id: Optional linked calendar event id for attachment upsert.
+
+        Returns:
+            The translated file path.
+        """
+        if not self.translation_engine:
+            raise RuntimeError("Translation engine is unavailable")
+
+        source_path = Path(transcript_path).expanduser().resolve()
+        if not source_path.exists():
+            raise FileNotFoundError(f"Transcript file not found: {source_path}")
+
+        text = source_path.read_text(encoding="utf-8")
+        if not text.strip():
+            raise ValueError("Transcript content is empty")
+
+        translated_text = await self._translate_text(
+            text=text,
+            source_lang=source_lang,
+            target_lang=target_lang,
+        )
+        if not translated_text:
+            raise ValueError("Translation result is empty")
+
+        ext = source_path.suffix.lstrip(".") or "txt"
+        translation_path = self._resolve_translation_output_path(
+            base_path=source_path,
+            target_lang=target_lang,
+            event_id=event_id,
+            extension=ext,
+        )
+        self._write_translation_file(translation_path, translated_text)
+        self._upsert_translation_attachment(event_id=event_id, translation_path=translation_path)
+        return str(translation_path)
+
+    async def _translate_text(self, *, text: str, source_lang: str, target_lang: str) -> str:
+        """Translate text and normalize async/sync engine return types."""
+        if not self.translation_engine:
+            raise RuntimeError("Translation engine is unavailable")
+
+        translated = self.translation_engine.translate(text, source_lang, target_lang)
+        if asyncio.iscoroutine(translated):
+            translated = await translated
+        if translated is None:
+            return ""
+        return str(translated)
+
+    def _resolve_translation_output_path(
+        self,
+        *,
+        base_path: Path,
+        target_lang: str,
+        event_id: Optional[str],
+        extension: str,
+    ) -> Path:
+        """Resolve translation output path with attachment overwrite preference."""
+        normalized_extension = extension.lstrip(".") or "txt"
+        if event_id:
+            existing_attachment = EventAttachment.get_by_event_and_type(
+                self.db, event_id, "translation"
+            )
+            if existing_attachment and existing_attachment.file_path:
+                return Path(existing_attachment.file_path).expanduser().resolve()
+
+        translation_filename = f"{base_path.stem}_translation_{target_lang}.{normalized_extension}"
+        return base_path.parent / translation_filename
+
+    @staticmethod
+    def _write_translation_file(path: Path, text: str) -> None:
+        """Persist translated text to disk."""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write(text)
+
+    def _upsert_translation_attachment(
+        self, *, event_id: Optional[str], translation_path: Path
+    ) -> None:
+        """Upsert translation attachment record when event context is available."""
+        if not event_id:
+            return
+        try:
+            file_size = translation_path.stat().st_size if translation_path.exists() else None
+            EventAttachment.upsert_for_event_type(
+                db_connection=self.db,
+                event_id=event_id,
+                attachment_type="translation",
+                file_path=str(translation_path),
+                file_size=file_size,
+            )
+            logger.info("Translation attachment saved for event %s", event_id)
+        except Exception as exc:
+            logger.warning("Failed to save translation attachment: %s", exc)
+
+    def _event_has_attachment_type(self, event_id: str, attachment_type: str) -> bool:
+        """Return whether event currently has an attachment of a specific type."""
+        try:
+            attachment = EventAttachment.get_by_event_and_type(self.db, event_id, attachment_type)
+            return bool(attachment and attachment.file_path)
+        except Exception:
+            return False
+
+    def _resolve_realtime_transcript_path(
+        self, task: TranscriptionTask, event_id: Optional[str]
+    ) -> Path:
+        """Pick replacement transcript path, preferring existing event transcript attachment."""
+        if event_id:
+            attachment = EventAttachment.get_by_event_and_type(self.db, event_id, "transcript")
+            if attachment and attachment.file_path:
+                return Path(attachment.file_path)
+        return Path(task.file_path).with_suffix(".txt")
 
     def _cleanup_after_cancellation(self, task_id: str) -> None:
         """Clean up resources after task cancellation."""

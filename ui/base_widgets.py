@@ -40,6 +40,7 @@ from ui.constants import (
     ROLE_EVENT_CARD,
     ROLE_EVENT_INDICATOR,
     ROLE_EVENT_META,
+    ROLE_EVENT_TIME,
     ROLE_EVENT_TITLE,
     ROLE_EVENT_TYPE_BADGE,
     ZERO_MARGINS,
@@ -544,7 +545,7 @@ class BaseEventCard(QFrame):
 
         # Localized time
         self.time_label = QLabel(self._get_formatted_time())
-        self.time_label.setProperty("role", ROLE_EVENT_META)
+        self.time_label.setProperty("role", ROLE_EVENT_TIME)
         meta_layout.addWidget(self.time_label)
 
         # Type badge

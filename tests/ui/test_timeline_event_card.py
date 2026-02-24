@@ -62,8 +62,9 @@ def test_event_card_action_buttons_use_semantic_roles(qapp, mock_i18n):
     )
 
     assert card.recording_btn.property("role") == "timeline-recording-action"
-    assert card.transcript_btn.property("role") == "timeline-transcript-action"
-    assert card.translation_btn.property("role") == "timeline-translation-action"
+    assert card.secondary_transcribe_btn.property("role") == "timeline-secondary-transcribe-action"
+    assert card.translate_btn.property("role") == "timeline-translation-action"
+    assert card.view_text_btn.property("role") == "timeline-transcript-action"
 
 
 def test_event_card_meta_labels_use_semantic_role(qapp, mock_i18n):
@@ -107,3 +108,70 @@ def test_event_card_delete_button_emits_event_id(qapp, mock_i18n):
 
     assert card.delete_btn.property("variant") == "danger"
     assert captured == ["evt-delete"]
+
+
+def test_event_card_view_text_prefers_transcript_when_both_exist(qapp, mock_i18n):
+    event = SimpleNamespace(
+        id="evt-view-both",
+        title="View Both",
+        start_time=datetime(2026, 1, 2, 9, 0, 0),
+        end_time=datetime(2026, 1, 2, 10, 0, 0),
+        source="local",
+        event_type="event",
+        location="",
+        attendees=[],
+        description="",
+    )
+    card = EventCard(
+        {
+            "event": event,
+            "artifacts": {
+                "transcript": "/tmp/meeting.txt",
+                "translation": "/tmp/meeting_zh.txt",
+            },
+        },
+        is_future=False,
+        i18n=mock_i18n,
+    )
+
+    transcript_captured = []
+    translation_captured = []
+    card.view_transcript.connect(transcript_captured.append)
+    card.view_translation.connect(translation_captured.append)
+    card.view_text_btn.click()
+
+    assert transcript_captured == ["/tmp/meeting.txt"]
+    assert translation_captured == []
+
+
+def test_event_card_view_text_uses_translation_when_transcript_missing(qapp, mock_i18n):
+    event = SimpleNamespace(
+        id="evt-view-translation",
+        title="View Translation",
+        start_time=datetime(2026, 1, 3, 9, 0, 0),
+        end_time=datetime(2026, 1, 3, 10, 0, 0),
+        source="local",
+        event_type="event",
+        location="",
+        attendees=[],
+        description="",
+    )
+    card = EventCard(
+        {
+            "event": event,
+            "artifacts": {
+                "translation": "/tmp/meeting_zh.txt",
+            },
+        },
+        is_future=False,
+        i18n=mock_i18n,
+    )
+
+    transcript_captured = []
+    translation_captured = []
+    card.view_transcript.connect(transcript_captured.append)
+    card.view_translation.connect(translation_captured.append)
+    card.view_text_btn.click()
+
+    assert transcript_captured == []
+    assert translation_captured == ["/tmp/meeting_zh.txt"]

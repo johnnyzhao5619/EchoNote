@@ -123,4 +123,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 ---
 
 **Last Updated**: February 17, 2026  
-**Version**: v1.4.0
+**Version**: v1.4.1

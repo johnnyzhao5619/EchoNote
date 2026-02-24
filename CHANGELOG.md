@@ -4,6 +4,13 @@ All notable changes to EchoNote will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [1.4.1] - 2026-02-24
+
+### Changed
+
+- Released `v1.4.1` with timeline/calendar/audio player UI and interaction refinements, including transcript/translation viewer integration and playback experience optimization.
+- Unified project, packaging, and documentation version references to `v1.4.1` for release consistency.
+
 ## [1.4.0] - 2026-02-20
 
 ### Added

@@ -90,6 +90,15 @@ def mock_settings_manager():
     manager.get_realtime_preferences = Mock(
         return_value={"recording_format": "wav", "auto_save": True}
     )
+    manager.get_realtime_translation_preferences = Mock(
+        return_value={
+            "translation_engine": "none",
+            "translation_source_lang": "auto",
+            "translation_target_lang": "en",
+            "floating_window_enabled": False,
+            "hide_main_window_when_floating": False,
+        }
+    )
     manager.setting_changed = Mock()
     manager.setting_changed.connect = Mock()
     return manager

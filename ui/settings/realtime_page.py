@@ -51,7 +51,6 @@ from config.constants import (
     TRANSLATION_ENGINE_NONE,
     TRANSLATION_ENGINE_OPUS_MT,
 )
-from ui.base_widgets import create_button, create_hbox, create_vbox
 from ui.constants import (
     GAIN_SLIDER_DEFAULT,
     GAIN_SLIDER_DIVISOR,
@@ -253,6 +252,19 @@ class RealtimeSettingsPage(BaseSettingsPage):
         translation_layout.addStretch()
         self.content_layout.addLayout(translation_layout)
 
+        self.floating_window_check = QCheckBox(
+            self.i18n.t("settings.realtime.floating_window_enabled")
+        )
+        self.floating_window_check.stateChanged.connect(self._on_floating_window_toggled)
+        self.floating_window_check.stateChanged.connect(self._emit_changed)
+        self.content_layout.addWidget(self.floating_window_check)
+
+        self.hide_main_window_check = QCheckBox(
+            self.i18n.t("settings.realtime.hide_main_window_when_floating")
+        )
+        self.hide_main_window_check.stateChanged.connect(self._emit_changed)
+        self.content_layout.addWidget(self.hide_main_window_check)
+
         # Opus-MT: language pair selection (visible only when Opus-MT is selected)
         self._opus_mt_section = create_vbox()
 
@@ -287,6 +299,7 @@ class RealtimeSettingsPage(BaseSettingsPage):
             item = self._opus_mt_section.itemAt(i)
             if item and item.widget():
                 item.widget().setVisible(False)
+        self._on_floating_window_toggled(self.floating_window_check.checkState().value)
 
         self.add_section_spacing()
 
@@ -473,22 +486,62 @@ class RealtimeSettingsPage(BaseSettingsPage):
                 self.auto_save_check.setChecked(auto_save)
 
             translation_engine = self.settings_manager.get_setting("realtime.translation_engine")
-            if translation_engine in SUPPORTED_REALTIME_TRANSLATION_ENGINES:
-                index = self.translation_combo.findData(translation_engine)
+            translation_preferences = {}
+            if hasattr(self.settings_manager, "get_realtime_translation_preferences"):
+                translation_preferences = self.settings_manager.get_realtime_translation_preferences()
+
+            selected_engine = (
+                translation_preferences.get("translation_engine", translation_engine)
+                if isinstance(translation_preferences, dict)
+                else translation_engine
+            )
+            if selected_engine in SUPPORTED_REALTIME_TRANSLATION_ENGINES:
+                index = self.translation_combo.findData(selected_engine)
                 if index >= 0:
                     self.translation_combo.setCurrentIndex(index)
 
-            source_lang = self.settings_manager.get_setting("realtime.translation_source_lang")
+            source_lang = (
+                translation_preferences.get("translation_source_lang")
+                if isinstance(translation_preferences, dict)
+                else None
+            ) or self.settings_manager.get_setting("realtime.translation_source_lang")
             if source_lang:
                 index = self.translation_source_combo.findData(source_lang)
                 if index >= 0:
                     self.translation_source_combo.setCurrentIndex(index)
 
-            target_lang = self.settings_manager.get_setting("realtime.translation_target_lang")
+            target_lang = (
+                translation_preferences.get("translation_target_lang")
+                if isinstance(translation_preferences, dict)
+                else None
+            ) or self.settings_manager.get_setting("realtime.translation_target_lang")
             if target_lang:
                 index = self.translation_target_combo.findData(target_lang)
                 if index >= 0:
                     self.translation_target_combo.setCurrentIndex(index)
+
+            floating_enabled = (
+                translation_preferences.get("floating_window_enabled")
+                if isinstance(translation_preferences, dict)
+                else None
+            )
+            if floating_enabled is None:
+                floating_enabled = self.settings_manager.get_setting(
+                    "realtime.floating_window_enabled"
+                )
+            self.floating_window_check.setChecked(bool(floating_enabled))
+
+            hide_main = (
+                translation_preferences.get("hide_main_window_when_floating")
+                if isinstance(translation_preferences, dict)
+                else None
+            )
+            if hide_main is None:
+                hide_main = self.settings_manager.get_setting(
+                    "realtime.hide_main_window_when_floating"
+                )
+            self.hide_main_window_check.setChecked(bool(hide_main))
+            self._on_floating_window_toggled(self.floating_window_check.checkState().value)
 
             save_transcript = self.settings_manager.get_setting("realtime.save_transcript")
             if save_transcript is not None:
@@ -546,6 +599,13 @@ class RealtimeSettingsPage(BaseSettingsPage):
             target_lang = self.translation_target_combo.currentData() or "en"
             self._set_setting_or_raise("realtime.translation_source_lang", source_lang)
             self._set_setting_or_raise("realtime.translation_target_lang", target_lang)
+            self._set_setting_or_raise(
+                "realtime.floating_window_enabled", self.floating_window_check.isChecked()
+            )
+            self._set_setting_or_raise(
+                "realtime.hide_main_window_when_floating",
+                self.hide_main_window_check.isChecked(),
+            )
 
             self._set_setting_or_raise(
                 "realtime.save_transcript", self.save_transcript_check.isChecked()
@@ -612,6 +672,14 @@ class RealtimeSettingsPage(BaseSettingsPage):
             self.path_label.setText(self.i18n.t("settings.realtime.recording_path"))
         if hasattr(self, "translation_label"):
             self.translation_label.setText(self.i18n.t("settings.realtime.translation_engine"))
+        if hasattr(self, "floating_window_check"):
+            self.floating_window_check.setText(
+                self.i18n.t("settings.realtime.floating_window_enabled")
+            )
+        if hasattr(self, "hide_main_window_check"):
+            self.hide_main_window_check.setText(
+                self.i18n.t("settings.realtime.hide_main_window_when_floating")
+            )
         if hasattr(self, "loopback_status_label"):
             self.loopback_status_label.setText(self.i18n.t("settings.realtime.loopback_status"))
         if hasattr(self, "vad_threshold_label"):
@@ -677,6 +745,8 @@ class RealtimeSettingsPage(BaseSettingsPage):
             self.translation_target_label.setText(self.i18n.t("settings.realtime.target_language"))
         if hasattr(self, "opus_mt_status_label"):
             self._update_opus_mt_status()
+        if hasattr(self, "floating_window_check"):
+            self._on_floating_window_toggled(self.floating_window_check.checkState().value)
 
     def _update_spinbox_suffixes(self) -> None:
         """Update localized unit suffixes for numeric controls."""
@@ -778,6 +848,13 @@ class RealtimeSettingsPage(BaseSettingsPage):
                     item.widget().setVisible(is_opus)
         if is_opus:
             self._update_opus_mt_status()
+
+    def _on_floating_window_toggled(self, state: int) -> None:
+        """Enable hide-main option only when floating mode is enabled."""
+        enabled = bool(state)
+        self.hide_main_window_check.setEnabled(enabled)
+        if not enabled:
+            self.hide_main_window_check.setChecked(False)
 
     def _detect_mp3_support(self) -> bool:
         try:

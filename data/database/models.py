@@ -544,6 +544,53 @@ class EventAttachment:
         return [EventAttachment.from_db_row(row) for row in result]
 
     @staticmethod
+    def get_by_event_and_type(
+        db_connection, event_id: str, attachment_type: str
+    ) -> Optional["EventAttachment"]:
+        """Get the latest attachment for an event/type pair."""
+        attachments = EventAttachment.get_by_event_id(db_connection, event_id)
+        typed = [item for item in attachments if item.attachment_type == attachment_type]
+        if not typed:
+            return None
+        return typed[-1]
+
+    @staticmethod
+    def upsert_for_event_type(
+        db_connection,
+        event_id: str,
+        attachment_type: str,
+        file_path: str,
+        file_size: Optional[int] = None,
+    ) -> "EventAttachment":
+        """
+        Upsert attachment for the same event/type pair.
+
+        Keeps only the latest attachment row for this type to avoid
+        unbounded duplicates produced by repeated retranscribe/retranslate.
+        """
+        attachments = EventAttachment.get_by_event_id(db_connection, event_id)
+        typed = [item for item in attachments if item.attachment_type == attachment_type]
+
+        if typed:
+            latest = typed[-1]
+            for stale in typed[:-1]:
+                stale.delete(db_connection)
+            latest.file_path = file_path
+            latest.file_size = file_size
+            latest.created_at = current_iso_timestamp()
+            latest.save(db_connection)
+            return latest
+
+        attachment = EventAttachment(
+            event_id=event_id,
+            attachment_type=attachment_type,
+            file_path=file_path,
+            file_size=file_size,
+        )
+        attachment.save(db_connection)
+        return attachment
+
+    @staticmethod
     def get_by_event_ids(db_connection, event_ids: List[str]) -> Dict[str, List["EventAttachment"]]:
         """Get attachments for multiple events in a single query."""
         if not event_ids:

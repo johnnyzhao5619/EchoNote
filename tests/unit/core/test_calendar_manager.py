@@ -369,6 +369,27 @@ class TestCalendarManagerDeleteEvent:
 
                             assert "/path/to/file.txt" in mock_file_manager.deleted_files
 
+    def test_delete_event_keeps_attachments_when_requested(self, calendar_manager, mock_file_manager):
+        """Deleting event-only should preserve attachment rows and files."""
+        mock_event = Mock()
+        mock_event.id = "event_123"
+        mock_event.is_readonly = False
+
+        mock_attachment = Mock()
+        mock_attachment.file_path = "/path/to/file.txt"
+
+        with patch.object(CalendarEvent, "get_by_id", return_value=mock_event):
+            with patch.object(CalendarEventLink, "list_for_event", return_value=[]):
+                with patch.object(
+                    EventAttachment, "get_by_event_id", return_value=[mock_attachment]
+                ) as mock_get_attachments:
+                    with patch.object(CalendarEvent, "delete"):
+                        calendar_manager.delete_event("event_123", delete_artifacts=False)
+
+        mock_get_attachments.assert_not_called()
+        assert mock_file_manager.deleted_files == []
+        mock_attachment.delete.assert_not_called()
+
 
 class TestCalendarManagerGetEvents:
     """Test event query functionality."""

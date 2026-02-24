@@ -49,12 +49,13 @@ def save_event_attachments(db_connection, event_id: str, recording_result: Dict)
             continue
 
         try:
-            EventAttachment(
+            EventAttachment.upsert_for_event_type(
+                db_connection=db_connection,
                 event_id=event_id,
                 attachment_type=type_code,
                 file_path=path,
                 file_size=os.path.getsize(path),
-            ).save(db_connection)
+            )
         except Exception as exc:  # noqa: BLE001
             logger.error(
                 "Failed to save %s attachment for event %s: %s",

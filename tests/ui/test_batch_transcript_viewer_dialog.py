@@ -76,3 +76,4 @@ def test_transcript_viewer_update_language_uses_viewer_keys(qapp, mock_i18n, mon
     assert dialog.copy_button.text() == "viewer.copy_all"
     assert dialog.export_button.text() == "viewer.export"
     assert dialog.search_button.text() == "viewer.search"
+    assert dialog.translate_button.text() == "timeline.translate_transcript"

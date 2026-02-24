@@ -786,14 +786,22 @@ class AutoTaskScheduler:
                     "Failed to load realtime preferences for auto tasks: %s", exc, exc_info=True
                 )
 
+        from config.constants import (
+            DEFAULT_TRANSLATION_TARGET_LANGUAGE,
+            TRANSLATION_ENGINE_NONE,
+            TRANSLATION_LANGUAGE_AUTO,
+        )
+
         return {
             "recording_format": "wav",
             "auto_save": True,
-            "translation_engine": "google",
+            "translation_engine": TRANSLATION_ENGINE_NONE,
             "vad_threshold": 0.5,
             "silence_duration_ms": 2000,
             "min_audio_duration": 3.0,
             "save_transcript": True,
+            "translation_source_lang": TRANSLATION_LANGUAGE_AUTO,
+            "translation_target_lang": DEFAULT_TRANSLATION_TARGET_LANGUAGE,
         }
 
     def _build_recording_options(self, event, auto_tasks: dict) -> Dict[str, Any]:
@@ -814,7 +822,7 @@ class AutoTaskScheduler:
 
         save_transcript = bool(preferences.get("save_transcript", True) and enable_transcription)
 
-        translation_globally_enabled = preferences.get("translation_engine", "google") != "none"
+        translation_globally_enabled = preferences.get("translation_engine", "none") != "none"
         translation_runtime_available = self._translation_engine_available()
         enable_translation = bool(
             enable_transcription
@@ -829,7 +837,8 @@ class AutoTaskScheduler:
             "language": auto_tasks.get("transcription_language"),
             "enable_transcription": enable_transcription,
             "enable_translation": enable_translation,
-            "target_language": auto_tasks.get("translation_target_language") or "en",
+            "target_language": auto_tasks.get("translation_target_language")
+            or preferences.get("translation_target_lang", "en"),
             "recording_format": preferences.get("recording_format", "wav"),
             "save_recording": save_recording,
             "save_transcript": save_transcript,

@@ -130,6 +130,7 @@ class EventCard(BaseEventCard):
     view_recording = Signal(str, str)  # file_path, event_id
     view_transcript = Signal(str)  # file_path
     view_translation = Signal(str)  # file_path
+    translate_transcript_requested = Signal(str, str)  # event_id, transcript_path
     delete_requested = Signal(str)  # event_id
     secondary_transcribe_requested = Signal(str, str)  # event_id, recording_path
 
@@ -160,8 +161,8 @@ class EventCard(BaseEventCard):
         # Additional badge/control labels
         self.recording_btn = None
         self.secondary_transcribe_btn = None
-        self.transcript_btn = None
-        self.translation_btn = None
+        self.view_text_btn = None
+        self.translate_btn = None
         self.translation_checkbox = None
         self.recording_checkbox = None
         self.transcription_checkbox = None
@@ -315,6 +316,8 @@ class EventCard(BaseEventCard):
             Actions layout
         """
         actions_layout = create_hbox(spacing=8)
+        primary_actions = create_hbox(spacing=8)
+        danger_actions = create_hbox(spacing=8)
 
         # Recording button
         has_recording = bool(self.artifacts.get("recording"))
@@ -325,38 +328,44 @@ class EventCard(BaseEventCard):
             self.recording_btn = create_button(self.i18n.t("timeline.play_recording"))
             self.recording_btn.clicked.connect(self._on_play_recording)
             self.recording_btn.setProperty("role", ROLE_TIMELINE_RECORDING_ACTION)
-            # Styling is handled by theme files (dark.qss / light.qss)
-            actions_layout.addWidget(self.recording_btn)
-            
+            primary_actions.addWidget(self.recording_btn)
+
         if has_transcript:
             self.secondary_transcribe_btn = create_button(self.i18n.t("timeline.secondary_transcribe"))
             self.secondary_transcribe_btn.clicked.connect(self._on_secondary_transcribe)
             self.secondary_transcribe_btn.setProperty(
                 "role", ROLE_TIMELINE_SECONDARY_TRANSCRIBE_ACTION
             )
-            actions_layout.addWidget(self.secondary_transcribe_btn)
+            primary_actions.addWidget(self.secondary_transcribe_btn)
 
-            self.transcript_btn = create_button(self.i18n.t("timeline.view_transcript"))
-            self.transcript_btn.clicked.connect(self._on_view_transcript)
-            self.transcript_btn.setProperty("role", ROLE_TIMELINE_TRANSCRIPT_ACTION)
-            # Styling is handled by theme files (dark.qss / light.qss)
-            actions_layout.addWidget(self.transcript_btn)
+            self.translate_btn = create_button(self.i18n.t("timeline.translate_transcript"))
+            self.translate_btn.clicked.connect(self._on_translate_transcript)
+            self.translate_btn.setProperty("role", ROLE_TIMELINE_TRANSLATION_ACTION)
+            primary_actions.addWidget(self.translate_btn)
 
-        if has_translation:
-            self.translation_btn = create_button(self.i18n.t("timeline.view_translation"))
-            self.translation_btn.clicked.connect(self._on_view_translation)
-            self.translation_btn.setProperty("role", ROLE_TIMELINE_TRANSLATION_ACTION)
-            actions_layout.addWidget(self.translation_btn)
+        if has_transcript or has_translation:
+            self.view_text_btn = create_button(
+                self._get_view_text_button_label(
+                    has_transcript=has_transcript,
+                    has_translation=has_translation,
+                )
+            )
+            self.view_text_btn.clicked.connect(self._on_view_text)
+            self.view_text_btn.setProperty("role", ROLE_TIMELINE_TRANSCRIPT_ACTION)
+            primary_actions.addWidget(self.view_text_btn)
 
         # Show message if no artifacts
         if not (has_recording or has_transcript or has_translation):
             no_artifacts_label = QLabel(self.i18n.t("timeline.no_artifacts"))
             no_artifacts_label.setObjectName("no_artifacts_label")
             no_artifacts_label.setProperty("role", ROLE_NO_ARTIFACTS)
-            actions_layout.addWidget(no_artifacts_label)
+            primary_actions.addWidget(no_artifacts_label)
 
-        self._add_delete_action(actions_layout)
+        self._add_delete_action(danger_actions)
+
+        actions_layout.addLayout(primary_actions)
         actions_layout.addStretch()
+        actions_layout.addLayout(danger_actions)
 
         return actions_layout
 
@@ -478,19 +487,26 @@ class EventCard(BaseEventCard):
             logger.info(f"Playing recording: {recording_path}")
             self.view_recording.emit(recording_path, self.calendar_event.id)
 
-    def _on_view_transcript(self):
-        """Handle view transcript button click."""
+    def _on_view_text(self):
+        """Open the most complete text view available for this event."""
         transcript_path = self.artifacts.get("transcript")
-        if transcript_path:
-            logger.info(f"Viewing transcript: {transcript_path}")
-            self.view_transcript.emit(transcript_path)
-
-    def _on_view_translation(self):
-        """Handle view translation button click."""
         translation_path = self.artifacts.get("translation")
+
+        if transcript_path:
+            logger.info("Viewing transcript/translation for event %s", self.calendar_event.id)
+            self.view_transcript.emit(transcript_path)
+            return
         if translation_path:
-            logger.info(f"Viewing translation: {translation_path}")
+            logger.info("Viewing translation for event %s", self.calendar_event.id)
             self.view_translation.emit(translation_path)
+
+    def _get_view_text_button_label(self, *, has_transcript: bool, has_translation: bool) -> str:
+        """Return the best-fit view action label based on available artifacts."""
+        if has_transcript and has_translation:
+            return self.i18n.t("timeline.view_transcript_translation")
+        if has_translation:
+            return self.i18n.t("timeline.view_translation")
+        return self.i18n.t("timeline.view_transcript")
 
     def _on_secondary_transcribe(self):
         """Handle re-transcription button click."""
@@ -498,6 +514,13 @@ class EventCard(BaseEventCard):
         if recording_path:
             logger.info(f"Requesting secondary transcription for event {self.calendar_event.id}")
             self.secondary_transcribe_requested.emit(self.calendar_event.id, recording_path)
+
+    def _on_translate_transcript(self):
+        """Handle manual translation request for transcript content."""
+        transcript_path = self.artifacts.get("transcript")
+        if transcript_path:
+            logger.info("Requesting transcript translation for event %s", self.calendar_event.id)
+            self.translate_transcript_requested.emit(self.calendar_event.id, transcript_path)
 
     def _on_delete_clicked(self):
         """Handle delete action click."""
@@ -534,10 +557,15 @@ class EventCard(BaseEventCard):
             # Update buttons
             if self.recording_btn:
                 self.recording_btn.setText(self.i18n.t("timeline.play_recording"))
-            if self.transcript_btn:
-                self.transcript_btn.setText(self.i18n.t("timeline.view_transcript"))
-            if self.translation_btn:
-                self.translation_btn.setText(self.i18n.t("timeline.view_translation"))
+            if self.view_text_btn:
+                self.view_text_btn.setText(
+                    self._get_view_text_button_label(
+                        has_transcript=bool(self.artifacts.get("transcript")),
+                        has_translation=bool(self.artifacts.get("translation")),
+                    )
+                )
+            if self.translate_btn:
+                self.translate_btn.setText(self.i18n.t("timeline.translate_transcript"))
             if self.secondary_transcribe_btn:
                 self.secondary_transcribe_btn.setText(self.i18n.t("timeline.secondary_transcribe"))
 

@@ -313,6 +313,8 @@ def main():
         )
         managers["translation_engine_loader"] = translation_engine_loader
         managers["translation_engine"] = TranslationEngineProxy(translation_engine_loader)
+        if managers.get("transcription_manager") is not None:
+            managers["transcription_manager"].translation_engine = managers["translation_engine"]
 
         # Initialize realtime recorder
         splash.show_progress(

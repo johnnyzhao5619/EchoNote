@@ -31,6 +31,7 @@ logger = logging.getLogger("echonote.timeline.manager")
 
 _DEFAULT_TRANSCRIPT_CANDIDATE_WINDOW_DAYS = DEFAULT_TRANSCRIPT_CANDIDATE_WINDOW_DAYS
 _MAX_TRANSCRIPT_CANDIDATES = MAX_TRANSCRIPT_CANDIDATES
+_UPCOMING_EVENT_FILTER = "__upcoming__"
 
 
 class TimelineManager:
@@ -211,7 +212,11 @@ class TimelineManager:
                 return False
 
         event_type = filters.get("event_type")
-        if event_type and getattr(event, "event_type", None) != event_type:
+        if event_type == _UPCOMING_EVENT_FILTER:
+            event_start = to_local_datetime(event.start_time)
+            if event_start < to_local_datetime(datetime.now()):
+                return False
+        elif event_type and getattr(event, "event_type", None) != event_type:
             return False
 
         source = filters.get("source")
@@ -261,7 +266,10 @@ class TimelineManager:
             calendar_filters = {
                 key: filter_context["filters"][key]
                 for key in ("event_type", "source")
-                if filter_context["filters"].get(key)
+                if (
+                    filter_context["filters"].get(key)
+                    and filter_context["filters"][key] != _UPCOMING_EVENT_FILTER
+                )
             }
 
             # Get all events in range
@@ -543,7 +551,11 @@ class TimelineManager:
             events = CalendarEvent.search(
                 self.db,
                 keyword=query,
-                event_type=filters.get("event_type"),
+                event_type=(
+                    None
+                    if filters.get("event_type") == _UPCOMING_EVENT_FILTER
+                    else filters.get("event_type")
+                ),
                 source=filters.get("source"),
             )
 
@@ -581,6 +593,8 @@ class TimelineManager:
                 candidate_filters = {
                     key: filters[key] for key in ("event_type", "source") if filters.get(key)
                 }
+                if candidate_filters.get("event_type") == _UPCOMING_EVENT_FILTER:
+                    candidate_filters.pop("event_type", None)
 
                 candidate_start_dt, candidate_end_dt = self._resolve_transcript_candidate_range(
                     start_dt,

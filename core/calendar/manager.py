@@ -298,12 +298,21 @@ class CalendarManager:
             logger.error(f"Failed to update event {event_id}: {e}")
             raise
 
-    def delete_event(self, event_id: str):
+    def delete_event(
+        self,
+        event_id: str,
+        *,
+        delete_artifacts: bool = True,
+        delete_artifact_files: bool = True,
+    ):
         """
         Delete a calendar event.
 
         Args:
             event_id: Event ID to delete
+            delete_artifacts: Whether to remove event attachments.
+            delete_artifact_files: Whether to remove underlying files when
+                deleting attachments.
         """
         try:
             event = CalendarEvent.get_by_id(self.db, event_id)
@@ -362,23 +371,24 @@ class CalendarManager:
                     commit=True,
                 )
 
-            attachments = EventAttachment.get_by_event_id(self.db, event_id)
-            for attachment in attachments:
-                if self.file_manager and attachment.file_path:
-                    try:
-                        self.file_manager.delete_file(attachment.file_path)
-                    except FileNotFoundError:
-                        logger.warning(
-                            "Attachment file already missing: %s",
-                            attachment.file_path,
-                        )
-                    except Exception as exc:  # pragma: no cover - defensive
-                        logger.error(
-                            "Failed to delete attachment file %s: %s",
-                            attachment.file_path,
-                            exc,
-                        )
-                attachment.delete(self.db)
+            if delete_artifacts:
+                attachments = EventAttachment.get_by_event_id(self.db, event_id)
+                for attachment in attachments:
+                    if delete_artifact_files and self.file_manager and attachment.file_path:
+                        try:
+                            self.file_manager.delete_file(attachment.file_path)
+                        except FileNotFoundError:
+                            logger.warning(
+                                "Attachment file already missing: %s",
+                                attachment.file_path,
+                            )
+                        except Exception as exc:  # pragma: no cover - defensive
+                            logger.error(
+                                "Failed to delete attachment file %s: %s",
+                                attachment.file_path,
+                                exc,
+                            )
+                    attachment.delete(self.db)
 
             event.delete(self.db)
             logger.info(f"Deleted event: {event_id}")

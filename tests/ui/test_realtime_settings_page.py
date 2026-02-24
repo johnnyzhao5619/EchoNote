@@ -19,6 +19,10 @@ class _FakeSettingsManager:
             "realtime.recording_save_path": "~/Documents/EchoNote/Recordings",
             "realtime.auto_save": True,
             "realtime.translation_engine": "none",
+            "realtime.translation_source_lang": "auto",
+            "realtime.translation_target_lang": "en",
+            "realtime.floating_window_enabled": True,
+            "realtime.hide_main_window_when_floating": False,
             "realtime.save_transcript": True,
             "realtime.create_calendar_event": False,
             "realtime.vad_threshold": 0.45,
@@ -40,6 +44,8 @@ def test_load_settings_populates_translation_engine(qapp, mock_i18n):
     page.load_settings()
 
     assert page.translation_combo.currentData() == "none"
+    assert page.floating_window_check.isChecked() is True
+    assert page.hide_main_window_check.isChecked() is False
     assert page.save_transcript_check.isChecked() is True
     assert page.create_calendar_event_check.isChecked() is False
     assert page.vad_threshold_spin.value() == 0.45
@@ -54,6 +60,8 @@ def test_save_settings_persists_translation_engine(qapp, mock_i18n):
     index = page.translation_combo.findData("google")
     assert index >= 0
     page.translation_combo.setCurrentIndex(index)
+    page.floating_window_check.setChecked(True)
+    page.hide_main_window_check.setChecked(True)
     page.save_transcript_check.setChecked(False)
     page.create_calendar_event_check.setChecked(True)
     page.vad_threshold_spin.setValue(0.6)
@@ -63,6 +71,8 @@ def test_save_settings_persists_translation_engine(qapp, mock_i18n):
     page.save_settings()
 
     assert settings_manager.get_setting("realtime.translation_engine") == "google"
+    assert settings_manager.get_setting("realtime.floating_window_enabled") is True
+    assert settings_manager.get_setting("realtime.hide_main_window_when_floating") is True
     assert settings_manager.get_setting("realtime.save_transcript") is False
     assert settings_manager.get_setting("realtime.create_calendar_event") is True
     assert settings_manager.get_setting("realtime.vad_threshold") == 0.6
@@ -82,6 +92,16 @@ def test_loopback_status_updates_from_checker(qapp, mock_i18n):
     assert page.loopback_status_text.text() == "settings.realtime.loopback_installed"
     assert page.loopback_status_text.property("state") == "available"
     assert page.loopback_info_label.text() == "settings.realtime.loopback_detected_devices"
+
+
+def test_floating_toggle_disables_hide_main_option(qapp, mock_i18n):
+    settings_manager = _FakeSettingsManager()
+    page = RealtimeSettingsPage(settings_manager, mock_i18n)
+
+    page.floating_window_check.setChecked(False)
+
+    assert page.hide_main_window_check.isEnabled() is False
+    assert page.hide_main_window_check.isChecked() is False
 
 
 def test_loopback_guide_opens_dialog_and_refreshes_status(qapp, mock_i18n):

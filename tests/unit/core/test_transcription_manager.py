@@ -272,6 +272,78 @@ class TestTranscriptionManager:
         assert mock_export.call_count == 2
         assert manager.db.tasks[task_id]["status"] == TASK_STATUS_COMPLETED
 
+    @pytest.mark.asyncio
+    async def test_process_task_preserves_event_id_for_translation_save(
+        self, manager, temp_audio_file, temp_dir
+    ):
+        """Event-bound tasks should retain event_id through translation save flow."""
+        manager.translation_engine = Mock()
+        manager.translation_engine.translate = AsyncMock(return_value="translated text")
+
+        task_id = manager.add_task(
+            str(temp_audio_file),
+            {"event_id": "evt-1", "enable_translation": True},
+        )
+        internal_path = temp_dir / f"{task_id}.json"
+
+        with (
+            patch.object(manager, "_get_internal_format_path", return_value=str(internal_path)),
+            patch.object(manager, "export_result", return_value=str(temp_dir / "out.txt")),
+            patch.object(manager, "_send_notification"),
+            patch(
+                "core.transcription.manager.EventAttachment.get_by_event_and_type",
+                return_value=None,
+            ),
+            patch("core.transcription.manager.EventAttachment.upsert_for_event_type") as mock_upsert,
+        ):
+            await manager._process_task_async(task_id, cancel_event=asyncio.Event())
+
+        manager.translation_engine.translate.assert_awaited_once()
+        assert mock_upsert.call_count == 1
+        assert mock_upsert.call_args.kwargs["event_id"] == "evt-1"
+        assert mock_upsert.call_args.kwargs["attachment_type"] == "translation"
+
+    @pytest.mark.asyncio
+    async def test_replace_realtime_retranslates_when_old_translation_exists(
+        self, manager, temp_audio_file, temp_dir
+    ):
+        """Secondary retranscription should regenerate translation if old translation exists."""
+        manager.translation_engine = Mock()
+        manager.translation_engine.translate = AsyncMock(return_value="retranslated text")
+
+        task_id = manager.add_task(
+            str(temp_audio_file),
+            {"event_id": "evt-2", "replace_realtime": True},
+        )
+        internal_path = temp_dir / f"{task_id}.json"
+
+        transcript_path = temp_dir / "existing_transcript.txt"
+        translation_path = temp_dir / "existing_translation.txt"
+
+        def _get_attachment(_db, _event_id, attachment_type):
+            if attachment_type == "transcript":
+                return Mock(file_path=str(transcript_path))
+            if attachment_type == "translation":
+                return Mock(file_path=str(translation_path))
+            return None
+
+        with (
+            patch.object(manager, "_get_internal_format_path", return_value=str(internal_path)),
+            patch.object(manager, "export_result", return_value=str(temp_dir / "out.txt")),
+            patch.object(manager, "_send_notification"),
+            patch(
+                "core.transcription.manager.EventAttachment.get_by_event_and_type",
+                side_effect=_get_attachment,
+            ),
+            patch("core.transcription.manager.EventAttachment.upsert_for_event_type") as mock_upsert,
+        ):
+            await manager._process_task_async(task_id, cancel_event=asyncio.Event())
+
+        manager.translation_engine.translate.assert_awaited_once()
+        upsert_types = [call.kwargs.get("attachment_type") for call in mock_upsert.call_args_list]
+        assert "transcript" in upsert_types
+        assert "translation" in upsert_types
+
     def test_add_task_file_not_found(self, manager):
         """Test adding a task with non-existent file."""
         with pytest.raises(FileNotFoundError):

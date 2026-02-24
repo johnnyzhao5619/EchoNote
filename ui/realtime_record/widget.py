@@ -36,6 +36,7 @@ from core.qt_imports import (
     QObject,
     QPlainTextEdit,
     QPushButton,
+    QMessageBox,
     QSlider,
     QTabWidget,
     Qt,
@@ -158,6 +159,9 @@ class RealtimeRecordWidget(BaseWidget):
     """Main widget for real-time recording."""
 
     LANGUAGE_OPTIONS = LANGUAGE_OPTION_KEYS
+    SOURCE_LANGUAGE_OPTIONS = ((TRANSLATION_LANGUAGE_AUTO, "settings.realtime.auto_detect"),) + tuple(
+        LANGUAGE_OPTION_KEYS
+    )
 
     def __init__(
         self,
@@ -213,6 +217,12 @@ class RealtimeRecordWidget(BaseWidget):
         self._min_audio_duration = 3.0
         self._save_transcript_enabled = True
         self._create_calendar_event_enabled = True
+        self._translation_source_lang = TRANSLATION_LANGUAGE_AUTO
+        self._translation_target_lang = DEFAULT_TRANSLATION_TARGET_LANGUAGE
+        self._floating_window_enabled = False
+        self._hide_main_window_when_floating = False
+        self._floating_overlay = None
+        self._main_window_hidden_by_overlay = False
         self._refresh_recording_preferences()
 
         # Notification Manager
@@ -277,6 +287,7 @@ class RealtimeRecordWidget(BaseWidget):
         self.setup_ui()
         self._apply_recording_preferences_to_controls()
         self._refresh_translation_availability()
+        self._sync_floating_overlay_visibility()
 
         # Connect language change signal
         self.i18n.language_changed.connect(self._update_ui_text)
@@ -293,6 +304,12 @@ class RealtimeRecordWidget(BaseWidget):
         if self.settings_manager and hasattr(self.settings_manager, "get_realtime_preferences"):
             try:
                 preferences = self.settings_manager.get_realtime_preferences()
+                if hasattr(self.settings_manager, "get_realtime_translation_preferences"):
+                    translation_preferences = (
+                        self.settings_manager.get_realtime_translation_preferences()
+                    )
+                else:
+                    translation_preferences = preferences
                 self._recording_format = preferences.get("recording_format", RECORDING_FORMAT_WAV)
                 self._auto_save_enabled = bool(preferences.get("auto_save", True))
                 default_input_source = preferences.get("default_input_source", "default")
@@ -340,11 +357,33 @@ class RealtimeRecordWidget(BaseWidget):
                 self._create_calendar_event_enabled = bool(
                     preferences.get("create_calendar_event", True)
                 )
+                self._translation_source_lang = (
+                    translation_preferences.get("translation_source_lang", TRANSLATION_LANGUAGE_AUTO)
+                    or TRANSLATION_LANGUAGE_AUTO
+                )
+                self._translation_target_lang = (
+                    translation_preferences.get(
+                        "translation_target_lang", DEFAULT_TRANSLATION_TARGET_LANGUAGE
+                    )
+                    or DEFAULT_TRANSLATION_TARGET_LANGUAGE
+                )
+                self._floating_window_enabled = bool(
+                    translation_preferences.get("floating_window_enabled", False)
+                )
+                self._hide_main_window_when_floating = bool(
+                    translation_preferences.get("hide_main_window_when_floating", False)
+                )
 
                 # 检查翻译引擎配置是否变更
-                new_translation_engine = preferences.get("translation_engine", TRANSLATION_ENGINE_NONE)
-                new_source = preferences.get("translation_source_lang", TRANSLATION_LANGUAGE_AUTO)
-                new_target = preferences.get("translation_target_lang", DEFAULT_TRANSLATION_TARGET_LANGUAGE)
+                new_translation_engine = translation_preferences.get(
+                    "translation_engine", TRANSLATION_ENGINE_NONE
+                )
+                new_source = translation_preferences.get(
+                    "translation_source_lang", TRANSLATION_LANGUAGE_AUTO
+                )
+                new_target = translation_preferences.get(
+                    "translation_target_lang", DEFAULT_TRANSLATION_TARGET_LANGUAGE
+                )
 
                 # 如果配置变更，尝试通知引擎代理进行重载
                 if (
@@ -360,9 +399,10 @@ class RealtimeRecordWidget(BaseWidget):
                         self.recorder.translation_engine.reload()
                         self._update_placeholders()
 
-                    self._last_translation_engine = new_translation_engine
-                    self._last_translation_source = new_source
-                    self._last_translation_target = new_target
+                self._last_translation_engine = new_translation_engine
+                self._last_translation_source = new_source
+                self._last_translation_target = new_target
+                self._sync_floating_overlay_visibility()
 
                 return
             except Exception as exc:  # noqa: BLE001
@@ -378,6 +418,10 @@ class RealtimeRecordWidget(BaseWidget):
         self._min_audio_duration = 3.0
         self._save_transcript_enabled = True
         self._create_calendar_event_enabled = True
+        self._translation_source_lang = TRANSLATION_LANGUAGE_AUTO
+        self._translation_target_lang = DEFAULT_TRANSLATION_TARGET_LANGUAGE
+        self._floating_window_enabled = False
+        self._hide_main_window_when_floating = False
 
     @Slot(str, object)
     def _on_settings_changed(self, key: str, _value: object) -> None:
@@ -385,9 +429,20 @@ class RealtimeRecordWidget(BaseWidget):
         if key.startswith("realtime."):
             self._refresh_recording_preferences()
             self._apply_recording_preferences_to_controls()
+            self._sync_floating_overlay_visibility()
 
     def _apply_recording_preferences_to_controls(self) -> None:
         """Apply preferences to UI controls."""
+        if hasattr(self, "source_lang_combo"):
+            source_index = self.source_lang_combo.findData(self._translation_source_lang)
+            if source_index >= 0:
+                self.source_lang_combo.setCurrentIndex(source_index)
+
+        if hasattr(self, "target_lang_combo"):
+            target_index = self.target_lang_combo.findData(self._translation_target_lang)
+            if target_index >= 0:
+                self.target_lang_combo.setCurrentIndex(target_index)
+
         gain_slider = getattr(self, "gain_slider", None)
         if gain_slider is not None:
             slider_value = int(round(self._default_gain * 100))
@@ -826,7 +881,7 @@ class RealtimeRecordWidget(BaseWidget):
         self.source_lang_combo = QComboBox()
         self.source_lang_combo.setProperty("role", ROLE_REALTIME_FIELD_CONTROL)
         self.source_lang_combo.setMinimumWidth(REALTIME_LANGUAGE_COMBO_MIN_WIDTH)
-        for code, label_key in self.LANGUAGE_OPTIONS:
+        for code, label_key in self.SOURCE_LANGUAGE_OPTIONS:
             self.source_lang_combo.addItem(self.i18n.t(label_key), code)
         source_layout.addWidget(self.source_lang_combo)
         row2.addWidget(source_container)
@@ -870,19 +925,6 @@ class RealtimeRecordWidget(BaseWidget):
         row3.addWidget(target_container)
         row3.addStretch()
         form.addRow(row3)
-
-        # Row 4: Secondary Transcription (High Quality)
-        row4 = create_hbox(spacing=PAGE_COMPACT_SPACING)
-        self.secondary_transcription_checkbox = QCheckBox(
-            self.i18n.t(
-                "realtime_record.secondary_transcription",
-                default="Secondary Transcription",
-            )
-        )
-        self.secondary_transcription_checkbox.setObjectName("form_checkbox")
-        row4.addWidget(self.secondary_transcription_checkbox)
-        row4.addStretch()
-        form.addRow(row4)
 
         return container
 
@@ -1394,6 +1436,8 @@ class RealtimeRecordWidget(BaseWidget):
         self._update_status_texts()
         self._update_placeholders()
         self._update_audio_availability()
+        if self._floating_overlay is not None:
+            self._floating_overlay.update_translations()
 
     def _update_button_texts(self):
         if hasattr(self, "record_button"):
@@ -1427,12 +1471,17 @@ class RealtimeRecordWidget(BaseWidget):
                 )
 
     def _update_language_combos(self):
-        for combo_attr in ["source_lang_combo", "target_lang_combo"]:
-            if hasattr(self, combo_attr):
-                combo = getattr(self, combo_attr)
-                for index, (_, label_key) in enumerate(self.LANGUAGE_OPTIONS):
-                    if index < combo.count():
-                        combo.setItemText(index, self.i18n.t(label_key))
+        if hasattr(self, "source_lang_combo"):
+            combo = self.source_lang_combo
+            for index, (_, label_key) in enumerate(self.SOURCE_LANGUAGE_OPTIONS):
+                if index < combo.count():
+                    combo.setItemText(index, self.i18n.t(label_key))
+
+        if hasattr(self, "target_lang_combo"):
+            combo = self.target_lang_combo
+            for index, (_, label_key) in enumerate(self.LANGUAGE_OPTIONS):
+                if index < combo.count():
+                    combo.setItemText(index, self.i18n.t(label_key))
 
     def _update_panel_titles(self):
         title_refs = (
@@ -1485,7 +1534,13 @@ class RealtimeRecordWidget(BaseWidget):
         if hasattr(self, "translation_text"):
             if not self.recorder.translation_engine:
                 # 获取当前选中的引擎
-                preferences = self.settings_manager.get_realtime_preferences()
+                if (
+                    self.settings_manager
+                    and hasattr(self.settings_manager, "get_realtime_translation_preferences")
+                ):
+                    preferences = self.settings_manager.get_realtime_translation_preferences()
+                else:
+                    preferences = self.settings_manager.get_realtime_preferences()
                 engine_type = preferences.get("translation_engine", TRANSLATION_ENGINE_NONE)
 
                 if engine_type == TRANSLATION_ENGINE_NONE:
@@ -1568,6 +1623,10 @@ class RealtimeRecordWidget(BaseWidget):
             scrollbar = self.transcription_text.verticalScrollBar()
             if scrollbar:
                 scrollbar.setValue(scrollbar.maximum())
+            if self._floating_overlay is not None and self._floating_window_enabled:
+                self._floating_overlay.update_preview_text(
+                    transcript=self.transcription_text.toPlainText()
+                )
         except Exception as e:
             logger.error(f"Error updating transcription display: {e}")
 
@@ -1588,6 +1647,10 @@ class RealtimeRecordWidget(BaseWidget):
             scrollbar = self.translation_text.verticalScrollBar()
             if scrollbar:
                 scrollbar.setValue(scrollbar.maximum())
+            if self._floating_overlay is not None and self._floating_window_enabled:
+                self._floating_overlay.update_preview_text(
+                    translation=self.translation_text.toPlainText()
+                )
         except Exception as e:
             logger.error(f"Error updating translation display: {e}")
 
@@ -1676,6 +1739,11 @@ class RealtimeRecordWidget(BaseWidget):
     @Slot(bool, float)
     def _update_status_display(self, is_recording: bool, duration: float):
         self.duration_value_label.setText(self._format_duration_hhmmss(duration))
+        if self._floating_overlay is not None and self._floating_window_enabled:
+            self._floating_overlay.update_runtime_state(
+                is_recording=is_recording,
+                duration_text=self.duration_value_label.text(),
+            )
 
     @Slot()
     def _on_recording_started(self):
@@ -1696,6 +1764,7 @@ class RealtimeRecordWidget(BaseWidget):
             self.status_indicator.style().polish(self.status_indicator)
         if hasattr(self, "status_text_label"):
             self.status_text_label.setText(self.i18n.t("realtime_record.status_recording"))
+        self._sync_floating_overlay_visibility()
 
     @Slot()
     def _on_recording_stopped(self):
@@ -1714,6 +1783,7 @@ class RealtimeRecordWidget(BaseWidget):
             self.status_indicator.style().polish(self.status_indicator)
         if hasattr(self, "status_text_label"):
             self.status_text_label.setText(self.i18n.t("realtime_record.status_ready"))
+        self._sync_floating_overlay_visibility()
 
     @Slot()
     def _update_status(self):
@@ -1805,6 +1875,103 @@ class RealtimeRecordWidget(BaseWidget):
         """Public hook used by MainWindow after engine reloads."""
         self._refresh_translation_availability()
 
+    def _ensure_floating_overlay(self):
+        """Lazily create floating overlay for compact runtime status."""
+        if self._floating_overlay is not None:
+            return self._floating_overlay
+
+        try:
+            from ui.realtime_record.floating_overlay import RealtimeFloatingOverlay
+
+            overlay = RealtimeFloatingOverlay(self.i18n)
+            overlay.show_main_window_requested.connect(self._restore_main_window_from_overlay)
+            overlay.overlay_closed.connect(self._on_floating_overlay_closed)
+            self._floating_overlay = overlay
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to initialize floating overlay: %s", exc, exc_info=True)
+            self._floating_overlay = None
+
+        return self._floating_overlay
+
+    def _on_floating_overlay_closed(self) -> None:
+        """Restore main window if overlay was the only visible window."""
+        if self._main_window_hidden_by_overlay:
+            self._restore_main_window_from_overlay()
+
+    def _sync_floating_overlay_visibility(self) -> None:
+        """Show/hide floating overlay based on settings and update displayed state."""
+        if not self._floating_window_enabled:
+            if self._floating_overlay is not None:
+                self._floating_overlay.hide()
+            self._restore_main_window_from_overlay()
+            return
+
+        overlay = self._ensure_floating_overlay()
+        if overlay is None:
+            return
+
+        duration_text = (
+            self.duration_value_label.text()
+            if hasattr(self, "duration_value_label")
+            else DEFAULT_DURATION_DISPLAY
+        )
+        overlay.update_runtime_state(is_recording=self.recorder.is_recording, duration_text=duration_text)
+        transcript = self.transcription_text.toPlainText() if hasattr(self, "transcription_text") else ""
+        translation = self.translation_text.toPlainText() if hasattr(self, "translation_text") else ""
+        overlay.update_preview_text(transcript=transcript, translation=translation)
+        if not overlay.isVisible():
+            overlay.show()
+
+        if self._hide_main_window_when_floating and self.recorder.is_recording:
+            self._hide_main_window_for_overlay()
+
+    def _hide_main_window_for_overlay(self) -> None:
+        """Hide main window while floating overlay mode is active."""
+        if self._main_window_hidden_by_overlay:
+            return
+
+        main_window = self.window()
+        overlay = self._floating_overlay
+        if main_window is None or overlay is None:
+            return
+        if main_window is self or main_window is overlay:
+            return
+        if not hasattr(main_window, "switch_page"):
+            return
+
+        try:
+            main_window.hide()
+            self._main_window_hidden_by_overlay = True
+            overlay.show()
+            overlay.raise_()
+            overlay.activateWindow()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to hide main window for floating overlay: %s", exc, exc_info=True)
+
+    def _restore_main_window_from_overlay(self) -> None:
+        """Restore main window hidden by floating overlay mode."""
+        if not self._main_window_hidden_by_overlay:
+            return
+
+        main_window = self.window()
+        if main_window is None or main_window is self:
+            self._main_window_hidden_by_overlay = False
+            return
+
+        try:
+            if main_window.isMinimized():
+                main_window.showNormal()
+            else:
+                main_window.show()
+            main_window.raise_()
+            main_window.activateWindow()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Failed to restore main window from floating overlay: %s", exc, exc_info=True
+            )
+        finally:
+            self._main_window_hidden_by_overlay = False
+
     def _add_marker(self):
         if not self.recorder.is_recording:
             warning = self.i18n.t("realtime_record.marker_unavailable")
@@ -1883,15 +2050,19 @@ class RealtimeRecordWidget(BaseWidget):
         self._refresh_recording_preferences()
 
         device_index = self.input_combo.currentData()
-        source_lang = self.source_lang_combo.currentData()
+        source_lang = self.source_lang_combo.currentData() or TRANSLATION_LANGUAGE_AUTO
         enable_translation = self.enable_translation_checkbox.isChecked()
-        target_lang = self.target_lang_combo.currentData()
+        target_lang = (
+            self.target_lang_combo.currentData() or self._translation_target_lang
+        )
 
         # Auto-switch engine if translation is requested but currently disabled
         if enable_translation and not self.recorder.translation_engine:
             if self.settings_manager:
                 logger.info("Translation enabled but engine is 'none'; auto-switching to 'opus-mt'")
-                self.settings_manager.update_setting("realtime.translation_engine", TRANSLATION_ENGINE_OPUS_MT)
+                self.settings_manager.set_setting(
+                    "realtime.translation_engine", TRANSLATION_ENGINE_OPUS_MT
+                )
                 # Reload engine in recorder
                 try:
                     # MainWindow handles major engine reloads, but we can try basic injection
@@ -1952,6 +2123,8 @@ class RealtimeRecordWidget(BaseWidget):
             self.audio_visualizer.clear()
         self._reset_markers_ui()
         self._update_status_message("", "success")
+        if self._floating_overlay is not None:
+            self._floating_overlay.clear_preview()
 
     def _submit_worker_task(self, coro) -> None:
         """Submit coroutine to worker loop and track lifecycle."""
@@ -2073,26 +2246,32 @@ class RealtimeRecordWidget(BaseWidget):
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Failed to send success notification: %s", exc, exc_info=True)
 
-        if (
-            save_path
-            and self.transcription_manager
-            and getattr(self, "secondary_transcription_checkbox", None)
-            and self.secondary_transcription_checkbox.isChecked()
-        ):
-            try:
-                # Add a high-quality transcription task with replace_realtime flag
-                options = {"replace_realtime": True, "event_id": event_id}
+        recording_path = str(result.get("recording_path") or "").strip()
+        if recording_path and self.transcription_manager:
+            self._ask_and_queue_secondary_transcription(recording_path, event_id)
 
-                # Fetch language selection
-                if hasattr(self, "source_lang_combo"):
-                    lang = self.source_lang_combo.currentData()
-                    if lang and lang != TRANSLATION_LANGUAGE_AUTO:
-                        options["language"] = lang
+    def _ask_and_queue_secondary_transcription(self, recording_path: str, event_id: str) -> None:
+        """Prompt after recording and optionally queue high-quality retranscription."""
+        reply = QMessageBox.question(
+            self,
+            self.i18n.t("realtime_record.secondary_transcription_prompt_title"),
+            self.i18n.t("realtime_record.secondary_transcription_prompt_message"),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
 
-                self.transcription_manager.add_task(file_path=save_path, options=options)
-                logger.info(f"Queued secondary transcription for {save_path}")
-            except Exception as e:
-                logger.error(f"Failed to queue secondary transcription: {e}")
+        try:
+            options = {"replace_realtime": True, "event_id": event_id}
+            if hasattr(self, "source_lang_combo"):
+                lang = self.source_lang_combo.currentData()
+                if lang and lang != TRANSLATION_LANGUAGE_AUTO:
+                    options["language"] = lang
+            self.transcription_manager.add_task(file_path=recording_path, options=options)
+            logger.info("Queued secondary transcription for %s", recording_path)
+        except Exception as exc:
+            logger.error("Failed to queue secondary transcription: %s", exc, exc_info=True)
 
     def _refresh_event_views(self) -> None:
         """Refresh timeline and calendar views after recording event creation."""
@@ -2210,6 +2389,16 @@ class RealtimeRecordWidget(BaseWidget):
                 self._worker.stop()
                 self._worker = None
                 self._async_loop = None
+
+            if self._floating_overlay is not None:
+                try:
+                    self._floating_overlay.hide()
+                    self._floating_overlay.deleteLater()
+                except Exception:
+                    pass
+                finally:
+                    self._floating_overlay = None
+            self._restore_main_window_from_overlay()
 
             self._cleanup_done = True
         finally:

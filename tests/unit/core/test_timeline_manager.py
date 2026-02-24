@@ -152,6 +152,46 @@ class TestTimelineManagerGetEvents:
 
         assert [item["event"].id for item in result["future_events"]] == ["event_far", "event_near"]
 
+    def test_get_timeline_events_upcoming_filter_uses_time_semantics(
+        self, timeline_manager, mock_calendar_manager
+    ):
+        """'Upcoming' filter should include only events that have not started yet."""
+        center_time = datetime.now().replace(microsecond=0)
+
+        past_task = Mock()
+        past_task.id = "task_past"
+        past_task.title = "Past Task"
+        past_task_start = center_time - timedelta(hours=2)
+        past_task_end = center_time - timedelta(hours=1)
+        past_task.start_time = past_task_start.isoformat()
+        past_task.end_time = past_task_end.isoformat()
+        past_task.event_type = "Task"
+        past_task.source = "local"
+        past_task.attendees = []
+
+        future_event = Mock()
+        future_event.id = "event_future"
+        future_event.title = "Future Event"
+        future_start = center_time + timedelta(hours=1)
+        future_end = center_time + timedelta(hours=2)
+        future_event.start_time = future_start.isoformat()
+        future_event.end_time = future_end.isoformat()
+        future_event.event_type = "Event"
+        future_event.source = "local"
+        future_event.attendees = []
+
+        mock_calendar_manager.get_events.return_value = [past_task, future_event]
+
+        result = timeline_manager.get_timeline_events(
+            center_time,
+            past_days=2,
+            future_days=2,
+            filters={"event_type": "__upcoming__"},
+        )
+
+        assert result["past_events"] == []
+        assert [item["event"].id for item in result["future_events"]] == ["event_future"]
+
 
 class TestTimelineManagerSearch:
     """Test search functionality."""
