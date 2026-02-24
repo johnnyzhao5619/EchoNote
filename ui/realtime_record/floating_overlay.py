@@ -21,18 +21,29 @@ from typing import Optional
 
 from core.qt_imports import (
     QDialog,
+    QEvent,
     QHBoxLayout,
     QLabel,
     QMouseEvent,
     QPoint,
+    QSizePolicy,
     Qt,
     QVBoxLayout,
     Signal,
 )
 from ui.base_widgets import connect_button_with_callback, create_button, create_hbox
 from ui.constants import (
-    ROLE_DIALOG_SECONDARY_ACTION,
+    REALTIME_FLOATING_CONTENT_MARGINS,
+    REALTIME_FLOATING_HEADER_SPACING,
+    REALTIME_FLOATING_LAYOUT_SPACING,
+    REALTIME_FLOATING_MIN_WIDTH,
+    REALTIME_FLOATING_PREVIEW_MIN_HEIGHT,
+    ROLE_REALTIME_FLOATING_ACTION,
+    ROLE_REALTIME_FLOATING_CLOSE,
+    ROLE_REALTIME_FLOATING_META,
     ROLE_REALTIME_FLOATING_OVERLAY,
+    ROLE_REALTIME_FLOATING_PREVIEW,
+    ROLE_REALTIME_FLOATING_SECTION_TITLE,
     ROLE_REALTIME_FLOATING_STATUS,
     ROLE_REALTIME_FLOATING_TITLE,
 )
@@ -40,6 +51,8 @@ from utils.i18n import I18nQtManager
 
 DEFAULT_DURATION = "00:00:00"
 MAX_PREVIEW_LENGTH = 260
+ACTIVE_WINDOW_OPACITY = 1.0
+IDLE_WINDOW_OPACITY = 0.82
 
 
 class RealtimeFloatingOverlay(QDialog):
@@ -47,6 +60,7 @@ class RealtimeFloatingOverlay(QDialog):
 
     show_main_window_requested = Signal()
     overlay_closed = Signal()
+    always_on_top_changed = Signal(bool)
 
     def __init__(self, i18n: I18nQtManager, parent=None):
         super().__init__(parent)
@@ -56,26 +70,25 @@ class RealtimeFloatingOverlay(QDialog):
         self._duration_text = DEFAULT_DURATION
         self._transcript_preview = ""
         self._translation_preview = ""
+        self._always_on_top = True
+        self._hovered = False
 
-        self.setWindowFlags(
-            Qt.WindowType.Tool
-            | Qt.WindowType.FramelessWindowHint
-            | Qt.WindowType.WindowStaysOnTopHint
-        )
+        self._apply_window_flags()
         self.setWindowModality(Qt.WindowModality.NonModal)
-        self.setMinimumWidth(360)
+        self.setMinimumWidth(REALTIME_FLOATING_MIN_WIDTH)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
         self.setProperty("role", ROLE_REALTIME_FLOATING_OVERLAY)
+        self.setWindowOpacity(IDLE_WINDOW_OPACITY)
 
         self._setup_ui()
         self.update_translations()
 
     def _setup_ui(self) -> None:
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 10, 12, 10)
-        layout.setSpacing(8)
+        layout.setContentsMargins(*REALTIME_FLOATING_CONTENT_MARGINS)
+        layout.setSpacing(REALTIME_FLOATING_LAYOUT_SPACING)
 
-        header = create_hbox(spacing=8)
+        header = create_hbox(spacing=REALTIME_FLOATING_HEADER_SPACING)
         self.title_label = QLabel()
         self.title_label.setProperty("role", ROLE_REALTIME_FLOATING_TITLE)
         header.addWidget(self.title_label)
@@ -87,35 +100,79 @@ class RealtimeFloatingOverlay(QDialog):
         self.status_label.setProperty("state", "ready")
         header.addWidget(self.status_label)
 
-        self.close_button = create_button("x")
-        self.close_button.setProperty("role", ROLE_DIALOG_SECONDARY_ACTION)
-        self.close_button.setFixedWidth(28)
+        self.close_button = create_button("×")
+        self.close_button.setProperty("role", ROLE_REALTIME_FLOATING_CLOSE)
+        self.close_button.setFixedSize(34, 28)
         connect_button_with_callback(self.close_button, self._on_close_clicked)
         header.addWidget(self.close_button)
 
         layout.addLayout(header)
 
         self.duration_label = QLabel()
+        self.duration_label.setProperty("role", ROLE_REALTIME_FLOATING_META)
+        self.duration_label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         layout.addWidget(self.duration_label)
 
         self.transcript_title_label = QLabel()
+        self.transcript_title_label.setProperty("role", ROLE_REALTIME_FLOATING_SECTION_TITLE)
+        self.transcript_title_label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         layout.addWidget(self.transcript_title_label)
+
         self.transcript_preview_label = QLabel()
+        self.transcript_preview_label.setProperty("role", ROLE_REALTIME_FLOATING_PREVIEW)
         self.transcript_preview_label.setWordWrap(True)
-        layout.addWidget(self.transcript_preview_label)
+        self.transcript_preview_label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        self.transcript_preview_label.setMinimumHeight(REALTIME_FLOATING_PREVIEW_MIN_HEIGHT)
+        self.transcript_preview_label.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding
+        )
+        layout.addWidget(self.transcript_preview_label, stretch=1)
 
         self.translation_title_label = QLabel()
+        self.translation_title_label.setProperty("role", ROLE_REALTIME_FLOATING_SECTION_TITLE)
+        self.translation_title_label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         layout.addWidget(self.translation_title_label)
+
         self.translation_preview_label = QLabel()
+        self.translation_preview_label.setProperty("role", ROLE_REALTIME_FLOATING_PREVIEW)
         self.translation_preview_label.setWordWrap(True)
-        layout.addWidget(self.translation_preview_label)
+        self.translation_preview_label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        self.translation_preview_label.setMinimumHeight(REALTIME_FLOATING_PREVIEW_MIN_HEIGHT)
+        self.translation_preview_label.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding
+        )
+        layout.addWidget(self.translation_preview_label, stretch=1)
 
         action_layout = QHBoxLayout()
-        action_layout.addStretch()
+        self.pin_top_button = create_button("")
+        self.pin_top_button.setProperty("role", ROLE_REALTIME_FLOATING_ACTION)
+        connect_button_with_callback(self.pin_top_button, self._on_pin_top_clicked)
+        action_layout.addWidget(self.pin_top_button)
+
+        action_layout.addStretch(1)
         self.show_main_button = create_button("")
+        self.show_main_button.setProperty("role", ROLE_REALTIME_FLOATING_ACTION)
         connect_button_with_callback(self.show_main_button, self.show_main_window_requested.emit)
         action_layout.addWidget(self.show_main_button)
         layout.addLayout(action_layout)
+
+    def _apply_window_flags(self) -> None:
+        flags = Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint
+        if self._always_on_top:
+            flags |= Qt.WindowType.WindowStaysOnTopHint
+        self.setWindowFlags(flags)
+
+    def set_always_on_top(self, always_on_top: bool) -> None:
+        new_value = bool(always_on_top)
+        if self._always_on_top == new_value:
+            return
+        was_visible = self.isVisible()
+        self._always_on_top = new_value
+        self._apply_window_flags()
+        if was_visible:
+            self.show()
+            self.raise_()
+        self._update_pin_top_button_state()
 
     def update_runtime_state(self, *, is_recording: bool, duration_text: Optional[str] = None) -> None:
         """Update recording status badge and duration text."""
@@ -168,8 +225,29 @@ class RealtimeFloatingOverlay(QDialog):
             self.i18n.t("realtime_record.floating_translation_preview")
         )
         self.show_main_button.setText(self.i18n.t("realtime_record.floating_show_main_window"))
+        self._update_pin_top_button_state()
         self.update_runtime_state(is_recording=self._is_recording, duration_text=self._duration_text)
         self.update_preview_text()
+
+    def _update_pin_top_button_state(self) -> None:
+        self.pin_top_button.setText(
+            self.i18n.t(
+                "realtime_record.floating_pin_top_on"
+                if self._always_on_top
+                else "realtime_record.floating_pin_top_off"
+            )
+        )
+        self.pin_top_button.setProperty("state", "active" if self._always_on_top else "inactive")
+        style = self.pin_top_button.style()
+        if style is not None:
+            style.unpolish(self.pin_top_button)
+            style.polish(self.pin_top_button)
+        self.pin_top_button.update()
+
+    def _on_pin_top_clicked(self) -> None:
+        new_value = not self._always_on_top
+        self.set_always_on_top(new_value)
+        self.always_on_top_changed.emit(new_value)
 
     @staticmethod
     def _trim_preview_text(text: str) -> str:
@@ -181,6 +259,17 @@ class RealtimeFloatingOverlay(QDialog):
     def _on_close_clicked(self) -> None:
         self.hide()
         self.overlay_closed.emit()
+
+    def event(self, event: QEvent) -> bool:
+        if event.type() == QEvent.Type.Enter:
+            if not self._hovered:
+                self._hovered = True
+                self.setWindowOpacity(ACTIVE_WINDOW_OPACITY)
+        elif event.type() == QEvent.Type.Leave:
+            if self._hovered:
+                self._hovered = False
+                self.setWindowOpacity(IDLE_WINDOW_OPACITY)
+        return super().event(event)
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
         if event.button() == Qt.MouseButton.LeftButton:

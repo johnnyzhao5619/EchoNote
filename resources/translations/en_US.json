@@ -220,7 +220,12 @@
     "floating_no_transcript": "No transcript yet",
     "floating_no_translation": "No translation yet",
     "floating_show_main_window": "Show Main Window",
-    "floating_close": "Close Floating Window"
+    "floating_close": "Close Floating Window",
+    "floating_pin_top_on": "Pin Top: On",
+    "floating_pin_top_off": "Pin Top: Off",
+    "floating_mode_enabled": "Floating: On",
+    "floating_mode_disabled": "Floating: Off",
+    "floating_mode_toggle_hint": "Show or hide the realtime floating window when recording starts"
   },
   "calendar_hub": {
     "title": "Calendar Hub",
@@ -679,6 +684,7 @@
       "target_language": "Target Language",
       "floating_window_enabled": "Enable floating window mode",
       "hide_main_window_when_floating": "Hide main window while floating mode is active",
+      "floating_window_always_on_top": "Always keep floating window on top",
       "auto_detect": "Auto Detect",
       "opus_mt_ready": "✓ Model {model} is ready",
       "opus_mt_not_downloaded": "⚠ Model {model} not downloaded — go to Model Management to download",

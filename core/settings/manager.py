@@ -139,6 +139,9 @@ class SettingsManager(QObject):
             "hide_main_window_when_floating": bool(
                 realtime_defaults.get("hide_main_window_when_floating", False)
             ),
+            "floating_window_always_on_top": bool(
+                realtime_defaults.get("floating_window_always_on_top", True)
+            ),
         }
 
         # Override with current settings
@@ -170,6 +173,9 @@ class SettingsManager(QObject):
             "floating_window_enabled": bool(preferences.get("floating_window_enabled", False)),
             "hide_main_window_when_floating": bool(
                 preferences.get("hide_main_window_when_floating", False)
+            ),
+            "floating_window_always_on_top": bool(
+                preferences.get("floating_window_always_on_top", True)
             ),
         }
 

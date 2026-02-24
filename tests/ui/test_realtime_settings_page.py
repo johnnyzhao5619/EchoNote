@@ -23,6 +23,7 @@ class _FakeSettingsManager:
             "realtime.translation_target_lang": "en",
             "realtime.floating_window_enabled": True,
             "realtime.hide_main_window_when_floating": False,
+            "realtime.floating_window_always_on_top": True,
             "realtime.save_transcript": True,
             "realtime.create_calendar_event": False,
             "realtime.vad_threshold": 0.45,
@@ -46,6 +47,7 @@ def test_load_settings_populates_translation_engine(qapp, mock_i18n):
     assert page.translation_combo.currentData() == "none"
     assert page.floating_window_check.isChecked() is True
     assert page.hide_main_window_check.isChecked() is False
+    assert page.floating_window_always_on_top_check.isChecked() is True
     assert page.save_transcript_check.isChecked() is True
     assert page.create_calendar_event_check.isChecked() is False
     assert page.vad_threshold_spin.value() == 0.45
@@ -62,6 +64,7 @@ def test_save_settings_persists_translation_engine(qapp, mock_i18n):
     page.translation_combo.setCurrentIndex(index)
     page.floating_window_check.setChecked(True)
     page.hide_main_window_check.setChecked(True)
+    page.floating_window_always_on_top_check.setChecked(False)
     page.save_transcript_check.setChecked(False)
     page.create_calendar_event_check.setChecked(True)
     page.vad_threshold_spin.setValue(0.6)
@@ -73,6 +76,7 @@ def test_save_settings_persists_translation_engine(qapp, mock_i18n):
     assert settings_manager.get_setting("realtime.translation_engine") == "google"
     assert settings_manager.get_setting("realtime.floating_window_enabled") is True
     assert settings_manager.get_setting("realtime.hide_main_window_when_floating") is True
+    assert settings_manager.get_setting("realtime.floating_window_always_on_top") is False
     assert settings_manager.get_setting("realtime.save_transcript") is False
     assert settings_manager.get_setting("realtime.create_calendar_event") is True
     assert settings_manager.get_setting("realtime.vad_threshold") == 0.6

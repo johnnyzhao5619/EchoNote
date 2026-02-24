@@ -2416,15 +2416,38 @@ QComboBox[role="realtime-field-control"] {
     padding: 3px 8px;
 }
 
+QPushButton[role="realtime-floating-toggle"] {
+    min-width: 84px;
+    min-height: 28px;
+    padding: 3px 8px;
+    border-radius: 9px;
+    border: 1px solid #4f6382;
+    background-color: #2e3a50;
+    color: #d2e1ff;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+QPushButton[role="realtime-floating-toggle"]:hover {
+    background-color: #364762;
+    border-color: #6780a5;
+}
+
+QPushButton[role="realtime-floating-toggle"][state="active"] {
+    color: #ffffff;
+    background-color: #3f78cb;
+    border-color: #3f78cb;
+}
+
 QWidget[role="realtime-floating-overlay"] {
-    background-color: #262f3c;
-    border: 1px solid #4b5d77;
-    border-radius: 12px;
+    background-color: #2b3037;
+    border: 1px solid #4f5865;
+    border-radius: 14px;
 }
 
 QLabel[role="realtime-floating-title"] {
     color: #eef4ff;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 600;
 }
 
@@ -2432,8 +2455,8 @@ QLabel[role="realtime-floating-status"] {
     color: #d2e5ff;
     background-color: #2f4361;
     border: 1px solid #4f6f9e;
-    border-radius: 10px;
-    padding: 2px 8px;
+    border-radius: 12px;
+    padding: 3px 10px;
     font-size: 12px;
     font-weight: 600;
 }
@@ -2442,6 +2465,71 @@ QLabel[role="realtime-floating-status"][state="recording"] {
     color: #f3fff7;
     background-color: #2f9e55;
     border-color: #2f9e55;
+}
+
+QLabel[role="realtime-floating-meta"] {
+    color: #d2d9e5;
+    font-size: 12px;
+    padding: 3px 6px;
+    background-color: #3a4049;
+    border-radius: 8px;
+}
+
+QLabel[role="realtime-floating-section-title"] {
+    color: #d0dff6;
+    font-size: 12px;
+    font-weight: 600;
+    margin-top: 2px;
+}
+
+QLabel[role="realtime-floating-preview"] {
+    color: #eef2f9;
+    background-color: #383f48;
+    border: 1px solid #5b6573;
+    border-radius: 8px;
+    padding: 6px 9px;
+    min-height: 38px;
+}
+
+QPushButton[role="realtime-floating-action"] {
+    min-height: 28px;
+    padding: 3px 10px;
+    border-radius: 9px;
+    border: 1px solid #60789a;
+    background-color: #314258;
+    color: #e0ecff;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+QPushButton[role="realtime-floating-action"]:hover {
+    background-color: #3a4e67;
+    border-color: #7592b7;
+}
+
+QPushButton[role="realtime-floating-action"][state="active"] {
+    background-color: #3f78cb;
+    color: #ffffff;
+    border-color: #3f78cb;
+}
+
+QPushButton[role="realtime-floating-close"] {
+    min-width: 34px;
+    min-height: 28px;
+    max-width: 34px;
+    max-height: 28px;
+    padding: 0;
+    border-radius: 9px;
+    border: 1px solid #667f9f;
+    background-color: #33465e;
+    color: #d8e9ff;
+    font-size: 16px;
+    font-weight: 700;
+}
+
+QPushButton[role="realtime-floating-close"]:hover {
+    background-color: #3d5471;
+    border-color: #7894ba;
 }
 
 QWidget[role="task-item"] QPushButton[role="task-action-start"] {

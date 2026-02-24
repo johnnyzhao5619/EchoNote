@@ -220,7 +220,12 @@
     "floating_no_transcript": "暂无转写内容",
     "floating_no_translation": "暂无转译内容",
     "floating_show_main_window": "显示主窗口",
-    "floating_close": "关闭浮动窗"
+    "floating_close": "关闭浮动窗",
+    "floating_pin_top_on": "置顶：开",
+    "floating_pin_top_off": "置顶：关",
+    "floating_mode_enabled": "浮动窗：开",
+    "floating_mode_disabled": "浮动窗：关",
+    "floating_mode_toggle_hint": "在录音开始后显示或隐藏实时浮动窗"
   },
   "calendar_hub": {
     "title": "日历中心",
@@ -679,6 +684,7 @@
       "target_language": "目标语言",
       "floating_window_enabled": "启用浮动窗模式",
       "hide_main_window_when_floating": "浮动窗运行时自动隐藏主窗口",
+      "floating_window_always_on_top": "浮动窗始终置顶",
       "auto_detect": "自动检测",
       "opus_mt_ready": "✓ 模型 {model} 已就绪",
       "opus_mt_not_downloaded": "⚠ 模型 {model} 未下载 — 请前往模型管理页面下载",

@@ -265,6 +265,12 @@ class RealtimeSettingsPage(BaseSettingsPage):
         self.hide_main_window_check.stateChanged.connect(self._emit_changed)
         self.content_layout.addWidget(self.hide_main_window_check)
 
+        self.floating_window_always_on_top_check = QCheckBox(
+            self.i18n.t("settings.realtime.floating_window_always_on_top")
+        )
+        self.floating_window_always_on_top_check.stateChanged.connect(self._emit_changed)
+        self.content_layout.addWidget(self.floating_window_always_on_top_check)
+
         # Opus-MT: language pair selection (visible only when Opus-MT is selected)
         self._opus_mt_section = create_vbox()
 
@@ -541,6 +547,18 @@ class RealtimeSettingsPage(BaseSettingsPage):
                     "realtime.hide_main_window_when_floating"
                 )
             self.hide_main_window_check.setChecked(bool(hide_main))
+            always_on_top = (
+                translation_preferences.get("floating_window_always_on_top")
+                if isinstance(translation_preferences, dict)
+                else None
+            )
+            if always_on_top is None:
+                always_on_top = self.settings_manager.get_setting(
+                    "realtime.floating_window_always_on_top"
+                )
+            if always_on_top is None:
+                always_on_top = True
+            self.floating_window_always_on_top_check.setChecked(bool(always_on_top))
             self._on_floating_window_toggled(self.floating_window_check.checkState().value)
 
             save_transcript = self.settings_manager.get_setting("realtime.save_transcript")
@@ -605,6 +623,10 @@ class RealtimeSettingsPage(BaseSettingsPage):
             self._set_setting_or_raise(
                 "realtime.hide_main_window_when_floating",
                 self.hide_main_window_check.isChecked(),
+            )
+            self._set_setting_or_raise(
+                "realtime.floating_window_always_on_top",
+                self.floating_window_always_on_top_check.isChecked(),
             )
 
             self._set_setting_or_raise(
@@ -679,6 +701,10 @@ class RealtimeSettingsPage(BaseSettingsPage):
         if hasattr(self, "hide_main_window_check"):
             self.hide_main_window_check.setText(
                 self.i18n.t("settings.realtime.hide_main_window_when_floating")
+            )
+        if hasattr(self, "floating_window_always_on_top_check"):
+            self.floating_window_always_on_top_check.setText(
+                self.i18n.t("settings.realtime.floating_window_always_on_top")
             )
         if hasattr(self, "loopback_status_label"):
             self.loopback_status_label.setText(self.i18n.t("settings.realtime.loopback_status"))
@@ -853,6 +879,7 @@ class RealtimeSettingsPage(BaseSettingsPage):
         """Enable hide-main option only when floating mode is enabled."""
         enabled = bool(state)
         self.hide_main_window_check.setEnabled(enabled)
+        self.floating_window_always_on_top_check.setEnabled(enabled)
         if not enabled:
             self.hide_main_window_check.setChecked(False)
 

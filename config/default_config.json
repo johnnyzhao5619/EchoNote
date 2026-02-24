@@ -1,5 +1,5 @@
 {
-  "version": "1.4.1",
+  "version": "1.4.2",
   "database": {
     "path": "~/.echonote/data.db",
     "encryption_enabled": true
@@ -35,6 +35,7 @@
     "create_calendar_event": true,
     "floating_window_enabled": false,
     "hide_main_window_when_floating": false,
+    "floating_window_always_on_top": true,
     "recording_save_path": "~/Documents/EchoNote/Recordings",
     "vad_threshold": 0.5,
     "silence_duration_ms": 2000,

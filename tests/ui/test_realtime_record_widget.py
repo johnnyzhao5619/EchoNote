@@ -3,10 +3,11 @@
 Tests for realtime record widget.
 """
 
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, PropertyMock, patch
 
 import pytest
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QEvent, Qt
+from PySide6.QtWidgets import QSizePolicy
 
 from ui.realtime_record.widget import RealtimeRecorderSignals, RealtimeRecordWidget
 
@@ -103,8 +104,11 @@ class TestRealtimeRecordWidget:
         assert widget.record_button.property("recording") is False
         assert widget.duration_value_label.property("role") == "realtime-duration"
         assert widget.input_combo.property("role") == "realtime-field-control"
+        assert widget.refresh_input_button.property("role") == "settings-inline-action"
         assert widget.source_lang_combo.property("role") == "realtime-field-control"
         assert widget.target_lang_combo.property("role") == "realtime-field-control"
+        assert widget.transcription_floating_toggle_button.property("role") == "realtime-floating-toggle"
+        assert widget.translation_floating_toggle_button.property("role") == "realtime-floating-toggle"
 
     def test_widget_has_async_loop(self, widget):
         """Test widget has async event loop."""
@@ -144,15 +148,26 @@ class TestRealtimeRecordWidget:
             "translation_target_lang": "en",
             "floating_window_enabled": True,
             "hide_main_window_when_floating": True,
+            "floating_window_always_on_top": False,
         }
 
         widget._refresh_recording_preferences()
 
         assert widget._floating_window_enabled is True
         assert widget._hide_main_window_when_floating is True
+        assert widget._floating_window_always_on_top is False
 
-    def test_widget_creates_floating_overlay_when_enabled(self, widget):
-        """Enabled floating mode should build an overlay widget with semantic role."""
+    def test_widget_keeps_overlay_hidden_when_not_recording(self, widget):
+        """Floating mode should not show overlay until recording starts."""
+        widget._floating_window_enabled = True
+
+        widget._sync_floating_overlay_visibility()
+
+        assert widget._floating_overlay is None
+
+    def test_widget_creates_floating_overlay_when_recording(self, widget):
+        """Enabled floating mode should build an overlay while recording."""
+        type(widget.recorder).is_recording = PropertyMock(return_value=True)
         widget._floating_window_enabled = True
 
         widget._sync_floating_overlay_visibility()
@@ -262,6 +277,40 @@ class TestRealtimeRecordWidgetCallbacks:
         assert widget.input_combo.itemText(1).endswith("(System Audio)")
         assert 3 in widget._system_audio_input_indices
 
+    def test_refresh_input_devices_keeps_current_selection_when_device_still_exists(self, widget):
+        """Refresh should preserve selected device when still available."""
+        widget.audio_capture.get_input_devices.return_value = [
+            {"index": 1, "name": "MacBook Pro Microphone"},
+            {"index": 3, "name": "Microsoft Teams Audio"},
+        ]
+        widget._populate_input_devices()
+        widget.input_combo.setCurrentIndex(widget.input_combo.findData(3))
+
+        widget.audio_capture.get_input_devices.return_value = [
+            {"index": 1, "name": "MacBook Pro Microphone"},
+            {"index": 3, "name": "Microsoft Teams Audio"},
+            {"index": 4, "name": "BlackHole 2ch"},
+        ]
+        widget._refresh_input_devices(force=True, preserve_selection=True)
+
+        assert widget.input_combo.currentData() == 3
+
+    def test_refresh_input_devices_falls_back_when_selected_device_removed(self, widget):
+        """Refresh should fall back to first device when previous one is removed."""
+        widget.audio_capture.get_input_devices.return_value = [
+            {"index": 1, "name": "MacBook Pro Microphone"},
+            {"index": 3, "name": "Microsoft Teams Audio"},
+        ]
+        widget._populate_input_devices()
+        widget.input_combo.setCurrentIndex(widget.input_combo.findData(3))
+
+        widget.audio_capture.get_input_devices.return_value = [
+            {"index": 1, "name": "MacBook Pro Microphone"},
+        ]
+        widget._refresh_input_devices(force=True, preserve_selection=True)
+
+        assert widget.input_combo.currentData() == 1
+
     def test_capture_plan_message_without_loopback(self, widget):
         """When no loopback device exists, guidance should include setup planning."""
         widget._loopback_input_indices = set()
@@ -311,3 +360,50 @@ class TestRealtimeRecordWidgetCallbacks:
         mock_realtime_recorder.start_recording.assert_awaited_once()
         _, kwargs = mock_realtime_recorder.start_recording.call_args
         assert kwargs["input_source"] == 7
+
+
+class TestRealtimeFloatingOverlay:
+    """Tests for floating overlay interaction behavior."""
+
+    def test_preview_sections_expand_while_meta_sections_remain_fixed(self, qapp, mock_i18n):
+        """Window growth should be consumed by transcript/translation preview panels."""
+        from ui.realtime_record.floating_overlay import RealtimeFloatingOverlay
+
+        overlay = RealtimeFloatingOverlay(mock_i18n)
+        try:
+            assert (
+                overlay.transcript_preview_label.sizePolicy().verticalPolicy()
+                == QSizePolicy.Policy.Expanding
+            )
+            assert (
+                overlay.translation_preview_label.sizePolicy().verticalPolicy()
+                == QSizePolicy.Policy.Expanding
+            )
+            assert overlay.duration_label.sizePolicy().verticalPolicy() == QSizePolicy.Policy.Fixed
+            assert (
+                overlay.transcript_title_label.sizePolicy().verticalPolicy()
+                == QSizePolicy.Policy.Fixed
+            )
+            assert (
+                overlay.translation_title_label.sizePolicy().verticalPolicy()
+                == QSizePolicy.Policy.Fixed
+            )
+        finally:
+            overlay.close()
+
+    def test_hover_event_updates_state_without_recursion(self, qapp, mock_i18n):
+        """Enter/Leave events should update hover state safely."""
+        from ui.realtime_record.floating_overlay import RealtimeFloatingOverlay
+
+        overlay = RealtimeFloatingOverlay(mock_i18n)
+        try:
+            enter_event = QEvent(QEvent.Type.Enter)
+            leave_event = QEvent(QEvent.Type.Leave)
+
+            assert overlay.event(enter_event) in (True, False)
+            assert overlay.windowOpacity() == pytest.approx(1.0, abs=1e-3)
+
+            assert overlay.event(leave_event) in (True, False)
+            assert overlay.windowOpacity() == pytest.approx(0.82, abs=1e-3)
+        finally:
+            overlay.close()

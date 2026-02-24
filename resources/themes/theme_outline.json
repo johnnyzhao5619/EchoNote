@@ -78,9 +78,15 @@
         "QPushButton[role=\"realtime-marker-action\"]",
         "QPushButton[role=\"realtime-record-action\"]",
         "QComboBox[role=\"realtime-field-control\"]",
+        "QPushButton[role=\"realtime-floating-toggle\"]",
         "QWidget[role=\"realtime-floating-overlay\"]",
         "QLabel[role=\"realtime-floating-title\"]",
-        "QLabel[role=\"realtime-floating-status\"]"
+        "QLabel[role=\"realtime-floating-status\"]",
+        "QLabel[role=\"realtime-floating-meta\"]",
+        "QLabel[role=\"realtime-floating-section-title\"]",
+        "QLabel[role=\"realtime-floating-preview\"]",
+        "QPushButton[role=\"realtime-floating-action\"]",
+        "QPushButton[role=\"realtime-floating-close\"]"
       ]
     },
     {

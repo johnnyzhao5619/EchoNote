@@ -389,7 +389,11 @@ class ConfigManager:
             return isinstance(value, (int, float)) and value >= 0
         elif setting == "save_transcript" or setting == "create_calendar_event":
             return isinstance(value, bool)
-        elif setting in ("floating_window_enabled", "hide_main_window_when_floating"):
+        elif setting in (
+            "floating_window_enabled",
+            "hide_main_window_when_floating",
+            "floating_window_always_on_top",
+        ):
             return isinstance(value, bool)
         elif setting == "recording_save_path":
             return isinstance(value, str)

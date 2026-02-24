@@ -19,6 +19,7 @@ class _FakeConfigManager:
                 "translation_target_lang": "en",
                 "floating_window_enabled": False,
                 "hide_main_window_when_floating": False,
+                "floating_window_always_on_top": True,
                 "vad_threshold": 0.5,
                 "silence_duration_ms": 2000,
                 "min_audio_duration": 3.0,
@@ -94,6 +95,7 @@ def test_get_realtime_preferences_includes_translation_engine():
     assert preferences["translation_engine"] == "none"
     assert preferences["default_gain"] == 1.5
     assert preferences["floating_window_enabled"] is True
+    assert preferences["floating_window_always_on_top"] is True
 
 
 def test_get_realtime_translation_preferences_uses_unified_defaults():
@@ -105,6 +107,7 @@ def test_get_realtime_translation_preferences_uses_unified_defaults():
     assert preferences["translation_target_lang"] == "en"
     assert preferences["floating_window_enabled"] is True
     assert preferences["hide_main_window_when_floating"] is False
+    assert preferences["floating_window_always_on_top"] is True
 
 
 def test_validate_realtime_translation_engine_setting():

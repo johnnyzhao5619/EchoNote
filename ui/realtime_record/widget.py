@@ -76,6 +76,8 @@ from ui.constants import (
     REALTIME_BUTTON_MIN_WIDTH,
     REALTIME_RECORD_BUTTON_MIN_WIDTH,
     REALTIME_COMBO_MIN_WIDTH,
+    REALTIME_DEVICE_REFRESH_BUTTON_MIN_WIDTH,
+    REALTIME_DEVICE_REFRESH_INTERVAL_MS,
     REALTIME_FORM_HORIZONTAL_SPACING,
     REALTIME_FORM_MARGINS,
     REALTIME_GAIN_SLIDER_MAX_WIDTH,
@@ -95,9 +97,11 @@ from ui.constants import (
     ROLE_FEEDBACK,
     ROLE_REALTIME_DURATION,
     ROLE_REALTIME_FIELD_CONTROL,
+    ROLE_REALTIME_FLOATING_TOGGLE,
     ROLE_REALTIME_MARKER_ACTION,
     ROLE_REALTIME_RECORD_ACTION,
     ROLE_SETTINGS_INLINE,
+    ROLE_SETTINGS_INLINE_ACTION,
     ROLE_WARNING_LARGE,
     STATUS_INDICATOR_SYMBOL,
     ZERO_MARGINS,
@@ -183,6 +187,7 @@ class RealtimeRecordWidget(BaseWidget):
         self._input_devices_by_index: Dict[int, Dict[str, Any]] = {}
         self._loopback_input_indices = set()
         self._system_audio_input_indices = set()
+        self._input_devices_signature = tuple()
         self._form_labels: Dict[str, QLabel] = {}
 
         # Signals
@@ -221,8 +226,10 @@ class RealtimeRecordWidget(BaseWidget):
         self._translation_target_lang = DEFAULT_TRANSLATION_TARGET_LANGUAGE
         self._floating_window_enabled = False
         self._hide_main_window_when_floating = False
+        self._floating_window_always_on_top = True
         self._floating_overlay = None
         self._main_window_hidden_by_overlay = False
+        self._floating_mode_toggle_buttons = []
         self._refresh_recording_preferences()
 
         # Notification Manager
@@ -282,6 +289,8 @@ class RealtimeRecordWidget(BaseWidget):
         # Status Update Timer
         self.status_timer = QTimer()
         self.status_timer.timeout.connect(self._update_status)
+        self.device_refresh_timer = QTimer(self)
+        self.device_refresh_timer.timeout.connect(self._auto_refresh_input_devices)
 
         # Initialize UI
         self.setup_ui()
@@ -373,6 +382,10 @@ class RealtimeRecordWidget(BaseWidget):
                 self._hide_main_window_when_floating = bool(
                     translation_preferences.get("hide_main_window_when_floating", False)
                 )
+                self._floating_window_always_on_top = bool(
+                    translation_preferences.get("floating_window_always_on_top", True)
+                )
+                self._refresh_floating_mode_toggle_controls()
 
                 # 检查翻译引擎配置是否变更
                 new_translation_engine = translation_preferences.get(
@@ -422,6 +435,8 @@ class RealtimeRecordWidget(BaseWidget):
         self._translation_target_lang = DEFAULT_TRANSLATION_TARGET_LANGUAGE
         self._floating_window_enabled = False
         self._hide_main_window_when_floating = False
+        self._floating_window_always_on_top = True
+        self._refresh_floating_mode_toggle_controls()
 
     @Slot(str, object)
     def _on_settings_changed(self, key: str, _value: object) -> None:
@@ -429,6 +444,7 @@ class RealtimeRecordWidget(BaseWidget):
         if key.startswith("realtime."):
             self._refresh_recording_preferences()
             self._apply_recording_preferences_to_controls()
+            self._refresh_floating_mode_toggle_controls()
             self._sync_floating_overlay_visibility()
 
     def _apply_recording_preferences_to_controls(self) -> None:
@@ -674,6 +690,17 @@ class RealtimeRecordWidget(BaseWidget):
 
         layout.addStretch()
 
+        floating_toggle_button = create_secondary_button("")
+        floating_toggle_button.setCheckable(True)
+        floating_toggle_button.setProperty("role", ROLE_REALTIME_FLOATING_TOGGLE)
+        floating_toggle_button.clicked.connect(self._on_floating_mode_toggle_clicked)
+        self._floating_mode_toggle_buttons.append(floating_toggle_button)
+        layout.addWidget(floating_toggle_button)
+        if text_type == "transcription":
+            self.transcription_floating_toggle_button = floating_toggle_button
+        else:
+            self.translation_floating_toggle_button = floating_toggle_button
+
         # Copy Button
         copy_btn = create_secondary_button(self.i18n.t("common.copy"))
         copy_btn.clicked.connect(lambda: self._copy_text(text_type))
@@ -693,6 +720,7 @@ class RealtimeRecordWidget(BaseWidget):
             self.export_translation_button = export_btn
         layout.addWidget(export_btn)
 
+        self._refresh_floating_mode_toggle_controls()
         return toolbar
 
     def _create_status_section(self) -> QWidget:
@@ -824,6 +852,13 @@ class RealtimeRecordWidget(BaseWidget):
         self._populate_input_devices()
         self.input_combo.currentIndexChanged.connect(self._on_input_device_changed)
         device_layout.addWidget(self.input_combo)
+
+        self.refresh_input_button = create_secondary_button(self.i18n.t("common.refresh"))
+        self.refresh_input_button.setProperty("role", ROLE_SETTINGS_INLINE_ACTION)
+        self.refresh_input_button.setMinimumHeight(CONTROL_BUTTON_MIN_HEIGHT)
+        self.refresh_input_button.setMinimumWidth(REALTIME_DEVICE_REFRESH_BUTTON_MIN_WIDTH)
+        connect_button_with_callback(self.refresh_input_button, self._on_refresh_input_devices_clicked)
+        device_layout.addWidget(self.refresh_input_button)
         row1.addWidget(device_container)
 
         gain_container, gain_layout = create_inline_container()
@@ -954,11 +989,82 @@ class RealtimeRecordWidget(BaseWidget):
 
         return container
 
-    def _populate_input_devices(self):
+    def _snapshot_input_devices(self) -> list[Dict[str, Any]]:
+        """Fetch current input devices from the capture backend."""
+        if self.audio_capture is None:
+            return []
+        try:
+            devices = self.audio_capture.get_input_devices()
+            if isinstance(devices, list):
+                return devices
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Failed to fetch input devices: %s", exc)
+        return []
+
+    @staticmethod
+    def _build_input_devices_signature(devices: list[Dict[str, Any]]) -> tuple:
+        """Build a stable signature for change detection."""
+        signature = []
+        for device in devices:
+            index = device.get("index")
+            if index is None:
+                continue
+            try:
+                device_index = int(index)
+            except (TypeError, ValueError):
+                continue
+            signature.append(
+                (
+                    device_index,
+                    str(device.get("name", "")).strip(),
+                    int(device.get("max_input_channels") or 0),
+                    float(device.get("default_sample_rate") or 0.0),
+                )
+            )
+        return tuple(sorted(signature))
+
+    def _on_refresh_input_devices_clicked(self) -> None:
+        """Handle manual refresh request from input-device row."""
+        self._refresh_input_devices(force=True, preserve_selection=True)
+
+    def _auto_refresh_input_devices(self) -> None:
+        """Periodically refresh input devices while idle."""
+        if not self._audio_available:
+            return
+        if bool(getattr(self.recorder, "is_recording", False)):
+            return
+        if not hasattr(self, "input_combo"):
+            return
+        if self.input_combo.view().isVisible():
+            return
+        self._refresh_input_devices(force=False, preserve_selection=True)
+
+    def _refresh_input_devices(self, *, force: bool, preserve_selection: bool) -> None:
+        """Refresh input devices and preserve selection when possible."""
+        if not hasattr(self, "input_combo"):
+            return
+
+        if self.audio_capture is None:
+            self._populate_input_devices()
+            return
+
+        selected_index = self.input_combo.currentData() if preserve_selection else None
+        devices = self._snapshot_input_devices()
+        signature = self._build_input_devices_signature(devices)
+        if not force and signature == self._input_devices_signature:
+            return
+        self._populate_input_devices(devices=devices, preferred_index=selected_index)
+
+    def _populate_input_devices(
+        self, devices: Optional[list[Dict[str, Any]]] = None, preferred_index: Optional[object] = None
+    ):
         """Populate audio input devices combo box."""
+        if preferred_index is None and hasattr(self, "input_combo"):
+            preferred_index = self.input_combo.currentData()
         self._input_devices_by_index = {}
         self._loopback_input_indices = set()
         self._system_audio_input_indices = set()
+        self._input_devices_signature = tuple()
         if self.audio_capture is None:
             self.input_combo.clear()
             self.input_combo.addItem(self.i18n.t("realtime_record.audio_unavailable_short"), None)
@@ -966,9 +1072,8 @@ class RealtimeRecordWidget(BaseWidget):
             return
 
         try:
-            devices = self.audio_capture.get_input_devices()
-            if not isinstance(devices, list):
-                devices = []
+            if devices is None:
+                devices = self._snapshot_input_devices()
             self.input_combo.clear()
 
             if not devices:
@@ -1011,10 +1116,18 @@ class RealtimeRecordWidget(BaseWidget):
                     app_scoped_source or TRANSLATION_ENGINE_NONE,
                 )
 
-            logger.info(f"Populated {len(devices)} input devices")
+            self._input_devices_signature = self._build_input_devices_signature(devices)
+            if preferred_index is not None:
+                preferred_combo_index = self.input_combo.findData(preferred_index)
+                if preferred_combo_index >= 0:
+                    self.input_combo.setCurrentIndex(preferred_combo_index)
+            if self.input_combo.currentIndex() < 0 and self.input_combo.count() > 0:
+                self.input_combo.setCurrentIndex(0)
+
+            logger.info("Populated %s input devices", len(self._input_devices_by_index))
             self._update_capture_plan_message()
-        except Exception as e:
-            logger.error(f"Failed to populate input devices: {e}")
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Failed to populate input devices: %s", exc)
             self.input_combo.addItem(
                 self.i18n.t("ui_strings.realtime_record.error_loading_devices"), None
             )
@@ -1304,6 +1417,12 @@ class RealtimeRecordWidget(BaseWidget):
             self.add_marker_button.setEnabled(self._audio_available and self.recorder.is_recording)
             self.add_marker_button.setToolTip("" if self._audio_available else tooltip)
 
+        if getattr(self, "refresh_input_button", None):
+            self.refresh_input_button.setEnabled(
+                self._audio_available and not bool(getattr(self.recorder, "is_recording", False))
+            )
+            self.refresh_input_button.setToolTip("" if self._audio_available else tooltip)
+
         for widget_name in ("input_combo", "gain_slider", "gain_value_label", "audio_visualizer"):
             widget = getattr(self, widget_name, None)
             if widget:
@@ -1318,15 +1437,23 @@ class RealtimeRecordWidget(BaseWidget):
                 self.audio_unavailable_label.setVisible(True)
 
         if not self._audio_available and hasattr(self, "input_combo"):
+            if hasattr(self, "device_refresh_timer"):
+                self.device_refresh_timer.stop()
             self.input_combo.clear()
             self.input_combo.addItem(short_text, None)
             self._input_devices_by_index = {}
             self._loopback_input_indices = set()
             self._system_audio_input_indices = set()
+            self._input_devices_signature = tuple()
             self._update_capture_plan_message()
         elif self._audio_available and not previous_state:
-            self._populate_input_devices()
+            if hasattr(self, "device_refresh_timer") and not self.device_refresh_timer.isActive():
+                self.device_refresh_timer.start(REALTIME_DEVICE_REFRESH_INTERVAL_MS)
+            self._refresh_input_devices(force=True, preserve_selection=True)
         else:
+            if self._audio_available and hasattr(self, "device_refresh_timer"):
+                if not self.device_refresh_timer.isActive():
+                    self.device_refresh_timer.start(REALTIME_DEVICE_REFRESH_INTERVAL_MS)
             self._update_capture_plan_message()
 
     def _update_model_list(self):
@@ -1448,6 +1575,8 @@ class RealtimeRecordWidget(BaseWidget):
 
         if hasattr(self, "add_marker_button"):
             self.add_marker_button.setText(self.i18n.t("realtime_record.add_marker"))
+        if hasattr(self, "refresh_input_button"):
+            self.refresh_input_button.setText(self.i18n.t("common.refresh"))
 
     def _update_form_labels(self):
         text_map = {
@@ -1515,6 +1644,58 @@ class RealtimeRecordWidget(BaseWidget):
             )
         if hasattr(self, "_download_warning_label"):
             self._download_warning_label.setText(self.i18n.t("common.warning"))
+        self._refresh_floating_mode_toggle_controls()
+
+    def _floating_toggle_button_text(self) -> str:
+        key = (
+            "realtime_record.floating_mode_enabled"
+            if self._floating_window_enabled
+            else "realtime_record.floating_mode_disabled"
+        )
+        return self.i18n.t(key)
+
+    def _refresh_floating_mode_toggle_controls(self) -> None:
+        if not hasattr(self, "_floating_mode_toggle_buttons"):
+            return
+        button_text = self._floating_toggle_button_text()
+        tooltip = self.i18n.t("realtime_record.floating_mode_toggle_hint")
+        for button in self._floating_mode_toggle_buttons:
+            button.blockSignals(True)
+            button.setChecked(self._floating_window_enabled)
+            button.setProperty("state", "active" if self._floating_window_enabled else "inactive")
+            button.setText(button_text)
+            button.setToolTip(tooltip)
+            button.blockSignals(False)
+
+    def _on_floating_mode_toggle_clicked(self, checked: bool) -> None:
+        enabled = bool(checked)
+        persisted = False
+
+        if self.settings_manager is not None and hasattr(self.settings_manager, "set_setting"):
+            try:
+                persisted = bool(
+                    self.settings_manager.set_setting("realtime.floating_window_enabled", enabled)
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Failed to persist floating mode toggle: %s", exc, exc_info=True)
+                persisted = False
+
+        if persisted:
+            # settings_changed signal will refresh state once; apply immediately for responsiveness.
+            self._floating_window_enabled = enabled
+            self._refresh_floating_mode_toggle_controls()
+            self._sync_floating_overlay_visibility()
+            return
+
+        if self.settings_manager is None:
+            self._floating_window_enabled = enabled
+            self._refresh_floating_mode_toggle_controls()
+            self._sync_floating_overlay_visibility()
+            return
+
+        # Failed to persist; rollback to stored preference.
+        self._refresh_recording_preferences()
+        self._refresh_floating_mode_toggle_controls()
 
     def _update_tab_titles(self):
         if hasattr(self, "tab_widget"):
@@ -1758,6 +1939,8 @@ class RealtimeRecordWidget(BaseWidget):
         if hasattr(self, "add_marker_button"):
             self.add_marker_button.setEnabled(True)
             self.add_marker_button.setToolTip("")
+        if hasattr(self, "refresh_input_button"):
+            self.refresh_input_button.setEnabled(False)
         if hasattr(self, "status_indicator"):
             self.status_indicator.setProperty("state", "recording")
             self.status_indicator.style().unpolish(self.status_indicator)
@@ -1777,6 +1960,8 @@ class RealtimeRecordWidget(BaseWidget):
         self.status_timer.stop()
         if hasattr(self, "add_marker_button"):
             self.add_marker_button.setEnabled(False)
+        if hasattr(self, "refresh_input_button"):
+            self.refresh_input_button.setEnabled(self._audio_available)
         if hasattr(self, "status_indicator"):
             self.status_indicator.setProperty("state", "ready")
             self.status_indicator.style().unpolish(self.status_indicator)
@@ -1886,6 +2071,8 @@ class RealtimeRecordWidget(BaseWidget):
             overlay = RealtimeFloatingOverlay(self.i18n)
             overlay.show_main_window_requested.connect(self._restore_main_window_from_overlay)
             overlay.overlay_closed.connect(self._on_floating_overlay_closed)
+            overlay.always_on_top_changed.connect(self._on_overlay_always_on_top_changed)
+            overlay.set_always_on_top(self._floating_window_always_on_top)
             self._floating_overlay = overlay
         except Exception as exc:  # noqa: BLE001
             logger.warning("Failed to initialize floating overlay: %s", exc, exc_info=True)
@@ -1900,7 +2087,8 @@ class RealtimeRecordWidget(BaseWidget):
 
     def _sync_floating_overlay_visibility(self) -> None:
         """Show/hide floating overlay based on settings and update displayed state."""
-        if not self._floating_window_enabled:
+        should_show_overlay = self._floating_window_enabled and bool(self.recorder.is_recording)
+        if not should_show_overlay:
             if self._floating_overlay is not None:
                 self._floating_overlay.hide()
             self._restore_main_window_from_overlay()
@@ -1915,15 +2103,32 @@ class RealtimeRecordWidget(BaseWidget):
             if hasattr(self, "duration_value_label")
             else DEFAULT_DURATION_DISPLAY
         )
+        overlay.set_always_on_top(self._floating_window_always_on_top)
         overlay.update_runtime_state(is_recording=self.recorder.is_recording, duration_text=duration_text)
         transcript = self.transcription_text.toPlainText() if hasattr(self, "transcription_text") else ""
         translation = self.translation_text.toPlainText() if hasattr(self, "translation_text") else ""
         overlay.update_preview_text(transcript=transcript, translation=translation)
         if not overlay.isVisible():
             overlay.show()
+            overlay.raise_()
 
-        if self._hide_main_window_when_floating and self.recorder.is_recording:
+        if self._hide_main_window_when_floating:
             self._hide_main_window_for_overlay()
+
+    def _on_overlay_always_on_top_changed(self, enabled: bool) -> None:
+        self._floating_window_always_on_top = bool(enabled)
+        if self.settings_manager is not None and hasattr(self.settings_manager, "set_setting"):
+            try:
+                persisted = bool(
+                    self.settings_manager.set_setting(
+                        "realtime.floating_window_always_on_top",
+                        self._floating_window_always_on_top,
+                    )
+                )
+                if persisted:
+                    return
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Failed to persist always-on-top setting: %s", exc, exc_info=True)
 
     def _hide_main_window_for_overlay(self) -> None:
         """Hide main window while floating overlay mode is active."""
@@ -1993,6 +2198,10 @@ class RealtimeRecordWidget(BaseWidget):
         if hasattr(self, "add_marker_button"):
             self.add_marker_button.setEnabled(
                 self._audio_available and self.recorder.is_recording and not active
+            )
+        if hasattr(self, "refresh_input_button"):
+            self.refresh_input_button.setEnabled(
+                self._audio_available and not self.recorder.is_recording and not active
             )
 
     def _has_pending_worker_tasks(self) -> bool:
@@ -2347,6 +2556,8 @@ class RealtimeRecordWidget(BaseWidget):
         try:
             if hasattr(self, "status_timer") and self.status_timer:
                 self.status_timer.stop()
+            if hasattr(self, "device_refresh_timer") and self.device_refresh_timer:
+                self.device_refresh_timer.stop()
 
             worker_loop = getattr(self._worker, "loop", None)
             if (

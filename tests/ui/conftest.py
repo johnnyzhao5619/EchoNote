@@ -85,6 +85,7 @@ def mock_settings_manager():
     manager.config_manager.replace_all = Mock()
     manager.get = Mock(side_effect=lambda key, default=None: default)
     manager.set = Mock()
+    manager.set_setting = Mock(return_value=True)
     manager.save = Mock()
     manager.get_all = Mock(return_value={})
     manager.get_realtime_preferences = Mock(
@@ -97,6 +98,7 @@ def mock_settings_manager():
             "translation_target_lang": "en",
             "floating_window_enabled": False,
             "hide_main_window_when_floating": False,
+            "floating_window_always_on_top": True,
         }
     )
     manager.setting_changed = Mock()
