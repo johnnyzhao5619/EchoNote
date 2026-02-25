@@ -126,8 +126,6 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         concurrent_layout.addStretch()
         self.content_layout.addLayout(concurrent_layout)
 
-        self.add_section_spacing()
-
         # FFmpeg status section
         self.ffmpeg_title = self.add_section_title(
             self.i18n.t("settings.transcription.ffmpeg_status")
@@ -228,6 +226,14 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         self.model_size_label = QLabel(self.i18n.t("settings.transcription.model_size"))
         whisper_layout.addRow(self.model_size_label, self.model_size_combo)
 
+        self.secondary_model_size_combo = QComboBox()
+        self.secondary_model_size_combo.addItems(list(get_default_model_names()))
+        self.secondary_model_size_combo.currentTextChanged.connect(self._emit_changed)
+        self.secondary_model_size_label = QLabel(
+            self.i18n.t("settings.transcription.secondary_model_size")
+        )
+        whisper_layout.addRow(self.secondary_model_size_label, self.secondary_model_size_combo)
+
         # Device
         self.device_combo = QComboBox()
         self._populate_device_options()
@@ -256,6 +262,18 @@ class TranscriptionSettingsPage(BaseSettingsPage):
 
         self.whisper_group.setLayout(whisper_layout)
         self.content_layout.addWidget(self.whisper_group)
+
+        self.model_guidance_layout = create_hbox()
+        self.model_guidance_label = QLabel()
+        self.model_guidance_label.setWordWrap(True)
+        self.model_guidance_label.setProperty("role", ROLE_DEVICE_INFO)
+        self.model_guidance_layout.addWidget(self.model_guidance_label, stretch=1)
+        self.model_management_button = create_button(self.i18n.t("batch_transcribe.go_to_download"))
+        self.model_management_button.setProperty("role", ROLE_SETTINGS_INLINE_ACTION)
+        self.model_management_button.clicked.connect(self._on_go_to_model_management)
+        self.model_guidance_layout.addWidget(self.model_management_button)
+        self.content_layout.addLayout(self.model_guidance_layout)
+        self._update_model_guidance(has_downloaded_models=True)
 
         # Cloud engine configuration (will be shown/hidden based on selection)
         self.cloud_group = QGroupBox(self.i18n.t("settings.transcription.cloud_config"))
@@ -286,27 +304,43 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         self.cloud_group.setVisible(False)
         self.content_layout.addWidget(self.cloud_group)
 
+    def _update_model_guidance(self, *, has_downloaded_models: bool) -> None:
+        """Update model availability hint and download shortcut visibility."""
+        if not hasattr(self, "model_guidance_label") or not hasattr(self, "model_management_button"):
+            return
+        if has_downloaded_models:
+            self.model_guidance_label.clear()
+            self.model_guidance_label.setVisible(False)
+            self.model_management_button.setVisible(False)
+            return
+        self.model_guidance_label.setText(self.i18n.t("settings.transcription.please_download_model"))
+        self.model_guidance_label.setVisible(True)
+        self.model_management_button.setVisible(True)
+
     def _update_model_list(self):
-        """Update model_size_combo with downloaded models from ModelManager."""
+        """Update model selectors with downloaded models from ModelManager."""
         if not self.model_manager:
             logger.debug("No model_manager available, skipping model list update")
             return
 
         # Save current selection
         current_model = self.model_size_combo.currentText()
+        current_secondary_model = self.secondary_model_size_combo.currentText()
 
         # Clear existing items
         self.model_size_combo.clear()
+        self.secondary_model_size_combo.clear()
 
         # Get downloaded models
         downloaded_models = self.model_manager.get_downloaded_models()
 
         if not downloaded_models:
             # No models downloaded
-            self.model_size_combo.addItem(
-                self.i18n.t("settings.transcription.please_download_model")
-            )
+            self.model_size_combo.clear()
             self.model_size_combo.setEnabled(False)
+            self.secondary_model_size_combo.clear()
+            self.secondary_model_size_combo.setEnabled(False)
+            self._update_model_guidance(has_downloaded_models=False)
             logger.info(
                 self.i18n.t(
                     "logging.settings.transcription_page.no_models_downloaded_selector_disabled"
@@ -315,8 +349,10 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         else:
             # Add downloaded models
             self.model_size_combo.setEnabled(True)
+            self.secondary_model_size_combo.setEnabled(True)
             for model in downloaded_models:
                 self.model_size_combo.addItem(model.name)
+                self.secondary_model_size_combo.addItem(model.name)
 
             # Try to restore previous selection
             index = self.model_size_combo.findText(current_model)
@@ -343,6 +379,24 @@ class TranscriptionSettingsPage(BaseSettingsPage):
                             f"{self.model_size_combo.currentText()}"
                         )
 
+            secondary_index = self.secondary_model_size_combo.findText(current_secondary_model)
+            if secondary_index >= 0:
+                self.secondary_model_size_combo.setCurrentIndex(secondary_index)
+            else:
+                configured_secondary_model = (
+                    self.settings_manager.get_setting("transcription.secondary_model_size")
+                    or self.settings_manager.get_setting("transcription.faster_whisper.model_size")
+                    or "base"
+                )
+                configured_secondary_index = self.secondary_model_size_combo.findText(
+                    configured_secondary_model
+                )
+                if configured_secondary_index >= 0:
+                    self.secondary_model_size_combo.setCurrentIndex(configured_secondary_index)
+                elif self.secondary_model_size_combo.count() > 0:
+                    self.secondary_model_size_combo.setCurrentIndex(0)
+
+            self._update_model_guidance(has_downloaded_models=True)
             logger.info(f"Updated model list with {len(downloaded_models)} models")
 
     def _create_api_key_section(self, parent_layout: QVBoxLayout):
@@ -756,6 +810,12 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         if directory:
             self.path_edit.setText(directory)
 
+    def _on_go_to_model_management(self) -> None:
+        """Navigate to settings model management page for model download."""
+        model_page = self._open_settings_page("model_management")
+        if model_page and hasattr(model_page, "tabs"):
+            model_page.tabs.setCurrentIndex(0)
+
     def load_settings(self):
         """Load transcription settings into UI."""
         try:
@@ -794,6 +854,9 @@ class TranscriptionSettingsPage(BaseSettingsPage):
 
             if whisper_settings:
                 model_size = whisper_settings.get("model_size", "base")
+                secondary_model_size = self.settings_manager.get_setting(
+                    "transcription.secondary_model_size"
+                ) or model_size
 
                 # Try to select the configured model
                 # (if ModelManager is used, _update_model_list already populated
@@ -801,6 +864,10 @@ class TranscriptionSettingsPage(BaseSettingsPage):
                 index = self.model_size_combo.findText(model_size)
                 if index >= 0:
                     self.model_size_combo.setCurrentIndex(index)
+
+                secondary_index = self.secondary_model_size_combo.findText(secondary_model_size)
+                if secondary_index >= 0:
+                    self.secondary_model_size_combo.setCurrentIndex(secondary_index)
 
                 # Load device setting (use 'auto' as default)
                 device = whisper_settings.get("device", "auto")
@@ -886,6 +953,11 @@ class TranscriptionSettingsPage(BaseSettingsPage):
             if self.model_size_combo.isEnabled():
                 self._set_setting_or_raise(
                     "transcription.faster_whisper.model_size", self.model_size_combo.currentText()
+                )
+            if self.secondary_model_size_combo.isEnabled():
+                self._set_setting_or_raise(
+                    "transcription.secondary_model_size",
+                    self.secondary_model_size_combo.currentText(),
                 )
 
             # Save device using the data (device_id) not the display text
@@ -1088,6 +1160,10 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         # Update Whisper config labels
         if hasattr(self, "model_size_label"):
             self.model_size_label.setText(self.i18n.t("settings.transcription.model_size"))
+        if hasattr(self, "secondary_model_size_label"):
+            self.secondary_model_size_label.setText(
+                self.i18n.t("settings.transcription.secondary_model_size")
+            )
         if hasattr(self, "device_label"):
             self.device_label.setText(self.i18n.t("settings.transcription.device"))
         if hasattr(self, "compute_type_label"):
@@ -1203,8 +1279,13 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         # Update refresh button
         if hasattr(self, "refresh_usage_button"):
             self.refresh_usage_button.setText(self.i18n.t("settings.transcription.refresh_usage"))
+        if hasattr(self, "model_management_button"):
+            self.model_management_button.setText(self.i18n.t("batch_transcribe.go_to_download"))
 
         if hasattr(self, "device_combo"):
             self._populate_device_options()
         if hasattr(self, "device_info_label"):
             self._update_device_info()
+        if hasattr(self, "model_size_combo"):
+            has_downloaded_models = self.model_size_combo.isEnabled() and self.model_size_combo.count() > 0
+            self._update_model_guidance(has_downloaded_models=has_downloaded_models)

@@ -38,7 +38,7 @@
 
 1. 浮窗模式已落地（设置项 + 运行态浮窗 + 主窗隐藏恢复 + 主题契约同步）。
 2. Calendar Hub 已补齐“查看转写/转译 + 翻译转写”入口，并复用统一查看器与统一翻译保存链路。
-3. 翻译偏好读取已统一到 `SettingsManager.get_realtime_translation_preferences()`，页面侧散点 fallback 已收敛。
+3. 翻译偏好读取已统一到 `SettingsManager.get_translation_preferences()`，页面侧散点 fallback 已收敛。
 4. 二次转写覆盖链路补强：无 `text` 字段结果也会从 `segments` 提取文本，保证覆盖与重译不丢失。
 5. i18n 与主题契约已补齐，并通过回归测试。
 

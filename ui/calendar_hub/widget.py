@@ -21,12 +21,17 @@ and account management.
 """
 
 import logging
-import asyncio
 import threading
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 from urllib.parse import urlparse
 
+from config.constants import (
+    DEFAULT_TRANSLATION_TARGET_LANGUAGE,
+    TRANSLATION_LANGUAGE_AUTO,
+)
+from core.settings.manager import resolve_translation_languages_from_settings
 from core.qt_imports import (
     QButtonGroup,
     QDate,
@@ -1530,6 +1535,14 @@ class CalendarHubWidget(BaseWidget):
             return managers.get("settings_manager")
         return None
 
+    def _get_model_manager(self):
+        """Resolve model manager from main window runtime context."""
+        main_window = self.window()
+        managers = getattr(main_window, "managers", {})
+        if isinstance(managers, dict):
+            return managers.get("model_manager")
+        return None
+
     def _open_event_text_viewer(
         self,
         *,
@@ -1589,7 +1602,7 @@ class CalendarHubWidget(BaseWidget):
         dialog.activateWindow()
 
     def _on_translate_transcript_requested(self, *, event_id: str, transcript_path: str) -> None:
-        """Translate event transcript and persist result into event attachments."""
+        """Queue transcript translation task and persist result into event attachments."""
         if not self.transcription_manager:
             return
         if not transcript_path:
@@ -1602,67 +1615,41 @@ class CalendarHubWidget(BaseWidget):
             )
             return
 
-        source_lang = "auto"
-        target_lang = "en"
-        settings_manager = self._get_settings_manager()
-        if settings_manager and hasattr(settings_manager, "get_realtime_translation_preferences"):
-            try:
-                preferences = settings_manager.get_realtime_translation_preferences()
-                if isinstance(preferences, dict):
-                    source_lang = preferences.get("translation_source_lang") or source_lang
-                    target_lang = preferences.get("translation_target_lang") or target_lang
-            except Exception as exc:  # noqa: BLE001
-                logger.warning("Failed to load translation preferences in calendar hub: %s", exc)
-
-        self.show_info(self.i18n.t("common.info"), self.i18n.t("timeline.translation_started"))
-
-        def _worker() -> None:
-            try:
-                translated_path = asyncio.run(
-                    self.transcription_manager.translate_transcript_file(
-                        transcript_path,
-                        source_lang=source_lang,
-                        target_lang=target_lang,
-                        event_id=event_id,
-                    )
-                )
-            except Exception as exc:  # noqa: BLE001
-                logger.error(
-                    "Calendar transcript translation failed for event %s: %s",
-                    event_id,
-                    exc,
-                    exc_info=True,
-                )
-                error_text = str(exc)
-                QTimer.singleShot(
-                    0,
-                    lambda err=error_text: self.show_error(
-                        self.i18n.t("common.error"),
-                        self.i18n.t("timeline.translation_failed", error=err),
-                    ),
-                )
-                return
-
-            QTimer.singleShot(
-                0,
-                lambda: self._on_translate_transcript_finished(
-                    transcript_path=transcript_path,
-                    translation_path=translated_path,
-                ),
-            )
-
-        threading.Thread(target=_worker, daemon=True).start()
-
-    def _on_translate_transcript_finished(
-        self, *, transcript_path: str, translation_path: str
-    ) -> None:
-        """UI callback after calendar transcript translation succeeds."""
-        self._refresh_current_view()
-        self.show_info(self.i18n.t("common.success"), self.i18n.t("timeline.translation_saved"))
-        self._open_event_text_viewer(
-            transcript_path=transcript_path,
-            translation_path=translation_path,
+        source_lang = TRANSLATION_LANGUAGE_AUTO
+        target_lang = DEFAULT_TRANSLATION_TARGET_LANGUAGE
+        resolved_languages = resolve_translation_languages_from_settings(
+            self._get_settings_manager()
         )
+        source_lang = resolved_languages.get(
+            "translation_source_lang", TRANSLATION_LANGUAGE_AUTO
+        )
+        target_lang = resolved_languages.get(
+            "translation_target_lang", DEFAULT_TRANSLATION_TARGET_LANGUAGE
+        )
+
+        output_suffix = Path(transcript_path).suffix.lower()
+        output_format = "md" if output_suffix == ".md" else "txt"
+        options = {
+            "event_id": event_id,
+            "translation_source_lang": source_lang,
+            "translation_target_lang": target_lang,
+            "output_format": output_format,
+        }
+
+        try:
+            self.transcription_manager.add_translation_task(transcript_path, options=options)
+            self.show_info(self.i18n.t("common.info"), self.i18n.t("timeline.translation_queued"))
+        except Exception as exc:  # noqa: BLE001
+            logger.error(
+                "Failed to queue calendar transcript translation for event %s: %s",
+                event_id,
+                exc,
+                exc_info=True,
+            )
+            self.show_error(
+                self.i18n.t("common.error"),
+                self.i18n.t("timeline.translation_failed", error=str(exc)),
+            )
 
     def _on_secondary_transcribe_requested(
         self, event_id: str, recording_path: str, dialog_data: Optional[Dict[str, Any]] = None
@@ -1672,28 +1659,39 @@ class CalendarHubWidget(BaseWidget):
             logger.error("Transcription manager not available for re-transcription")
             return
 
+        from ui.common.secondary_transcribe_dialog import select_secondary_transcribe_model
+
+        selected_model = select_secondary_transcribe_model(
+            parent=self,
+            i18n=self.i18n,
+            model_manager=self._get_model_manager(),
+            settings_manager=self._get_settings_manager(),
+        )
+        if not selected_model:
+            return
+
         logger.info(
             f"Submitting high-quality re-transcription from Calendar Hub for event {event_id}"
         )
         dialog_data = dialog_data or {}
-        source_lang = "auto"
+        source_lang = TRANSLATION_LANGUAGE_AUTO
         target_lang = dialog_data.get("translation_target_lang")
-        settings_manager = self._get_settings_manager()
-        if settings_manager and hasattr(settings_manager, "get_realtime_translation_preferences"):
-            try:
-                preferences = settings_manager.get_realtime_translation_preferences()
-                if isinstance(preferences, dict):
-                    source_lang = preferences.get("translation_source_lang") or source_lang
-                    if not target_lang:
-                        target_lang = preferences.get("translation_target_lang")
-            except Exception as exc:  # noqa: BLE001
-                logger.warning(
-                    "Failed to read translation preferences for secondary transcription: %s", exc
-                )
+        resolved_languages = resolve_translation_languages_from_settings(
+            self._get_settings_manager(),
+            target_lang=target_lang,
+        )
+        source_lang = resolved_languages.get(
+            "translation_source_lang", TRANSLATION_LANGUAGE_AUTO
+        )
+        target_lang = resolved_languages.get(
+            "translation_target_lang", DEFAULT_TRANSLATION_TARGET_LANGUAGE
+        )
 
         options = {
             "event_id": event_id,
             "replace_realtime": True,
+            "model_name": selected_model["model_name"],
+            "model_path": selected_model["model_path"],
             "enable_translation": dialog_data.get("enable_translation", False),
             "translation_source_lang": source_lang,
             "translation_target_lang": target_lang,

@@ -374,6 +374,101 @@ class TestTranscriptionManager:
         with pytest.raises(NotADirectoryError):
             manager.add_tasks_from_folder(str(temp_audio_file))
 
+    def test_add_translation_task_for_markdown_file(self, manager, temp_dir):
+        """Translation tasks should accept markdown files and persist translation task kind."""
+        manager.translation_engine = Mock()
+        source_file = temp_dir / "meeting.md"
+        source_file.write_text("Hello world", encoding="utf-8")
+
+        task_id = manager.add_translation_task(str(source_file))
+        task_data = manager.db.tasks[task_id]
+
+        assert task_data["engine"] == "translation"
+        assert task_data["output_format"] == "md"
+        assert task_data["language"] == "auto"
+        assert manager._task_engine_options[task_id]["task_kind"] == "translation"
+
+    @pytest.mark.asyncio
+    async def test_process_translation_task_exports_plain_markdown_without_transcript_template(
+        self, manager, temp_dir
+    ):
+        """Translation exports should keep plain translated text for markdown output."""
+        manager.translation_engine = Mock()
+        manager.translation_engine.translate = AsyncMock(return_value="Bonjour\nMonde")
+
+        source_file = temp_dir / "meeting.md"
+        source_file.write_text("Hello\nWorld", encoding="utf-8")
+        task_id = manager.add_translation_task(str(source_file), {"output_format": "md"})
+
+        internal_path = temp_dir / f"{task_id}.json"
+        with patch.object(manager, "_get_internal_format_path", return_value=str(internal_path)):
+            await manager._process_task_async(task_id, cancel_event=asyncio.Event())
+
+        output_path = Path(manager.db.tasks[task_id]["output_path"])
+        assert output_path.exists()
+        assert output_path.read_text(encoding="utf-8") == "Bonjour\nMonde"
+        assert manager.db.tasks[task_id]["status"] == TASK_STATUS_COMPLETED
+
+    @pytest.mark.asyncio
+    async def test_translate_text_retries_when_output_is_masked_placeholder(self, manager):
+        """Masked placeholder output should trigger chunked retry instead of being returned."""
+        masked = "* " * 40
+        manager.translation_engine = Mock()
+        manager.translation_engine.translate = AsyncMock(side_effect=[masked, "First line", "Second line"])
+
+        with patch.object(manager, "_split_translation_chunks", return_value=["第一句", "第二句"]):
+            translated = await manager._translate_text(
+                text="第一句\n第二句",
+                source_lang="auto",
+                target_lang="en",
+            )
+
+        assert translated == "First line\nSecond line"
+        assert manager.translation_engine.translate.await_count == 3
+        first_retry_call = manager.translation_engine.translate.await_args_list[1]
+        assert first_retry_call.args[1] == "zh"
+
+    @pytest.mark.asyncio
+    async def test_translate_text_raises_when_retry_still_masked(self, manager):
+        """If retry output remains masked placeholders, translation should fail explicitly."""
+        masked = "* " * 40
+        manager.translation_engine = Mock()
+        manager.translation_engine.translate = AsyncMock(side_effect=[masked, masked])
+
+        with patch.object(manager, "_split_translation_chunks", return_value=["第一句"]):
+            with pytest.raises(ValueError, match="masked placeholder"):
+                await manager._translate_text(
+                    text="第一句",
+                    source_lang="auto",
+                    target_lang="en",
+                )
+
+    def test_export_result_translation_md_uses_raw_translation_text(self, manager, temp_dir):
+        """Manual export for translation markdown should not use transcription markdown template."""
+        manager.translation_engine = Mock()
+        source_file = temp_dir / "source.txt"
+        source_file.write_text("hello", encoding="utf-8")
+        task_id = manager.add_translation_task(str(source_file), {"output_format": "md"})
+
+        task = TranscriptionTask.get_by_id(manager.db, task_id)
+        assert task is not None
+        task.status = TASK_STATUS_COMPLETED
+
+        translation_output = temp_dir / "translation_raw.md"
+        translation_output.write_text("[00:01:00] translated line", encoding="utf-8")
+        task.output_path = str(translation_output)
+        task.save(manager.db)
+
+        internal_data = {"text": "# Transcription\n**[00:00:00]** converted"}
+        internal_path = temp_dir / f"{task_id}.json"
+        internal_path.write_text(json.dumps(internal_data), encoding="utf-8")
+
+        exported_path = temp_dir / "manual_export.md"
+        with patch.object(manager, "_get_internal_format_path", return_value=str(internal_path)):
+            manager.export_result(task_id, "md", str(exported_path))
+
+        assert exported_path.read_text(encoding="utf-8") == "[00:01:00] translated line"
+
     # Status Query Tests
     def test_get_task_status_existing(self, manager, temp_audio_file):
         """Test getting status of an existing task."""
@@ -385,6 +480,7 @@ class TestTranscriptionManager:
         assert status["id"] == task_id
         assert status["status"] == TASK_STATUS_PENDING
         assert status["file_name"] == temp_audio_file.name
+        assert status["task_kind"] == "transcription"
 
     def test_get_task_status_nonexistent(self, manager):
         """Test getting status of a nonexistent task."""
@@ -406,6 +502,7 @@ class TestTranscriptionManager:
         all_tasks = manager.get_all_tasks()
 
         assert len(all_tasks) == 2
+        assert all(task["task_kind"] == "transcription" for task in all_tasks)
 
     def test_get_all_tasks_filtered_by_status(self, manager, temp_dir):
         """Test getting tasks filtered by status."""

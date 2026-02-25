@@ -4,6 +4,16 @@ All notable changes to EchoNote will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [1.4.3] - 2026-02-25
+
+### Changed
+
+- Released `v1.4.3` with batch transcribe/translate workflow alignment: tab-level controls now own their own import actions and task queues.
+- Refined translation defaults and override logic: settings defaults are used when page-level values are unset, while explicit values on batch/realtime pages take precedence.
+- Improved settings information architecture and visual density by reducing redundant cross-links and clarifying module boundaries for transcription, realtime recording, and translation.
+- Fixed language selection option hygiene by removing non-product placeholder entries and keeping only valid locale choices.
+- Synchronized project, packaging, documentation, and landing metadata version references to `v1.4.3` for release consistency.
+
 ## [1.4.2] - 2026-02-24
 
 ### Changed

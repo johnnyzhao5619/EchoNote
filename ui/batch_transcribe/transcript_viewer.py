@@ -15,13 +15,16 @@
 # limitations under the License.
 """Transcript viewer dialog for viewing and editing transcription results."""
 
-import asyncio
 import logging
 import os
 import shutil
-import threading
 from typing import Any, Optional
 
+from config.constants import (
+    DEFAULT_TRANSLATION_TARGET_LANGUAGE,
+    TRANSLATION_LANGUAGE_AUTO,
+)
+from core.settings.manager import resolve_translation_languages_from_settings
 from core.qt_imports import (
     QAction,
     QApplication,
@@ -49,10 +52,6 @@ from data.database.models import TranscriptionTask
 from ui.base_widgets import connect_button_with_callback, create_hbox
 from ui.batch_transcribe.search_widget import SearchWidget
 from ui.batch_transcribe.window_state_manager import WindowStateManager
-from ui.common.transcript_translation_viewer import (
-    VIEW_MODE_COMPARE,
-    TranscriptTranslationViewerDialog,
-)
 from ui.constants import (
     CONTROL_BUTTON_MIN_HEIGHT,
     ROLE_TRANSCRIPT_FILE,
@@ -120,7 +119,6 @@ class TranscriptViewerDialog(QDialog):
         # File loading state
         self.progress_dialog = None
         self.transcript_content = ""
-        self.translation_preview_dialog: Optional[TranscriptTranslationViewerDialog] = None
 
         # Initialize text_edit to None (will be created in _init_ui)
         self.text_edit = None
@@ -181,6 +179,7 @@ class TranscriptViewerDialog(QDialog):
                 "audio_duration": task.audio_duration,
                 "language": task.language,
                 "engine": task.engine,
+                "task_kind": "translation" if task.engine == "translation" else "transcription",
                 "output_path": task.output_path,
                 "completed_at": task.completed_at,
                 "status": task.status,
@@ -404,16 +403,10 @@ class TranscriptViewerDialog(QDialog):
         self.translate_target_combo.setMinimumHeight(CONTROL_BUTTON_MIN_HEIGHT)
         for code, label_key in LANGUAGE_OPTION_KEYS:
             self.translate_target_combo.addItem(self.i18n.t(label_key), code)
-        default_target = "en"
-        if self.settings_manager and hasattr(
-            self.settings_manager, "get_realtime_translation_preferences"
-        ):
-            try:
-                preferences = self.settings_manager.get_realtime_translation_preferences()
-                if isinstance(preferences, dict):
-                    default_target = preferences.get("translation_target_lang") or default_target
-            except Exception:
-                default_target = "en"
+        resolved = resolve_translation_languages_from_settings(self.settings_manager)
+        default_target = resolved.get(
+            "translation_target_lang", DEFAULT_TRANSLATION_TARGET_LANGUAGE
+        )
         default_index = self.translate_target_combo.findData(default_target)
         if default_index >= 0:
             self.translate_target_combo.setCurrentIndex(default_index)
@@ -424,6 +417,10 @@ class TranscriptViewerDialog(QDialog):
         self.translate_button.setMinimumHeight(CONTROL_BUTTON_MIN_HEIGHT)
         connect_button_with_callback(self.translate_button, self._on_translate_transcript_clicked)
         layout.addWidget(self.translate_button)
+
+        if self.task_data.get("task_kind") == "translation":
+            self.translate_target_combo.setVisible(False)
+            self.translate_button.setVisible(False)
 
         layout.addStretch()
 
@@ -843,7 +840,7 @@ class TranscriptViewerDialog(QDialog):
         return transcript_path
 
     def _on_translate_transcript_clicked(self):
-        """Translate transcript and open reusable compare viewer."""
+        """Queue transcript translation in batch task queue."""
         manager = self.transcription_manager
         if manager is None or getattr(manager, "translation_engine", None) is None:
             self.show_error(
@@ -853,76 +850,36 @@ class TranscriptViewerDialog(QDialog):
             return
 
         transcript_path = self._resolve_transcript_path()
-        target_lang = self.translate_target_combo.currentData() or "en"
-        source_lang = "auto"
-        if self.settings_manager and hasattr(
-            self.settings_manager, "get_realtime_translation_preferences"
-        ):
-            try:
-                preferences = self.settings_manager.get_realtime_translation_preferences()
-                if isinstance(preferences, dict):
-                    source_lang = preferences.get("translation_source_lang") or "auto"
-            except Exception:
-                source_lang = "auto"
+        selected_target = self.translate_target_combo.currentData()
+        resolved_languages = resolve_translation_languages_from_settings(
+            self.settings_manager,
+            target_lang=selected_target,
+        )
+        source_lang = resolved_languages.get(
+            "translation_source_lang", TRANSLATION_LANGUAGE_AUTO
+        )
+        target_lang = resolved_languages.get(
+            "translation_target_lang", DEFAULT_TRANSLATION_TARGET_LANGUAGE
+        )
 
-        self.show_info(self.i18n.t("common.info"), self.i18n.t("viewer.translation_started"))
-
-        def _worker() -> None:
-            try:
-                source_path = self._ensure_transcript_file(transcript_path)
-                translated_path = asyncio.run(
-                    manager.translate_transcript_file(
-                        source_path,
-                        source_lang=source_lang,
-                        target_lang=target_lang,
-                        event_id=None,
-                    )
-                )
-            except Exception as exc:  # noqa: BLE001
-                logger.error("Batch viewer translation failed: %s", exc, exc_info=True)
-                error_text = str(exc)
-                QTimer.singleShot(0, lambda err=error_text: self._on_translate_failed(err))
-                return
-
-            QTimer.singleShot(
-                0,
-                lambda: self._open_translation_preview(
-                    transcript_path=transcript_path,
-                    translation_path=translated_path,
-                ),
+        try:
+            source_path = self._ensure_transcript_file(transcript_path)
+            output_format = "md" if source_path.lower().endswith(".md") else "txt"
+            manager.add_translation_task(
+                source_path,
+                options={
+                    "translation_source_lang": source_lang,
+                    "translation_target_lang": target_lang,
+                    "output_format": output_format,
+                },
             )
-
-        threading.Thread(target=_worker, daemon=True).start()
-
-    def _on_translate_failed(self, error: str) -> None:
-        """Display translation failure details."""
-        self.show_error(
-            self.i18n.t("common.error"),
-            self.i18n.t("viewer.translation_failed", error=error),
-        )
-
-    def _open_translation_preview(self, *, transcript_path: str, translation_path: str) -> None:
-        """Open the reusable transcript/translation compare viewer."""
-        existing = self.translation_preview_dialog
-        if existing is not None:
-            try:
-                existing.close()
-            except Exception:
-                pass
-            self.translation_preview_dialog = None
-
-        dialog = TranscriptTranslationViewerDialog(
-            i18n=self.i18n,
-            transcript_path=transcript_path,
-            translation_path=translation_path,
-            initial_mode=VIEW_MODE_COMPARE,
-            title_key="timeline.translation_viewer_title",
-            parent=self,
-        )
-        self.translation_preview_dialog = dialog
-        dialog.show()
-        dialog.raise_()
-        dialog.activateWindow()
+            self.show_info(self.i18n.t("common.info"), self.i18n.t("viewer.translation_queued"))
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Failed to queue batch viewer translation task: %s", exc, exc_info=True)
+            self.show_error(
+                self.i18n.t("common.error"),
+                self.i18n.t("viewer.translation_failed", error=str(exc)),
+            )
 
     def copy_all(self):
         """Copy all text to clipboard."""

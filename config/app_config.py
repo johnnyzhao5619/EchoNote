@@ -199,6 +199,19 @@ class ConfigManager:
                 if not isinstance(fw_config["model_dir"], str):
                     raise TypeError("transcription.faster_whisper.model_dir must be a string")
 
+        if "secondary_model_size" in trans_config:
+            secondary_model = trans_config["secondary_model_size"]
+            if not isinstance(secondary_model, str):
+                raise TypeError("transcription.secondary_model_size must be a string")
+
+            from core.models.registry import get_default_model_names
+
+            valid_models = list(get_default_model_names())
+            if secondary_model not in valid_models:
+                raise ValueError(
+                    f"transcription.secondary_model_size must be one of {valid_models}"
+                )
+
     def _validate_resource_monitor_config(self) -> None:
         """Validate resource monitor configuration."""
         monitor_config = self._config["resource_monitor"]
@@ -315,6 +328,8 @@ class ConfigManager:
                 return self._validate_transcription_setting(setting, value)
             elif category == "realtime":
                 return self._validate_realtime_setting(setting, value)
+            elif category == "translation":
+                return self._validate_translation_setting(setting, value)
             elif category == "calendar":
                 return self._validate_calendar_setting(setting, value)
             elif category == "timeline":
@@ -347,6 +362,10 @@ class ConfigManager:
             from core.models.registry import get_default_model_names
 
             return isinstance(value, str) and value in get_default_model_names()
+        elif setting == "secondary_model_size":
+            from core.models.registry import get_default_model_names
+
+            return isinstance(value, str) and value in get_default_model_names()
         elif setting == "faster_whisper.model_dir":
             return isinstance(value, str)
         # Task queue settings
@@ -361,10 +380,7 @@ class ConfigManager:
         return True
 
     def _validate_realtime_setting(self, setting: str, value: Any) -> bool:
-        from config.constants import (
-            SUPPORTED_REALTIME_TRANSLATION_ENGINES,
-            SUPPORTED_RECORDING_FORMATS,
-        )
+        from config.constants import SUPPORTED_RECORDING_FORMATS
 
         if setting == "recording_format":
             return value in SUPPORTED_RECORDING_FORMATS
@@ -376,11 +392,6 @@ class ConfigManager:
         elif setting == "default_gain":
             # 0.1 to 10.0
             return isinstance(value, (int, float)) and 0.0 <= value <= 10.0
-        elif setting == "translation_engine":
-            return value in SUPPORTED_REALTIME_TRANSLATION_ENGINES
-        elif setting in ("translation_source_lang", "translation_target_lang"):
-            # "auto" or ISO 639-1/639-2 language code (non-empty string)
-            return isinstance(value, str) and len(value.strip()) >= 2
         elif setting == "vad_threshold":
             return isinstance(value, (int, float)) and 0.0 <= value <= 1.0
         elif setting == "silence_duration_ms":
@@ -397,6 +408,18 @@ class ConfigManager:
             return isinstance(value, bool)
         elif setting == "recording_save_path":
             return isinstance(value, str)
+        return True
+
+    def _validate_translation_setting(self, setting: str, value: Any) -> bool:
+        from config.constants import SUPPORTED_REALTIME_TRANSLATION_ENGINES
+
+        if setting == "models_dir":
+            return isinstance(value, str)
+        if setting == "translation_engine":
+            return value in SUPPORTED_REALTIME_TRANSLATION_ENGINES
+        if setting in ("translation_source_lang", "translation_target_lang"):
+            # "auto" or ISO 639-1/639-2 language code (non-empty string)
+            return isinstance(value, str) and len(value.strip()) >= 2
         return True
 
     def _validate_calendar_setting(self, setting: str, value: Any) -> bool:

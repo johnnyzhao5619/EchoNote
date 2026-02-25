@@ -20,7 +20,7 @@ Provides common functionality for all settings pages.
 """
 
 import logging
-from typing import Tuple, TypedDict
+from typing import Any, Optional, Tuple, TypedDict
 
 from core.qt_imports import (
     QHBoxLayout,
@@ -239,3 +239,53 @@ class BaseSettingsPage(BaseWidget):
         updated = self.settings_manager.set_setting(key, value)
         if not updated:
             raise ValueError(self.i18n.t("settings.error.setting_update_failed", key=key))
+
+    def _navigate_to_settings_page(self, page_id: str) -> bool:
+        """Navigate to a specific settings page when hosted inside ``SettingsWidget``."""
+        parent_widget = self.parentWidget()
+        while parent_widget is not None:
+            show_page = getattr(parent_widget, "show_page", None)
+            if callable(show_page):
+                try:
+                    return bool(show_page(page_id))
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Failed to navigate to settings page '%s': %s", page_id, exc)
+                    return False
+            parent_widget = parent_widget.parentWidget()
+        return False
+
+    def _find_settings_page_instance(self, page_id: str) -> Optional[Any]:
+        """Return settings page instance from nearest ``SettingsWidget`` container."""
+        parent_widget = self.parentWidget()
+        while parent_widget is not None:
+            settings_pages = getattr(parent_widget, "settings_pages", None)
+            if isinstance(settings_pages, dict):
+                return settings_pages.get(page_id)
+            parent_widget = parent_widget.parentWidget()
+        return None
+
+    def _open_settings_page(self, page_id: str) -> Optional[Any]:
+        """
+        Navigate to settings page and return its instance when available.
+
+        Flow:
+        1. If already inside SettingsWidget, switch there directly.
+        2. Otherwise switch main window to settings page and then select target.
+        """
+        if self._navigate_to_settings_page(page_id):
+            page = self._find_settings_page_instance(page_id)
+            if page is not None:
+                return page
+
+        main_window = self.window()
+        if main_window is None or not hasattr(main_window, "switch_page"):
+            return None
+
+        main_window.switch_page("settings")
+        settings_widget = getattr(main_window, "pages", {}).get("settings")
+        if settings_widget and hasattr(settings_widget, "show_page"):
+            if settings_widget.show_page(page_id):
+                settings_pages = getattr(settings_widget, "settings_pages", None)
+                if isinstance(settings_pages, dict):
+                    return settings_pages.get(page_id)
+        return None

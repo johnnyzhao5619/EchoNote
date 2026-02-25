@@ -49,35 +49,58 @@ class TestBatchTranscribeWidget:
         assert hasattr(widget, "import_folder_btn")
         assert hasattr(widget, "clear_queue_btn")
         assert hasattr(widget, "task_list")
+        assert hasattr(widget, "translation_task_list")
 
     def test_widget_has_model_combo(self, widget):
         """Test widget has model combo when model_manager is provided."""
         assert hasattr(widget, "model_combo")
         assert hasattr(widget, "model_label")
 
+    def test_widget_uses_task_tabs_and_translation_target_selector(self, widget):
+        """Batch page should use tabs and expose translation target selector."""
+        assert hasattr(widget, "task_tabs")
+        assert hasattr(widget, "translation_target_combo")
+        assert widget.translation_target_combo.count() > 0
+
+    def test_translation_options_use_selected_target_language(self, widget):
+        """Translation task options should follow target language selected in translation tab."""
+        target_index = widget.translation_target_combo.findData("fr")
+        if target_index >= 0:
+            widget.task_tabs.setCurrentIndex(1)
+            widget.translation_target_combo.setCurrentIndex(target_index)
+
+            options = widget._build_translation_task_options()
+            assert options["translation_target_lang"] == "fr"
+
     def test_import_file_button_exists(self, widget):
         """Test import file button exists and is clickable."""
         assert widget.import_file_btn is not None
-        assert widget.import_file_btn.isEnabled()
+        assert widget.import_file_btn.isEnabled() == widget._transcription_mode_ready()
 
     def test_import_folder_button_exists(self, widget):
         """Test import folder button exists and is clickable."""
         assert widget.import_folder_btn is not None
-        assert widget.import_folder_btn.isEnabled()
+        assert widget.import_folder_btn.isEnabled() == widget._transcription_mode_ready()
 
     def test_clear_queue_button_exists(self, widget):
         """Test clear queue button exists."""
         assert widget.clear_queue_btn is not None
+        assert widget.translation_clear_queue_btn is not None
 
     def test_toolbar_buttons_use_semantic_role(self, widget):
         """Toolbar buttons should expose semantic role hook for unified styling."""
         assert widget.import_file_btn.property("role") == "toolbar-secondary-action"
         assert widget.import_folder_btn.property("role") == "toolbar-secondary-action"
         assert widget.clear_queue_btn.property("role") == "toolbar-secondary-action"
+        assert widget.translation_import_file_btn.property("role") == "toolbar-secondary-action"
+        assert widget.translation_import_folder_btn.property("role") == "toolbar-secondary-action"
+        assert widget.translation_clear_queue_btn.property("role") == "toolbar-secondary-action"
+        assert widget.translation_paste_text_btn.property("role") == "toolbar-secondary-action"
 
     def test_task_list_exists(self, widget):
-        """Test task list widget exists."""
+        """Test task list widgets exist for both tabs."""
         assert widget.task_list is not None
+        assert widget.translation_task_list is not None
 
     def test_task_items_dictionary(self, widget):
         """Test task items dictionary is initialized."""
@@ -117,6 +140,26 @@ class TestBatchTranscribeWidget:
         # Verify dialog was opened
         mock_dialog.assert_called_once()
 
+    @patch("ui.batch_transcribe.widget.QFileDialog.getOpenFileNames")
+    def test_import_file_translation_mode_uses_translation_queue(
+        self, mock_dialog, widget, mock_transcription_manager
+    ):
+        """Translation mode should enqueue translation tasks for imported files."""
+        mock_dialog.return_value = (["/test/file.txt"], "Text Files (*.txt)")
+        mock_transcription_manager.add_translation_task.return_value = "translation-task-id"
+        widget.task_tabs.setCurrentIndex(1)
+
+        with patch.object(
+            widget,
+            "_build_translation_task_options",
+            return_value={"translation_target_lang": "en"},
+        ):
+            widget._on_import_file()
+
+        mock_transcription_manager.add_translation_task.assert_called_once_with(
+            "/test/file.txt", {"translation_target_lang": "en"}
+        )
+
     @patch("ui.batch_transcribe.widget.QFileDialog.getExistingDirectory")
     def test_import_folder_dialog(self, mock_dialog, widget, mock_transcription_manager):
         """Test import folder opens directory dialog."""
@@ -128,6 +171,27 @@ class TestBatchTranscribeWidget:
 
         # Verify dialog was opened
         mock_dialog.assert_called_once()
+
+    @patch("ui.batch_transcribe.widget.QFileDialog.getExistingDirectory")
+    def test_import_folder_translation_mode_uses_translation_options(
+        self, mock_dialog, widget, mock_transcription_manager
+    ):
+        """Translation mode folder import should use translation queue API."""
+        mock_dialog.return_value = "/test/folder"
+        mock_transcription_manager.add_translation_tasks_from_folder.return_value = ["task-1"]
+        widget.task_tabs.setCurrentIndex(1)
+
+        with patch.object(
+            widget,
+            "_build_translation_task_options",
+            return_value={"translation_target_lang": "en"},
+        ):
+            widget._on_import_folder()
+
+        mock_transcription_manager.add_translation_tasks_from_folder.assert_called_once_with(
+            "/test/folder",
+            {"translation_target_lang": "en"},
+        )
 
     @patch("ui.batch_transcribe.widget.QFileDialog.getExistingDirectory")
     def test_import_folder_uses_built_options(
@@ -172,6 +236,22 @@ class TestBatchTranscribeWidget:
 
         mock_transcription_manager.stop_all_tasks.assert_called_once()
         mock_transcription_manager.start_processing.assert_called()
+
+    @patch("ui.batch_transcribe.widget.QMessageBox.question")
+    def test_clear_queue_only_clears_current_kind(
+        self, mock_question, widget, mock_transcription_manager
+    ):
+        """Clear queue in translation tab should only clear translation tasks."""
+        mock_question.return_value = QMessageBox.StandardButton.Yes
+        mock_transcription_manager.get_all_tasks.return_value = [
+            {"id": "task-transcription", "status": TASK_STATUS_PENDING, "task_kind": "transcription"},
+            {"id": "task-translation", "status": TASK_STATUS_PENDING, "task_kind": "translation"},
+        ]
+        mock_transcription_manager.delete_task.return_value = True
+
+        widget._on_clear_queue("translation")
+
+        mock_transcription_manager.delete_task.assert_called_once_with("task-translation")
 
     @patch("ui.batch_transcribe.widget.QTimer.singleShot")
     @patch("ui.batch_transcribe.widget.QMessageBox.question")
@@ -297,6 +377,18 @@ class TestBatchTranscribeWidget:
         with patch.object(widget, "_set_tasks_pause_state") as mock_set_pause:
             widget._handle_manager_event("processing_resumed", {})
             mock_set_pause.assert_called_with(False)
+
+    def test_translation_task_is_rendered_in_translation_queue(self, widget):
+        """Translation tasks should be rendered in translation tab queue only."""
+        task_data = {
+            "id": "translation-task",
+            "status": TASK_STATUS_PENDING,
+            "file_name": "sample.txt",
+            "task_kind": "translation",
+        }
+        widget._add_task_item(task_data)
+        assert widget.translation_task_list.count() == 1
+        assert widget.task_list.count() == 0
 
 
 class TestBatchTranscribeWidgetWithoutModelManager:

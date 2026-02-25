@@ -23,30 +23,19 @@ import logging
 from typing import Dict, Union
 
 from core.qt_imports import (
-    QCheckBox,
-    QComboBox,
     QDialog,
     QFont,
-    QFormLayout,
     QFrame,
     QLabel,
     QMessageBox,
     QProgressBar,
     QPushButton,
-    QSpinBox,
     QTabWidget,
     QVBoxLayout,
     QWidget,
     Slot,
 )
 
-from config.constants import (
-    DEFAULT_COMPUTE_TYPE,
-    DEVICE_CPU,
-    DEVICE_CUDA,
-    SUPPORTED_COMPUTE_TYPES,
-    SUPPORTED_TRANSCRIPTION_DEVICES,
-)
 from core.models.registry import ModelInfo
 from core.models.translation_registry import TranslationModelInfo
 from ui.base_widgets import (
@@ -57,7 +46,6 @@ from ui.base_widgets import (
 )
 from ui.common.error_dialog import show_error_dialog
 from ui.constants import (
-    MODEL_CONFIG_DIALOG_MIN_WIDTH,
     MODEL_DETAILS_DIALOG_MIN_HEIGHT,
     MODEL_DETAILS_DIALOG_MIN_WIDTH,
     MODEL_MANAGEMENT_ACTION_BUTTON_MAX_WIDTH_MEDIUM,
@@ -67,9 +55,8 @@ from ui.constants import (
     MODEL_MANAGEMENT_RECOMMENDED_BUTTON_MAX_WIDTH,
     MODEL_MANAGEMENT_SECTION_TITLE_FONT_SIZE,
     ROLE_AUDIO_FILE,
-    ROLE_CUDA_NOTE,
-    ROLE_MODEL_CONFIG_FIELD_LABEL,
     ROLE_MODEL_REASON,
+    ROLE_SETTINGS_INLINE_ACTION,
     ROLE_TIME_DISPLAY,
     ZERO_MARGINS,
 )
@@ -150,6 +137,26 @@ class ModelManagementPage(BaseSettingsPage):
         self.desc_label.setWordWrap(True)
         self.desc_label.setObjectName("description_label")
         self.content_layout.addWidget(self.desc_label)
+
+        self.related_settings_layout = create_hbox()
+        self.related_settings_label = QLabel(
+            self.i18n.t("settings.model_management.related_settings")
+        )
+        self.go_to_transcription_button = create_button(
+            self.i18n.t("settings.model_management.go_to_transcription_settings")
+        )
+        self.go_to_transcription_button.setProperty("role", ROLE_SETTINGS_INLINE_ACTION)
+        self.go_to_transcription_button.clicked.connect(self._on_go_to_transcription_settings)
+        self.go_to_translation_button = create_button(
+            self.i18n.t("settings.model_management.go_to_translation_settings")
+        )
+        self.go_to_translation_button.setProperty("role", ROLE_SETTINGS_INLINE_ACTION)
+        self.go_to_translation_button.clicked.connect(self._on_go_to_translation_settings)
+        self.related_settings_layout.addWidget(self.related_settings_label)
+        self.related_settings_layout.addWidget(self.go_to_transcription_button)
+        self.related_settings_layout.addWidget(self.go_to_translation_button)
+        self.related_settings_layout.addStretch()
+        self.content_layout.addLayout(self.related_settings_layout)
 
         self.add_spacing()
 
@@ -248,6 +255,18 @@ class ModelManagementPage(BaseSettingsPage):
             self.title_label.setText(self.i18n.t("settings.model_management.title"))
         if hasattr(self, "desc_label"):
             self.desc_label.setText(self.i18n.t("settings.model_management.description"))
+        if hasattr(self, "related_settings_label"):
+            self.related_settings_label.setText(
+                self.i18n.t("settings.model_management.related_settings")
+            )
+        if hasattr(self, "go_to_transcription_button"):
+            self.go_to_transcription_button.setText(
+                self.i18n.t("settings.model_management.go_to_transcription_settings")
+            )
+        if hasattr(self, "go_to_translation_button"):
+            self.go_to_translation_button.setText(
+                self.i18n.t("settings.model_management.go_to_translation_settings")
+            )
 
         # 更新区域标题
         if hasattr(self, "downloaded_title"):
@@ -328,31 +347,9 @@ class ModelManagementPage(BaseSettingsPage):
             card.delete_clicked.connect(self._on_delete_clicked)
             card.details_clicked.connect(self._on_view_details_clicked)
 
-        card.config_clicked.connect(self._on_config_clicked)
         card.cancel_download_clicked.connect(self._on_cancel_download_clicked)
 
         return card
-
-    def _on_config_clicked(self, model_name: str):
-        """
-        处理配置按钮点击
-
-        Args:
-            model_name: 模型名称
-        """
-        logger.info(f"Config clicked for model: {model_name}")
-
-        # 获取模型信息
-        model = self.model_manager.get_model(model_name)
-        if not model:
-            logger.error(f"Model not found: {model_name}")
-            return
-
-        # 创建并显示配置对话框
-        dialog = ModelConfigDialog(model, self.settings_manager, self.i18n, self)
-        if dialog.exec():
-            # 配置已保存
-            logger.info(f"Configuration saved for model: {model_name}")
 
     def _on_delete_clicked(self, model_name: str):
         """
@@ -865,6 +862,14 @@ class ModelManagementPage(BaseSettingsPage):
     def save_settings(self):
         """保存设置（模型管理页面不需要保存设置）"""
 
+    def _on_go_to_transcription_settings(self) -> None:
+        """Navigate to transcription settings page."""
+        self._open_settings_page("transcription")
+
+    def _on_go_to_translation_settings(self) -> None:
+        """Navigate to translation settings page."""
+        self._open_settings_page("translation")
+
     # ------------------------------------------------------------------
     # 翻译模型（Opus-MT）管理方法
     # ------------------------------------------------------------------
@@ -1166,198 +1171,3 @@ class ModelDetailsDialog(QDialog):
 
         except Exception as e:
             logger.error(f"Error opening file explorer: {e}")
-
-
-class ModelConfigDialog(QDialog):
-    """模型配置对话框"""
-
-    MIN_WIDTH = MODEL_CONFIG_DIALOG_MIN_WIDTH
-
-    def __init__(self, model: ModelInfo, settings_manager, i18n: I18nQtManager, parent=None):
-        """
-        初始化模型配置对话框
-
-        Args:
-            model: 模型信息
-            settings_manager: 设置管理器
-            i18n: 国际化管理器
-            parent: 父控件
-        """
-        super().__init__(parent)
-        self.model = model
-        self.settings_manager = settings_manager
-        self.i18n = i18n
-        self.setObjectName("model_config_dialog")
-
-        self.setWindowTitle(i18n.t("settings.model_management.config_title", model=model.full_name))
-        self.setMinimumWidth(self.MIN_WIDTH)
-
-        layout = QVBoxLayout(self)
-
-        # 标题
-        title_label = QLabel(i18n.t("settings.model_management.config_description"))
-        title_label.setWordWrap(True)
-        layout.addWidget(title_label)
-
-        # 配置表单
-        form_layout = QFormLayout()
-
-        def _create_form_label(i18n_key: str) -> QLabel:
-            label = QLabel(i18n.t(i18n_key) + ":")
-            label.setProperty("role", ROLE_MODEL_CONFIG_FIELD_LABEL)
-            return label
-
-        # 计算设备选择
-        device_label = _create_form_label("settings.model_management.compute_device")
-        device_combo = QComboBox()
-        device_combo.addItems(SUPPORTED_TRANSCRIPTION_DEVICES)
-
-        # 检查 CUDA 是否可用
-        cuda_available = False
-        try:
-            import torch
-
-            cuda_available = torch.cuda.is_available()
-        except Exception:
-            pass
-
-        if not cuda_available:
-            # 禁用 CUDA 选项
-            cuda_index = device_combo.findText(DEVICE_CUDA)
-            if cuda_index >= 0:
-                device_combo.model().item(cuda_index).setEnabled(False)
-
-        form_layout.addRow(device_label, device_combo)
-
-        # 计算精度选择
-        compute_type_label = _create_form_label("settings.model_management.compute_precision")
-        compute_type_combo = QComboBox()
-        compute_type_combo.addItems(SUPPORTED_COMPUTE_TYPES)
-        form_layout.addRow(compute_type_label, compute_type_combo)
-
-        # VAD 过滤（批量转录）
-        vad_label = _create_form_label("settings.model_management.enable_vad")
-        vad_checkbox = QCheckBox(i18n.t("settings.model_management.vad_description"))
-        form_layout.addRow(vad_label, vad_checkbox)
-
-        # VAD 静音阈值
-        vad_threshold_label = _create_form_label("settings.model_management.vad_threshold")
-        vad_threshold_spin = QSpinBox()
-        vad_threshold_spin.setMinimum(100)
-        vad_threshold_spin.setMaximum(5000)
-        vad_threshold_spin.setSingleStep(100)
-        vad_threshold_spin.setValue(500)
-        vad_threshold_spin.setSuffix(" ms")
-        vad_threshold_spin.setEnabled(False)  # 初始禁用
-
-        # VAD 复选框状态改变时启用/禁用阈值设置
-        vad_checkbox.stateChanged.connect(lambda state: vad_threshold_spin.setEnabled(bool(state)))
-
-        form_layout.addRow(vad_threshold_label, vad_threshold_spin)
-
-        layout.addLayout(form_layout)
-
-        # 加载当前配置
-        config_key = f"transcription.model_configs.{model.name}"
-
-        # 设备
-        current_device = settings_manager.get_setting(f"{config_key}.device") or DEVICE_CPU
-        device_index = device_combo.findText(current_device)
-        if device_index >= 0:
-            device_combo.setCurrentIndex(device_index)
-
-        # 计算精度
-        current_compute_type = (
-            settings_manager.get_setting(f"{config_key}.compute_type") or DEFAULT_COMPUTE_TYPE
-        )
-        compute_type_index = compute_type_combo.findText(current_compute_type)
-        if compute_type_index >= 0:
-            compute_type_combo.setCurrentIndex(compute_type_index)
-
-        # VAD 设置
-        current_vad_enabled = settings_manager.get_setting(f"{config_key}.vad_filter")
-        if current_vad_enabled is None:
-            current_vad_enabled = False
-        vad_checkbox.setChecked(current_vad_enabled)
-
-        current_vad_threshold = (
-            settings_manager.get_setting(f"{config_key}.vad_threshold_ms") or 500
-        )
-        vad_threshold_spin.setValue(current_vad_threshold)
-
-        # 提示信息
-        if not cuda_available:
-            cuda_note = QLabel(i18n.t("settings.model_management.cuda_not_available"))
-            cuda_note.setWordWrap(True)
-            cuda_note.setProperty("role", ROLE_CUDA_NOTE)
-            layout.addWidget(cuda_note)
-
-        # 添加弹性空间
-        layout.addStretch()
-
-        # 按钮布局
-        button_layout = create_hbox()
-        button_layout.addStretch()
-
-        # 取消按钮
-        cancel_btn = create_button(i18n.t("settings.model_management.cancel"))
-        connect_button_with_callback(cancel_btn, self.reject)
-        button_layout.addWidget(cancel_btn)
-
-        # 保存按钮
-        save_btn = create_button(i18n.t("settings.model_management.save"))
-        save_btn.setDefault(True)
-
-        def save_config():
-            # 验证配置
-            selected_device = device_combo.currentText()
-
-            if selected_device == DEVICE_CUDA and not cuda_available:
-                self.show_warning(
-                    i18n.t("settings.model_management.validation_error"),
-                    i18n.t("settings.model_management.cuda_not_available"),
-                )
-                return
-
-            # 保存配置
-            updates = [
-                (f"{config_key}.device", selected_device),
-                (f"{config_key}.compute_type", compute_type_combo.currentText()),
-                (f"{config_key}.vad_filter", vad_checkbox.isChecked()),
-                (f"{config_key}.vad_threshold_ms", vad_threshold_spin.value()),
-            ]
-            for key, value in updates:
-                if not settings_manager.set_setting(key, value):
-                    self.show_warning(
-                        i18n.t("settings.model_management.validation_error"),
-                        i18n.t("settings.error.setting_update_failed", key=key),
-                    )
-                    return
-
-            # 保存到磁盘
-            config_manager = getattr(settings_manager, "config_manager", None)
-            save_config = getattr(config_manager, "save", None)
-            if not callable(save_config):
-                self.show_warning(
-                    i18n.t("settings.model_management.validation_error"),
-                    i18n.t("exceptions.settings.failed_to_save_to_disk"),
-                )
-                return
-
-            try:
-                save_config()
-            except Exception as exc:  # noqa: BLE001
-                logger.error("Failed to persist model settings: %s", exc, exc_info=True)
-                self.show_warning(
-                    i18n.t("settings.model_management.validation_error"),
-                    i18n.t("exceptions.settings.failed_to_save_to_disk"),
-                )
-                return
-
-            logger.info(f"Configuration saved for model: {model.name}")
-            self.accept()
-
-        connect_button_with_callback(save_btn, save_config)
-        button_layout.addWidget(save_btn)
-
-        layout.addLayout(button_layout)

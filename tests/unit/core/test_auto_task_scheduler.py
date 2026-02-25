@@ -188,6 +188,13 @@ def mock_settings_manager():
             "auto_save": True,
         }
     )
+    manager.get_translation_preferences = Mock(
+        return_value={
+            "translation_engine": "none",
+            "translation_source_lang": "auto",
+            "translation_target_lang": "en",
+        }
+    )
     manager.setting_changed = Mock()
     manager.setting_changed.connect = Mock()
     return manager

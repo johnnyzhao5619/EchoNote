@@ -24,7 +24,7 @@ from pathlib import Path
 
 import pytest
 
-from utils.i18n import I18nManager
+from utils.i18n import I18nManager, get_translation_codes
 
 
 class TestI18nEnhanced:
@@ -183,6 +183,21 @@ class TestI18nEnhanced:
 
         i18n = I18nManager(str(temp_translations_dir), "zh_CN", fallback_language="en_US")
         assert i18n.t("simple.message") == "Simple message"
+
+    def test_get_translation_codes_excludes_non_locale_json(self, temp_translations_dir):
+        """Only locale-style translation files should appear in selectors."""
+        (temp_translations_dir / "i18n_outline.json").write_text("{}", encoding="utf-8")
+        (temp_translations_dir / "en-us.json").write_text("{}", encoding="utf-8")
+        (temp_translations_dir / "en.json").write_text("{}", encoding="utf-8")
+
+        assert get_translation_codes(temp_translations_dir) == ["en_US", "zh_CN"]
+
+    def test_i18n_manager_available_languages_excludes_non_locale_json(self, temp_translations_dir):
+        """Manager language discovery should match UI locale filtering."""
+        (temp_translations_dir / "i18n_outline.json").write_text("{}", encoding="utf-8")
+
+        i18n = I18nManager(str(temp_translations_dir), "zh_CN")
+        assert i18n.get_available_languages() == ["en_US", "zh_CN"]
 
     def test_template_caching(self, i18n_manager):
         """Test template caching functionality."""

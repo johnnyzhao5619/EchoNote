@@ -3,7 +3,10 @@
 
 from typing import Any
 
-from core.settings.manager import SettingsManager
+from core.settings.manager import (
+    SettingsManager,
+    resolve_translation_languages_from_settings,
+)
 
 
 class _FakeConfigManager:
@@ -14,9 +17,6 @@ class _FakeConfigManager:
                 "auto_save": True,
                 "default_input_source": "default",
                 "default_gain": 1.0,
-                "translation_engine": "google",
-                "translation_source_lang": "auto",
-                "translation_target_lang": "en",
                 "floating_window_enabled": False,
                 "hide_main_window_when_floating": False,
                 "floating_window_always_on_top": True,
@@ -25,14 +25,21 @@ class _FakeConfigManager:
                 "min_audio_duration": 3.0,
                 "save_transcript": True,
                 "create_calendar_event": True,
-            }
+            },
+            "translation": {
+                "translation_engine": "google",
+                "translation_source_lang": "auto",
+                "translation_target_lang": "en",
+            },
         }
         self._settings = {
             "realtime": {
-                "translation_engine": "none",
                 "default_gain": 1.5,
                 "floating_window_enabled": True,
-            }
+            },
+            "translation": {
+                "translation_engine": "none",
+            },
         }
 
     def get_defaults(self):
@@ -66,7 +73,7 @@ class _FakeConfigManager:
 
     def validate_setting(self, key: str, value: Any) -> bool:
         # Simple mock validation logic
-        if key == "realtime.translation_engine":
+        if key == "translation.translation_engine":
             return value in ["none", "google"]
         if key == "realtime.default_input_source":
             return value == "default"
@@ -88,34 +95,59 @@ class _FakeConfigManager:
         self._settings = snapshot
 
 
-def test_get_realtime_preferences_includes_translation_engine():
+def test_get_realtime_preferences_uses_realtime_defaults_only():
     manager = SettingsManager(_FakeConfigManager())
     preferences = manager.get_realtime_preferences()
 
-    assert preferences["translation_engine"] == "none"
+    assert "translation_engine" not in preferences
     assert preferences["default_gain"] == 1.5
     assert preferences["floating_window_enabled"] is True
     assert preferences["floating_window_always_on_top"] is True
 
 
-def test_get_realtime_translation_preferences_uses_unified_defaults():
+def test_get_translation_preferences_uses_unified_defaults():
     manager = SettingsManager(_FakeConfigManager())
-    preferences = manager.get_realtime_translation_preferences()
+    preferences = manager.get_translation_preferences()
 
     assert preferences["translation_engine"] == "none"
     assert preferences["translation_source_lang"] == "auto"
     assert preferences["translation_target_lang"] == "en"
-    assert preferences["floating_window_enabled"] is True
-    assert preferences["hide_main_window_when_floating"] is False
-    assert preferences["floating_window_always_on_top"] is True
+
+
+def test_resolve_realtime_translation_languages_uses_runtime_overrides():
+    manager = SettingsManager(_FakeConfigManager())
+
+    resolved = manager.resolve_realtime_translation_languages(source_lang="zh", target_lang="fr")
+
+    assert resolved["translation_source_lang"] == "zh"
+    assert resolved["translation_target_lang"] == "fr"
+
+
+def test_resolve_realtime_translation_languages_falls_back_to_settings_defaults():
+    config = _FakeConfigManager()
+    config.set("translation.translation_source_lang", "ja")
+    config.set("translation.translation_target_lang", "ko")
+    manager = SettingsManager(config)
+
+    resolved = manager.resolve_realtime_translation_languages(source_lang="", target_lang=None)
+
+    assert resolved["translation_source_lang"] == "ja"
+    assert resolved["translation_target_lang"] == "ko"
+
+
+def test_resolve_translation_languages_from_settings_handles_missing_manager():
+    resolved = resolve_translation_languages_from_settings(None, target_lang="fr")
+
+    assert resolved["translation_source_lang"] == "auto"
+    assert resolved["translation_target_lang"] == "fr"
 
 
 def test_validate_realtime_translation_engine_setting():
     manager = SettingsManager(_FakeConfigManager())
 
-    assert manager.validate_setting("realtime.translation_engine", "none")
-    assert manager.validate_setting("realtime.translation_engine", "google")
-    assert not manager.validate_setting("realtime.translation_engine", "azure")
+    assert manager.validate_setting("translation.translation_engine", "none")
+    assert manager.validate_setting("translation.translation_engine", "google")
+    assert not manager.validate_setting("translation.translation_engine", "azure")
 
 
 def test_validate_realtime_default_input_source_setting():

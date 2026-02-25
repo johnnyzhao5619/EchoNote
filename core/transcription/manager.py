@@ -25,6 +25,7 @@ import concurrent.futures
 import json
 import logging
 import os
+import re
 import threading
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -42,6 +43,11 @@ from engines.speech.base import AUDIO_VIDEO_SUFFIXES, SpeechEngine
 from ui.common.notification import get_notification_manager
 
 logger = logging.getLogger("echonote.transcription.manager")
+
+TEXT_TRANSLATION_SUFFIXES = frozenset({".txt", ".md"})
+TRANSLATION_TASK_ENGINE = "translation"
+TRANSLATION_TASK_KIND = "translation"
+TRANSCRIPTION_TASK_KIND = "transcription"
 
 
 class TaskNotFoundError(Exception):
@@ -379,11 +385,161 @@ class TranscriptionManager:
                 "file_name": task.file_name,
                 "status": task.status,
                 "created_at": task.created_at,
+                "task_kind": TRANSCRIPTION_TASK_KIND,
             },
         )
 
         logger.info(f"Added transcription task: {task.id} for file {file_path.name}")
         return task.id
+
+    def add_translation_task(self, file_path: str, options: Optional[Dict[str, Any]] = None) -> str:
+        """
+        Add a translation task for a text/audio/video source file.
+
+        Args:
+            file_path: Path to source file (audio/video/txt/md)
+            options: Optional task options:
+                - translation_source_lang: Source language code
+                - translation_target_lang: Target language code
+                - language: Source transcription language (audio/video only)
+                - output_format: Output format (txt/md)
+                - output_path: Custom output path
+
+        Returns:
+            Task ID
+        """
+        if not self.translation_engine:
+            raise RuntimeError("Translation engine is unavailable")
+
+        options = options or {}
+        source_path = Path(file_path).expanduser().resolve()
+        if not source_path.exists():
+            raise FileNotFoundError(f"File not found: {source_path}")
+
+        supported_suffixes = AUDIO_VIDEO_SUFFIXES | TEXT_TRANSLATION_SUFFIXES
+        suffix = source_path.suffix.lower()
+        if suffix not in supported_suffixes:
+            raise ValueError(
+                f"Unsupported file format: {source_path.suffix}. "
+                f"Supported formats: {', '.join(sorted(supported_suffixes))}"
+            )
+
+        output_format = (options.get("output_format") or "").strip().lower()
+        if not output_format:
+            output_format = "md" if suffix == ".md" else "txt"
+        if output_format not in {"txt", "md"}:
+            raise ValueError("Translation output_format must be one of: txt, md")
+
+        from config.constants import TASK_STATUS_PENDING
+
+        task = TranscriptionTask(
+            file_path=str(source_path),
+            file_name=source_path.name,
+            file_size=source_path.stat().st_size,
+            status=TASK_STATUS_PENDING,
+            language=options.get("translation_source_lang") or "auto",
+            engine=TRANSLATION_TASK_ENGINE,
+            output_format=output_format,
+            output_path=options.get("output_path"),
+        )
+        task.save(self.db)
+
+        engine_option_keys = {
+            "model_name",
+            "model_path",
+            "beam_size",
+            "vad_filter",
+            "vad_min_silence_duration_ms",
+            "prompt",
+            "temperature",
+            "event_id",
+            "language",
+            "translation_source_lang",
+            "translation_target_lang",
+        }
+        engine_options = {key: options[key] for key in engine_option_keys if key in options}
+        engine_options["task_kind"] = TRANSLATION_TASK_KIND
+        self._task_engine_options[task.id] = engine_options
+        self._persist_task_engine_options()
+
+        if not self._queue_or_buffer_task(task.id):
+            logger.info(f"Task queue not ready, task {task.id} cached until processing starts")
+
+        self._notify_listeners(
+            "task_added",
+            {
+                "id": task.id,
+                "file_name": task.file_name,
+                "status": task.status,
+                "created_at": task.created_at,
+                "task_kind": TRANSLATION_TASK_KIND,
+            },
+        )
+        logger.info("Added translation task: %s for file %s", task.id, source_path.name)
+        return task.id
+
+    def add_translation_tasks_from_folder(
+        self, folder_path: str, options: Optional[Dict[str, Any]] = None
+    ) -> List[str]:
+        """
+        Add translation tasks for all supported files in a folder.
+
+        Supported input formats: audio/video/txt/md.
+        """
+        folder_path_obj = Path(folder_path).expanduser().resolve()
+        if not folder_path_obj.is_dir():
+            raise NotADirectoryError(f"Not a directory: {folder_path_obj}")
+
+        task_ids: List[str] = []
+        supported_suffixes = AUDIO_VIDEO_SUFFIXES | TEXT_TRANSLATION_SUFFIXES
+        for file_path in folder_path_obj.rglob("*"):
+            if not file_path.is_file():
+                continue
+            if file_path.suffix.lower() not in supported_suffixes:
+                continue
+            try:
+                task_ids.append(self.add_translation_task(str(file_path), options))
+            except Exception as exc:
+                logger.error("Failed to add translation task for %s: %s", file_path, exc)
+
+        logger.info("Added %d translation tasks from folder %s", len(task_ids), folder_path_obj)
+        return task_ids
+
+    def add_translation_text_task(
+        self,
+        text: str,
+        *,
+        file_name: str = "pasted_text.txt",
+        options: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """
+        Persist pasted text as a source file and enqueue a translation task.
+        """
+        content = text.strip()
+        if not content:
+            raise ValueError("Text content is empty")
+
+        clean_file_name = Path(file_name or "pasted_text.txt").name
+        suffix = Path(clean_file_name).suffix.lower()
+        if suffix not in TEXT_TRANSLATION_SUFFIXES:
+            clean_file_name = f"{Path(clean_file_name).stem}.txt"
+
+        input_dir = get_app_dir() / "translation_inputs"
+        input_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            os.chmod(input_dir, 0o700)
+        except Exception:
+            pass
+
+        task_seed = TranscriptionTask()
+        source_path = input_dir / f"{task_seed.id}_{clean_file_name}"
+        source_path.write_text(content, encoding="utf-8")
+        try:
+            os.chmod(source_path, 0o600)
+        except Exception:
+            pass
+
+        return self.add_translation_task(str(source_path), options=options)
 
     def add_tasks_from_folder(
         self, folder_path: str, options: Optional[Dict[str, Any]] = None
@@ -733,6 +889,7 @@ class TranscriptionManager:
             cancel_event: Event to check for cancellation
         """
         task: Optional[TranscriptionTask] = None
+        runtime_options: Dict[str, Any] = {}
 
         def ensure_not_cancelled(stage: str) -> None:
             if cancel_event.is_set():
@@ -791,6 +948,25 @@ class TranscriptionManager:
 
             # Prepare engine/runtime options
             runtime_options = dict(self._task_engine_options.get(task_id, {}))
+            task_kind = runtime_options.get("task_kind")
+            if task_kind == TRANSLATION_TASK_KIND:
+                await self._process_translation_task_async(
+                    task=task,
+                    task_id=task_id,
+                    runtime_options=runtime_options,
+                    ensure_not_cancelled=ensure_not_cancelled,
+                )
+                updated_task = TranscriptionTask.get_by_id(self.db, task_id) or task
+                self._notify_listeners(
+                    "task_updated",
+                    self._build_task_payload(updated_task, runtime_options=runtime_options),
+                )
+                self._notify_listeners("task_completed", {"id": task_id})
+                if task_id in self._task_engine_options:
+                    del self._task_engine_options[task_id]
+                    self._persist_task_engine_options()
+                return
+
             replace_realtime = bool(runtime_options.pop("replace_realtime", False))
             event_id = runtime_options.get("event_id")
 
@@ -873,7 +1049,10 @@ class TranscriptionManager:
                     # 翻译失败不影响转写任务的完成状态
 
             # Notify completion
-            self._notify_listeners("task_updated", task.to_dict())
+            self._notify_listeners(
+                "task_updated",
+                self._build_task_payload(task, runtime_options=runtime_options),
+            )
             self._notify_listeners("task_completed", {"id": task_id})
 
             # Cleanup engine options
@@ -889,7 +1068,10 @@ class TranscriptionManager:
             if task:
                 task.status = TASK_STATUS_CANCELLED
                 task.save(self.db)
-                self._notify_listeners("task_updated", task.to_dict())
+                self._notify_listeners(
+                    "task_updated",
+                    self._build_task_payload(task, runtime_options=runtime_options),
+                )
                 self._notify_listeners("task_cancelled", {"id": task_id})
 
             # Use helper to ensure consistent cleanup if needed
@@ -904,7 +1086,10 @@ class TranscriptionManager:
                 task.status = TASK_STATUS_FAILED
                 task.error_message = str(e)
                 task.save(self.db)
-                self._notify_listeners("task_updated", task.to_dict())
+                self._notify_listeners(
+                    "task_updated",
+                    self._build_task_payload(task, runtime_options=runtime_options),
+                )
                 self._notify_listeners("task_failed", {"id": task_id, "error": str(e)})
 
     def _save_internal_result(self, task_id: str, result: Dict[str, Any]) -> None:
@@ -997,6 +1182,179 @@ class TranscriptionManager:
                 )
 
             # We don't fail the task if export fails, but we log it
+
+    async def _process_translation_task_async(
+        self,
+        *,
+        task: TranscriptionTask,
+        task_id: str,
+        runtime_options: Dict[str, Any],
+        ensure_not_cancelled: Callable[[str], None],
+    ) -> None:
+        """Process translation task for text/audio/video inputs."""
+        if not self.translation_engine:
+            raise RuntimeError("Translation engine is unavailable")
+
+        source_path = Path(task.file_path).expanduser().resolve()
+        suffix = source_path.suffix.lower()
+        source_lang = runtime_options.get("translation_source_lang") or "auto"
+        target_lang = runtime_options.get("translation_target_lang") or "en"
+        source_text = ""
+        transcribe_result: Dict[str, Any] = {}
+
+        def _persist_progress(progress: float, message: str) -> None:
+            self.db.execute(
+                "UPDATE transcription_tasks SET progress = ? WHERE id = ?",
+                (float(progress), task_id),
+                commit=True,
+            )
+            self._update_progress(task_id, float(progress), message)
+
+        _persist_progress(5.0, "Loading source")
+        ensure_not_cancelled("before loading translation source")
+
+        if suffix in AUDIO_VIDEO_SUFFIXES:
+            self._update_progress(task_id, 10.0, "Transcribing source audio")
+            audio_language = runtime_options.get("language")
+            engine_kwargs = dict(runtime_options)
+            engine_kwargs.pop("task_kind", None)
+            engine_kwargs.pop("event_id", None)
+            engine_kwargs.pop("language", None)
+            engine_kwargs.pop("translation_source_lang", None)
+            engine_kwargs.pop("translation_target_lang", None)
+            engine_kwargs["progress_callback"] = (
+                lambda progress: _persist_progress(10.0 + (float(progress) * 0.5), "Transcribing")
+            )
+            transcribe_result = await self.speech_engine.transcribe_file(
+                task.file_path,
+                language=audio_language,
+                **engine_kwargs,
+            )
+            source_text = self._extract_transcript_text(transcribe_result)
+        elif suffix in TEXT_TRANSLATION_SUFFIXES:
+            source_text = source_path.read_text(encoding="utf-8")
+        else:
+            raise ValueError(
+                f"Unsupported file format for translation: {source_path.suffix}. "
+                f"Supported formats: {', '.join(sorted(AUDIO_VIDEO_SUFFIXES | TEXT_TRANSLATION_SUFFIXES))}"
+            )
+
+        if not source_text.strip():
+            raise ValueError("Translation source text is empty")
+
+        ensure_not_cancelled("before translation")
+        _persist_progress(70.0, "Translating")
+        translated_text = await self._translate_text(
+            text=source_text,
+            source_lang=source_lang,
+            target_lang=target_lang,
+        )
+        if not translated_text.strip():
+            raise ValueError("Translation result is empty")
+
+        ensure_not_cancelled("before saving translation")
+        _persist_progress(90.0, "Saving results")
+
+        output_format = (task.output_format or "txt").lower()
+        if output_format not in {"txt", "md"}:
+            raise ValueError("Translation output_format must be one of: txt, md")
+
+        event_id = runtime_options.get("event_id")
+        if task.output_path:
+            output_path = Path(task.output_path).expanduser().resolve()
+        else:
+            output_path = self._resolve_translation_output_path(
+                base_path=source_path,
+                target_lang=target_lang,
+                event_id=event_id,
+                extension=output_format,
+            )
+        task.output_path = str(output_path)
+        task.output_format = output_format
+        task.save(self.db)
+
+        internal_result = self._build_internal_result_from_text(translated_text)
+        self._save_internal_result(task_id, internal_result)
+
+        self._write_translation_output(
+            text=translated_text,
+            output_format=output_format,
+            output_path=output_path,
+        )
+        self._upsert_translation_attachment(event_id=event_id, translation_path=output_path)
+
+        if suffix in AUDIO_VIDEO_SUFFIXES and isinstance(transcribe_result, dict):
+            duration = transcribe_result.get("duration")
+            if isinstance(duration, (int, float)):
+                task.audio_duration = float(duration)
+
+        from config.constants import TASK_STATUS_COMPLETED
+
+        task.status = TASK_STATUS_COMPLETED
+        task.completed_at = current_iso_timestamp()
+        task.progress = 100.0
+        task.error_message = None
+        task.save(self.db)
+
+        _persist_progress(100.0, "Completed")
+
+    @staticmethod
+    def _build_internal_result_from_text(text: str) -> Dict[str, Any]:
+        """Build internal transcript-like payload from plain text."""
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+        segments = []
+        for index, line in enumerate(lines):
+            start_time = float(index)
+            segments.append(
+                {
+                    "start": start_time,
+                    "end": start_time,
+                    "text": line,
+                }
+            )
+
+        return {
+            "text": text.strip(),
+            "segments": segments,
+            "duration": float(len(lines)),
+        }
+
+    def _resolve_task_kind(
+        self,
+        *,
+        task: Optional[TranscriptionTask] = None,
+        task_id: Optional[str] = None,
+        runtime_options: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """Resolve task kind from runtime options first, then persisted metadata."""
+        options = runtime_options
+        if options is None and task_id:
+            options = self._task_engine_options.get(task_id, {})
+
+        if isinstance(options, dict):
+            task_kind = options.get("task_kind")
+            if isinstance(task_kind, str) and task_kind:
+                return task_kind
+
+        if task and task.engine == TRANSLATION_TASK_ENGINE:
+            return TRANSLATION_TASK_KIND
+
+        return TRANSCRIPTION_TASK_KIND
+
+    def _build_task_payload(
+        self,
+        task: TranscriptionTask,
+        *,
+        runtime_options: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Serialize task to listener payload with stable task kind metadata."""
+        payload = task.to_dict()
+        payload["task_kind"] = self._resolve_task_kind(
+            task=task,
+            task_id=task.id,
+            runtime_options=runtime_options,
+        )
+        return payload
 
     @staticmethod
     def _extract_transcript_text(result: Dict[str, Any]) -> str:
@@ -1107,16 +1465,146 @@ class TranscriptionManager:
         return str(translation_path)
 
     async def _translate_text(self, *, text: str, source_lang: str, target_lang: str) -> str:
-        """Translate text and normalize async/sync engine return types."""
+        """Translate text with a quality guard against degenerate masked outputs."""
         if not self.translation_engine:
             raise RuntimeError("Translation engine is unavailable")
 
+        translated_text = await self._translate_once(
+            text=text,
+            source_lang=source_lang,
+            target_lang=target_lang,
+        )
+        if translated_text and not self._is_masked_placeholder_text(translated_text):
+            return translated_text
+
+        logger.warning(
+            "Detected degenerate translation output (source=%s, target=%s). "
+            "Retrying with chunked translation fallback.",
+            source_lang,
+            target_lang,
+        )
+
+        retry_source_lang = source_lang
+        if source_lang == "auto" and self._contains_cjk(text):
+            retry_source_lang = "zh"
+
+        chunks = self._split_translation_chunks(text)
+        fallback_parts: List[str] = []
+        for chunk in chunks:
+            chunk_translation = await self._translate_once(
+                text=chunk,
+                source_lang=retry_source_lang,
+                target_lang=target_lang,
+            )
+            if (
+                self._is_masked_placeholder_text(chunk_translation)
+                and retry_source_lang != "zh"
+                and self._contains_cjk(chunk)
+            ):
+                chunk_translation = await self._translate_once(
+                    text=chunk,
+                    source_lang="zh",
+                    target_lang=target_lang,
+                )
+
+            if chunk_translation.strip() and not self._is_masked_placeholder_text(chunk_translation):
+                fallback_parts.append(chunk_translation.strip())
+
+        fallback_text = "\n".join(fallback_parts).strip()
+        if fallback_text and not self._is_masked_placeholder_text(fallback_text):
+            return fallback_text
+
+        raise ValueError("Translation output is invalid (masked placeholder text)")
+
+    async def _translate_once(self, *, text: str, source_lang: str, target_lang: str) -> str:
+        """Run a single translation engine call and normalize return value."""
         translated = self.translation_engine.translate(text, source_lang, target_lang)
         if asyncio.iscoroutine(translated):
             translated = await translated
         if translated is None:
             return ""
         return str(translated)
+
+    @staticmethod
+    def _contains_cjk(text: str) -> bool:
+        """Return whether text contains at least one CJK Unified Ideograph."""
+        return any("\u4e00" <= char <= "\u9fff" for char in text)
+
+    @staticmethod
+    def _is_masked_placeholder_text(text: str) -> bool:
+        """
+        Detect degenerate outputs like '* * * * ...' produced by bad decoding.
+
+        Keep threshold conservative to avoid false positives for normal markdown content.
+        """
+        stripped = text.strip()
+        if not stripped:
+            return True
+
+        non_whitespace = [char for char in stripped if not char.isspace()]
+        if len(non_whitespace) < 20:
+            return False
+
+        star_count = sum(1 for char in non_whitespace if char in {"*", "＊"})
+        return (star_count / len(non_whitespace)) >= 0.85
+
+    @staticmethod
+    def _split_translation_chunks(text: str, *, max_chunk_chars: int = 220) -> List[str]:
+        """Split translation input into short sentence-like chunks for retry."""
+        normalized = text.replace("\r\n", "\n").replace("\r", "\n").strip()
+        if not normalized:
+            return []
+
+        # Keep newline as a hard sentence boundary, then pack into small chunks.
+        sentences = [
+            segment.strip()
+            for segment in re.split(r"(?<=[。！？.!?;；\n])", normalized)
+            if segment.strip()
+        ]
+        if not sentences:
+            sentences = [normalized]
+
+        chunks: List[str] = []
+        current_parts: List[str] = []
+        current_length = 0
+
+        def flush_current() -> None:
+            nonlocal current_parts, current_length
+            if not current_parts:
+                return
+            chunks.append(" ".join(current_parts).strip())
+            current_parts = []
+            current_length = 0
+
+        for sentence in sentences:
+            sentence_parts = [sentence]
+            if len(sentence) > max_chunk_chars:
+                sentence_parts = [
+                    part.strip()
+                    for part in re.split(r"(?<=[，,、])", sentence)
+                    if part.strip()
+                ]
+                if not sentence_parts:
+                    sentence_parts = [sentence]
+
+            for part in sentence_parts:
+                if len(part) > max_chunk_chars:
+                    flush_current()
+                    for start in range(0, len(part), max_chunk_chars):
+                        chunk = part[start : start + max_chunk_chars].strip()
+                        if chunk:
+                            chunks.append(chunk)
+                    continue
+
+                addition = len(part) + (1 if current_parts else 0)
+                if current_parts and current_length + addition > max_chunk_chars:
+                    flush_current()
+
+                current_parts.append(part)
+                current_length += addition
+
+        flush_current()
+        return chunks
 
     def _resolve_translation_output_path(
         self,
@@ -1138,12 +1626,23 @@ class TranscriptionManager:
         translation_filename = f"{base_path.stem}_translation_{target_lang}.{normalized_extension}"
         return base_path.parent / translation_filename
 
+    def _write_translation_output(self, *, text: str, output_format: str, output_path: Path) -> None:
+        """Write translated text to output format without transcription-specific conversion."""
+        normalized_format = output_format.lower()
+        if normalized_format not in {"txt", "md"}:
+            raise ValueError("Translation output_format must be one of: txt, md")
+        self._write_translation_file(output_path, text)
+
     @staticmethod
     def _write_translation_file(path: Path, text: str) -> None:
         """Persist translated text to disk."""
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w", encoding="utf-8") as handle:
             handle.write(text)
+        try:
+            os.chmod(path, 0o600)
+        except Exception:
+            pass
 
     def _upsert_translation_attachment(
         self, *, event_id: Optional[str], translation_path: Path
@@ -1218,6 +1717,7 @@ class TranscriptionManager:
             "created_at": task.created_at,
             "started_at": task.started_at,
             "completed_at": task.completed_at,
+            "task_kind": self._resolve_task_kind(task=task, task_id=task.id),
         }
 
     def cancel_task(self, task_id: str) -> bool:
@@ -1330,6 +1830,7 @@ class TranscriptionManager:
                 "created_at": task.created_at,
                 "started_at": task.started_at,
                 "completed_at": task.completed_at,
+                "task_kind": self._resolve_task_kind(task=task, task_id=task.id),
             }
             for task in tasks
         ]
@@ -1447,12 +1948,16 @@ class TranscriptionManager:
             # Re-raise with context
             raise TaskNotFoundError(f"Cannot export task {task_id}: content not found")
 
-        # Convert content
-        try:
-            formatted_content = self.format_converter.convert(content, output_format)
-        except ValueError as e:
-            logger.error(f"Format conversion failed for task {task_id}: {e}")
-            raise
+        task_kind = self._resolve_task_kind(task=task, task_id=task.id)
+        if task_kind == TRANSLATION_TASK_KIND and output_format.lower() in {"txt", "md"}:
+            formatted_content = self._resolve_translation_export_text(task, content)
+        else:
+            # Convert content
+            try:
+                formatted_content = self.format_converter.convert(content, output_format)
+            except ValueError as e:
+                logger.error(f"Format conversion failed for task {task_id}: {e}")
+                raise
 
         # Ensure directory exists
         path_obj = Path(output_path)
@@ -1468,6 +1973,27 @@ class TranscriptionManager:
 
         logger.info(f"Exported task {task_id} to {output_format.upper()} at {output_path}")
         return output_path
+
+    def _resolve_translation_export_text(
+        self, task: TranscriptionTask, content: Dict[str, Any]
+    ) -> str:
+        """Resolve raw translation text for txt/md export without template conversion."""
+        if task.output_path:
+            output_file = Path(task.output_path).expanduser().resolve()
+            if output_file.exists():
+                try:
+                    return output_file.read_text(encoding="utf-8")
+                except Exception as exc:
+                    logger.warning(
+                        "Failed to read existing translation output file %s: %s",
+                        output_file,
+                        exc,
+                    )
+
+        text = content.get("text")
+        if isinstance(text, str):
+            return text
+        return self.format_converter.convert(content, "txt")
 
     def _get_internal_format_path(self, task_id: str) -> str:
         """
@@ -1501,9 +2027,18 @@ class TranscriptionManager:
 
         # Notify global listeners
         try:
+            task_kind = self._resolve_task_kind(task_id=task_id)
+            payload = {
+                "id": task_id,
+                "progress": progress,
+                "status": "processing",
+                "message": message,
+            }
+            if task_kind:
+                payload["task_kind"] = task_kind
             self._notify_listeners(
                 "task_updated",
-                {"id": task_id, "progress": progress, "status": "processing", "message": message},
+                payload,
             )
         except Exception:
             pass

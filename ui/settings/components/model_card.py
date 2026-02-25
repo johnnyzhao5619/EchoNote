@@ -43,7 +43,6 @@ class ModelCardWidget(QFrame):
     # 信号定义
     download_clicked = Signal(str)  # model_id
     delete_clicked = Signal(str)  # model_id
-    config_clicked = Signal(str)  # model_id
     details_clicked = Signal(str)  # model_id
     cancel_download_clicked = Signal(str)  # model_id
 
@@ -128,11 +127,6 @@ class ModelCardWidget(QFrame):
 
         # 1. 按钮构建
         if self.model.is_downloaded:
-            if not self.is_translation:
-                config_btn = create_button(self.i18n.t("settings.model_management.configure"))
-                config_btn.clicked.connect(lambda: self.config_clicked.emit(self.model_id))
-                self.actions_layout.addWidget(config_btn)
-
             delete_btn = create_button(self.i18n.t("settings.model_management.delete"))
             delete_btn.setProperty("role", ROLE_MODEL_DELETE)
             delete_btn.clicked.connect(lambda: self.delete_clicked.emit(self.model_id))

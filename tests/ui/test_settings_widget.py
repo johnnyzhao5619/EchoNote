@@ -172,6 +172,14 @@ class TestSettingsWidgetCategories:
         """Test category list has items."""
         assert widget.category_list.count() >= 5
 
+    def test_translation_category_exists(self, widget):
+        """Translation settings category should be available."""
+        category_ids = [
+            widget.category_list.item(i).data(Qt.ItemDataRole.UserRole)
+            for i in range(widget.category_list.count())
+        ]
+        assert "translation" in category_ids
+
     def test_category_count_matches_page_count(self, widget):
         """Category list and page stack should stay aligned."""
         assert widget.category_list.count() == len(widget.settings_pages)

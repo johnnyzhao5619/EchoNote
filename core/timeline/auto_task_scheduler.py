@@ -34,6 +34,7 @@ from config.constants import (
     DEFAULT_REMINDER_MINUTES,
     DEFAULT_STOP_CONFIRMATION_DELAY_MINUTES,
     TIMELINE_STOP_CONFIRMATION_DELAY_MAX_MINUTES,
+    TRANSLATION_ENGINE_NONE,
 )
 from core.realtime.integration import save_event_attachments
 from ui.common.notification import get_notification_manager
@@ -795,34 +796,55 @@ class AutoTaskScheduler:
         return {
             "recording_format": "wav",
             "auto_save": True,
-            "translation_engine": TRANSLATION_ENGINE_NONE,
             "vad_threshold": 0.5,
             "silence_duration_ms": 2000,
             "min_audio_duration": 3.0,
             "save_transcript": True,
+        }
+
+    def _get_translation_preferences(self) -> Dict[str, Any]:
+        """Load translation defaults from settings manager."""
+        if self.settings_manager and hasattr(self.settings_manager, "get_translation_preferences"):
+            try:
+                return self.settings_manager.get_translation_preferences()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "Failed to load translation preferences for auto tasks: %s",
+                    exc,
+                    exc_info=True,
+                )
+
+        return {
+            "translation_engine": TRANSLATION_ENGINE_NONE,
             "translation_source_lang": TRANSLATION_LANGUAGE_AUTO,
             "translation_target_lang": DEFAULT_TRANSLATION_TARGET_LANGUAGE,
         }
 
     def _build_recording_options(self, event, auto_tasks: dict) -> Dict[str, Any]:
         """Assemble recording options for auto-started sessions."""
-        preferences = self._get_realtime_preferences()
+        realtime_preferences = self._get_realtime_preferences()
+        translation_preferences = self._get_translation_preferences()
 
         enable_recording = auto_tasks.get("enable_recording")
         if enable_recording is None:
-            save_recording = preferences.get("auto_save", True)
+            save_recording = realtime_preferences.get("auto_save", True)
         else:
             save_recording = bool(enable_recording)
 
         enable_transcription = auto_tasks.get("enable_transcription")
         if enable_transcription is None:
-            enable_transcription = bool(preferences.get("save_transcript", True))
+            enable_transcription = bool(realtime_preferences.get("save_transcript", True))
         else:
             enable_transcription = bool(enable_transcription)
 
-        save_transcript = bool(preferences.get("save_transcript", True) and enable_transcription)
+        save_transcript = bool(
+            realtime_preferences.get("save_transcript", True) and enable_transcription
+        )
 
-        translation_globally_enabled = preferences.get("translation_engine", "none") != "none"
+        translation_globally_enabled = (
+            translation_preferences.get("translation_engine", TRANSLATION_ENGINE_NONE)
+            != TRANSLATION_ENGINE_NONE
+        )
         translation_runtime_available = self._translation_engine_available()
         enable_translation = bool(
             enable_transcription
@@ -838,13 +860,13 @@ class AutoTaskScheduler:
             "enable_transcription": enable_transcription,
             "enable_translation": enable_translation,
             "target_language": auto_tasks.get("translation_target_language")
-            or preferences.get("translation_target_lang", "en"),
-            "recording_format": preferences.get("recording_format", "wav"),
+            or translation_preferences.get("translation_target_lang", "en"),
+            "recording_format": realtime_preferences.get("recording_format", "wav"),
             "save_recording": save_recording,
             "save_transcript": save_transcript,
-            "vad_threshold": float(preferences.get("vad_threshold", 0.5)),
-            "silence_duration_ms": int(preferences.get("silence_duration_ms", 2000)),
-            "min_audio_duration": float(preferences.get("min_audio_duration", 3.0)),
+            "vad_threshold": float(realtime_preferences.get("vad_threshold", 0.5)),
+            "silence_duration_ms": int(realtime_preferences.get("silence_duration_ms", 2000)),
+            "min_audio_duration": float(realtime_preferences.get("min_audio_duration", 3.0)),
             "create_calendar_event": False,
         }
 

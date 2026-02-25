@@ -7,10 +7,10 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
-from PySide6.QtWidgets import QLabel, QPushButton
+from PySide6.QtWidgets import QPushButton
 
 from core.models.registry import ModelInfo
-from ui.settings.model_management_page import ModelConfigDialog, ModelManagementPage
+from ui.settings.model_management_page import ModelManagementPage
 
 pytestmark = pytest.mark.ui
 
@@ -91,19 +91,10 @@ def test_model_card_action_buttons_have_semantic_roles(
     assert len(delete_buttons) == 1
 
 
-def test_model_config_dialog_field_labels_have_semantic_role(
-    qapp, mock_i18n, mock_settings_manager
+def test_model_management_related_settings_shortcuts_have_semantic_roles(
+    qapp, mock_i18n, mock_settings_manager, model_manager
 ):
-    model = _make_model("base", downloaded=False)
-    mock_settings_manager.get_setting = Mock(return_value=None)
-    mock_settings_manager.set_setting = Mock(return_value=True)
-    mock_settings_manager.config_manager.save = Mock()
+    page = ModelManagementPage(mock_settings_manager, mock_i18n, model_manager)
 
-    dialog = ModelConfigDialog(model, mock_settings_manager, mock_i18n)
-    field_labels = [
-        label
-        for label in dialog.findChildren(QLabel)
-        if label.property("role") == "model-config-field-label"
-    ]
-
-    assert len(field_labels) == 4
+    assert page.go_to_transcription_button.property("role") == "settings-inline-action"
+    assert page.go_to_translation_button.property("role") == "settings-inline-action"

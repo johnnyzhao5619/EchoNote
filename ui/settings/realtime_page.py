@@ -29,13 +29,11 @@ from core.qt_imports import (
     QComboBox,
     QDoubleSpinBox,
     QFileDialog,
-    QFormLayout,
     QLabel,
     QLineEdit,
     QSlider,
     QSpinBox,
     Qt,
-    QVBoxLayout,
 )
 from ui.base_widgets import (
     create_button,
@@ -46,10 +44,7 @@ from ui.base_widgets import (
 from config.constants import (
     RECORDING_FORMAT_MP3,
     RECORDING_FORMAT_WAV,
-    SUPPORTED_REALTIME_TRANSLATION_ENGINES,
     SUPPORTED_RECORDING_FORMATS,
-    TRANSLATION_ENGINE_NONE,
-    TRANSLATION_ENGINE_OPUS_MT,
 )
 from ui.constants import (
     GAIN_SLIDER_DEFAULT,
@@ -113,18 +108,6 @@ class RealtimeSettingsPage(BaseSettingsPage):
         self.audio_input_title = self.add_section_title(
             self.i18n.t("settings.realtime.audio_input")
         )
-
-        # Default input source
-        source_layout = create_hbox()
-        self.source_label = QLabel(self.i18n.t("settings.realtime.input_source"))
-        self.source_label.setMinimumWidth(STANDARD_LABEL_WIDTH)
-        self.source_combo = QComboBox()
-        self.source_combo.addItems([self.i18n.t("settings.realtime.default_device")])
-        self.source_combo.currentTextChanged.connect(self._emit_changed)
-        source_layout.addWidget(self.source_label)
-        source_layout.addWidget(self.source_combo)
-        source_layout.addStretch()
-        self.content_layout.addLayout(source_layout)
 
         # Gain level
         gain_layout = create_vbox()
@@ -234,23 +217,9 @@ class RealtimeSettingsPage(BaseSettingsPage):
 
         self.add_section_spacing()
 
-        # Translation settings section
-        self.translation_title = self.add_section_title(
-            self.i18n.t("settings.realtime.translation")
+        self.floating_window_title = self.add_section_title(
+            self.i18n.t("settings.realtime.floating_window")
         )
-
-        # Translation engine
-        translation_layout = create_hbox()
-        self.translation_label = QLabel(self.i18n.t("settings.realtime.translation_engine"))
-        self.translation_label.setMinimumWidth(STANDARD_LABEL_WIDTH)
-        self.translation_combo = QComboBox()
-        self._populate_translation_options()
-        self.translation_combo.currentIndexChanged.connect(self._on_translation_engine_changed)
-        self.translation_combo.currentTextChanged.connect(self._emit_changed)
-        translation_layout.addWidget(self.translation_label)
-        translation_layout.addWidget(self.translation_combo)
-        translation_layout.addStretch()
-        self.content_layout.addLayout(translation_layout)
 
         self.floating_window_check = QCheckBox(
             self.i18n.t("settings.realtime.floating_window_enabled")
@@ -270,41 +239,6 @@ class RealtimeSettingsPage(BaseSettingsPage):
         )
         self.floating_window_always_on_top_check.stateChanged.connect(self._emit_changed)
         self.content_layout.addWidget(self.floating_window_always_on_top_check)
-
-        # Opus-MT: language pair selection (visible only when Opus-MT is selected)
-        self._opus_mt_section = create_vbox()
-
-        src_tgt_layout = create_hbox()
-        self.translation_source_label = QLabel(self.i18n.t("settings.realtime.source_language"))
-        self.translation_source_label.setMinimumWidth(STANDARD_LABEL_WIDTH)
-        self.translation_source_combo = QComboBox()
-        self.translation_target_label = QLabel(self.i18n.t("settings.realtime.target_language"))
-        self.translation_target_combo = QComboBox()
-        src_tgt_layout.addWidget(self.translation_source_label)
-        src_tgt_layout.addWidget(self.translation_source_combo)
-        src_tgt_layout.addWidget(self.translation_target_label)
-        src_tgt_layout.addWidget(self.translation_target_combo)
-        src_tgt_layout.addStretch()
-        self._opus_mt_section.addLayout(src_tgt_layout)
-
-        self.opus_mt_status_label = QLabel()
-        self.opus_mt_status_label.setProperty("role", ROLE_DEVICE_INFO)
-        self.opus_mt_status_label.setWordWrap(True)
-        self._opus_mt_section.addWidget(self.opus_mt_status_label)
-
-        self._populate_opus_mt_language_options()
-        self.translation_source_combo.currentIndexChanged.connect(self._on_opus_mt_source_changed)
-        self.translation_source_combo.currentIndexChanged.connect(self._emit_changed)
-        self.translation_target_combo.currentIndexChanged.connect(self._update_opus_mt_status)
-        self.translation_target_combo.currentIndexChanged.connect(self._emit_changed)
-
-        self.content_layout.addLayout(self._opus_mt_section)
-        self._opus_mt_section.setEnabled(False)
-        # hide all widgets in the section initially
-        for i in range(self._opus_mt_section.count()):
-            item = self._opus_mt_section.itemAt(i)
-            if item and item.widget():
-                item.widget().setVisible(False)
         self._on_floating_window_toggled(self.floating_window_check.checkState().value)
 
         self.add_section_spacing()
@@ -456,18 +390,21 @@ class RealtimeSettingsPage(BaseSettingsPage):
     def load_settings(self):
         """Load realtime settings into UI."""
         try:
-            # Input source
-            input_source = self.settings_manager.get_setting("realtime.default_input_source")
-            if input_source:
-                self.source_combo.setCurrentIndex(0)
+            preferences = {}
+            if hasattr(self.settings_manager, "get_realtime_preferences"):
+                loaded = self.settings_manager.get_realtime_preferences()
+                if isinstance(loaded, dict):
+                    preferences = loaded
 
             # Gain level
-            gain = self.settings_manager.get_setting("realtime.default_gain")
+            gain = preferences.get("default_gain", self.settings_manager.get_setting("realtime.default_gain"))
             if gain is not None:
                 self.gain_slider.setValue(int(gain * GAIN_SLIDER_DIVISOR))
 
             # Recording format
-            recording_format = self.settings_manager.get_setting("realtime.recording_format")
+            recording_format = preferences.get(
+                "recording_format", self.settings_manager.get_setting("realtime.recording_format")
+            )
             if recording_format:
                 if recording_format == RECORDING_FORMAT_MP3 and not self._mp3_supported:
                     logger.warning(
@@ -481,105 +418,71 @@ class RealtimeSettingsPage(BaseSettingsPage):
                         self.format_combo.setCurrentIndex(index)
 
             # Recording save path
-            save_path = self.settings_manager.get_setting("realtime.recording_save_path")
+            save_path = preferences.get(
+                "recording_save_path", self.settings_manager.get_setting("realtime.recording_save_path")
+            )
             if save_path:
                 expanded_path = Path(save_path).expanduser()
                 self.path_edit.setText(str(expanded_path))
 
             # Auto-save (if this setting exists)
-            auto_save = self.settings_manager.get_setting("realtime.auto_save")
+            auto_save = preferences.get("auto_save", self.settings_manager.get_setting("realtime.auto_save"))
             if auto_save is not None:
                 self.auto_save_check.setChecked(auto_save)
 
-            translation_engine = self.settings_manager.get_setting("realtime.translation_engine")
-            translation_preferences = {}
-            if hasattr(self.settings_manager, "get_realtime_translation_preferences"):
-                translation_preferences = self.settings_manager.get_realtime_translation_preferences()
-
-            selected_engine = (
-                translation_preferences.get("translation_engine", translation_engine)
-                if isinstance(translation_preferences, dict)
-                else translation_engine
+            floating_enabled = preferences.get(
+                "floating_window_enabled",
+                self.settings_manager.get_setting("realtime.floating_window_enabled"),
             )
-            if selected_engine in SUPPORTED_REALTIME_TRANSLATION_ENGINES:
-                index = self.translation_combo.findData(selected_engine)
-                if index >= 0:
-                    self.translation_combo.setCurrentIndex(index)
-
-            source_lang = (
-                translation_preferences.get("translation_source_lang")
-                if isinstance(translation_preferences, dict)
-                else None
-            ) or self.settings_manager.get_setting("realtime.translation_source_lang")
-            if source_lang:
-                index = self.translation_source_combo.findData(source_lang)
-                if index >= 0:
-                    self.translation_source_combo.setCurrentIndex(index)
-
-            target_lang = (
-                translation_preferences.get("translation_target_lang")
-                if isinstance(translation_preferences, dict)
-                else None
-            ) or self.settings_manager.get_setting("realtime.translation_target_lang")
-            if target_lang:
-                index = self.translation_target_combo.findData(target_lang)
-                if index >= 0:
-                    self.translation_target_combo.setCurrentIndex(index)
-
-            floating_enabled = (
-                translation_preferences.get("floating_window_enabled")
-                if isinstance(translation_preferences, dict)
-                else None
-            )
-            if floating_enabled is None:
-                floating_enabled = self.settings_manager.get_setting(
-                    "realtime.floating_window_enabled"
-                )
             self.floating_window_check.setChecked(bool(floating_enabled))
 
-            hide_main = (
-                translation_preferences.get("hide_main_window_when_floating")
-                if isinstance(translation_preferences, dict)
-                else None
+            hide_main = preferences.get(
+                "hide_main_window_when_floating",
+                self.settings_manager.get_setting("realtime.hide_main_window_when_floating"),
             )
-            if hide_main is None:
-                hide_main = self.settings_manager.get_setting(
-                    "realtime.hide_main_window_when_floating"
-                )
             self.hide_main_window_check.setChecked(bool(hide_main))
-            always_on_top = (
-                translation_preferences.get("floating_window_always_on_top")
-                if isinstance(translation_preferences, dict)
-                else None
+
+            always_on_top = preferences.get(
+                "floating_window_always_on_top",
+                self.settings_manager.get_setting("realtime.floating_window_always_on_top"),
             )
-            if always_on_top is None:
-                always_on_top = self.settings_manager.get_setting(
-                    "realtime.floating_window_always_on_top"
-                )
             if always_on_top is None:
                 always_on_top = True
             self.floating_window_always_on_top_check.setChecked(bool(always_on_top))
             self._on_floating_window_toggled(self.floating_window_check.checkState().value)
 
-            save_transcript = self.settings_manager.get_setting("realtime.save_transcript")
+            save_transcript = preferences.get(
+                "save_transcript",
+                self.settings_manager.get_setting("realtime.save_transcript"),
+            )
             if save_transcript is not None:
                 self.save_transcript_check.setChecked(bool(save_transcript))
 
-            create_calendar_event = self.settings_manager.get_setting(
-                "realtime.create_calendar_event"
+            create_calendar_event = preferences.get(
+                "create_calendar_event",
+                self.settings_manager.get_setting("realtime.create_calendar_event"),
             )
             if create_calendar_event is not None:
                 self.create_calendar_event_check.setChecked(bool(create_calendar_event))
 
-            vad_threshold = self.settings_manager.get_setting("realtime.vad_threshold")
+            vad_threshold = preferences.get(
+                "vad_threshold",
+                self.settings_manager.get_setting("realtime.vad_threshold"),
+            )
             if isinstance(vad_threshold, (int, float)):
                 self.vad_threshold_spin.setValue(float(vad_threshold))
 
-            silence_duration_ms = self.settings_manager.get_setting("realtime.silence_duration_ms")
+            silence_duration_ms = preferences.get(
+                "silence_duration_ms",
+                self.settings_manager.get_setting("realtime.silence_duration_ms"),
+            )
             if isinstance(silence_duration_ms, int):
                 self.silence_duration_spin.setValue(silence_duration_ms)
 
-            min_audio_duration = self.settings_manager.get_setting("realtime.min_audio_duration")
+            min_audio_duration = preferences.get(
+                "min_audio_duration",
+                self.settings_manager.get_setting("realtime.min_audio_duration"),
+            )
             if isinstance(min_audio_duration, (int, float)):
                 self.min_audio_duration_spin.setValue(float(min_audio_duration))
 
@@ -592,9 +495,6 @@ class RealtimeSettingsPage(BaseSettingsPage):
     def save_settings(self):
         """Save realtime settings from UI."""
         try:
-            # Input source
-            self._set_setting_or_raise("realtime.default_input_source", "default")
-
             # Gain level
             gain = self.gain_slider.value() / GAIN_SLIDER_DIVISOR
             self._set_setting_or_raise("realtime.default_gain", gain)
@@ -608,15 +508,6 @@ class RealtimeSettingsPage(BaseSettingsPage):
             # Auto-save
             self._set_setting_or_raise("realtime.auto_save", self.auto_save_check.isChecked())
 
-            translation_engine = self.translation_combo.currentData()
-            if translation_engine is None:
-                translation_engine = TRANSLATION_ENGINE_NONE
-            self._set_setting_or_raise("realtime.translation_engine", translation_engine)
-
-            source_lang = self.translation_source_combo.currentData() or "auto"
-            target_lang = self.translation_target_combo.currentData() or "en"
-            self._set_setting_or_raise("realtime.translation_source_lang", source_lang)
-            self._set_setting_or_raise("realtime.translation_target_lang", target_lang)
             self._set_setting_or_raise(
                 "realtime.floating_window_enabled", self.floating_window_check.isChecked()
             )
@@ -678,22 +569,18 @@ class RealtimeSettingsPage(BaseSettingsPage):
             self.audio_input_title.setText(self.i18n.t("settings.realtime.audio_input"))
         if hasattr(self, "recording_title"):
             self.recording_title.setText(self.i18n.t("settings.realtime.recording"))
-        if hasattr(self, "translation_title"):
-            self.translation_title.setText(self.i18n.t("settings.realtime.translation"))
+        if hasattr(self, "floating_window_title"):
+            self.floating_window_title.setText(self.i18n.t("settings.realtime.floating_window"))
         if hasattr(self, "processing_title"):
             self.processing_title.setText(self.i18n.t("settings.realtime.processing"))
 
         # Update labels
-        if hasattr(self, "source_label"):
-            self.source_label.setText(self.i18n.t("settings.realtime.input_source"))
         if hasattr(self, "gain_label"):
             self.gain_label.setText(self.i18n.t("settings.realtime.gain_level"))
         if hasattr(self, "format_label"):
             self.format_label.setText(self.i18n.t("settings.realtime.recording_format"))
         if hasattr(self, "path_label"):
             self.path_label.setText(self.i18n.t("settings.realtime.recording_path"))
-        if hasattr(self, "translation_label"):
-            self.translation_label.setText(self.i18n.t("settings.realtime.translation_engine"))
         if hasattr(self, "floating_window_check"):
             self.floating_window_check.setText(
                 self.i18n.t("settings.realtime.floating_window_enabled")
@@ -746,31 +633,6 @@ class RealtimeSettingsPage(BaseSettingsPage):
             else:
                 self.format_combo.setToolTip(self.i18n.t("settings.realtime.mp3_enabled_ffmpeg"))
 
-        # Update combo box options
-        if hasattr(self, "source_combo"):
-            current_index = self.source_combo.currentIndex()
-            self.source_combo.blockSignals(True)
-            self.source_combo.clear()
-            self.source_combo.addItems([self.i18n.t("settings.realtime.default_device")])
-            self.source_combo.setCurrentIndex(current_index)
-            self.source_combo.blockSignals(False)
-
-        if hasattr(self, "translation_combo"):
-            current_engine = self.translation_combo.currentData()
-            self.translation_combo.blockSignals(True)
-            self._populate_translation_options()
-            if current_engine is not None:
-                index = self.translation_combo.findData(current_engine)
-                if index >= 0:
-                    self.translation_combo.setCurrentIndex(index)
-            self.translation_combo.blockSignals(False)
-
-        if hasattr(self, "translation_source_label"):
-            self.translation_source_label.setText(self.i18n.t("settings.realtime.source_language"))
-        if hasattr(self, "translation_target_label"):
-            self.translation_target_label.setText(self.i18n.t("settings.realtime.target_language"))
-        if hasattr(self, "opus_mt_status_label"):
-            self._update_opus_mt_status()
         if hasattr(self, "floating_window_check"):
             self._on_floating_window_toggled(self.floating_window_check.checkState().value)
 
@@ -784,96 +646,6 @@ class RealtimeSettingsPage(BaseSettingsPage):
             self.min_audio_duration_spin.setSuffix(
                 f" {self.i18n.t('settings.realtime.seconds_short')}"
             )
-
-    def _populate_translation_options(self) -> None:
-        """从 SUPPORTED_REALTIME_TRANSLATION_ENGINES 动态生成翻译引擎下拉选项，避免硬编码。"""
-        if not hasattr(self, "translation_combo"):
-            return
-        self.translation_combo.clear()
-        for engine in SUPPORTED_REALTIME_TRANSLATION_ENGINES:
-            # i18n key 规则：settings.realtime.engine_<engine_id>
-            label = self.i18n.t(f"settings.realtime.engine_{engine}")
-            self.translation_combo.addItem(label, engine)
-
-    def _populate_opus_mt_language_options(self) -> None:
-        """从 TranslationModelRegistry 读取语言对，填充源/目标语言下拉框。"""
-        from core.models.translation_registry import get_translation_registry
-
-        registry = get_translation_registry()
-        sources = registry.get_available_sources()
-
-        self.translation_source_combo.blockSignals(True)
-        self.translation_source_combo.clear()
-        self.translation_source_combo.addItem(self.i18n.t("settings.realtime.auto_detect"), "auto")
-        for lang in sources:
-            self.translation_source_combo.addItem(lang, lang)
-        self.translation_source_combo.blockSignals(False)
-
-        self._refresh_target_options()
-
-    def _refresh_target_options(self) -> None:
-        """根据当前源语言刷新目标语言选项。"""
-        from core.models.translation_registry import get_translation_registry
-
-        registry = get_translation_registry()
-        source = self.translation_source_combo.currentData()
-        targets = registry.get_available_targets(source if source != "auto" else None)
-
-        self.translation_target_combo.blockSignals(True)
-        current_target = self.translation_target_combo.currentData()
-        self.translation_target_combo.clear()
-        for lang in targets:
-            self.translation_target_combo.addItem(lang, lang)
-        # 恢复之前的目标语言选择
-        idx = self.translation_target_combo.findData(current_target)
-        if idx >= 0:
-            self.translation_target_combo.setCurrentIndex(idx)
-        self.translation_target_combo.blockSignals(False)
-        self._update_opus_mt_status()
-
-    def _on_opus_mt_source_changed(self) -> None:
-        self._refresh_target_options()
-
-    def _update_opus_mt_status(self) -> None:
-        """显示当前语言对的模型下载状态。"""
-        if not hasattr(self, "opus_mt_status_label"):
-            return
-        source = self.translation_source_combo.currentData() or "auto"
-        target = self.translation_target_combo.currentData() or "en"
-
-        # 通过 managers 获取 model_manager（如果有）
-        model_manager = self.managers.get("model_manager") if hasattr(self, "managers") else None
-        if not model_manager:
-            return
-
-        # 使用管理器统一的逻辑查找最佳模型
-        model_info = model_manager.get_best_translation_model(
-            source, target, auto_detect=(source == "auto")
-        )
-
-        if model_info and model_info.is_downloaded:
-            self.opus_mt_status_label.setText(
-                self.i18n.t("settings.realtime.opus_mt_ready", model=model_info.model_id)
-            )
-        elif model_info:
-            self.opus_mt_status_label.setText(
-                self.i18n.t("settings.realtime.opus_mt_not_downloaded", model=model_info.model_id)
-            )
-        else:
-            self.opus_mt_status_label.setText(self.i18n.t("settings.realtime.opus_mt_unavailable"))
-
-    def _on_translation_engine_changed(self) -> None:
-        """切换翻译引擎时显示/隐藏 Opus-MT 语言配置区域。"""
-        engine = self.translation_combo.currentData()
-        is_opus = engine == TRANSLATION_ENGINE_OPUS_MT
-        if hasattr(self, "_opus_mt_section"):
-            self._opus_mt_section.setEnabled(is_opus)
-            for i in range(self._opus_mt_section.count()):
-                item = self._opus_mt_section.itemAt(i)
-                if item and item.widget():
-                    item.widget().setVisible(is_opus)
-        if is_opus:
-            self._update_opus_mt_status()
 
     def _on_floating_window_toggled(self, state: int) -> None:
         """Enable hide-main option only when floating mode is enabled."""

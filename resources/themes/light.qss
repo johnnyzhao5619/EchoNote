@@ -2314,9 +2314,9 @@ QPushButton[role="realtime-record-action"][recording="true"]:hover {
 }
 
 QPushButton[role="settings-inline-action"] {
-    min-width: 68px;
-    min-height: 26px;
-    padding: 2px 8px;
+    min-width: 76px;
+    min-height: 28px;
+    padding: 3px 9px;
     border-radius: 8px;
 }
 
@@ -3008,16 +3008,45 @@ QTabWidget#main_tabs QTabBar::tab:hover:!selected {
     color: #284a79;
 }
 
+QTabWidget#model_management_tabs::pane {
+    border: 1px solid #d7e1f0;
+    border-radius: 10px;
+    background-color: #ffffff;
+    top: -1px;
+}
+
+QTabWidget#model_management_tabs QTabBar::tab {
+    background-color: #f5f8ff;
+    color: #4b5f82;
+    border: 1px solid #d7e1f0;
+    border-bottom: none;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    padding: 7px 14px;
+}
+
+QTabWidget#model_management_tabs QTabBar::tab:selected {
+    background-color: #ffffff;
+    color: #153766;
+    border-color: #c5d5eb;
+}
+
+QTabWidget#model_management_tabs QTabBar::tab:hover:!selected {
+    background-color: #edf4ff;
+    color: #284a79;
+}
+
 QListWidget[role="settings-nav"] {
     background-color: #f7faff;
     border: 1px solid #d7e1f0;
     border-radius: 10px;
-    padding: 2px;
+    padding: 4px;
 }
 
 QListWidget[role="settings-nav"]::item {
     border-radius: 7px;
-    padding: 5px 7px;
+    min-height: 30px;
+    padding: 6px 10px;
     color: #2e466c;
 }
 

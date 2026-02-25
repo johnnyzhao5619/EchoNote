@@ -246,7 +246,7 @@ def initialize_translation_engine(config, secrets_manager=None, model_manager=No
         try:
             logger.info("Loading translation engine...")
             selected_engine = (
-                str(config.get("realtime.translation_engine", TRANSLATION_ENGINE_NONE))
+                str(config.get("translation.translation_engine", TRANSLATION_ENGINE_NONE))
                 .strip()
                 .lower()
             )
@@ -260,7 +260,7 @@ def initialize_translation_engine(config, secrets_manager=None, model_manager=No
                     logger.warning("ModelManager not available; Opus-MT disabled.")
                     return None
 
-                target_lang = config.get("realtime.translation_target_lang", "en")
+                target_lang = config.get("translation.translation_target_lang", "en")
                 from engines.translation.opus_mt_engine import MultiModelOpusMTEngine
 
                 engine = MultiModelOpusMTEngine(model_manager, target_lang)

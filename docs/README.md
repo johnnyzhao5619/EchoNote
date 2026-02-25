@@ -34,6 +34,7 @@ For contributors and developers:
 - **[Code Standards](CODE_STANDARDS.md)** - Coding conventions and best practices
 - **[Contributing Guide](CONTRIBUTING.md)** - How to contribute to the project
 - **[CI/CD Guide](CI_CD_GUIDE.md)** - Continuous integration and deployment
+- Settings architecture note: translation defaults are managed in `ui/settings/translation_page.py`, while realtime recording controls remain in `ui/settings/realtime_page.py`.
 
 ---
 
@@ -123,4 +124,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 ---
 
 **Last Updated**: February 17, 2026  
-**Version**: v1.4.2
+**Version**: v1.4.3

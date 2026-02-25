@@ -20,13 +20,27 @@ Provides UI for importing audio files and managing transcription tasks.
 """
 
 import logging
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, Optional
 
-from core.transcription.manager import TranscriptionManager
+from config.constants import (
+    DEFAULT_TRANSLATION_TARGET_LANGUAGE,
+    TRANSLATION_ENGINE_OPUS_MT,
+    TRANSLATION_LANGUAGE_AUTO,
+)
+from core.settings.manager import resolve_translation_languages_from_settings
+from core.transcription.manager import (
+    TRANSCRIPTION_TASK_KIND,
+    TEXT_TRANSLATION_SUFFIXES,
+    TRANSLATION_TASK_KIND,
+    TranscriptionManager,
+)
+from engines.speech.base import AUDIO_VIDEO_SUFFIXES
 from ui.base_widgets import (
     BaseWidget,
     connect_button_with_callback,
+    create_button,
     create_hbox,
     create_primary_button,
 )
@@ -38,27 +52,47 @@ from ui.constants import (
 )
 from core.qt_imports import (
     QComboBox,
+    QDialog,
     QFileDialog,
+    QFormLayout,
     QFrame,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QMessageBox,
+    QPlainTextEdit,
     QPushButton,
     QSize,
+    QTabWidget,
     Qt,
     QTimer,
     QVBoxLayout,
     QWidget,
     Signal,
 )
-from utils.i18n import I18nQtManager
+from utils.i18n import I18nQtManager, LANGUAGE_OPTION_KEYS
 
 if TYPE_CHECKING:
     from ui.batch_transcribe.transcript_viewer import TranscriptViewerDialog
 
 logger = logging.getLogger("echonote.ui.batch_transcribe")
+
+
+@dataclass
+class _TaskTabContext:
+    kind: str
+    tab: QWidget
+    queue_label: QLabel
+    task_list: QListWidget
+    import_file_btn: QPushButton
+    import_folder_btn: QPushButton
+    clear_queue_btn: QPushButton
+    download_guide_frame: QFrame
+    download_guide_message_label: QLabel
+    download_guide_button: QPushButton
+    paste_text_btn: Optional[QPushButton] = None
 
 
 class BatchTranscribeWidget(BaseWidget):
@@ -75,7 +109,6 @@ class BatchTranscribeWidget(BaseWidget):
 
     _CLEAR_QUEUE_MAX_RETRIES = 10
     _CLEAR_QUEUE_RETRY_INTERVAL_MS = 300
-
     def __init__(
         self,
         transcription_manager: TranscriptionManager,
@@ -100,12 +133,12 @@ class BatchTranscribeWidget(BaseWidget):
 
         # Task item widgets dictionary (task_id -> TaskItem)
         self.task_items: Dict[str, TaskItem] = {}
+        self.task_item_kinds: Dict[str, str] = {}
+        self._tab_contexts: Dict[str, _TaskTabContext] = {}
 
         # Open transcript viewer windows dictionary (task_id -> TranscriptViewerDialog)
         self.open_viewers: Dict[str, "TranscriptViewerDialog"] = {}
 
-        # Download guide widget reference
-        self.download_guide_widget: Optional[QWidget] = None
         self._clear_queue_in_progress = False
 
         # Setup UI
@@ -117,6 +150,10 @@ class BatchTranscribeWidget(BaseWidget):
         # Connect model manager signals if available
         if self.model_manager:
             self.model_manager.models_updated.connect(self._update_model_list)
+            if hasattr(self.model_manager, "translation_models_updated"):
+                self.model_manager.translation_models_updated.connect(
+                    self._on_translation_models_updated
+                )
 
         # Connect manager event signal
         self.manager_event.connect(self._handle_manager_event)
@@ -131,92 +168,392 @@ class BatchTranscribeWidget(BaseWidget):
 
     def setup_ui(self):
         """Set up the user interface."""
-        # Main layout
         layout = self.create_page_layout()
-
-        # Title
         self.title_label = self.create_page_title("batch_transcribe.title", layout)
 
-        # Toolbar
-        toolbar_layout = create_hbox(spacing=PAGE_COMPACT_SPACING)
+        self.task_tabs = QTabWidget()
+        self.task_tabs.setObjectName("main_tabs")
+        self.task_tabs.currentChanged.connect(self._on_task_tab_changed)
+        layout.addWidget(self.task_tabs)
 
-        self.import_file_btn = self._create_toolbar_button(
-            toolbar_layout,
-            callback=self._on_import_file,
-        )
-        self.import_folder_btn = self._create_toolbar_button(
-            toolbar_layout,
-            callback=self._on_import_folder,
-        )
-        self.clear_queue_btn = self._create_toolbar_button(
-            toolbar_layout,
-            callback=self._on_clear_queue,
-        )
+        transcription_context = self._build_task_tab(TRANSCRIPTION_TASK_KIND)
+        translation_context = self._build_task_tab(TRANSLATION_TASK_KIND)
+        self._tab_contexts = {
+            TRANSCRIPTION_TASK_KIND: transcription_context,
+            TRANSLATION_TASK_KIND: translation_context,
+        }
+        self.task_tabs.addTab(transcription_context.tab, "")
+        self.task_tabs.addTab(translation_context.tab, "")
 
-        # Spacer
-        toolbar_layout.addStretch()
+        # Backward-compatible aliases used by tests and legacy call-sites.
+        self.import_file_btn = transcription_context.import_file_btn
+        self.import_folder_btn = transcription_context.import_folder_btn
+        self.clear_queue_btn = transcription_context.clear_queue_btn
+        self.paste_text_btn = translation_context.paste_text_btn
+        self.transcription_import_file_btn = transcription_context.import_file_btn
+        self.transcription_import_folder_btn = transcription_context.import_folder_btn
+        self.transcription_clear_queue_btn = transcription_context.clear_queue_btn
+        self.translation_import_file_btn = translation_context.import_file_btn
+        self.translation_import_folder_btn = translation_context.import_folder_btn
+        self.translation_clear_queue_btn = translation_context.clear_queue_btn
+        self.translation_paste_text_btn = translation_context.paste_text_btn
+        self.queue_label = transcription_context.queue_label
+        self.task_list = transcription_context.task_list
+        self.transcription_queue_label = transcription_context.queue_label
+        self.translation_queue_label = translation_context.queue_label
+        self.transcription_task_list = transcription_context.task_list
+        self.translation_task_list = translation_context.task_list
 
-        # Model selection (if model_manager is available)
-        if self.model_manager:
-            model_label = QLabel()
-            model_label.setObjectName("model_label")
-            toolbar_layout.addWidget(model_label)
-            self.model_label = model_label
-
-            model_combo = QComboBox()
-            model_combo.setObjectName("model_combo")
-            model_combo.setMinimumWidth(BATCH_SELECTOR_MIN_WIDTH)
-            toolbar_layout.addWidget(model_combo)
-            self.model_combo = model_combo
-
-            # Models will be populated in _initial_load
-            pass
-        else:
-            # Fallback to engine selection for backward compatibility
-            engine_label = QLabel()
-            engine_label.setObjectName("engine_label")
-            toolbar_layout.addWidget(engine_label)
-            self.engine_label = engine_label
-
-            engine_combo = QComboBox()
-            engine_combo.setObjectName("engine_combo")
-            engine_combo.setMinimumWidth(BATCH_SELECTOR_MIN_WIDTH)
-            # Populate with available engines
-            self._populate_engines(engine_combo)
-            toolbar_layout.addWidget(engine_combo)
-            self.engine_combo = engine_combo
-
-        layout.addLayout(toolbar_layout)
-
-        # Task queue label
-        queue_label = QLabel()
-        queue_label.setObjectName("section_title")
-        layout.addWidget(queue_label)
-        self.queue_label = queue_label
-
-        # Task list
-        task_list = QListWidget()
-        task_list.setObjectName("task_list")
-        layout.addWidget(task_list)
-        self.task_list = task_list
-
-        # Update translations
         self.update_translations()
+        self._populate_translation_target_languages()
+        self._update_mode_controls()
 
         logger.debug("Batch transcribe UI setup complete")
+
+    def _build_task_tab(self, task_kind: str) -> _TaskTabContext:
+        tab = QWidget()
+        tab.setObjectName("transcription_tab" if task_kind == TRANSCRIPTION_TASK_KIND else "translation_tab")
+        tab_layout = QVBoxLayout(tab)
+        tab_layout.setSpacing(PAGE_COMPACT_SPACING)
+
+        config_layout = create_hbox(spacing=PAGE_COMPACT_SPACING)
+        if task_kind == TRANSCRIPTION_TASK_KIND:
+            if self.model_manager:
+                self.model_label = QLabel()
+                self.model_label.setObjectName("model_label")
+                config_layout.addWidget(self.model_label)
+
+                self.model_combo = QComboBox()
+                self.model_combo.setObjectName("model_combo")
+                self.model_combo.setMinimumWidth(BATCH_SELECTOR_MIN_WIDTH)
+                config_layout.addWidget(self.model_combo)
+            else:
+                self.engine_label = QLabel()
+                self.engine_label.setObjectName("engine_label")
+                config_layout.addWidget(self.engine_label)
+
+                self.engine_combo = QComboBox()
+                self.engine_combo.setObjectName("engine_combo")
+                self.engine_combo.setMinimumWidth(BATCH_SELECTOR_MIN_WIDTH)
+                self._populate_engines(self.engine_combo)
+                config_layout.addWidget(self.engine_combo)
+        else:
+            self.translation_target_label = QLabel()
+            self.translation_target_label.setObjectName("translation_target_label")
+            config_layout.addWidget(self.translation_target_label)
+
+            self.translation_target_combo = QComboBox()
+            self.translation_target_combo.setObjectName("translation_target_combo")
+            self.translation_target_combo.setMinimumWidth(BATCH_SELECTOR_MIN_WIDTH)
+            self.translation_target_combo.currentIndexChanged.connect(self._on_translation_target_changed)
+            config_layout.addWidget(self.translation_target_combo)
+
+        config_layout.addStretch()
+        tab_layout.addLayout(config_layout)
+
+        (
+            download_guide_frame,
+            download_guide_message_label,
+            download_guide_button,
+        ) = self._create_download_guide_widget(task_kind)
+        tab_layout.addWidget(download_guide_frame)
+
+        action_layout = create_hbox(spacing=PAGE_COMPACT_SPACING)
+        import_file_btn = self._create_toolbar_button(
+            action_layout,
+            callback=self._on_import_file,
+            callback_args=(task_kind,),
+        )
+        import_folder_btn = self._create_toolbar_button(
+            action_layout,
+            callback=self._on_import_folder,
+            callback_args=(task_kind,),
+        )
+        paste_text_btn: Optional[QPushButton] = None
+        if task_kind == TRANSLATION_TASK_KIND:
+            paste_text_btn = self._create_toolbar_button(
+                action_layout,
+                callback=self._on_paste_text,
+                callback_args=(task_kind,),
+            )
+        clear_queue_btn = self._create_toolbar_button(
+            action_layout,
+            callback=self._on_clear_queue,
+            callback_args=(task_kind,),
+        )
+        action_layout.addStretch()
+        tab_layout.addLayout(action_layout)
+
+        queue_label = QLabel()
+        queue_label.setObjectName("section_title")
+        tab_layout.addWidget(queue_label)
+
+        task_list = QListWidget()
+        task_list.setObjectName("task_list")
+        tab_layout.addWidget(task_list)
+
+        return _TaskTabContext(
+            kind=task_kind,
+            tab=tab,
+            queue_label=queue_label,
+            task_list=task_list,
+            import_file_btn=import_file_btn,
+            import_folder_btn=import_folder_btn,
+            clear_queue_btn=clear_queue_btn,
+            download_guide_frame=download_guide_frame,
+            download_guide_message_label=download_guide_message_label,
+            download_guide_button=download_guide_button,
+            paste_text_btn=paste_text_btn,
+        )
+
+    def _create_download_guide_widget(
+        self, task_kind: str
+    ) -> tuple[QFrame, QLabel, QPushButton]:
+        guide_frame = QFrame()
+        guide_frame.setObjectName("download_guide_frame")
+        guide_frame.setFrameShape(QFrame.Shape.StyledPanel)
+        guide_frame.setVisible(False)
+
+        guide_layout = QVBoxLayout(guide_frame)
+        message_label = QLabel()
+        message_label.setWordWrap(True)
+        message_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        guide_layout.addWidget(message_label)
+
+        download_btn = create_primary_button(self.i18n.t("batch_transcribe.go_to_download"))
+        connect_button_with_callback(download_btn, self._on_go_to_download, task_kind)
+        guide_layout.addWidget(download_btn, alignment=Qt.AlignmentFlag.AlignCenter)
+        return guide_frame, message_label, download_btn
 
     def _create_toolbar_button(
         self,
         toolbar_layout: QHBoxLayout,
         *,
         callback,
+        callback_args: tuple = (),
     ) -> QPushButton:
         """Create and append a standard toolbar action button."""
         button = QPushButton()
         button.setProperty("role", ROLE_TOOLBAR_SECONDARY_ACTION)
-        connect_button_with_callback(button, callback)
+        connect_button_with_callback(button, callback, *callback_args)
         toolbar_layout.addWidget(button)
         return button
+
+    def _current_task_kind(self) -> str:
+        if hasattr(self, "task_tabs") and self.task_tabs.currentIndex() == 1:
+            return TRANSLATION_TASK_KIND
+        return TRANSCRIPTION_TASK_KIND
+
+    def _is_translation_mode(self) -> bool:
+        return self._current_task_kind() == TRANSLATION_TASK_KIND
+
+    def _translation_engine_available(self) -> bool:
+        return bool(getattr(self.transcription_manager, "translation_engine", None))
+
+    def _on_task_tab_changed(self, _index: int) -> None:
+        self._update_mode_controls()
+
+    def _on_translation_target_changed(self, _index: int) -> None:
+        if self._is_translation_mode():
+            self._refresh_download_guide()
+
+    def _on_translation_models_updated(self) -> None:
+        self._refresh_download_guide()
+        self._update_mode_controls()
+
+    def _update_mode_controls(self) -> None:
+        transcription_ready = self._transcription_mode_ready()
+        translation_ready, _ = self._resolve_translation_readiness()
+
+        transcription_context = self._tab_contexts.get(TRANSCRIPTION_TASK_KIND)
+        if transcription_context:
+            transcription_context.import_file_btn.setEnabled(transcription_ready)
+            transcription_context.import_folder_btn.setEnabled(transcription_ready)
+
+        translation_context = self._tab_contexts.get(TRANSLATION_TASK_KIND)
+        if translation_context:
+            translation_context.import_file_btn.setEnabled(translation_ready)
+            translation_context.import_folder_btn.setEnabled(translation_ready)
+            if translation_context.paste_text_btn is not None:
+                translation_context.paste_text_btn.setEnabled(translation_ready)
+
+        if hasattr(self, "translation_target_combo"):
+            self.translation_target_combo.setEnabled(self._translation_engine_available())
+        self._set_clear_buttons_enabled(not self._clear_queue_in_progress)
+        self._refresh_download_guide()
+
+    def _set_clear_buttons_enabled(self, enabled: bool) -> None:
+        for context in self._tab_contexts.values():
+            context.clear_queue_btn.setEnabled(enabled)
+
+    def _transcription_mode_ready(self) -> bool:
+        if not self.model_manager or not hasattr(self, "model_combo"):
+            return True
+        return self.model_combo.isEnabled() and self.model_combo.currentData() is not None
+
+    def _get_settings_manager(self):
+        main_window = self.window()
+        managers = getattr(main_window, "managers", None)
+        if isinstance(managers, dict):
+            return managers.get("settings_manager")
+        return None
+
+    def _get_translation_preferences(self) -> Dict[str, str]:
+        settings_manager = self._get_settings_manager()
+        resolved_languages = resolve_translation_languages_from_settings(settings_manager)
+        source_lang = resolved_languages.get("translation_source_lang", TRANSLATION_LANGUAGE_AUTO)
+        target_lang = resolved_languages.get(
+            "translation_target_lang", DEFAULT_TRANSLATION_TARGET_LANGUAGE
+        )
+        engine = ""
+
+        if settings_manager and hasattr(settings_manager, "get_translation_preferences"):
+            try:
+                preferences = settings_manager.get_translation_preferences()
+                if isinstance(preferences, dict):
+                    engine = str(preferences.get("translation_engine") or "")
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Failed to load translation preferences: %s", exc)
+
+        return {
+            "translation_source_lang": source_lang,
+            "translation_target_lang": target_lang,
+            "translation_engine": engine,
+        }
+
+    def _resolve_translation_languages(
+        self,
+        *,
+        source_lang: Optional[str] = None,
+        target_lang: Optional[str] = None,
+    ) -> Dict[str, str]:
+        """Resolve translation language pair with page override > settings > defaults."""
+        return resolve_translation_languages_from_settings(
+            self._get_settings_manager(),
+            source_lang=source_lang,
+            target_lang=target_lang,
+        )
+
+    def _populate_translation_target_languages(self) -> None:
+        if not hasattr(self, "translation_target_combo"):
+            return
+
+        preferences = self._get_translation_preferences()
+        preferred_target = (
+            self.translation_target_combo.currentData()
+            or preferences.get("translation_target_lang")
+            or DEFAULT_TRANSLATION_TARGET_LANGUAGE
+        )
+        self.translation_target_combo.blockSignals(True)
+        self.translation_target_combo.clear()
+        for code, label_key in LANGUAGE_OPTION_KEYS:
+            self.translation_target_combo.addItem(self.i18n.t(label_key), code)
+
+        target_index = self.translation_target_combo.findData(preferred_target)
+        if target_index < 0:
+            target_index = self.translation_target_combo.findData(DEFAULT_TRANSLATION_TARGET_LANGUAGE)
+        if target_index < 0 and self.translation_target_combo.count() > 0:
+            target_index = 0
+        if target_index >= 0:
+            self.translation_target_combo.setCurrentIndex(target_index)
+        self.translation_target_combo.blockSignals(False)
+
+    def _selected_translation_source_lang(self) -> str:
+        return self._resolve_translation_languages().get(
+            "translation_source_lang", TRANSLATION_LANGUAGE_AUTO
+        )
+
+    def _selected_translation_target_lang(self) -> str:
+        selected = self.translation_target_combo.currentData() if hasattr(
+            self, "translation_target_combo"
+        ) else None
+        return self._resolve_translation_languages(target_lang=selected).get(
+            "translation_target_lang", DEFAULT_TRANSLATION_TARGET_LANGUAGE
+        )
+
+    def _translation_engine_name(self) -> str:
+        translation_engine = getattr(self.transcription_manager, "translation_engine", None)
+        if translation_engine is None:
+            return ""
+        get_name = getattr(translation_engine, "get_name", None)
+        if callable(get_name):
+            try:
+                return str(get_name()).strip().lower()
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("Failed to get translation engine name: %s", exc)
+        return translation_engine.__class__.__name__.strip().lower()
+
+    def _translation_uses_local_models(self) -> bool:
+        preference_engine = str(
+            self._get_translation_preferences().get("translation_engine") or ""
+        ).strip().lower()
+        if preference_engine == TRANSLATION_ENGINE_OPUS_MT:
+            return True
+
+        engine_name = self._translation_engine_name()
+        return "opus" in engine_name
+
+    def _resolve_translation_readiness(self) -> tuple[bool, str]:
+        if not self._translation_engine_available():
+            return False, self.i18n.t("batch_transcribe.translation_not_available")
+
+        if not self._translation_uses_local_models():
+            return True, ""
+
+        if not self.model_manager or not hasattr(self.model_manager, "get_best_translation_model"):
+            return False, self.i18n.t("batch_transcribe.translation_not_available")
+
+        source_lang = self._selected_translation_source_lang()
+        target_lang = self._selected_translation_target_lang()
+        auto_detect = source_lang == TRANSLATION_LANGUAGE_AUTO
+
+        try:
+            model_info = self.model_manager.get_best_translation_model(
+                source_lang,
+                target_lang,
+                auto_detect=auto_detect,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to resolve translation model readiness: %s", exc)
+            return False, self.i18n.t("batch_transcribe.translation_not_available")
+
+        if model_info and getattr(model_info, "is_downloaded", False):
+            return True, ""
+
+        model_name = getattr(model_info, "model_id", f"opus-mt-{source_lang}-{target_lang}")
+        return False, self.i18n.t("settings.translation.opus_mt_not_downloaded", model=model_name)
+
+    def _ensure_translation_ready(self) -> bool:
+        ready, message = self._resolve_translation_readiness()
+        if ready:
+            return True
+
+        self.show_warning(
+            self.i18n.t("common.warning"),
+            message or self.i18n.t("batch_transcribe.translation_not_available"),
+        )
+        self._refresh_download_guide()
+        return False
+
+    def _preferred_transcription_model(self) -> str:
+        settings_manager = self._get_settings_manager()
+        if settings_manager and hasattr(settings_manager, "get_setting"):
+            try:
+                configured_model = settings_manager.get_setting("transcription.faster_whisper.model_size")
+                if isinstance(configured_model, str) and configured_model.strip():
+                    return configured_model.strip()
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("Failed to read preferred transcription model: %s", exc)
+        return ""
+
+    def _build_import_file_filter(self, task_kind: Optional[str] = None) -> str:
+        audio_patterns = " ".join(f"*{suffix}" for suffix in sorted(AUDIO_VIDEO_SUFFIXES))
+        text_patterns = " ".join(f"*{suffix}" for suffix in sorted(TEXT_TRANSLATION_SUFFIXES))
+        if (task_kind or self._current_task_kind()) == TRANSLATION_TASK_KIND:
+            return (
+                f"Translation Source Files ({audio_patterns} {text_patterns});;All Files (*)"
+            )
+        return f"Audio/Video Files ({audio_patterns});;All Files (*)"
 
     def _populate_engines(self, combo: QComboBox):
         """
@@ -253,111 +590,109 @@ class BatchTranscribeWidget(BaseWidget):
 
         try:
             # Save current selection
-            current_model = self.model_combo.currentText()
+            current_model = self.model_combo.currentData()
 
             # Clear combo box
             self.model_combo.clear()
 
             # Get downloaded models
-            downloaded_models = self.model_manager.get_downloaded_models()
+            downloaded_models = list(self.model_manager.get_downloaded_models() or [])
 
             if not downloaded_models:
                 # No models available
-                self.model_combo.addItem(self.i18n.t("batch_transcribe.no_models_available"))
+                self.model_combo.addItem(self.i18n.t("batch_transcribe.no_models_available"), None)
                 self.model_combo.setEnabled(False)
-
-                # Show download guide
-                self._show_download_guide()
 
                 logger.warning(self.i18n.t("logging.batch_transcribe.no_models_downloaded"))
             else:
                 # Enable combo box
                 self.model_combo.setEnabled(True)
 
-                # Hide download guide if visible
-                if self.download_guide_widget:
-                    self.download_guide_widget.hide()
-
                 # Add models to combo box
                 for model in downloaded_models:
-                    self.model_combo.addItem(model.name)
+                    self.model_combo.addItem(model.name, model.name)
 
                 # Restore previous selection if still available
-                index = self.model_combo.findText(current_model)
+                preferred_model = (
+                    current_model
+                    or self._preferred_transcription_model()
+                    or self.model_manager.recommend_model()
+                )
+                index = self.model_combo.findData(preferred_model)
                 if index >= 0:
                     self.model_combo.setCurrentIndex(index)
-                else:
-                    # Select recommended model or first available model
-                    try:
-                        default_model = self.model_manager.recommend_model()
-                        if default_model:
-                            index = self.model_combo.findText(default_model)
-                            if index >= 0:
-                                self.model_combo.setCurrentIndex(index)
-                    except Exception as e:
-                        logger.debug(f"Could not get recommended model: {e}")
+                elif self.model_combo.count() > 0:
+                    self.model_combo.setCurrentIndex(0)
 
                 logger.info(f"Updated model list: {len(downloaded_models)} models")
+            self._update_mode_controls()
 
         except Exception as e:
             logger.error(f"Error updating model list: {e}")
             self.model_combo.addItem(
-                self.i18n.t("ui_strings.batch_transcribe.error_loading_models")
+                self.i18n.t("ui_strings.batch_transcribe.error_loading_models"),
+                None,
             )
             self.model_combo.setEnabled(False)
+            self._update_mode_controls()
 
-    def _show_download_guide(self):
-        """Show download guide widget when no models are available."""
-        if self.download_guide_widget:
-            # Already showing
-            self.download_guide_widget.show()
+    def _show_download_guide(self, task_kind: str, message: str):
+        """Show contextual download guide inside the target tab."""
+        context = self._tab_contexts.get(task_kind)
+        if not context:
             return
 
-        try:
-            # Create download guide widget
-            guide_frame = QFrame()
-            guide_frame.setObjectName("download_guide_frame")
-            guide_frame.setFrameShape(QFrame.Shape.StyledPanel)
+        if not message:
+            context.download_guide_frame.hide()
+            return
 
-            guide_layout = QVBoxLayout(guide_frame)
+        context.download_guide_message_label.setText(message)
+        context.download_guide_frame.show()
 
-            # Message label
-            message_label = QLabel(self.i18n.t("batch_transcribe.no_models_message"))
-            message_label.setWordWrap(True)
-            message_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            guide_layout.addWidget(message_label)
+    def _hide_download_guide(self, task_kind: Optional[str] = None):
+        if task_kind:
+            context = self._tab_contexts.get(task_kind)
+            if context:
+                context.download_guide_frame.hide()
+            return
+        for context in self._tab_contexts.values():
+            context.download_guide_frame.hide()
 
-            # Download button
-            download_btn = create_primary_button(self.i18n.t("batch_transcribe.go_to_download"))
-            connect_button_with_callback(download_btn, self._on_go_to_download)
-            guide_layout.addWidget(download_btn, alignment=Qt.AlignmentFlag.AlignCenter)
+    def _refresh_download_guide(self) -> None:
+        if self.model_manager and hasattr(self, "model_combo") and not self._transcription_mode_ready():
+            self._show_download_guide(
+                TRANSCRIPTION_TASK_KIND,
+                self.i18n.t("batch_transcribe.no_models_message"),
+            )
+        else:
+            self._hide_download_guide(TRANSCRIPTION_TASK_KIND)
 
-            # Add to main layout (after toolbar, before task list)
-            main_layout = self.layout()
-            # Insert after toolbar (index 2: title, toolbar, guide, queue_label, task_list)
-            main_layout.insertWidget(2, guide_frame)
+        translation_ready, message = self._resolve_translation_readiness()
+        if translation_ready:
+            self._hide_download_guide(TRANSLATION_TASK_KIND)
+        else:
+            self._show_download_guide(TRANSLATION_TASK_KIND, message)
 
-            self.download_guide_widget = guide_frame
-
-            logger.debug("Download guide widget created")
-
-        except Exception as e:
-            logger.error(f"Error creating download guide: {e}")
-
-    def _on_go_to_download(self):
+    def _on_go_to_download(self, task_kind: Optional[str] = None):
         """Handle 'Go to Download' button click."""
         try:
-            # Emit signal to switch to settings page
-            # We need to access the main window to switch pages
+            active_kind = task_kind or self._current_task_kind()
             main_window = self.window()
             if hasattr(main_window, "switch_page"):
                 main_window.switch_page("settings")
-
-                # Try to switch to model management page in settings
                 settings_widget = main_window.pages.get("settings")
                 if settings_widget and hasattr(settings_widget, "show_page"):
-                    # Give it a moment to switch pages
-                    QTimer.singleShot(100, lambda: settings_widget.show_page("model_management"))
+                    def _show_model_management():
+                        settings_widget.show_page("model_management")
+                        if active_kind != TRANSLATION_TASK_KIND:
+                            return
+                        model_page = getattr(settings_widget, "settings_pages", {}).get(
+                            "model_management"
+                        )
+                        if model_page and hasattr(model_page, "tabs"):
+                            model_page.tabs.setCurrentIndex(1)
+
+                    QTimer.singleShot(100, _show_model_management)
 
                 logger.info(self.i18n.t("logging.batch_transcribe.navigating_to_model_management"))
             else:
@@ -371,29 +706,48 @@ class BatchTranscribeWidget(BaseWidget):
     def update_translations(self):
         """Update all UI text with current language translations."""
         try:
-            # Update title
             self.title_label.setText(self.i18n.t("batch_transcribe.title"))
+            if hasattr(self, "task_tabs"):
+                self.task_tabs.setTabText(0, self.i18n.t("batch_transcribe.mode_transcription"))
+                self.task_tabs.setTabText(1, self.i18n.t("batch_transcribe.mode_translation"))
 
-            # Update buttons
-            self.import_file_btn.setText(self.i18n.t("batch_transcribe.import_file"))
-            self.import_folder_btn.setText(self.i18n.t("batch_transcribe.import_folder"))
-            self.clear_queue_btn.setText(self.i18n.t("batch_transcribe.clear_queue"))
+            transcription_context = self._tab_contexts.get(TRANSCRIPTION_TASK_KIND)
+            if transcription_context:
+                transcription_context.import_file_btn.setText(self.i18n.t("batch_transcribe.import_file"))
+                transcription_context.import_folder_btn.setText(
+                    self.i18n.t("batch_transcribe.import_folder")
+                )
+                transcription_context.clear_queue_btn.setText(self.i18n.t("batch_transcribe.clear_queue"))
+                transcription_context.download_guide_button.setText(
+                    self.i18n.t("batch_transcribe.go_to_download")
+                )
 
-            # Update model/engine label
+            translation_context = self._tab_contexts.get(TRANSLATION_TASK_KIND)
+            if translation_context:
+                translation_context.import_file_btn.setText(self.i18n.t("batch_transcribe.import_file"))
+                translation_context.import_folder_btn.setText(
+                    self.i18n.t("batch_transcribe.import_folder")
+                )
+                if translation_context.paste_text_btn is not None:
+                    translation_context.paste_text_btn.setText(self.i18n.t("batch_transcribe.paste_text"))
+                translation_context.clear_queue_btn.setText(self.i18n.t("batch_transcribe.clear_queue"))
+                translation_context.download_guide_button.setText(
+                    self.i18n.t("batch_transcribe.go_to_download")
+                )
+
             if hasattr(self, "model_label"):
                 self.model_label.setText(self.i18n.t("batch_transcribe.model") + ":")
             elif hasattr(self, "engine_label"):
                 self.engine_label.setText(self.i18n.t("batch_transcribe.engine") + ":")
+            if hasattr(self, "translation_target_label"):
+                self.translation_target_label.setText(
+                    self.i18n.t("settings.translation.target_language")
+                )
 
+            self._populate_translation_target_languages()
+            self._update_mode_controls()
             self._update_queue_label()
-
-            # Update download guide if visible
-            if self.download_guide_widget and self.download_guide_widget.isVisible():
-                # Recreate the guide with updated translations
-                self.download_guide_widget.hide()
-                self.download_guide_widget.deleteLater()
-                self.download_guide_widget = None
-                self._show_download_guide()
+            self._refresh_download_guide()
 
             logger.debug("Translations updated")
 
@@ -401,22 +755,24 @@ class BatchTranscribeWidget(BaseWidget):
             logger.error(f"Error updating translations: {e}")
 
     def _update_queue_label(self):
-        """Update queue label with current task count."""
-        task_count = self.task_list.count()
-        self.queue_label.setText(
-            self.i18n.t("batch_transcribe.task_queue")
-            + " "
-            + self.i18n.t("batch_transcribe.tasks_count", count=task_count)
-        )
+        """Update both queue labels with current task counts."""
+        for context in self._tab_contexts.values():
+            task_count = context.task_list.count()
+            context.queue_label.setText(
+                self.i18n.t("batch_transcribe.task_queue")
+                + " "
+                + self.i18n.t("batch_transcribe.tasks_count", count=task_count)
+            )
 
-    def _on_import_file(self):
+    def _on_import_file(self, task_kind: Optional[str] = None):
         """Handle import file button click."""
         try:
+            active_kind = task_kind or self._current_task_kind()
+            if active_kind == TRANSLATION_TASK_KIND and not self._ensure_translation_ready():
+                return
+
             # Open file dialog
-            file_filter = (
-                "Audio/Video Files (*.mp3 *.wav *.m4a *.flac *.ogg "
-                "*.opus *.mp4 *.avi *.mkv *.mov *.webm);;All Files (*)"
-            )
+            file_filter = self._build_import_file_filter(active_kind)
             file_paths, _ = QFileDialog.getOpenFileNames(
                 self, self.i18n.t("batch_transcribe.import_file"), "", file_filter
             )
@@ -426,7 +782,7 @@ class BatchTranscribeWidget(BaseWidget):
 
             # Add tasks for each file
             for file_path in file_paths:
-                self._add_task(file_path)
+                self._add_task(file_path, active_kind)
 
             logger.info(f"Imported {len(file_paths)} files")
 
@@ -434,9 +790,13 @@ class BatchTranscribeWidget(BaseWidget):
             logger.error(f"Error importing files: {e}")
             self._show_error(self.i18n.t("errors.unknown_error"), str(e))
 
-    def _on_import_folder(self):
+    def _on_import_folder(self, task_kind: Optional[str] = None):
         """Handle import folder button click."""
         try:
+            active_kind = task_kind or self._current_task_kind()
+            if active_kind == TRANSLATION_TASK_KIND and not self._ensure_translation_ready():
+                return
+
             # Open folder dialog
             folder_path = QFileDialog.getExistingDirectory(
                 self, self.i18n.t("batch_transcribe.import_folder"), ""
@@ -446,8 +806,14 @@ class BatchTranscribeWidget(BaseWidget):
                 return
 
             # Add tasks from folder with the same options used by single-file import
-            options = self._build_task_options()
-            task_ids = self.transcription_manager.add_tasks_from_folder(folder_path, options)
+            if active_kind == TRANSLATION_TASK_KIND:
+                options = self._build_translation_task_options()
+                task_ids = self.transcription_manager.add_translation_tasks_from_folder(
+                    folder_path, options
+                )
+            else:
+                options = self._build_task_options()
+                task_ids = self.transcription_manager.add_tasks_from_folder(folder_path, options)
             logger.info(f"Added {len(task_ids)} tasks from folder")
 
             logger.info(f"Importing from folder: {folder_path}")
@@ -456,12 +822,79 @@ class BatchTranscribeWidget(BaseWidget):
             logger.error(f"Error importing folder: {e}")
             self._show_error(self.i18n.t("errors.unknown_error"), str(e))
 
-    def _on_clear_queue(self):
+    def _on_paste_text(self, task_kind: Optional[str] = None):
+        """Handle creating translation task from pasted text."""
+        active_kind = task_kind or self._current_task_kind()
+        if active_kind != TRANSLATION_TASK_KIND:
+            return
+
+        if not self._ensure_translation_ready():
+            return
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle(self.i18n.t("batch_transcribe.paste_dialog_title"))
+        dialog.setMinimumSize(640, 420)
+
+        layout = QVBoxLayout(dialog)
+        form_layout = QFormLayout()
+
+        file_name_edit = QLineEdit("pasted_text.txt")
+        form_layout.addRow(
+            self.i18n.t("batch_transcribe.paste_filename_label"),
+            file_name_edit,
+        )
+
+        output_format_combo = QComboBox()
+        output_format_combo.addItem("TXT", "txt")
+        output_format_combo.addItem("MD", "md")
+        form_layout.addRow(
+            self.i18n.t("batch_transcribe.paste_output_format_label"),
+            output_format_combo,
+        )
+        layout.addLayout(form_layout)
+
+        text_editor = QPlainTextEdit()
+        text_editor.setPlaceholderText(self.i18n.t("batch_transcribe.paste_text_placeholder"))
+        layout.addWidget(text_editor)
+
+        action_layout = create_hbox()
+        action_layout.addStretch()
+        cancel_btn = create_button(self.i18n.t("common.cancel"))
+        confirm_btn = create_primary_button(self.i18n.t("common.ok"))
+        connect_button_with_callback(cancel_btn, dialog.reject)
+        connect_button_with_callback(confirm_btn, dialog.accept)
+        action_layout.addWidget(cancel_btn)
+        action_layout.addWidget(confirm_btn)
+        layout.addLayout(action_layout)
+
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        text = text_editor.toPlainText()
+        if not text.strip():
+            self.show_warning(
+                self.i18n.t("common.warning"),
+                self.i18n.t("batch_transcribe.paste_text_empty"),
+            )
+            return
+
+        options = self._build_translation_task_options()
+        options["output_format"] = output_format_combo.currentData()
+        self.transcription_manager.add_translation_text_task(
+            text=text,
+            file_name=file_name_edit.text().strip() or "pasted_text.txt",
+            options=options,
+        )
+        self._notify_user(self.i18n.t("batch_transcribe.translation_queued"))
+
+    def _on_clear_queue(self, task_kind: Optional[str] = None):
         """Handle clear queue button click."""
         try:
             if self._clear_queue_in_progress:
                 logger.info("Clear queue already in progress, ignoring duplicate request")
                 return
+
+            active_kind = task_kind or self._current_task_kind()
 
             # Confirm with user
             reply = QMessageBox.question(
@@ -474,25 +907,27 @@ class BatchTranscribeWidget(BaseWidget):
 
             if reply == QMessageBox.StandardButton.Yes:
                 self._clear_queue_in_progress = True
-                self.clear_queue_btn.setEnabled(False)
+                self._set_clear_buttons_enabled(False)
 
                 # Stop all running/pending tasks first to avoid race conditions
                 self.transcription_manager.stop_all_tasks()
 
-                self._clear_queue_with_retry(attempt=1)
+                self._clear_queue_with_retry(active_kind, attempt=1)
 
         except Exception as e:
             logger.error(f"Error clearing queue: {e}")
             self._clear_queue_in_progress = False
-            self.clear_queue_btn.setEnabled(True)
+            self._update_mode_controls()
             self._show_error(self.i18n.t("errors.unknown_error"), str(e))
 
-    def _clear_queue_with_retry(self, attempt: int):
-        """Delete queue tasks with short retries to handle in-flight cancellation."""
+    def _clear_queue_with_retry(self, task_kind: str, attempt: int):
+        """Delete queue tasks of a specific kind with short retries."""
         deleted_task_ids = set()
         remaining_processing_ids = []
 
         for task_data in self.transcription_manager.get_all_tasks():
+            if self._resolve_task_kind_from_data(task_data) != task_kind:
+                continue
             task_id = task_data["id"]
             if self.transcription_manager.delete_task(task_id):
                 deleted_task_ids.add(task_id)
@@ -511,7 +946,7 @@ class BatchTranscribeWidget(BaseWidget):
             )
             QTimer.singleShot(
                 self._CLEAR_QUEUE_RETRY_INTERVAL_MS,
-                lambda: self._clear_queue_with_retry(attempt + 1),
+                lambda: self._clear_queue_with_retry(task_kind, attempt + 1),
             )
             return
 
@@ -530,23 +965,36 @@ class BatchTranscribeWidget(BaseWidget):
 
         self.transcription_manager.start_processing()
         self._clear_queue_in_progress = False
-        self.clear_queue_btn.setEnabled(True)
+        self._update_mode_controls()
         self._update_queue_label()
         logger.info(self.i18n.t("logging.batch_transcribe.task_queue_cleared"))
 
-    def _add_task(self, file_path: str):
+    def _add_task(self, file_path: str, task_kind: Optional[str] = None):
         """
-        Add a transcription task.
+        Add a task according to current mode.
 
         Args:
-            file_path: Path to audio/video file
+            file_path: Source file path
         """
         try:
-            options = self._build_task_options()
+            source_path = Path(file_path)
+            suffix = source_path.suffix.lower()
+            active_kind = task_kind or self._current_task_kind()
 
-            # Add task to transcription manager
-            task_id = self.transcription_manager.add_task(file_path, options)
-            logger.info(f"Task added: {task_id}")
+            if active_kind == TRANSLATION_TASK_KIND:
+                if not self._ensure_translation_ready():
+                    return
+                supported_suffixes = AUDIO_VIDEO_SUFFIXES | TEXT_TRANSLATION_SUFFIXES
+                if suffix not in supported_suffixes:
+                    raise ValueError(
+                        self.i18n.t("batch_transcribe.unsupported_translation_file_type")
+                    )
+                options = self._build_translation_task_options()
+                task_id = self.transcription_manager.add_translation_task(file_path, options)
+            else:
+                task_id = self.transcription_manager.add_task(file_path, self._build_task_options())
+
+            logger.info("Task added: %s (%s)", task_id, active_kind)
 
         except Exception as e:
             logger.error(f"Error adding task: {e}")
@@ -557,60 +1005,86 @@ class BatchTranscribeWidget(BaseWidget):
         options: Dict[str, str] = {}
 
         if self.model_manager and hasattr(self, "model_combo"):
-            selected_model = self.model_combo.currentText()
+            selected_model = self.model_combo.currentData()
+            if not selected_model:
+                raise ValueError(self.i18n.t("batch_transcribe.no_models_available"))
 
-            if selected_model and selected_model != self.i18n.t(
-                "batch_transcribe.no_models_available"
-            ):
-                model_info = self.model_manager.get_model(selected_model)
+            model_info = self.model_manager.get_model(str(selected_model))
+            if not model_info or not model_info.is_downloaded:
+                raise ValueError(
+                    self.i18n.t("batch_transcribe.model_not_available", model=selected_model)
+                )
 
-                if not model_info or not model_info.is_downloaded:
-                    raise ValueError(
-                        self.i18n.t("batch_transcribe.model_not_available", model=selected_model)
-                    )
-
-                options["model_name"] = selected_model
-                options["model_path"] = model_info.local_path
-                logger.debug(f"Using model {selected_model} at {model_info.local_path}")
+            options["model_name"] = str(selected_model)
+            options["model_path"] = model_info.local_path
+            logger.debug(f"Using model {selected_model} at {model_info.local_path}")
 
         return options
+
+    def _build_translation_task_options(self) -> Dict[str, str]:
+        """Build translation task options with language preferences."""
+        selected_target = self.translation_target_combo.currentData() if hasattr(
+            self, "translation_target_combo"
+        ) else None
+        return self._resolve_translation_languages(target_lang=selected_target)
 
     def _refresh_tasks(self):
         """Refresh task list from transcription manager."""
         try:
-            # Get all tasks from manager
             all_tasks = self.transcription_manager.get_all_tasks()
-
-            # Update existing task items and add new ones
             current_task_ids = set(self.task_items.keys())
             new_task_ids = {task["id"] for task in all_tasks}
 
-            # Remove tasks that no longer exist
             for task_id in current_task_ids - new_task_ids:
                 self._remove_task_item(task_id)
 
-            # Add or update tasks
             for task_data in all_tasks:
-                task_id = task_data["id"]
+                self._upsert_task_item(task_data)
 
-                if task_id in self.task_items:
-                    # Update existing task item
-                    if task_data.get("status") == "processing":
-                        logger.debug(
-                            f"Updating task {task_id}: "
-                            f"progress={task_data.get('progress', 0):.1f}%"
-                        )
-                    self.task_items[task_id].update_task_data(task_data)
-                else:
-                    # Add new task item
-                    self._add_task_item(task_data)
-
-            # Keep periodic refresh lightweight: only update dynamic queue count.
             self._update_queue_label()
             self._set_tasks_pause_state(self.transcription_manager.is_paused())
 
         except Exception as e:
             logger.error(f"Error refreshing tasks: {e}")
+
+    @staticmethod
+    def _resolve_task_kind_from_data(task_data: Dict) -> str:
+        task_kind = task_data.get("task_kind")
+        if task_kind in {TRANSCRIPTION_TASK_KIND, TRANSLATION_TASK_KIND}:
+            return str(task_kind)
+        if task_data.get("engine") == "translation":
+            return TRANSLATION_TASK_KIND
+        return TRANSCRIPTION_TASK_KIND
+
+    def _task_list_for_kind(self, task_kind: str) -> QListWidget:
+        context = self._tab_contexts.get(task_kind) or self._tab_contexts.get(TRANSCRIPTION_TASK_KIND)
+        if context is None:
+            raise RuntimeError(f"Task list context missing for kind: {task_kind}")
+        return context.task_list
+
+    def _upsert_task_item(self, task_data: Dict) -> None:
+        task_id = task_data["id"]
+        desired_kind = self._resolve_task_kind_from_data(task_data)
+        existing_item = self.task_items.get(task_id)
+        if existing_item is None:
+            self._add_task_item(task_data)
+            return
+
+        current_kind = self.task_item_kinds.get(task_id, desired_kind)
+        if current_kind != desired_kind:
+            merged_data = dict(existing_item.task_data)
+            merged_data.update(task_data)
+            self._remove_task_item(task_id)
+            self._add_task_item(merged_data)
+            return
+
+        if task_data.get("status") == "processing":
+            logger.debug(
+                "Updating task %s: progress=%.1f%%",
+                task_id,
+                float(task_data.get("progress", 0)),
+            )
+        existing_item.update_task_data(task_data)
 
     def _add_task_item(self, task_data: Dict):
         """
@@ -621,11 +1095,10 @@ class BatchTranscribeWidget(BaseWidget):
         """
         try:
             task_id = task_data["id"]
+            task_kind = self._resolve_task_kind_from_data(task_data)
+            target_list = self._task_list_for_kind(task_kind)
 
-            # Create task item widget
             task_item = TaskItem(task_data, self.i18n)
-
-            # Connect signals
             task_item.start_clicked.connect(self._on_task_start)
             task_item.pause_clicked.connect(self._on_task_pause)
             task_item.cancel_clicked.connect(self._on_task_cancel)
@@ -634,20 +1107,17 @@ class BatchTranscribeWidget(BaseWidget):
             task_item.export_clicked.connect(self._on_task_export)
             task_item.retry_clicked.connect(self._on_task_retry)
 
-            # Add to list widget
-            list_item = QListWidgetItem(self.task_list)
-            # Set a fixed size hint to prevent overlapping
+            list_item = QListWidgetItem()
             list_item.setSizeHint(QSize(800, 160))
-            self.task_list.addItem(list_item)
-            self.task_list.setItemWidget(list_item, task_item)
+            target_list.addItem(list_item)
+            target_list.setItemWidget(list_item, task_item)
 
-            # Store reference
             self.task_items[task_id] = task_item
+            self.task_item_kinds[task_id] = task_kind
 
-            # Ensure pause button reflects current processing state
             task_item.set_processing_paused(self.transcription_manager.is_paused())
 
-            logger.debug(f"Added task item for task {task_id}")
+            logger.debug("Added task item for task %s (%s)", task_id, task_kind)
 
         except Exception as e:
             logger.error(f"Error adding task item: {e}")
@@ -663,16 +1133,24 @@ class BatchTranscribeWidget(BaseWidget):
             if task_id not in self.task_items:
                 return
 
-            # Find and remove list item
-            for i in range(self.task_list.count()):
-                item = self.task_list.item(i)
-                widget = self.task_list.itemWidget(item)
-                if isinstance(widget, TaskItem) and widget.task_id == task_id:
-                    self.task_list.takeItem(i)
-                    break
+            task_lists = []
+            current_kind = self.task_item_kinds.get(task_id)
+            if current_kind in self._tab_contexts:
+                task_lists.append(self._tab_contexts[current_kind].task_list)
+            for context in self._tab_contexts.values():
+                if context.task_list not in task_lists:
+                    task_lists.append(context.task_list)
 
-            # Remove from dictionary
+            for task_list in task_lists:
+                for i in range(task_list.count()):
+                    item = task_list.item(i)
+                    widget = task_list.itemWidget(item)
+                    if isinstance(widget, TaskItem) and widget.task_id == task_id:
+                        task_list.takeItem(i)
+                        break
+
             del self.task_items[task_id]
+            self.task_item_kinds.pop(task_id, None)
 
             logger.debug(f"Removed task item for task {task_id}")
 
@@ -820,9 +1298,11 @@ class BatchTranscribeWidget(BaseWidget):
             # 2. Populate models
             if self.model_manager:
                 self._update_model_list()
+            self._populate_translation_target_languages()
 
             # 3. Refresh task list (queries database and creates sub-widgets)
             self._refresh_tasks()
+            self._update_mode_controls()
 
             logger.debug("Initial load complete")
         except Exception as e:
@@ -849,19 +1329,11 @@ class BatchTranscribeWidget(BaseWidget):
         """
         try:
             if event_type == "task_added":
-                task_id = data["id"]
-                if task_id not in self.task_items:
-                    self._add_task_item(data)
-                    self._update_queue_label()
+                self._upsert_task_item(data)
+                self._update_queue_label()
 
             elif event_type == "task_updated":
-                task_id = data["id"]
-                if task_id in self.task_items:
-                    self.task_items[task_id].update_task_data(data)
-                elif task_id not in self.task_items:
-                    # Might happen if we missed the add event or it was filtered
-                    # We can try to fetch the full task data or ignore
-                    pass
+                self._upsert_task_item(data)
 
             elif event_type == "task_deleted":
                 task_id = data["id"]

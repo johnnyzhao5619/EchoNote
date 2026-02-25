@@ -41,6 +41,7 @@ NESTED_VALUE_CACHE_SIZE = 128
 PARAMETER_PATTERN = r"\{(\w+)\}"
 CONDITIONAL_PATTERN = r"\{(\w+)\|([^|}]*)\|([^}]*)\}"
 SPECIAL_PARAMETERS = {"condition", "fallback"}
+UI_LANGUAGE_CODE_PATTERN = re.compile(r"^[a-z]{2}_[A-Z]{2}$")
 
 # Shared language options used by translation-aware widgets across the UI.
 # Each tuple contains the language code and the translation key for the
@@ -81,7 +82,11 @@ def get_translation_codes(translations_dir: str | Path | None = None) -> list[st
     if not translations_dir.exists():
         return []
 
-    return sorted(file.stem for file in translations_dir.glob("*.json"))
+    return sorted(
+        file.stem
+        for file in translations_dir.glob("*.json")
+        if UI_LANGUAGE_CODE_PATTERN.match(file.stem)
+    )
 
 
 def get_language_display_name(language_code: str, i18n_manager=None) -> str:
@@ -491,10 +496,11 @@ class I18nManager:
         Returns:
             List of language codes
         """
-        languages = []
-        for file in self.translations_dir.glob("*.json"):
-            languages.append(file.stem)
-        return sorted(languages)
+        return sorted(
+            file.stem
+            for file in self.translations_dir.glob("*.json")
+            if UI_LANGUAGE_CODE_PATTERN.match(file.stem)
+        )
 
     def precompile_templates(self) -> None:
         """

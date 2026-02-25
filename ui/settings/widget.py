@@ -201,6 +201,7 @@ class SettingsWidget(BaseWidget):
         from ui.settings.model_management_page import ModelManagementPage
         from ui.settings.realtime_page import RealtimeSettingsPage
         from ui.settings.timeline_page import TimelineSettingsPage
+        from ui.settings.translation_page import TranslationSettingsPage
         from ui.settings.transcription_page import TranscriptionSettingsPage
 
         # Page definitions: (id, class, args)
@@ -213,6 +214,11 @@ class SettingsWidget(BaseWidget):
             (
                 "realtime",
                 RealtimeSettingsPage,
+                (self.settings_manager, self.i18n, self.managers),
+            ),
+            (
+                "translation",
+                TranslationSettingsPage,
                 (self.settings_manager, self.i18n, self.managers),
             ),
             (
@@ -269,13 +275,14 @@ class SettingsWidget(BaseWidget):
         categories = [
             "transcription",
             "realtime",
+            "translation",
             "calendar",
             "timeline",
             "appearance",
             "language",
         ]
         if "model_manager" in self.managers:
-            categories.insert(2, "model_management")
+            categories.insert(3, "model_management")
         return categories
 
     def _on_category_changed(self, index: int):

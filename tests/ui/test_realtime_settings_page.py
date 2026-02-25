@@ -18,9 +18,6 @@ class _FakeSettingsManager:
             "realtime.recording_format": "wav",
             "realtime.recording_save_path": "~/Documents/EchoNote/Recordings",
             "realtime.auto_save": True,
-            "realtime.translation_engine": "none",
-            "realtime.translation_source_lang": "auto",
-            "realtime.translation_target_lang": "en",
             "realtime.floating_window_enabled": True,
             "realtime.hide_main_window_when_floating": False,
             "realtime.floating_window_always_on_top": True,
@@ -39,12 +36,11 @@ class _FakeSettingsManager:
         return True
 
 
-def test_load_settings_populates_translation_engine(qapp, mock_i18n):
+def test_load_settings_populates_realtime_controls(qapp, mock_i18n):
     settings_manager = _FakeSettingsManager()
     page = RealtimeSettingsPage(settings_manager, mock_i18n)
     page.load_settings()
 
-    assert page.translation_combo.currentData() == "none"
     assert page.floating_window_check.isChecked() is True
     assert page.hide_main_window_check.isChecked() is False
     assert page.floating_window_always_on_top_check.isChecked() is True
@@ -55,13 +51,10 @@ def test_load_settings_populates_translation_engine(qapp, mock_i18n):
     assert page.min_audio_duration_spin.value() == 2.5
 
 
-def test_save_settings_persists_translation_engine(qapp, mock_i18n):
+def test_save_settings_persists_realtime_preferences(qapp, mock_i18n):
     settings_manager = _FakeSettingsManager()
     page = RealtimeSettingsPage(settings_manager, mock_i18n)
 
-    index = page.translation_combo.findData("google")
-    assert index >= 0
-    page.translation_combo.setCurrentIndex(index)
     page.floating_window_check.setChecked(True)
     page.hide_main_window_check.setChecked(True)
     page.floating_window_always_on_top_check.setChecked(False)
@@ -73,7 +66,6 @@ def test_save_settings_persists_translation_engine(qapp, mock_i18n):
 
     page.save_settings()
 
-    assert settings_manager.get_setting("realtime.translation_engine") == "google"
     assert settings_manager.get_setting("realtime.floating_window_enabled") is True
     assert settings_manager.get_setting("realtime.hide_main_window_when_floating") is True
     assert settings_manager.get_setting("realtime.floating_window_always_on_top") is False
@@ -82,6 +74,7 @@ def test_save_settings_persists_translation_engine(qapp, mock_i18n):
     assert settings_manager.get_setting("realtime.vad_threshold") == 0.6
     assert settings_manager.get_setting("realtime.silence_duration_ms") == 2500
     assert settings_manager.get_setting("realtime.min_audio_duration") == 4.2
+
 
 
 def test_loopback_status_updates_from_checker(qapp, mock_i18n):

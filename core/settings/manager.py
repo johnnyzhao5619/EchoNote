@@ -32,6 +32,54 @@ from utils.i18n import get_translation_codes
 logger = logging.getLogger(__name__)
 
 
+def _coerce_non_empty_string(value: Any) -> Optional[str]:
+    """Normalize language-like values to a non-empty string."""
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip()
+    if not normalized:
+        return None
+    return normalized
+
+
+def resolve_translation_languages_from_settings(
+    settings_manager: Any,
+    *,
+    source_lang: Any = None,
+    target_lang: Any = None,
+) -> Dict[str, str]:
+    """Resolve translation languages with overrides > settings > constant defaults."""
+    from config.constants import (
+        DEFAULT_TRANSLATION_TARGET_LANGUAGE,
+        TRANSLATION_LANGUAGE_AUTO,
+    )
+
+    preferences: Dict[str, Any] = {}
+    preferences_loader = getattr(settings_manager, "get_translation_preferences", None)
+    if callable(preferences_loader):
+        try:
+            loaded = preferences_loader()
+            if isinstance(loaded, dict):
+                preferences = loaded
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to load translation preferences: %s", exc)
+
+    resolved_source = (
+        _coerce_non_empty_string(source_lang)
+        or _coerce_non_empty_string(preferences.get("translation_source_lang"))
+        or TRANSLATION_LANGUAGE_AUTO
+    )
+    resolved_target = (
+        _coerce_non_empty_string(target_lang)
+        or _coerce_non_empty_string(preferences.get("translation_target_lang"))
+        or DEFAULT_TRANSLATION_TARGET_LANGUAGE
+    )
+    return {
+        "translation_source_lang": resolved_source,
+        "translation_target_lang": resolved_target,
+    }
+
+
 class SettingsManager(QObject):
     """
     Manages application settings with validation and change notifications.
@@ -106,12 +154,7 @@ class SettingsManager(QObject):
         # Get defaults from configuration schema
         realtime_defaults = self._default_config.get("realtime", {})
 
-        from config.constants import (
-            DEFAULT_TRANSLATION_TARGET_LANGUAGE,
-            RECORDING_FORMAT_WAV,
-            TRANSLATION_ENGINE_NONE,
-            TRANSLATION_LANGUAGE_AUTO,
-        )
+        from config.constants import RECORDING_FORMAT_WAV
 
         # Start with defaults
         preferences = {
@@ -119,15 +162,6 @@ class SettingsManager(QObject):
             "auto_save": realtime_defaults.get("auto_save", True),
             "default_input_source": realtime_defaults.get("default_input_source", "default"),
             "default_gain": realtime_defaults.get("default_gain", 1.0),
-            "translation_engine": realtime_defaults.get(
-                "translation_engine", TRANSLATION_ENGINE_NONE
-            ),
-            "translation_source_lang": realtime_defaults.get(
-                "translation_source_lang", TRANSLATION_LANGUAGE_AUTO
-            ),
-            "translation_target_lang": realtime_defaults.get(
-                "translation_target_lang", DEFAULT_TRANSLATION_TARGET_LANGUAGE
-            ),
             "vad_threshold": realtime_defaults.get("vad_threshold", 0.5),
             "silence_duration_ms": realtime_defaults.get("silence_duration_ms", 2000),
             "min_audio_duration": realtime_defaults.get("min_audio_duration", 3.0),
@@ -151,15 +185,30 @@ class SettingsManager(QObject):
 
         return preferences
 
-    def get_realtime_translation_preferences(self) -> Dict[str, Any]:
-        """Return realtime translation preferences with defaults applied."""
+    def get_translation_preferences(self) -> Dict[str, Any]:
+        """Return shared translation preferences with defaults applied."""
         from config.constants import (
             DEFAULT_TRANSLATION_TARGET_LANGUAGE,
             TRANSLATION_ENGINE_NONE,
             TRANSLATION_LANGUAGE_AUTO,
         )
 
-        preferences = self.get_realtime_preferences()
+        translation_defaults = self._default_config.get("translation", {})
+        preferences = {
+            "translation_engine": translation_defaults.get(
+                "translation_engine", TRANSLATION_ENGINE_NONE
+            ),
+            "translation_source_lang": translation_defaults.get(
+                "translation_source_lang", TRANSLATION_LANGUAGE_AUTO
+            ),
+            "translation_target_lang": translation_defaults.get(
+                "translation_target_lang", DEFAULT_TRANSLATION_TARGET_LANGUAGE
+            ),
+        }
+        current_settings = self.config_manager.get("translation", {})
+        if isinstance(current_settings, dict):
+            preferences.update(current_settings)
+
         return {
             "translation_engine": preferences.get("translation_engine", TRANSLATION_ENGINE_NONE),
             "translation_source_lang": preferences.get(
@@ -170,14 +219,27 @@ class SettingsManager(QObject):
                 "translation_target_lang", DEFAULT_TRANSLATION_TARGET_LANGUAGE
             )
             or DEFAULT_TRANSLATION_TARGET_LANGUAGE,
-            "floating_window_enabled": bool(preferences.get("floating_window_enabled", False)),
-            "hide_main_window_when_floating": bool(
-                preferences.get("hide_main_window_when_floating", False)
-            ),
-            "floating_window_always_on_top": bool(
-                preferences.get("floating_window_always_on_top", True)
-            ),
         }
+
+    def resolve_realtime_translation_languages(
+        self,
+        *,
+        source_lang: Any = None,
+        target_lang: Any = None,
+    ) -> Dict[str, str]:
+        """
+        Resolve translation source/target languages with unified precedence.
+
+        Precedence:
+        1. Explicit runtime overrides (page-level selections)
+        2. Settings defaults (`translation.translation_*`)
+        3. Built-in fallback constants (`auto` / `en`)
+        """
+        return resolve_translation_languages_from_settings(
+            self,
+            source_lang=source_lang,
+            target_lang=target_lang,
+        )
 
     def set_setting(self, key: str, value: Any) -> bool:
         """

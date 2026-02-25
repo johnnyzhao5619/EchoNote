@@ -323,6 +323,12 @@ class TaskItem(BaseWidget):
         """Update informational label with translated text."""
         info_parts = []
 
+        task_kind = self.task_data.get("task_kind")
+        if task_kind == "translation":
+            info_parts.append(self.i18n.t("batch_transcribe.task_kind_translation"))
+        else:
+            info_parts.append(self.i18n.t("batch_transcribe.task_kind_transcription"))
+
         file_size = self.task_data.get("file_size")
         if file_size:
             size_mb = file_size / (1024 * 1024)

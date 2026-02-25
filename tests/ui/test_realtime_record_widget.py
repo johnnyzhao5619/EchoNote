@@ -141,14 +141,14 @@ class TestRealtimeRecordWidget:
             "default_gain": 1.0,
             "save_transcript": True,
             "create_calendar_event": True,
-        }
-        widget.settings_manager.get_realtime_translation_preferences.return_value = {
-            "translation_engine": "none",
-            "translation_source_lang": "auto",
-            "translation_target_lang": "en",
             "floating_window_enabled": True,
             "hide_main_window_when_floating": True,
             "floating_window_always_on_top": False,
+        }
+        widget.settings_manager.get_translation_preferences.return_value = {
+            "translation_engine": "none",
+            "translation_source_lang": "auto",
+            "translation_target_lang": "en",
         }
 
         widget._refresh_recording_preferences()

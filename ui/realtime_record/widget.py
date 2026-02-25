@@ -55,6 +55,7 @@ from config.constants import (
     TRANSLATION_ENGINE_OPUS_MT,
     TRANSLATION_LANGUAGE_AUTO,
 )
+from core.settings.manager import resolve_translation_languages_from_settings
 from core.realtime.audio_routing import (
     detect_app_scoped_system_audio_device,
     is_loopback_input_device,
@@ -163,7 +164,7 @@ class RealtimeRecordWidget(BaseWidget):
     """Main widget for real-time recording."""
 
     LANGUAGE_OPTIONS = LANGUAGE_OPTION_KEYS
-    SOURCE_LANGUAGE_OPTIONS = ((TRANSLATION_LANGUAGE_AUTO, "settings.realtime.auto_detect"),) + tuple(
+    SOURCE_LANGUAGE_OPTIONS = ((TRANSLATION_LANGUAGE_AUTO, "settings.translation.auto_detect"),) + tuple(
         LANGUAGE_OPTION_KEYS
     )
 
@@ -313,12 +314,11 @@ class RealtimeRecordWidget(BaseWidget):
         if self.settings_manager and hasattr(self.settings_manager, "get_realtime_preferences"):
             try:
                 preferences = self.settings_manager.get_realtime_preferences()
-                if hasattr(self.settings_manager, "get_realtime_translation_preferences"):
-                    translation_preferences = (
-                        self.settings_manager.get_realtime_translation_preferences()
-                    )
-                else:
-                    translation_preferences = preferences
+                translation_preferences: Dict[str, Any] = {}
+                if hasattr(self.settings_manager, "get_translation_preferences"):
+                    loaded_translation = self.settings_manager.get_translation_preferences()
+                    if isinstance(loaded_translation, dict):
+                        translation_preferences = loaded_translation
                 self._recording_format = preferences.get("recording_format", RECORDING_FORMAT_WAV)
                 self._auto_save_enabled = bool(preferences.get("auto_save", True))
                 default_input_source = preferences.get("default_input_source", "default")
@@ -377,13 +377,13 @@ class RealtimeRecordWidget(BaseWidget):
                     or DEFAULT_TRANSLATION_TARGET_LANGUAGE
                 )
                 self._floating_window_enabled = bool(
-                    translation_preferences.get("floating_window_enabled", False)
+                    preferences.get("floating_window_enabled", False)
                 )
                 self._hide_main_window_when_floating = bool(
-                    translation_preferences.get("hide_main_window_when_floating", False)
+                    preferences.get("hide_main_window_when_floating", False)
                 )
                 self._floating_window_always_on_top = bool(
-                    translation_preferences.get("floating_window_always_on_top", True)
+                    preferences.get("floating_window_always_on_top", True)
                 )
                 self._refresh_floating_mode_toggle_controls()
 
@@ -441,7 +441,7 @@ class RealtimeRecordWidget(BaseWidget):
     @Slot(str, object)
     def _on_settings_changed(self, key: str, _value: object) -> None:
         """Handle settings changes."""
-        if key.startswith("realtime."):
+        if key.startswith("realtime.") or key.startswith("translation."):
             self._refresh_recording_preferences()
             self._apply_recording_preferences_to_controls()
             self._refresh_floating_mode_toggle_controls()
@@ -496,6 +496,25 @@ class RealtimeRecordWidget(BaseWidget):
         combo_index = self.input_combo.findData(preferred_index)
         if combo_index >= 0:
             self.input_combo.setCurrentIndex(combo_index)
+
+    def _resolve_translation_languages(
+        self,
+        *,
+        source_lang: Optional[str] = None,
+        target_lang: Optional[str] = None,
+    ) -> tuple[str, str]:
+        """Resolve translation language pair with UI override > settings > local defaults."""
+        effective_source = source_lang or self._translation_source_lang
+        effective_target = target_lang or self._translation_target_lang
+        resolved = resolve_translation_languages_from_settings(
+            self.settings_manager,
+            source_lang=effective_source,
+            target_lang=effective_target,
+        )
+        return (
+            resolved.get("translation_source_lang", TRANSLATION_LANGUAGE_AUTO),
+            resolved.get("translation_target_lang", DEFAULT_TRANSLATION_TARGET_LANGUAGE),
+        )
 
     def setup_ui(self):
         """Initialize the UI layout."""
@@ -1715,13 +1734,13 @@ class RealtimeRecordWidget(BaseWidget):
         if hasattr(self, "translation_text"):
             if not self.recorder.translation_engine:
                 # 获取当前选中的引擎
-                if (
-                    self.settings_manager
-                    and hasattr(self.settings_manager, "get_realtime_translation_preferences")
+                preferences: Dict[str, Any] = {}
+                if self.settings_manager and hasattr(
+                    self.settings_manager, "get_translation_preferences"
                 ):
-                    preferences = self.settings_manager.get_realtime_translation_preferences()
-                else:
-                    preferences = self.settings_manager.get_realtime_preferences()
+                    loaded_preferences = self.settings_manager.get_translation_preferences()
+                    if isinstance(loaded_preferences, dict):
+                        preferences = loaded_preferences
                 engine_type = preferences.get("translation_engine", TRANSLATION_ENGINE_NONE)
 
                 if engine_type == TRANSLATION_ENGINE_NONE:
@@ -2259,10 +2278,16 @@ class RealtimeRecordWidget(BaseWidget):
         self._refresh_recording_preferences()
 
         device_index = self.input_combo.currentData()
-        source_lang = self.source_lang_combo.currentData() or TRANSLATION_LANGUAGE_AUTO
+        selected_source = self.source_lang_combo.currentData() if hasattr(
+            self, "source_lang_combo"
+        ) else None
         enable_translation = self.enable_translation_checkbox.isChecked()
-        target_lang = (
-            self.target_lang_combo.currentData() or self._translation_target_lang
+        selected_target = self.target_lang_combo.currentData() if hasattr(
+            self, "target_lang_combo"
+        ) else None
+        source_lang, target_lang = self._resolve_translation_languages(
+            source_lang=selected_source,
+            target_lang=selected_target,
         )
 
         # Auto-switch engine if translation is requested but currently disabled
@@ -2270,7 +2295,7 @@ class RealtimeRecordWidget(BaseWidget):
             if self.settings_manager:
                 logger.info("Translation enabled but engine is 'none'; auto-switching to 'opus-mt'")
                 self.settings_manager.set_setting(
-                    "realtime.translation_engine", TRANSLATION_ENGINE_OPUS_MT
+                    "translation.translation_engine", TRANSLATION_ENGINE_OPUS_MT
                 )
                 # Reload engine in recorder
                 try:
@@ -2461,18 +2486,24 @@ class RealtimeRecordWidget(BaseWidget):
 
     def _ask_and_queue_secondary_transcription(self, recording_path: str, event_id: str) -> None:
         """Prompt after recording and optionally queue high-quality retranscription."""
-        reply = QMessageBox.question(
-            self,
-            self.i18n.t("realtime_record.secondary_transcription_prompt_title"),
-            self.i18n.t("realtime_record.secondary_transcription_prompt_message"),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.Yes,
+        from ui.common.secondary_transcribe_dialog import select_secondary_transcribe_model
+
+        selected_model = select_secondary_transcribe_model(
+            parent=self,
+            i18n=self.i18n,
+            model_manager=self.model_manager,
+            settings_manager=self.settings_manager,
         )
-        if reply != QMessageBox.StandardButton.Yes:
+        if not selected_model:
             return
 
         try:
-            options = {"replace_realtime": True, "event_id": event_id}
+            options = {
+                "replace_realtime": True,
+                "event_id": event_id,
+                "model_name": selected_model["model_name"],
+                "model_path": selected_model["model_path"],
+            }
             if hasattr(self, "source_lang_combo"):
                 lang = self.source_lang_combo.currentData()
                 if lang and lang != TRANSLATION_LANGUAGE_AUTO:

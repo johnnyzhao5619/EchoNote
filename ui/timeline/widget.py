@@ -19,13 +19,17 @@ Timeline widget for EchoNote.
 Displays a vertical timeline of past and future events with search and filtering.
 """
 
-import asyncio
 import importlib
 import logging
 import math
-import threading
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, cast
 
+from config.constants import (
+    DEFAULT_TRANSLATION_TARGET_LANGUAGE,
+    TRANSLATION_LANGUAGE_AUTO,
+)
+from core.settings.manager import resolve_translation_languages_from_settings
 from core.qt_imports import (
     QComboBox,
     QDate,
@@ -1064,7 +1068,7 @@ class TimelineWidget(BaseWidget):
         )
 
     def _on_translate_transcript_requested(self, event_id: str, transcript_path: str):
-        """Translate transcript text and persist translation attachment for event."""
+        """Queue transcript translation task and persist translation attachment for event."""
         if not self.transcription_manager:
             return
         if not transcript_path:
@@ -1078,65 +1082,41 @@ class TimelineWidget(BaseWidget):
             )
             return
 
-        target_lang = "en"
-        source_lang = "auto"
-        manager = self.settings_manager
-        if manager and hasattr(manager, "get_realtime_translation_preferences"):
-            try:
-                translation_preferences = manager.get_realtime_translation_preferences()
-                if isinstance(translation_preferences, dict):
-                    target_lang = translation_preferences.get("translation_target_lang") or target_lang
-                    source_lang = translation_preferences.get("translation_source_lang") or source_lang
-            except Exception as exc:  # noqa: BLE001
-                logger.warning("Failed to load translation preferences: %s", exc)
+        target_lang = DEFAULT_TRANSLATION_TARGET_LANGUAGE
+        source_lang = TRANSLATION_LANGUAGE_AUTO
+        resolved_languages = resolve_translation_languages_from_settings(self.settings_manager)
+        target_lang = resolved_languages.get(
+            "translation_target_lang", DEFAULT_TRANSLATION_TARGET_LANGUAGE
+        )
+        source_lang = resolved_languages.get(
+            "translation_source_lang", TRANSLATION_LANGUAGE_AUTO
+        )
 
-        self._update_shell_message(self.i18n.t("timeline.translation_started"))
+        output_suffix = Path(transcript_path).suffix.lower()
+        output_format = "md" if output_suffix == ".md" else "txt"
+        options = {
+            "event_id": event_id,
+            "translation_source_lang": source_lang,
+            "translation_target_lang": target_lang,
+            "output_format": output_format,
+        }
 
-        def _worker() -> None:
-            try:
-                translated_path = asyncio.run(
-                    self.transcription_manager.translate_transcript_file(
-                        transcript_path,
-                        source_lang=source_lang,
-                        target_lang=target_lang,
-                        event_id=event_id,
-                    )
-                )
-            except Exception as exc:  # noqa: BLE001
-                logger.error("Translate transcript failed for event %s: %s", event_id, exc, exc_info=True)
-                error_text = str(exc)
-                QTimer.singleShot(0, lambda err=error_text: self._on_translation_failed(err))
-                return
-
-            QTimer.singleShot(
-                0,
-                lambda: self._on_translation_finished(
-                    transcript_path=transcript_path,
-                    translation_path=translated_path,
-                ),
+        try:
+            self.transcription_manager.add_translation_task(transcript_path, options=options)
+            self._update_shell_message(self.i18n.t("timeline.translation_queued"))
+            QTimer.singleShot(5000, lambda: self._update_shell_message(""))
+            self.show_info(self.i18n.t("common.info"), self.i18n.t("timeline.translation_queued"))
+        except Exception as exc:  # noqa: BLE001
+            logger.error(
+                "Failed to queue translation task for event %s: %s",
+                event_id,
+                exc,
+                exc_info=True,
             )
-
-        threading.Thread(target=_worker, daemon=True).start()
-
-    def _on_translation_finished(self, *, transcript_path: str, translation_path: str) -> None:
-        """UI-thread callback after transcript translation completes."""
-        self._refresh_timeline(reset=True)
-        self.show_info(self.i18n.t("common.success"), self.i18n.t("timeline.translation_saved"))
-        self._open_text_viewer(
-            transcript_path=transcript_path,
-            translation_path=translation_path,
-            initial_mode="compare",
-            title_key="timeline.translation_viewer_title",
-        )
-        self._update_shell_message("")
-
-    def _on_translation_failed(self, error: str) -> None:
-        """UI-thread callback after transcript translation failure."""
-        self._update_shell_message("")
-        self.show_error(
-            self.i18n.t("common.error"),
-            self.i18n.t("timeline.translation_failed", error=error),
-        )
+            self.show_error(
+                self.i18n.t("common.error"),
+                self.i18n.t("timeline.translation_failed", error=str(exc)),
+            )
 
     def _update_shell_message(self, message: str) -> None:
         """Show a short status message on shell footer when available."""
@@ -1147,16 +1127,37 @@ class TimelineWidget(BaseWidget):
             except Exception:
                 pass
 
+    def _resolve_model_manager(self):
+        """Resolve model manager from main window managers when available."""
+        main_window = self.window()
+        managers = getattr(main_window, "managers", None)
+        if isinstance(managers, dict):
+            return managers.get("model_manager")
+        return None
+
     def _on_secondary_transcribe_requested(self, event_id: str, recording_path: str):
         """Handle request for high-quality secondary transcription of an existing event."""
         if not self.transcription_manager:
             logger.error("Transcription manager not available for re-transcription")
             return
 
+        from ui.common.secondary_transcribe_dialog import select_secondary_transcribe_model
+
+        selected_model = select_secondary_transcribe_model(
+            parent=self,
+            i18n=self.i18n,
+            model_manager=self._resolve_model_manager(),
+            settings_manager=self.settings_manager,
+        )
+        if not selected_model:
+            return
+
         logger.info(f"Submitting high-quality re-transcription for event {event_id}")
         options = {
             "event_id": event_id,
             "replace_realtime": True,
+            "model_name": selected_model["model_name"],
+            "model_path": selected_model["model_path"],
         }
 
         # Use event-specific language if available in auto-task config
