@@ -403,6 +403,26 @@ class TestTranscribeStream:
         assert result["language"] == "en"
 
     @pytest.mark.asyncio
+    @patch("engines.speech.faster_whisper_engine.asyncio.to_thread", new_callable=AsyncMock)
+    @patch("faster_whisper.WhisperModel")
+    async def test_transcribe_stream_runs_in_worker_thread(
+        self, mock_whisper_class, mock_to_thread, mock_model_manager
+    ):
+        """Stream transcription should offload heavy work via asyncio.to_thread."""
+        mock_model = Mock()
+        mock_whisper_class.return_value = mock_model
+        mock_to_thread.return_value = {"text": "Test transcription", "language": "en"}
+
+        engine = FasterWhisperEngine(model_size="base", model_manager=mock_model_manager)
+        audio_chunk = np.random.rand(16000).astype(np.float32)
+
+        result = await engine.transcribe_stream(audio_chunk, language="en", sample_rate=16000)
+
+        assert result == {"text": "Test transcription", "language": "en"}
+        mock_to_thread.assert_awaited_once()
+        assert mock_to_thread.await_args.args[0] == engine._transcribe_stream_sync
+
+    @pytest.mark.asyncio
     @patch("faster_whisper.WhisperModel")
     async def test_transcribe_stream_normalizes_auto_language(
         self, mock_whisper_class, mock_model_manager

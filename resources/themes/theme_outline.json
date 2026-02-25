@@ -16,7 +16,11 @@
         "QLabel#top_bar_hint",
         "#sidebar",
         "#sidebar QPushButton[role=\"sidebar-nav-button\"]",
-        "QWidget#shell_status_bar"
+        "QWidget#shell_status_bar",
+        "QProgressBar[role=\"shell-resource-bar\"]",
+        "QProgressBar[role=\"shell-resource-bar\"][state=\"normal\"]::chunk",
+        "QProgressBar[role=\"shell-resource-bar\"][state=\"warning\"]::chunk",
+        "QProgressBar[role=\"shell-resource-bar\"][state=\"unavailable\"]::chunk"
       ]
     },
     {

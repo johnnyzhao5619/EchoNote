@@ -15,6 +15,9 @@
     "tasks_running": "任务：运行中 {count}",
     "recording_on": "录音：进行中",
     "recording_off": "录音：空闲",
+    "resource_cpu_label": "CPU",
+    "resource_gpu_label": "GPU",
+    "resource_unavailable": "N/A",
     "theme_status": "主题：{theme}"
   },
   "common": {
@@ -37,6 +40,7 @@
     "hide_details": "Hide Details",
     "refresh": "刷新",
     "words": "words",
+    "characters": "字",
     "file_count": "{count} file",
     "file_count_plural": "{count} files",
     "task_status": "Task {name} is {status|completed|in progress}",

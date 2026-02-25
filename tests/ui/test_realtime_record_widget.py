@@ -3,6 +3,7 @@
 Tests for realtime record widget.
 """
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, Mock, PropertyMock, patch
 
 import pytest
@@ -261,6 +262,16 @@ class TestRealtimeRecordWidgetCallbacks:
         # Should not raise exception
         widget._on_audio_data(audio_data)
 
+    def test_count_text_units_uses_characters_for_chinese(self, widget):
+        """Chinese text should use character-based counting."""
+        assert widget._count_text_units("你好世界") == 4
+        assert widget._uses_character_unit("你好世界") is True
+
+    def test_count_text_units_uses_words_for_english(self, widget):
+        """English text should use word-based counting."""
+        assert widget._count_text_units("hello world from echonote") == 4
+        assert widget._uses_character_unit("hello world") is False
+
     def test_on_marker_callback(self, widget):
         """Test marker callback."""
         marker = {"timestamp": 1.0, "text": "Test marker"}
@@ -387,6 +398,26 @@ class TestRealtimeRecordWidgetCallbacks:
         mock_realtime_recorder.start_recording.assert_awaited_once()
         _, kwargs = mock_realtime_recorder.start_recording.call_args
         assert kwargs["input_source"] == 7
+
+    @pytest.mark.asyncio
+    async def test_stop_recording_emits_stopped_before_success(self, widget, mock_realtime_recorder):
+        """Stop path should reset UI state before heavy stop post-processing finishes."""
+        steps = []
+
+        async def _slow_stop():
+            steps.append("stop_started")
+            await asyncio.sleep(0)
+            steps.append("stop_finished")
+            return {"duration": 1.0}
+
+        mock_realtime_recorder.stop_recording = AsyncMock(side_effect=_slow_stop)
+        widget.signals.recording_stopped.connect(lambda: steps.append("stopped_signal"))
+        widget.signals.recording_succeeded.connect(lambda _payload: steps.append("succeeded_signal"))
+
+        await widget._stop_recording_and_emit_signals()
+
+        assert steps.index("stopped_signal") < steps.index("stop_finished")
+        assert steps.index("succeeded_signal") > steps.index("stop_finished")
 
 
 class TestRealtimeFloatingOverlay:

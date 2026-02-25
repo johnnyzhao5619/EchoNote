@@ -1,5 +1,5 @@
 {
-  "version": "1.4.5",
+  "version": "1.4.7",
   "database": {
     "path": "~/.echonote/data.db",
     "encryption_enabled": true
@@ -37,7 +37,10 @@
     "recording_save_path": "~/Documents/EchoNote/Recordings",
     "vad_threshold": 0.5,
     "silence_duration_ms": 2000,
-    "min_audio_duration": 3.0
+    "min_audio_duration": 3.0,
+    "processing_task_timeout": 5.0,
+    "translation_task_timeout": 5.0,
+    "translation_task_shutdown_timeout": 2.0
   },
   "translation": {
     "models_dir": "~/.echonote/translation_models",

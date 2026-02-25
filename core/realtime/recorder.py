@@ -565,6 +565,7 @@ class RealtimeRecorder:
             finally:
                 audio_buffer.clear()
 
+        cancelled = False
         try:
             while self.is_recording or not queue.empty():
                 try:
@@ -586,6 +587,7 @@ class RealtimeRecorder:
                     if not self.is_recording and queue.empty():
                         break
         except asyncio.CancelledError:
+            cancelled = True
             logger.info("Audio stream processing cancelled")
             raise
         except Exception as e:
@@ -593,12 +595,14 @@ class RealtimeRecorder:
             if self.on_error:
                 self.on_error(f"Processing error: {e}")
         finally:
-            try:
-                await _process_buffered_audio(force=True)
-            except Exception as e:
-                logger.error(f"Failed to flush audio buffer: {e}", exc_info=True)
-                if self.on_error:
-                    self.on_error(f"Processing error: {e}")
+            # Skip expensive final flush when the task was cancelled during stop.
+            if not cancelled:
+                try:
+                    await _process_buffered_audio(force=True)
+                except Exception as e:
+                    logger.error(f"Failed to flush audio buffer: {e}", exc_info=True)
+                    if self.on_error:
+                        self.on_error(f"Processing error: {e}")
 
             logger.info(
                 "Audio stream processing stopped. Total chunks: %s, Transcription attempts: %s",
@@ -712,7 +716,10 @@ class RealtimeRecorder:
         # Wait for background processing to drain.
         if self.processing_task:
             try:
-                await asyncio.wait_for(self.processing_task, timeout=5.0)
+                await asyncio.wait_for(
+                    self.processing_task,
+                    timeout=float(self.config.processing_task_timeout),
+                )
             except asyncio.TimeoutError:
                 logger.warning("Processing task timeout")
                 self.processing_task.cancel()

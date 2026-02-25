@@ -53,6 +53,7 @@ from ui.base_widgets import (
     create_primary_button,
 )
 from ui.common.audio_player_launcher import open_or_activate_audio_player
+from ui.common.style_utils import set_widget_state
 from ui.common.text_viewer_launcher import (
     open_or_activate_text_viewer,
     resolve_text_viewer_initial_mode,
@@ -893,7 +894,7 @@ class CalendarHubWidget(BaseWidget):
         self.add_account_btn.setEnabled(False)
         self.sync_now_btn.setEnabled(False)
         self.sync_status_label.setText(self.i18n.t("calendar_hub.widget.syncing"))
-        self.sync_status_label.setProperty("state", "syncing")
+        set_widget_state(self.sync_status_label, "syncing")
 
         try:
             self._oauth_connect_thread = threading.Thread(
@@ -1353,7 +1354,7 @@ class CalendarHubWidget(BaseWidget):
             # Update UI to show syncing
             self.sync_now_btn.setEnabled(False)
             self.sync_status_label.setText(self.i18n.t("calendar_hub.widget.syncing"))
-            self.sync_status_label.setProperty("state", "syncing")
+            set_widget_state(self.sync_status_label, "syncing")
 
             providers = list(self.connected_accounts.keys())
             self._manual_sync_thread = threading.Thread(
@@ -1469,10 +1470,10 @@ class CalendarHubWidget(BaseWidget):
                 self.sync_status_label.setText(
                     self.i18n.t("calendar_hub.widget.last_sync", time_ago=time_ago)
                 )
-                self.sync_status_label.setProperty("state", None)  # Reset to default
+                set_widget_state(self.sync_status_label, None)  # Reset to default
             else:
                 self.sync_status_label.setText(self.i18n.t("calendar_hub.widget.never_synced"))
-                self.sync_status_label.setProperty("state", "never")
+                set_widget_state(self.sync_status_label, "never")
 
         except Exception as e:
             logger.error(f"Error updating sync status: {e}")

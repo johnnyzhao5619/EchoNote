@@ -20,6 +20,7 @@ Local speech recognition engine based on the faster-whisper library
 Reference: https://github.com/SYSTRAN/faster-whisper
 """
 
+import asyncio
 import logging
 import os
 import threading
@@ -647,50 +648,58 @@ class FasterWhisperEngine(SpeechEngine):
                 processed_audio = self._extract_speech_segments(processed_audio, speech_timestamps)
 
         try:
-            # 转录音频块
-            # 注意：faster-whisper 需要音频文件路径，所以需要临时保存
-            import tempfile
-
-            import soundfile as sf
-
-            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_file:
-                tmp_path = tmp_file.name
-
-            try:
-                # 写入音频文件
-                sf.write(tmp_path, processed_audio, effective_rate or 16000)
-                logger.debug(f"Wrote audio to temp file: {tmp_path}")
-
-                # 转录
-                segments, info = active_model.transcribe(
-                    tmp_path,
-                    language=normalized_language,
-                    beam_size=1,  # 实时转录使用较小的 beam size
-                    vad_filter=False,  # 已经做过 VAD
-                    word_timestamps=False,  # 不需要词级时间戳
-                )
-
-                # 合并所有段落的文本
-                text_parts = []
-                for seg in segments:
-                    text_parts.append(seg.text.strip())
-
-                text = " ".join(text_parts)
-                lang = info.language if hasattr(info, "language") else "unknown"
-                logger.debug(f"Transcription result: '{text}' (language: {lang})")
-                return {"text": text, "language": lang}
-
-            finally:
-                # 清理临时文件
-                try:
-                    if os.path.exists(tmp_path):
-                        os.unlink(tmp_path)
-                except Exception as e:
-                    logger.warning(f"Failed to delete temp file {tmp_path}: {e}")
-
+            return await asyncio.to_thread(
+                self._transcribe_stream_sync,
+                active_model,
+                processed_audio,
+                normalized_language,
+                int(effective_rate or 16000),
+            )
         except Exception as e:
             logger.error(f"Stream transcription failed: {e}", exc_info=True)
             return ""
+
+    @staticmethod
+    def _transcribe_stream_sync(active_model, audio_data, normalized_language, effective_rate):
+        """同步执行流式转写，供 ``asyncio.to_thread`` 调用。"""
+        # 注意：faster-whisper 需要音频文件路径，所以需要临时保存
+        import tempfile
+
+        import soundfile as sf
+
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_file:
+            tmp_path = tmp_file.name
+
+        try:
+            # 写入音频文件
+            sf.write(tmp_path, audio_data, effective_rate)
+            logger.debug(f"Wrote audio to temp file: {tmp_path}")
+
+            # 转录
+            segments, info = active_model.transcribe(
+                tmp_path,
+                language=normalized_language,
+                beam_size=1,  # 实时转录使用较小的 beam size
+                vad_filter=False,  # 已经做过 VAD
+                word_timestamps=False,  # 不需要词级时间戳
+            )
+
+            # 合并所有段落的文本
+            text_parts = []
+            for seg in segments:
+                text_parts.append(seg.text.strip())
+
+            text = " ".join(text_parts)
+            lang = info.language if hasattr(info, "language") else "unknown"
+            logger.debug(f"Transcription result: '{text}' (language: {lang})")
+            return {"text": text, "language": lang}
+        finally:
+            # 清理临时文件
+            try:
+                if os.path.exists(tmp_path):
+                    os.unlink(tmp_path)
+            except Exception as e:
+                logger.warning(f"Failed to delete temp file {tmp_path}: {e}")
 
     def _detect_speech(self, audio_chunk: np.ndarray) -> List[Dict]:
         """

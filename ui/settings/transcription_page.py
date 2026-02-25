@@ -60,6 +60,7 @@ from ui.constants import (
     ROLE_USAGE_STATS,
     STANDARD_LABEL_WIDTH,
 )
+from ui.common.style_utils import set_widget_state
 from ui.settings.base_page import BaseSettingsPage, PostSaveMessage
 from utils.i18n import I18nQtManager
 from utils.time_utils import now_local
@@ -145,13 +146,13 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         if ffmpeg_checker.is_ffmpeg_available() and ffmpeg_checker.is_ffprobe_available():
             self.ffmpeg_status_text.setText(self.i18n.t("settings.transcription.ffmpeg_installed"))
             self.ffmpeg_status_text.setProperty("role", ROLE_FFMPEG_STATUS)
-            self.ffmpeg_status_text.setProperty("state", "success")
+            set_widget_state(self.ffmpeg_status_text, "success")
         else:
             self.ffmpeg_status_text.setText(
                 self.i18n.t("settings.transcription.ffmpeg_not_installed")
             )
             self.ffmpeg_status_text.setProperty("role", ROLE_FFMPEG_STATUS)
-            self.ffmpeg_status_text.setProperty("state", "missing")
+            set_widget_state(self.ffmpeg_status_text, "missing")
 
         ffmpeg_status_layout.addWidget(self.ffmpeg_status_label)
         ffmpeg_status_layout.addWidget(self.ffmpeg_status_text)
@@ -787,13 +788,13 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         if ffmpeg_checker.is_ffmpeg_available() and ffmpeg_checker.is_ffprobe_available():
             self.ffmpeg_status_text.setText(self.i18n.t("settings.transcription.ffmpeg_installed"))
             self.ffmpeg_status_text.setProperty("role", ROLE_FFMPEG_STATUS)
-            self.ffmpeg_status_text.setProperty("state", "success")
+            set_widget_state(self.ffmpeg_status_text, "success")
         else:
             self.ffmpeg_status_text.setText(
                 self.i18n.t("settings.transcription.ffmpeg_not_installed")
             )
             self.ffmpeg_status_text.setProperty("role", ROLE_FFMPEG_STATUS)
-            self.ffmpeg_status_text.setProperty("state", "missing")
+            set_widget_state(self.ffmpeg_status_text, "missing")
 
         logger.info(self.i18n.t("logging.settings.transcription_page.showed_ffmpeg_guide"))
 

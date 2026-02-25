@@ -35,6 +35,7 @@ from core.qt_imports import (
 
 # Import base widget
 from ui.base_widgets import BaseWidget, create_hbox
+from ui.common.style_utils import set_widget_state
 from ui.constants import (
     ROLE_TASK_ACTION_CANCEL,
     ROLE_TASK_ACTION_DELETE,
@@ -296,21 +297,17 @@ class TaskItem(BaseWidget):
         self.status_label.setProperty("role", ROLE_TASK_STATUS)
 
         if status == "pending":
-            self.status_label.setProperty("state", "pending")
+            set_widget_state(self.status_label, "pending")
         elif status == "processing":
-            self.status_label.setProperty("state", "processing")
+            set_widget_state(self.status_label, "processing")
         elif status == "completed":
-            self.status_label.setProperty("state", "completed")
+            set_widget_state(self.status_label, "completed")
         elif status == "failed":
-            self.status_label.setProperty("state", "failed")
+            set_widget_state(self.status_label, "failed")
         else:
-            self.status_label.setProperty("state", "cancelled")
+            set_widget_state(self.status_label, "cancelled")
 
         self.status_label.setText(status_text)
-
-        # Force style refresh to apply new properties
-        self.status_label.style().unpolish(self.status_label)
-        self.status_label.style().polish(self.status_label)
 
     def _update_filename_label(self):
         """Update filename label with fallback translation if needed."""

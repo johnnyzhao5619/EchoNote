@@ -51,6 +51,7 @@ from ui.base_widgets import (
     create_hbox,
     create_primary_button,
 )
+from ui.common.style_utils import set_widget_state
 from ui.constants import (
     CALENDAR_OAUTH_DIALOG_MIN_WIDTH,
     ROLE_OAUTH_STATUS,
@@ -501,7 +502,7 @@ class OAuthDialog(QDialog):
                         self.i18n.t("calendar_hub.oauth_dialog.authorization_failed")
                     )
                     self.status_label.setProperty("role", ROLE_OAUTH_STATUS)
-                    self.status_label.setProperty("state", "error")
+                    set_widget_state(self.status_label, "error")
                     self._show_error(mismatch_message)
                     self.authorization_failed.emit(mismatch_message)
                     QTimer.singleShot(2000, self._reset_ui)
@@ -518,7 +519,7 @@ class OAuthDialog(QDialog):
                     self.i18n.t("calendar_hub.oauth_dialog.authorization_successful")
                 )
                 self.status_label.setProperty("role", ROLE_OAUTH_STATUS)
-                self.status_label.setProperty("state", "success")
+                set_widget_state(self.status_label, "success")
 
                 # Emit signal
                 self.authorization_complete.emit(self.auth_code, self.code_verifier)
@@ -535,7 +536,7 @@ class OAuthDialog(QDialog):
                     self.i18n.t("calendar_hub.oauth_dialog.authorization_failed", error=error_msg)
                 )
                 self.status_label.setProperty("role", ROLE_OAUTH_STATUS)
-                self.status_label.setProperty("state", "error")
+                set_widget_state(self.status_label, "error")
 
                 # Emit signal
                 self.authorization_failed.emit(error_msg)
@@ -670,7 +671,7 @@ class OAuthResultDialog(QDialog):
         icon_label = QLabel(f"<h2>{status_text}</h2>")
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         icon_label.setProperty("role", ROLE_OAUTH_STATUS)
-        icon_label.setProperty("state", "success" if self.success else "error")
+        set_widget_state(icon_label, "success" if self.success else "error")
         layout.addWidget(icon_label)
 
         message_label = QLabel(self.message)

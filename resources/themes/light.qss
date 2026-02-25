@@ -2004,6 +2004,30 @@ QLabel#shell_status_message {
     font-weight: 600;
 }
 
+QProgressBar[role="shell-resource-bar"] {
+    background-color: #edf2fb;
+    border: 1px solid #d5deed;
+    border-radius: 4px;
+    text-align: center;
+    color: #234270;
+    padding: 0px 2px;
+}
+
+QProgressBar[role="shell-resource-bar"][state="normal"]::chunk {
+    background-color: #1f8f4f;
+    border-radius: 3px;
+}
+
+QProgressBar[role="shell-resource-bar"][state="warning"]::chunk {
+    background-color: #d64545;
+    border-radius: 3px;
+}
+
+QProgressBar[role="shell-resource-bar"][state="unavailable"]::chunk {
+    background-color: #b8c2d7;
+    border-radius: 3px;
+}
+
 /* ========================================
    Unified Design System Overrides
    ======================================== */

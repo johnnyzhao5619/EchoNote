@@ -23,6 +23,7 @@ gain adjustment, language selection, and transcription/translation display.
 import asyncio
 import logging
 import platform
+import re
 import threading
 from concurrent.futures import Future, TimeoutError
 from typing import Any, Dict, Optional
@@ -69,6 +70,7 @@ from ui.base_widgets import (
     create_secondary_button,
 )
 from ui.common.notification import get_notification_manager
+from ui.common.style_utils import set_widget_dynamic_property, set_widget_state
 from ui.constants import (
     CONTROL_BUTTON_MIN_HEIGHT,
     DEFAULT_DURATION_DISPLAY,
@@ -112,6 +114,12 @@ from utils.i18n import LANGUAGE_OPTION_KEYS
 
 logger = logging.getLogger(__name__)
 
+CJK_CHAR_PATTERN = re.compile(r"[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF\u3040-\u30FF\uAC00-\uD7AF]")
+NON_CJK_WORD_PATTERN = re.compile(r"[A-Za-z0-9]+(?:['-][A-Za-z0-9]+)?")
+WORKER_STOP_TIMEOUT_SECONDS = 3.0
+CLEANUP_STOP_TIMEOUT_SECONDS = 10.0
+PENDING_FUTURE_DRAIN_TIMEOUT_SECONDS = 1.0
+
 
 class AsyncWorker(QThread):
     """Worker thread for running asyncio loops."""
@@ -133,11 +141,13 @@ class AsyncWorker(QThread):
         """Block until the worker loop is initialized."""
         return self._loop_ready.wait(timeout)
 
-    def stop(self):
+    def stop(self, timeout: float = WORKER_STOP_TIMEOUT_SECONDS):
         """Stop the event loop and wait for the thread to exit."""
         if self.loop and self.loop.is_running():
             self.loop.call_soon_threadsafe(self.loop.stop)
-        self.wait()
+        wait_ms = max(int(float(timeout) * 1000), 0)
+        if not self.wait(wait_ms):
+            logger.warning("Async worker thread did not stop within %.2fs", float(timeout))
 
     def submit(self, coro):
         """Submit a coroutine to run on the loop."""
@@ -793,10 +803,8 @@ class RealtimeRecordWidget(BaseWidget):
             clipboard.setText(text)
             if hasattr(self, "feedback_label"):
                 self.feedback_label.setText(self.i18n.t("common.copied"))
-                self.feedback_label.setProperty("state", "success")
+                set_widget_state(self.feedback_label, "success")
                 self.feedback_label.setVisible(True)
-                self.feedback_label.style().unpolish(self.feedback_label)
-                self.feedback_label.style().polish(self.feedback_label)
                 QTimer.singleShot(3000, lambda: self.feedback_label.setVisible(False))
 
     def _create_header_section(self) -> QWidget:
@@ -827,7 +835,7 @@ class RealtimeRecordWidget(BaseWidget):
 
         self.record_button = QPushButton()
         self.record_button.setProperty("role", ROLE_REALTIME_RECORD_ACTION)
-        self.record_button.setProperty("recording", False)
+        set_widget_dynamic_property(self.record_button, "recording", False)
         self.record_button.setMinimumHeight(CONTROL_BUTTON_MIN_HEIGHT)
         self.record_button.setMinimumWidth(REALTIME_RECORD_BUTTON_MIN_WIDTH)
         connect_button_with_callback(self.record_button, self._toggle_recording)
@@ -1681,7 +1689,7 @@ class RealtimeRecordWidget(BaseWidget):
         for button in self._floating_mode_toggle_buttons:
             button.blockSignals(True)
             button.setChecked(self._floating_window_enabled)
-            button.setProperty("state", "active" if self._floating_window_enabled else "inactive")
+            set_widget_state(button, "active" if self._floating_window_enabled else "inactive")
             button.setText(button_text)
             button.setToolTip(tooltip)
             button.blockSignals(False)
@@ -1772,14 +1780,23 @@ class RealtimeRecordWidget(BaseWidget):
             self.clear_markers_button.setText(self.i18n.t("realtime_record.clear_markers"))
 
     @staticmethod
-    def _count_words(text: str) -> int:
+    def _count_text_units(text: str) -> int:
         stripped = (text or "").strip()
         if not stripped:
             return 0
-        return len(stripped.split())
+
+        cjk_count = len(CJK_CHAR_PATTERN.findall(stripped))
+        non_cjk_text = CJK_CHAR_PATTERN.sub(" ", stripped)
+        word_count = len(NON_CJK_WORD_PATTERN.findall(non_cjk_text))
+        return cjk_count + word_count
+
+    @staticmethod
+    def _uses_character_unit(text: str) -> bool:
+        return bool(CJK_CHAR_PATTERN.search(text or ""))
 
     def _set_word_count_label(self, label: QLabel, text: str) -> None:
-        label.setText(f"{self._count_words(text)} {self.i18n.t('common.words')}")
+        unit_key = "common.characters" if self._uses_character_unit(text) else "common.words"
+        label.setText(f"{self._count_text_units(text)} {self.i18n.t(unit_key)}")
 
     def _update_word_count_labels(self) -> None:
         if hasattr(self, "transcription_word_count") and hasattr(self, "transcription_text"):
@@ -1913,11 +1930,9 @@ class RealtimeRecordWidget(BaseWidget):
             self.feedback_label.setVisible(False)
             return
         self.feedback_label.setProperty("role", ROLE_FEEDBACK)
-        self.feedback_label.setProperty("state", level)
+        set_widget_state(self.feedback_label, level)
         self.feedback_label.setText(message)
         self.feedback_label.setVisible(True)
-        self.feedback_label.style().unpolish(self.feedback_label)
-        self.feedback_label.style().polish(self.feedback_label)
 
     @Slot(str)
     def _show_error(self, error: str):
@@ -1951,9 +1966,7 @@ class RealtimeRecordWidget(BaseWidget):
         self._set_recording_transition(False)
         self._silent_input_warning_shown = False
         self.record_button.setText(self.i18n.t("realtime_record.stop_recording"))
-        self.record_button.setProperty("recording", True)
-        self.record_button.style().unpolish(self.record_button)
-        self.record_button.style().polish(self.record_button)
+        set_widget_dynamic_property(self.record_button, "recording", True)
         self.status_timer.start(100)
         if hasattr(self, "add_marker_button"):
             self.add_marker_button.setEnabled(True)
@@ -1961,9 +1974,7 @@ class RealtimeRecordWidget(BaseWidget):
         if hasattr(self, "refresh_input_button"):
             self.refresh_input_button.setEnabled(False)
         if hasattr(self, "status_indicator"):
-            self.status_indicator.setProperty("state", "recording")
-            self.status_indicator.style().unpolish(self.status_indicator)
-            self.status_indicator.style().polish(self.status_indicator)
+            set_widget_state(self.status_indicator, "recording")
         if hasattr(self, "status_text_label"):
             self.status_text_label.setText(self.i18n.t("realtime_record.status_recording"))
         self._sync_floating_overlay_visibility()
@@ -1973,18 +1984,14 @@ class RealtimeRecordWidget(BaseWidget):
         logger.info(self.i18n.t("logging.realtime_record.updating_ui_recording_stopped"))
         self._set_recording_transition(False)
         self.record_button.setText(self.i18n.t("realtime_record.start_recording"))
-        self.record_button.setProperty("recording", False)
-        self.record_button.style().unpolish(self.record_button)
-        self.record_button.style().polish(self.record_button)
+        set_widget_dynamic_property(self.record_button, "recording", False)
         self.status_timer.stop()
         if hasattr(self, "add_marker_button"):
             self.add_marker_button.setEnabled(False)
         if hasattr(self, "refresh_input_button"):
             self.refresh_input_button.setEnabled(self._audio_available)
         if hasattr(self, "status_indicator"):
-            self.status_indicator.setProperty("state", "ready")
-            self.status_indicator.style().unpolish(self.status_indicator)
-            self.status_indicator.style().polish(self.status_indicator)
+            set_widget_state(self.status_indicator, "ready")
         if hasattr(self, "status_text_label"):
             self.status_text_label.setText(self.i18n.t("realtime_record.status_ready"))
         self._sync_floating_overlay_visibility()
@@ -2421,12 +2428,20 @@ class RealtimeRecordWidget(BaseWidget):
             logger.error(error_message, exc_info=True)
             self.signals.error_occurred.emit(error_message)
 
+    async def _stop_recording_and_emit_signals(self) -> Dict[str, Any]:
+        """Centralized stop pipeline shared by normal stop and cleanup flow."""
+        # Notify UI immediately so controls can leave recording state
+        # while persistence and post-processing continue in worker loop.
+        self.signals.recording_stopped.emit()
+        result = await self.recorder.stop_recording()
+        logger.info(f"Recording stopped: {result}")
+        payload = result or {}
+        self.signals.recording_succeeded.emit(payload)
+        return payload
+
     async def _stop_recording(self):
         try:
-            result = await self.recorder.stop_recording()
-            self.signals.recording_stopped.emit()
-            logger.info(f"Recording stopped: {result}")
-            self.signals.recording_succeeded.emit(result or {})
+            await self._stop_recording_and_emit_signals()
         except Exception as e:
             error_message = self.i18n.t("realtime_record.stop_failed", error=str(e))
             logger.error(error_message, exc_info=True)
@@ -2616,14 +2631,11 @@ class RealtimeRecordWidget(BaseWidget):
             ):
                 try:
                     stop_future = asyncio.run_coroutine_threadsafe(
-                        self.recorder.stop_recording(), worker_loop
+                        self._stop_recording_and_emit_signals(), worker_loop
                     )
                     with self._future_lock:
                         self._pending_futures.add(stop_future)
-                    stop_result = stop_future.result(timeout=10.0)
-                    if isinstance(stop_result, dict):
-                        self.signals.recording_stopped.emit()
-                        self.signals.recording_succeeded.emit(stop_result)
+                    stop_future.result(timeout=CLEANUP_STOP_TIMEOUT_SECONDS)
                 except TimeoutError:
                     logger.warning("Timed out while stopping active recording during cleanup")
                 except Exception as exc:  # noqa: BLE001
@@ -2638,7 +2650,7 @@ class RealtimeRecordWidget(BaseWidget):
 
             for future in pending:
                 try:
-                    future.result(timeout=1.0)
+                    future.result(timeout=PENDING_FUTURE_DRAIN_TIMEOUT_SECONDS)
                 except Exception:
                     pass
 
@@ -2646,7 +2658,7 @@ class RealtimeRecordWidget(BaseWidget):
                 self._pending_futures.clear()
 
             if hasattr(self, "_worker") and self._worker:
-                self._worker.stop()
+                self._worker.stop(timeout=WORKER_STOP_TIMEOUT_SECONDS)
                 self._worker = None
                 self._async_loop = None
 

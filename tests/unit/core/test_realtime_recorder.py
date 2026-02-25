@@ -253,6 +253,23 @@ class TestRealtimeRecorderLifecycle:
         assert result["event_id"] == "event_123"
 
     @pytest.mark.asyncio
+    async def test_stop_recording_respects_processing_timeout_config(self, recorder, event_loop):
+        await recorder.start_recording(
+            options={"enable_transcription": False, "save_recording": False},
+            event_loop=event_loop,
+        )
+        recorder.config.processing_task_timeout = 0.01
+        blocking_task = asyncio.create_task(asyncio.sleep(60))
+        recorder.processing_task = blocking_task
+
+        start = asyncio.get_running_loop().time()
+        await recorder.stop_recording()
+        elapsed = asyncio.get_running_loop().time() - start
+
+        assert elapsed < 1.0
+        assert blocking_task.cancelled()
+
+    @pytest.mark.asyncio
     async def test_stop_recording_always_cleans_streaming_capture(self, recorder, event_loop):
         await recorder.start_recording(event_loop=event_loop)
         recorder.session_archiver.abort_recording_capture = Mock()

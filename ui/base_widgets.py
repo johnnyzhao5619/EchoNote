@@ -45,6 +45,7 @@ from ui.constants import (
     ROLE_EVENT_TYPE_BADGE,
     ZERO_MARGINS,
 )
+from ui.common.style_utils import set_widget_dynamic_property
 from ui.signal_helpers import connect_button_with_callback as connect_button_signal
 from ui.signal_helpers import safe_disconnect as safe_disconnect_signal
 from utils.i18n import I18nQtManager
@@ -119,7 +120,7 @@ class BaseWidget(QWidget):
         """
         self._theme_properties[property_name] = value
         if hasattr(self, "setProperty"):
-            self.setProperty(property_name, value)
+            set_widget_dynamic_property(self, property_name, value)
 
     def get_theme_property(self, property_name: str, default: Any = None) -> Any:
         """获取主题属性

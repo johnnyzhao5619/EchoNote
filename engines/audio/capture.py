@@ -25,6 +25,8 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+_CAPTURE_THREAD_JOIN_TIMEOUT_SECONDS = 2.0
+
 
 class AudioCapture:
     """High-level wrapper for microphone capture using PyAudio."""
@@ -275,15 +277,24 @@ class AudioCapture:
         logger.info("Stopping audio capture...")
         self.is_capturing = False
 
+        # Stop and close the stream first so blocking reads can exit promptly.
+        if self.stream:
+            try:
+                self.stream.stop_stream()
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("Ignoring stream stop error during shutdown: %s", exc)
+            try:
+                self.stream.close()
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("Ignoring stream close error during shutdown: %s", exc)
+            self.stream = None
+
         # Wait for the capture thread to terminate.
         if self.capture_thread:
-            self.capture_thread.join(timeout=2.0)
-
-        # Stop and close the underlying PyAudio stream.
-        if self.stream:
-            self.stream.stop_stream()
-            self.stream.close()
-            self.stream = None
+            self.capture_thread.join(timeout=_CAPTURE_THREAD_JOIN_TIMEOUT_SECONDS)
+            if self.capture_thread.is_alive():
+                logger.warning("Audio capture thread did not terminate within timeout")
+            self.capture_thread = None
 
         # Flush remaining audio from the queue.
         while not self.audio_queue.empty():

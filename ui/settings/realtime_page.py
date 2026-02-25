@@ -40,6 +40,7 @@ from ui.base_widgets import (
     create_hbox,
     create_vbox,
 )
+from ui.common.style_utils import set_widget_state
 
 from config.constants import (
     RECORDING_FORMAT_MP3,
@@ -146,7 +147,7 @@ class RealtimeSettingsPage(BaseSettingsPage):
 
         self.loopback_status_text = QLabel()
         self.loopback_status_text.setProperty("role", ROLE_FFMPEG_STATUS)
-        self.loopback_status_text.setProperty("state", "missing")
+        set_widget_state(self.loopback_status_text, "missing")
 
         self.loopback_setup_btn = create_button(
             self.i18n.t("settings.realtime.loopback_view_guide")
@@ -337,12 +338,7 @@ class RealtimeSettingsPage(BaseSettingsPage):
 
     def _set_status_state(self, state: str) -> None:
         """Apply semantic status state for theme-aware label colors."""
-        self.loopback_status_text.setProperty("state", state)
-        style = self.loopback_status_text.style()
-        if style is not None:
-            style.unpolish(self.loopback_status_text)
-            style.polish(self.loopback_status_text)
-        self.loopback_status_text.update()
+        set_widget_state(self.loopback_status_text, state)
 
     def _refresh_loopback_status(self) -> None:
         """Refresh loopback availability status and details."""

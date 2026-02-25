@@ -36,6 +36,7 @@ class RealtimeConfig:
     min_audio_duration: float = 3.0
 
     # Task Timeouts
+    processing_task_timeout: float = 5.0
     translation_task_timeout: float = 5.0
     translation_task_shutdown_timeout: float = 2.0
 

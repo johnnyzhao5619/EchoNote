@@ -15,6 +15,9 @@
     "tasks_running": "Tâches : {count} en cours",
     "recording_on": "Enregistrement : actif",
     "recording_off": "Enregistrement : inactif",
+    "resource_cpu_label": "CPU",
+    "resource_gpu_label": "GPU",
+    "resource_unavailable": "N/A",
     "theme_status": "Thème : {theme}"
   },
   "common": {
@@ -37,6 +40,7 @@
     "hide_details": "Hide Details",
     "refresh": "Actualiser",
     "words": "words",
+    "characters": "caractères",
     "file_count": "{count} file",
     "file_count_plural": "{count} files",
     "task_status": "Task {name} is {status|completed|in progress}",

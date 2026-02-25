@@ -24,18 +24,22 @@ import logging
 from typing import Any, Callable, Dict, Optional
 
 from ui.common.theme import ThemeManager
+from ui.common.style_utils import set_widget_state
 from ui.constants import (
     APP_SEARCH_MAX_WIDTH,
     APP_SEARCH_MIN_WIDTH,
     APP_SHELL_CONTENT_MARGINS,
     APP_STATUS_BAR_HEIGHT,
     APP_STATUS_BAR_MARGINS,
+    APP_SHELL_RESOURCE_BAR_HEIGHT,
+    APP_SHELL_RESOURCE_BAR_WIDTH,
     APP_STATUS_BAR_SPACING,
     APP_TOP_BAR_CONTROL_HEIGHT,
     APP_TOP_BAR_HEIGHT,
     APP_TOP_BAR_HINT_WIDTH,
     APP_TOP_BAR_MARGINS,
     APP_TOP_BAR_SPACING,
+    ROLE_SHELL_RESOURCE_BAR,
     SHELL_STATUS_REFRESH_INTERVAL_MS,
     ZERO_MARGINS,
     ZERO_SPACING,
@@ -51,6 +55,7 @@ from core.qt_imports import (
     QLineEdit,
     QMainWindow,
     QPoint,
+    QProgressBar,
     QSettings,
     QShortcut,
     QSize,
@@ -274,7 +279,50 @@ class MainWindow(QMainWindow):
         self.shell_message_label.setObjectName("shell_status_message")
         layout.addWidget(self.shell_message_label)
 
+        self._resource_warning_threshold_percent = self._resolve_resource_warning_threshold()
+        self.cpu_resource_label = QLabel(self.i18n.t("app_shell.resource_cpu_label"))
+        self.cpu_resource_label.setObjectName("shell_status_item")
+        layout.addWidget(self.cpu_resource_label)
+
+        self.cpu_resource_bar = self._create_resource_bar()
+        layout.addWidget(self.cpu_resource_bar)
+
+        self.gpu_resource_label = QLabel(self.i18n.t("app_shell.resource_gpu_label"))
+        self.gpu_resource_label.setObjectName("shell_status_item")
+        layout.addWidget(self.gpu_resource_label)
+
+        self.gpu_resource_bar = self._create_resource_bar()
+        layout.addWidget(self.gpu_resource_bar)
+
         return bar
+
+    def _create_resource_bar(self) -> QProgressBar:
+        """Create a compact progress bar for shell resource telemetry."""
+        bar = QProgressBar()
+        bar.setMinimum(0)
+        bar.setMaximum(100)
+        bar.setValue(0)
+        bar.setTextVisible(True)
+        bar.setFormat("0%")
+        bar.setFixedWidth(APP_SHELL_RESOURCE_BAR_WIDTH)
+        bar.setFixedHeight(APP_SHELL_RESOURCE_BAR_HEIGHT)
+        bar.setProperty("role", ROLE_SHELL_RESOURCE_BAR)
+        self._set_resource_bar_state(bar, state="normal")
+        return bar
+
+    def _resolve_resource_warning_threshold(self) -> float:
+        """Resolve CPU/GPU warning threshold from resource monitor settings."""
+        resource_monitor = self.managers.get("resource_monitor")
+        threshold = getattr(resource_monitor, "high_cpu_threshold_percent", 90.0)
+        try:
+            return max(1.0, min(float(threshold), 100.0))
+        except (TypeError, ValueError):
+            return 90.0
+
+    @staticmethod
+    def _set_resource_bar_state(bar: QProgressBar, *, state: str) -> None:
+        """Set semantic state and refresh style from theme QSS."""
+        set_widget_state(bar, state)
 
     def _switch_to_first_available_page(self):
         """Switch to the first registered page using shared nav order."""
@@ -476,6 +524,10 @@ class MainWindow(QMainWindow):
             self.global_search_input.setPlaceholderText(self.i18n.t("app_shell.search_placeholder"))
         if hasattr(self, "search_hint_label"):
             self.search_hint_label.setText(self.i18n.t("app_shell.search_hint"))
+        if hasattr(self, "cpu_resource_label"):
+            self.cpu_resource_label.setText(self.i18n.t("app_shell.resource_cpu_label"))
+        if hasattr(self, "gpu_resource_label"):
+            self.gpu_resource_label.setText(self.i18n.t("app_shell.resource_gpu_label"))
         self._update_shell_status()
 
     def _resolve_search_target(self, raw_query: str) -> Optional[str]:
@@ -593,6 +645,70 @@ class MainWindow(QMainWindow):
         is_recording = bool(getattr(realtime_recorder, "is_recording", False))
         recording_key = "app_shell.recording_on" if is_recording else "app_shell.recording_off"
         self.record_status_label.setText(self.i18n.t(recording_key))
+        self._update_resource_usage_status()
+
+    def _update_resource_usage_status(self) -> None:
+        """Refresh CPU/GPU usage bars from current resource monitor statistics."""
+        if not hasattr(self, "cpu_resource_bar") or not hasattr(self, "gpu_resource_bar"):
+            return
+
+        resource_monitor = self.managers.get("resource_monitor")
+        if resource_monitor is None or not hasattr(resource_monitor, "get_current_stats"):
+            self._set_resource_bar_unavailable(self.cpu_resource_bar)
+            self._set_resource_bar_unavailable(self.gpu_resource_bar)
+            return
+
+        try:
+            stats = resource_monitor.get_current_stats() or {}
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Failed to read resource monitor stats: %s", exc)
+            self._set_resource_bar_unavailable(self.cpu_resource_bar)
+            self._set_resource_bar_unavailable(self.gpu_resource_bar)
+            return
+
+        cpu_percent = self._normalize_percent(stats.get("cpu_percent"))
+        if cpu_percent is not None:
+            self._set_resource_bar_percent(self.cpu_resource_bar, cpu_percent)
+        else:
+            self._set_resource_bar_unavailable(self.cpu_resource_bar)
+
+        gpu_percent = self._normalize_percent(stats.get("gpu_percent"))
+        gpu_available = bool(stats.get("gpu_available", gpu_percent is not None))
+        if gpu_available and gpu_percent is not None:
+            self._set_resource_bar_percent(self.gpu_resource_bar, gpu_percent)
+        else:
+            self._set_resource_bar_unavailable(self.gpu_resource_bar)
+
+    @staticmethod
+    def _normalize_percent(value: Any) -> Optional[float]:
+        """Normalize telemetry percentage into [0, 100]."""
+        try:
+            numeric = float(value)
+        except (TypeError, ValueError):
+            return None
+        if numeric < 0:
+            return 0.0
+        if numeric > 100:
+            return 100.0
+        return numeric
+
+    def _set_resource_bar_percent(self, bar: QProgressBar, percent: float) -> None:
+        """Render resource bar as a valid percentage with warning state."""
+        value = int(round(percent))
+        bar.setEnabled(True)
+        bar.setValue(value)
+        bar.setFormat(f"{value}%")
+        self._set_resource_bar_state(
+            bar,
+            state="warning" if percent >= self._resource_warning_threshold_percent else "normal",
+        )
+
+    def _set_resource_bar_unavailable(self, bar: QProgressBar) -> None:
+        """Render resource bar as unavailable."""
+        bar.setEnabled(False)
+        bar.setValue(0)
+        bar.setFormat(self.i18n.t("app_shell.resource_unavailable"))
+        self._set_resource_bar_state(bar, state="unavailable")
 
     def apply_theme(self, theme: str):
         """

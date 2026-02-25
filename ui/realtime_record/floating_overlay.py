@@ -32,6 +32,7 @@ from core.qt_imports import (
     Signal,
 )
 from ui.base_widgets import connect_button_with_callback, create_button, create_hbox
+from ui.common.style_utils import set_widget_state
 from ui.constants import (
     REALTIME_FLOATING_CONTENT_MARGINS,
     REALTIME_FLOATING_HEADER_SPACING,
@@ -97,7 +98,7 @@ class RealtimeFloatingOverlay(QDialog):
 
         self.status_label = QLabel()
         self.status_label.setProperty("role", ROLE_REALTIME_FLOATING_STATUS)
-        self.status_label.setProperty("state", "ready")
+        set_widget_state(self.status_label, "ready")
         header.addWidget(self.status_label)
 
         self.close_button = create_button("×")
@@ -179,7 +180,7 @@ class RealtimeFloatingOverlay(QDialog):
         self._is_recording = bool(is_recording)
         self._duration_text = duration_text or self._duration_text or DEFAULT_DURATION
 
-        self.status_label.setProperty("state", "recording" if self._is_recording else "ready")
+        set_widget_state(self.status_label, "recording" if self._is_recording else "ready")
         self.status_label.setText(
             self.i18n.t(
                 "realtime_record.floating_status_recording"
@@ -187,11 +188,6 @@ class RealtimeFloatingOverlay(QDialog):
                 else "realtime_record.floating_status_ready"
             )
         )
-        style = self.status_label.style()
-        if style is not None:
-            style.unpolish(self.status_label)
-            style.polish(self.status_label)
-        self.status_label.update()
         self.duration_label.setText(
             self.i18n.t("realtime_record.recording_duration") + f": {self._duration_text}"
         )
@@ -237,12 +233,7 @@ class RealtimeFloatingOverlay(QDialog):
                 else "realtime_record.floating_pin_top_off"
             )
         )
-        self.pin_top_button.setProperty("state", "active" if self._always_on_top else "inactive")
-        style = self.pin_top_button.style()
-        if style is not None:
-            style.unpolish(self.pin_top_button)
-            style.polish(self.pin_top_button)
-        self.pin_top_button.update()
+        set_widget_state(self.pin_top_button, "active" if self._always_on_top else "inactive")
 
     def _on_pin_top_clicked(self) -> None:
         new_value = not self._always_on_top

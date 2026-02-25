@@ -34,6 +34,7 @@ class ResourceMonitor(QObject):
 
     # Constants
     BYTES_TO_MB = 1024 * 1024  # Conversion factor from bytes to megabytes
+    DEFAULT_GPU_INDEX = 0
 
     def __init__(
         self,
@@ -96,6 +97,12 @@ class ResourceMonitor(QObject):
         self._last_cpu_percent = 0
         self._is_checking = False
         self._cpu_percent_initialized = False
+        self._gpu_backend_initialized = False
+        self._gpu_supported = False
+        self._gpu_name = ""
+        self._gpu_handle = None
+        self._pynvml = None
+        self._last_gpu_percent: Optional[float] = None
 
         self._prime_cpu_percent()
 
@@ -183,7 +190,7 @@ class ResourceMonitor(QObject):
         finally:
             self._is_checking = False
 
-    def get_current_stats(self) -> Dict[str, float]:
+    def get_current_stats(self) -> Dict[str, Any]:
         """
         Get current resource statistics.
 
@@ -201,12 +208,15 @@ class ResourceMonitor(QObject):
             memory = psutil.virtual_memory()
             cpu_percent = self._get_cpu_percent()
 
+            gpu_percent = self._get_gpu_percent()
             return {
                 "memory_available_mb": memory.available / self.BYTES_TO_MB,
                 "memory_used_percent": memory.percent,
                 "memory_total_mb": memory.total / self.BYTES_TO_MB,
                 "cpu_percent": cpu_percent,
                 "cpu_count": psutil.cpu_count(),
+                "gpu_percent": gpu_percent,
+                "gpu_available": gpu_percent is not None,
             }
         except Exception as e:
             logger.error(f"Error getting resource stats: {e}")
@@ -216,16 +226,23 @@ class ResourceMonitor(QObject):
                 "memory_total_mb": 0,
                 "cpu_percent": 0,
                 "cpu_count": 0,
+                "gpu_percent": None,
+                "gpu_available": False,
             }
 
-    def get_last_check_stats(self) -> Dict[str, float]:
+    def get_last_check_stats(self) -> Dict[str, Any]:
         """
         Get statistics from last check.
 
         Returns:
             Dict with last check stats
         """
-        return {"memory_available_mb": self._last_memory_mb, "cpu_percent": self._last_cpu_percent}
+        return {
+            "memory_available_mb": self._last_memory_mb,
+            "cpu_percent": self._last_cpu_percent,
+            "gpu_percent": self._last_gpu_percent,
+            "gpu_available": self._last_gpu_percent is not None,
+        }
 
     def is_low_memory(self) -> bool:
         """Check if system is currently in low memory state."""
@@ -234,6 +251,16 @@ class ResourceMonitor(QObject):
     def is_high_cpu(self) -> bool:
         """Check if system is currently in high CPU state."""
         return self._high_cpu_warned
+
+    def has_gpu(self) -> bool:
+        """Check whether GPU telemetry is available."""
+        self._ensure_gpu_backend()
+        return self._gpu_supported
+
+    def get_gpu_name(self) -> str:
+        """Return detected GPU name if available."""
+        self._ensure_gpu_backend()
+        return self._gpu_name
 
     @staticmethod
     def format_memory_size(size_mb: float) -> str:
@@ -336,6 +363,52 @@ class ResourceMonitor(QObject):
                 logger.warning("Failed to read %s via get: %s", key, exc)
 
         return None
+
+    def _ensure_gpu_backend(self) -> None:
+        """Initialize optional NVML backend lazily."""
+        if self._gpu_backend_initialized:
+            return
+        self._gpu_backend_initialized = True
+
+        try:
+            import pynvml  # type: ignore
+
+            pynvml.nvmlInit()
+            device_count = int(pynvml.nvmlDeviceGetCount())
+            if device_count <= 0:
+                logger.info("GPU telemetry unavailable: no NVML devices detected")
+                return
+
+            self._gpu_handle = pynvml.nvmlDeviceGetHandleByIndex(self.DEFAULT_GPU_INDEX)
+            raw_name = pynvml.nvmlDeviceGetName(self._gpu_handle)
+            if isinstance(raw_name, bytes):
+                raw_name = raw_name.decode("utf-8", errors="ignore")
+
+            self._gpu_name = str(raw_name or "").strip()
+            self._pynvml = pynvml
+            self._gpu_supported = True
+            logger.info("GPU telemetry enabled via NVML (%s)", self._gpu_name or "unknown GPU")
+        except ImportError:
+            logger.info("GPU telemetry unavailable: pynvml is not installed")
+        except Exception as exc:  # noqa: BLE001
+            logger.info("GPU telemetry unavailable: %s", exc)
+
+    def _get_gpu_percent(self) -> Optional[float]:
+        """Return GPU utilization percentage if available, otherwise None."""
+        self._ensure_gpu_backend()
+        if not self._gpu_supported or self._pynvml is None or self._gpu_handle is None:
+            self._last_gpu_percent = None
+            return None
+
+        try:
+            utilization = self._pynvml.nvmlDeviceGetUtilizationRates(self._gpu_handle)
+            gpu_percent = float(utilization.gpu)
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Failed to sample GPU utilization: %s", exc)
+            return self._last_gpu_percent
+
+        self._last_gpu_percent = gpu_percent
+        return gpu_percent
 
 
 # Singleton instance

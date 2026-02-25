@@ -5,6 +5,16 @@ All notable changes to EchoNote will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.7] - 2026-02-25
+
+### Changed
+
+- Released `v1.4.7` with realtime stop-path reliability and responsiveness improvements: streaming transcription now offloads heavy inference work from the event-loop thread, reducing stop-request starvation under load.
+- Refined realtime shutdown behavior to prioritize deterministic stop semantics by avoiding expensive forced flush work after cancellation and by centralizing stop timeout controls in realtime configuration.
+- Improved audio capture shutdown stability by closing streams before thread joins and adding bounded worker-thread stop waits to prevent cleanup hangs.
+- Consolidated duplicate realtime widget stop flows into a single stop pipeline and added regression coverage for stop signal ordering, stop timeout handling, and capture shutdown sequence.
+- Synchronized project, packaging, documentation, and landing metadata version references to `v1.4.7`.
+
 ## [1.4.5] - 2026-02-25
 
 ### Changed

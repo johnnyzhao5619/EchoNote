@@ -52,6 +52,7 @@ from data.database.models import TranscriptionTask
 from ui.base_widgets import connect_button_with_callback, create_hbox
 from ui.batch_transcribe.search_widget import SearchWidget
 from ui.batch_transcribe.window_state_manager import WindowStateManager
+from ui.common.style_utils import set_widget_state
 from ui.constants import (
     CONTROL_BUTTON_MIN_HEIGHT,
     ROLE_TRANSCRIPT_FILE,
@@ -428,10 +429,7 @@ class TranscriptViewerDialog(QDialog):
 
     def _set_edit_button_active_state(self, is_active: bool):
         """Expose edit mode state as a semantic property for unified theming."""
-        self.edit_button.setProperty("state", "active" if is_active else "default")
-        self.edit_button.style().unpolish(self.edit_button)
-        self.edit_button.style().polish(self.edit_button)
-        self.edit_button.update()
+        set_widget_state(self.edit_button, "active" if is_active else "default")
 
     def _create_export_menu(self):
         """Create export dropdown menu with format options."""

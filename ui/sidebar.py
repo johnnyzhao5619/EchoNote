@@ -23,6 +23,7 @@ import logging
 from typing import Dict, Optional
 
 from ui.base_widgets import BaseWidget
+from ui.common.style_utils import set_widget_dynamic_property
 from ui.navigation import NAV_ITEMS, NAV_PAGE_ORDER, NavigationItem
 from core.qt_imports import (
     QButtonGroup,
@@ -210,14 +211,10 @@ class Sidebar(BaseWidget):
         for name, button in self.nav_buttons.items():
             if name == page_name:
                 button.setChecked(True)
-                button.setProperty("active", True)
+                set_widget_dynamic_property(button, "active", True)
             else:
                 button.setChecked(False)
-                button.setProperty("active", False)
-
-            # Force style update
-            button.style().unpolish(button)
-            button.style().polish(button)
+                set_widget_dynamic_property(button, "active", False)
 
         self.current_page = page_name
 

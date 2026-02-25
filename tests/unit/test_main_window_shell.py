@@ -36,11 +36,13 @@ def test_update_shell_status_sets_runtime_labels():
     fake_window.theme_manager = Mock()
     fake_window.theme_manager.get_current_theme.return_value = "dark"
     fake_window._get_running_task_count = Mock(return_value=3)
+    fake_window._update_resource_usage_status = Mock()
 
     MainWindow._update_shell_status(fake_window)
 
     fake_window.task_status_label.setText.assert_called_once_with("Tasks: 3 running")
     fake_window.record_status_label.setText.assert_called_once_with("Recording: active")
+    fake_window._update_resource_usage_status.assert_called_once()
 
 
 def test_update_shell_status_handles_idle_recording_state():
@@ -52,10 +54,12 @@ def test_update_shell_status_handles_idle_recording_state():
     fake_window.theme_manager = Mock()
     fake_window.theme_manager.get_current_theme.return_value = "light"
     fake_window._get_running_task_count = Mock(return_value=0)
+    fake_window._update_resource_usage_status = Mock()
 
     MainWindow._update_shell_status(fake_window)
 
     fake_window.record_status_label.setText.assert_called_once_with("Recording: idle")
+    fake_window._update_resource_usage_status.assert_called_once()
 
 
 def test_get_active_transcription_task_count_prefers_manager_runtime_count():
