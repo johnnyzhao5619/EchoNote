@@ -357,6 +357,16 @@ class FasterWhisperEngine(SpeechEngine):
         # Whisper 支持的基础语言
         return combine_languages(BASE_LANGUAGE_CODES)
 
+    @staticmethod
+    def _normalize_language_code(language: Optional[str]) -> Optional[str]:
+        """Normalize UI language tokens to faster-whisper compatible values."""
+        if language is None:
+            return None
+        normalized = str(language).strip().lower()
+        if not normalized or normalized == "auto":
+            return None
+        return normalized
+
     def _probe_duration_with_soundfile(self, audio_path: str) -> Optional[float]:
         """Probe media duration using soundfile when supported."""
         try:
@@ -475,7 +485,8 @@ class FasterWhisperEngine(SpeechEngine):
         vad_min_silence_duration_ms = kwargs.get("vad_min_silence_duration_ms", 500)
         progress_callback = kwargs.get("progress_callback")
 
-        logger.info(f"Transcribing file: {audio_path}, language={language}")
+        normalized_language = self._normalize_language_code(language)
+        logger.info(f"Transcribing file: {audio_path}, language={normalized_language}")
 
         try:
             # 首先获取音频时长以计算进度
@@ -487,7 +498,7 @@ class FasterWhisperEngine(SpeechEngine):
                 # 执行转录（返回迭代器）
                 segments_iterator, transcribe_info = active_model.transcribe(
                     audio_path,
-                    language=language,
+                    language=normalized_language,
                     beam_size=beam_size,
                     vad_filter=vad_filter,
                     vad_parameters=(
@@ -600,6 +611,7 @@ class FasterWhisperEngine(SpeechEngine):
                 - use_vad: 是否使用 VAD（默认 False，因为外部已经做了 VAD）
         """
         active_model, _ = self._prepare_active_model()
+        normalized_language = self._normalize_language_code(language)
 
         # 检查音频长度
         if len(audio_chunk) == 0:
@@ -652,7 +664,7 @@ class FasterWhisperEngine(SpeechEngine):
                 # 转录
                 segments, info = active_model.transcribe(
                     tmp_path,
-                    language=language,
+                    language=normalized_language,
                     beam_size=1,  # 实时转录使用较小的 beam size
                     vad_filter=False,  # 已经做过 VAD
                     word_timestamps=False,  # 不需要词级时间戳

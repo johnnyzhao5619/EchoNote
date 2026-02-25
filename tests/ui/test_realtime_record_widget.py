@@ -175,6 +175,33 @@ class TestRealtimeRecordWidget:
         assert widget._floating_overlay is not None
         assert widget._floating_overlay.property("role") == "realtime-floating-overlay"
 
+    def test_show_main_action_hides_overlay_and_refreshes_shell_status(self, widget):
+        """Floating action should restore main window and close overlay."""
+        type(widget.recorder).is_recording = PropertyMock(return_value=True)
+        widget._floating_window_enabled = True
+        widget._sync_floating_overlay_visibility()
+
+        overlay = widget._floating_overlay
+        assert overlay is not None
+        overlay.show()
+        assert overlay.isVisible() is True
+
+        main_window = Mock()
+        main_window.isMinimized = Mock(return_value=False)
+        main_window.show = Mock()
+        main_window.raise_ = Mock()
+        main_window.activateWindow = Mock()
+        main_window._update_shell_status = Mock()
+        widget.window = Mock(return_value=main_window)
+
+        widget._show_main_window_and_close_overlay()
+
+        assert overlay.isVisible() is False
+        main_window.show.assert_called_once()
+        main_window.raise_.assert_called_once()
+        main_window.activateWindow.assert_called_once()
+        main_window._update_shell_status.assert_called_once()
+
 
 class TestRealtimeRecordWidgetWithoutAudio:
     """Tests for RealtimeRecordWidget without audio capture."""

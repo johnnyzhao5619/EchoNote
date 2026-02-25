@@ -5,6 +5,15 @@ All notable changes to EchoNote will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.5] - 2026-02-25
+
+### Changed
+
+- Released `v1.4.5` with realtime recording reliability fixes: source language `auto` is now normalized before speech-engine invocation, preventing faster-whisper invalid language errors during live transcription.
+- Refined realtime floating window interaction: clicking "Show Main Window" now restores the main window, closes the overlay, and synchronizes shell status updates in one unified flow.
+- Reviewed and updated GitHub Actions workflows under `.github/workflows` by replacing unsupported `@v6` action references with stable action major versions to keep CI/release pipelines executable.
+- Synchronized project, packaging, documentation, and landing metadata version references to `v1.4.5`.
+
 ## [1.4.4] - 2026-02-25
 
 ### Changed

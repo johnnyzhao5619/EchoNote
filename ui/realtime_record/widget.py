@@ -2088,7 +2088,7 @@ class RealtimeRecordWidget(BaseWidget):
             from ui.realtime_record.floating_overlay import RealtimeFloatingOverlay
 
             overlay = RealtimeFloatingOverlay(self.i18n)
-            overlay.show_main_window_requested.connect(self._restore_main_window_from_overlay)
+            overlay.show_main_window_requested.connect(self._show_main_window_and_close_overlay)
             overlay.overlay_closed.connect(self._on_floating_overlay_closed)
             overlay.always_on_top_changed.connect(self._on_overlay_always_on_top_changed)
             overlay.set_always_on_top(self._floating_window_always_on_top)
@@ -2103,6 +2103,24 @@ class RealtimeRecordWidget(BaseWidget):
         """Restore main window if overlay was the only visible window."""
         if self._main_window_hidden_by_overlay:
             self._restore_main_window_from_overlay()
+
+    def _show_main_window_and_close_overlay(self) -> None:
+        """Handle floating action: show main window and close overlay."""
+        if self._floating_overlay is not None:
+            self._floating_overlay.hide()
+        self._restore_main_window_from_overlay(force=True)
+        self._refresh_floating_mode_toggle_controls()
+
+        main_window = self.window()
+        if (
+            main_window is not None
+            and main_window is not self
+            and hasattr(main_window, "_update_shell_status")
+        ):
+            try:
+                main_window._update_shell_status()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Failed to refresh shell status after restoring window: %s", exc)
 
     def _sync_floating_overlay_visibility(self) -> None:
         """Show/hide floating overlay based on settings and update displayed state."""
@@ -2172,9 +2190,9 @@ class RealtimeRecordWidget(BaseWidget):
         except Exception as exc:  # noqa: BLE001
             logger.warning("Failed to hide main window for floating overlay: %s", exc, exc_info=True)
 
-    def _restore_main_window_from_overlay(self) -> None:
+    def _restore_main_window_from_overlay(self, *, force: bool = False) -> None:
         """Restore main window hidden by floating overlay mode."""
-        if not self._main_window_hidden_by_overlay:
+        if not self._main_window_hidden_by_overlay and not force:
             return
 
         main_window = self.window()

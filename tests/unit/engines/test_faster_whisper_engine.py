@@ -402,6 +402,28 @@ class TestTranscribeStream:
         assert "language" in result
         assert result["language"] == "en"
 
+    @pytest.mark.asyncio
+    @patch("faster_whisper.WhisperModel")
+    async def test_transcribe_stream_normalizes_auto_language(
+        self, mock_whisper_class, mock_model_manager
+    ):
+        """UI auto-detect token should be converted to faster-whisper auto mode."""
+        mock_model = Mock()
+        segment = Mock()
+        segment.text = "Test transcription"
+        info = Mock()
+        info.language = "en"
+        mock_model.transcribe = Mock(return_value=([segment], info))
+        mock_whisper_class.return_value = mock_model
+
+        engine = FasterWhisperEngine(model_size="base", model_manager=mock_model_manager)
+        audio_chunk = np.random.rand(16000).astype(np.float32)
+
+        await engine.transcribe_stream(audio_chunk, language="auto", sample_rate=16000)
+
+        _, kwargs = mock_model.transcribe.call_args
+        assert kwargs["language"] is None
+
 
 class TestConfigValidation:
     """Test configuration validation."""

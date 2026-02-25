@@ -21,13 +21,13 @@ All other files should import version from this module to ensure consistency.
 """
 
 # Single source of truth for version information
-__version__ = "1.4.4"
+__version__ = "1.4.5"
 
 # Version metadata
 VERSION_INFO = {
     "major": 1,
     "minor": 4,
-    "patch": 4,
+    "patch": 5,
     "pre_release": None,  # e.g., "alpha", "beta", "rc1"
     "build": None,  # e.g., build number or commit hash
 }
