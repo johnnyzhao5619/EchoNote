@@ -13,11 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""
-Audio player widget for timeline recordings.
-
-Provides playback controls for audio recordings.
-"""
+"""Reusable audio player widget and dialog for recording playback."""
 
 import logging
 import weakref
@@ -96,7 +92,7 @@ from ui.constants import (
 from ui.common.theme import ThemeManager
 from utils.i18n import I18nQtManager
 
-logger = logging.getLogger("echonote.ui.timeline.audio_player")
+logger = logging.getLogger("echonote.ui.common.audio_player")
 
 
 class AudioPlayer(BaseWidget):

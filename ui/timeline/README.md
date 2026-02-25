@@ -46,7 +46,7 @@ Event card component with different layouts for past and future events:
 
 - Visual separator showing current time in timeline
 
-### 3. AudioPlayer (`audio_player.py`)
+### 3. AudioPlayer（共享组件：`ui/common/audio_player.py`）
 
 Built-in audio player for recordings with modern, centered design:
 

@@ -19,21 +19,15 @@ Timeline widget for EchoNote.
 Displays a vertical timeline of past and future events with search and filtering.
 """
 
-import importlib
 import logging
 import math
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, cast
 
-from config.constants import (
-    DEFAULT_TRANSLATION_TARGET_LANGUAGE,
-    TRANSLATION_LANGUAGE_AUTO,
-)
-from core.settings.manager import resolve_translation_languages_from_settings
 from core.qt_imports import (
     QComboBox,
     QDate,
     QDateEdit,
+    QDialog,
     QDateTime,
     QLabel,
     QLineEdit,
@@ -51,11 +45,16 @@ from ui.signal_helpers import (
 )
 
 if TYPE_CHECKING:
-    from ui.timeline.audio_player import AudioPlayerDialog
     from ui.common.transcript_translation_viewer import TranscriptTranslationViewerDialog
 
 from core.calendar.constants import CalendarSource, EventType
 from ui.base_widgets import BaseWidget, create_button, create_hbox, create_vbox
+from ui.common.audio_player_launcher import open_or_activate_audio_player
+from ui.common.text_viewer_launcher import (
+    open_or_activate_text_viewer,
+    resolve_text_viewer_initial_mode,
+)
+from ui.common.translation_task_options import enqueue_event_translation_task
 from ui.constants import (
     PAGE_COMPACT_SPACING,
     PAGE_LAYOUT_SPACING,
@@ -134,7 +133,7 @@ class TimelineWidget(BaseWidget):
         self._pending_refresh: Optional[bool] = None
         self.has_more = True
         self.event_cards: List[QWidget] = []
-        self._audio_player_dialogs: Dict[str, "AudioPlayerDialog"] = {}
+        self._audio_player_dialogs: Dict[str, QDialog] = {}
         self._text_viewer_dialogs: Dict[str, "TranscriptTranslationViewerDialog"] = {}
 
         # Current filters
@@ -813,12 +812,6 @@ class TimelineWidget(BaseWidget):
         """Trigger a timeline refresh respecting the loading guard."""
         self.load_timeline_events(reset=reset)
 
-    def _show_audio_unavailable_message(self):
-        """Inform the user that audio playback components are unavailable."""
-        title = self.i18n.t("timeline.audio_player_unavailable_title")
-        message = self.i18n.t("timeline.audio_player_unavailable_message")
-        self.show_warning(title, message)
-
     def _on_auto_task_changed(self, event_id: str, config: Dict[str, Any]):
         """
         Handle auto-task configuration change.
@@ -898,81 +891,25 @@ class TimelineWidget(BaseWidget):
             file_path: Path to recording file
             event_id: Associated event ID
         """
-        try:
-            audio_module = importlib.import_module("ui.timeline.audio_player")
-        except ImportError as exc:
-            logger.warning("Failed to import audio playback components: %s", exc)
-            self._show_audio_unavailable_message()
-            return
+        transcript_path = None
+        translation_path = None
+        if event_id:
+            card = self.get_event_card_by_id(event_id)
+            if card:
+                transcript_path = card.artifacts.get("transcript")
+                translation_path = card.artifacts.get("translation")
 
-        AudioPlayerDialog = getattr(audio_module, "AudioPlayerDialog", None)
-        if AudioPlayerDialog is None:
-            logger.warning(
-                "Audio playback dialog is unavailable; skipping playback for %s",
-                file_path,
-            )
-            self._show_audio_unavailable_message()
-            return
-
-        try:
-            existing_dialog = self._audio_player_dialogs.get(file_path)
-
-            if existing_dialog:
-                transcript_path = None
-                translation_path = None
-                if event_id:
-                    card = self.get_event_card_by_id(event_id)
-                    if card:
-                        transcript_path = card.artifacts.get("transcript")
-                        translation_path = card.artifacts.get("translation")
-                existing_dialog.player.load_file(file_path, transcript_path, translation_path)
-                existing_dialog.show()
-                existing_dialog.raise_()
-                existing_dialog.activateWindow()
-                logger.info(f"Activated existing audio player for {file_path}")
-                return
-
-            transcript_path = None
-            translation_path = None
-            if event_id:
-                card = self.get_event_card_by_id(event_id)
-                if card:
-                    transcript_path = card.artifacts.get("transcript")
-                    translation_path = card.artifacts.get("translation")
-
-            dialog = AudioPlayerDialog(file_path, self.i18n, self, transcript_path, translation_path)
-        except Exception as exc:
-            logger.exception("Failed to create audio player dialog for %s", file_path)
-            title = self.i18n.t("timeline.audio_player_open_failed_title")
-            message = self.i18n.t("timeline.audio_player_open_failed_message", error=str(exc))
-            self.show_error(title, message)
-            return
-
-        self._audio_player_dialogs[file_path] = dialog
-
-        try:
-
-            def _cleanup_dialog(*_):
-                tracked_dialog = self._audio_player_dialogs.get(file_path)
-                if tracked_dialog is dialog:
-                    self._audio_player_dialogs.pop(file_path, None)
-                    logger.debug(f"Closed audio player for {file_path}")
-
-            dialog.finished.connect(_cleanup_dialog)
-            dialog.destroyed.connect(_cleanup_dialog)
-
-            dialog.show()
-            dialog.raise_()
-            dialog.activateWindow()
-            logger.info(f"Opened audio player for {file_path}")
-        except Exception as exc:
-            self._audio_player_dialogs.pop(file_path, None)
-            logger.exception("Failed to display audio player dialog for %s", file_path)
-            title = self.i18n.t("timeline.audio_player_open_failed_title")
-            message = self.i18n.t("timeline.audio_player_open_failed_message").format(
-                error=str(exc)
-            )
-            self.show_error(title, message)
+        open_or_activate_audio_player(
+            file_path=file_path,
+            i18n=self.i18n,
+            parent=self,
+            dialog_cache=self._audio_player_dialogs,
+            logger=logger,
+            show_warning=self.show_warning,
+            show_error=self.show_error,
+            transcript_path=transcript_path,
+            translation_path=translation_path,
+        )
 
     def _open_text_viewer(
         self,
@@ -983,47 +920,17 @@ class TimelineWidget(BaseWidget):
         title_key: str,
     ):
         """Open unified transcript/translation dialog for timeline artifacts."""
-        from ui.common.transcript_translation_viewer import TranscriptTranslationViewerDialog
-
-        try:
-            cache_key = f"{transcript_path or ''}|{translation_path or ''}"
-            existing_dialog = self._text_viewer_dialogs.get(cache_key)
-
-            if existing_dialog:
-                existing_dialog.viewer.set_view_mode(initial_mode)
-                existing_dialog._title_key = title_key
-                existing_dialog.setWindowTitle(self.i18n.t(title_key))
-                existing_dialog.show()
-                existing_dialog.raise_()
-                existing_dialog.activateWindow()
-                logger.info(f"Activated text viewer for {cache_key}")
-                return
-
-            dialog = TranscriptTranslationViewerDialog(
-                i18n=self.i18n,
-                transcript_path=transcript_path,
-                translation_path=translation_path,
-                initial_mode=initial_mode,
-                title_key=title_key,
-                parent=self,
-            )
-            self._text_viewer_dialogs[cache_key] = dialog
-
-            def _cleanup_dialog(*_):
-                tracked_dialog = self._text_viewer_dialogs.get(cache_key)
-                if tracked_dialog is dialog:
-                    self._text_viewer_dialogs.pop(cache_key, None)
-                    logger.debug(f"Closed text viewer for {cache_key}")
-
-            dialog.finished.connect(_cleanup_dialog)
-            dialog.destroyed.connect(_cleanup_dialog)
-
-            dialog.show()
-            dialog.raise_()
-            dialog.activateWindow()
-            logger.info(f"Opened text viewer for {cache_key}")
-        except Exception as e:
-            logger.error(f"Failed to open text viewer: {e}")
+        open_or_activate_text_viewer(
+            i18n=self.i18n,
+            dialog_cache=self._text_viewer_dialogs,
+            parent=self,
+            transcript_path=transcript_path,
+            translation_path=translation_path,
+            initial_mode=initial_mode,
+            title_key=title_key,
+            show_warning=self.show_warning,
+            logger=logger,
+        )
 
     def _resolve_artifact_pair_from_path(
         self, file_path: str, *, preferred_mode: str
@@ -1047,7 +954,10 @@ class TimelineWidget(BaseWidget):
         transcript_path, translation_path = self._resolve_artifact_pair_from_path(
             file_path, preferred_mode="transcript"
         )
-        initial_mode = "compare" if transcript_path and translation_path else "transcript"
+        initial_mode = resolve_text_viewer_initial_mode(
+            transcript_path=transcript_path,
+            translation_path=translation_path,
+        )
         self._open_text_viewer(
             transcript_path=transcript_path,
             translation_path=translation_path,
@@ -1069,54 +979,28 @@ class TimelineWidget(BaseWidget):
 
     def _on_translate_transcript_requested(self, event_id: str, transcript_path: str):
         """Queue transcript translation task and persist translation attachment for event."""
-        if not self.transcription_manager:
-            return
-        if not transcript_path:
-            return
-
-        translation_engine = getattr(self.transcription_manager, "translation_engine", None)
-        if translation_engine is None:
-            self.show_warning(
-                self.i18n.t("common.warning"),
-                self.i18n.t("timeline.translation_not_available"),
-            )
-            return
-
-        target_lang = DEFAULT_TRANSLATION_TARGET_LANGUAGE
-        source_lang = TRANSLATION_LANGUAGE_AUTO
-        resolved_languages = resolve_translation_languages_from_settings(self.settings_manager)
-        target_lang = resolved_languages.get(
-            "translation_target_lang", DEFAULT_TRANSLATION_TARGET_LANGUAGE
-        )
-        source_lang = resolved_languages.get(
-            "translation_source_lang", TRANSLATION_LANGUAGE_AUTO
-        )
-
-        output_suffix = Path(transcript_path).suffix.lower()
-        output_format = "md" if output_suffix == ".md" else "txt"
-        options = {
-            "event_id": event_id,
-            "translation_source_lang": source_lang,
-            "translation_target_lang": target_lang,
-            "output_format": output_format,
-        }
-
-        try:
-            self.transcription_manager.add_translation_task(transcript_path, options=options)
+        def _on_queued() -> None:
             self._update_shell_message(self.i18n.t("timeline.translation_queued"))
             QTimer.singleShot(5000, lambda: self._update_shell_message(""))
             self.show_info(self.i18n.t("common.info"), self.i18n.t("timeline.translation_queued"))
-        except Exception as exc:  # noqa: BLE001
-            logger.error(
-                "Failed to queue translation task for event %s: %s",
-                event_id,
-                exc,
-                exc_info=True,
-            )
-            self.show_error(
+
+        enqueue_event_translation_task(
+            transcription_manager=self.transcription_manager,
+            settings_manager=self.settings_manager,
+            event_id=event_id,
+            transcript_path=transcript_path,
+            logger=logger,
+            context_label="timeline transcript translation",
+            on_translation_unavailable=lambda: self.show_warning(
+                self.i18n.t("common.warning"),
+                self.i18n.t("timeline.translation_not_available"),
+            ),
+            on_queued=_on_queued,
+            on_failed=lambda exc: self.show_error(
                 self.i18n.t("common.error"),
                 self.i18n.t("timeline.translation_failed", error=str(exc)),
-            )
+            ),
+        )
 
     def _update_shell_message(self, message: str) -> None:
         """Show a short status message on shell footer when available."""

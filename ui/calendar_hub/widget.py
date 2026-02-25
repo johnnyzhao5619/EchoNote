@@ -23,7 +23,6 @@ and account management.
 import logging
 import threading
 from datetime import datetime
-from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 from urllib.parse import urlparse
 
@@ -34,18 +33,12 @@ from config.constants import (
 from core.settings.manager import resolve_translation_languages_from_settings
 from core.qt_imports import (
     QButtonGroup,
-    QDate,
     QDialog,
-    QFileDialog,
     QFrame,
     QHBoxLayout,
     QLabel,
     QMessageBox,
-    QPushButton,
-    QScrollArea,
-    QSplitter,
     QStackedWidget,
-    QTimer,
     QVBoxLayout,
     QWidget,
     Signal,
@@ -57,18 +50,20 @@ from ui.base_widgets import (
     BaseWidget,
     connect_button_with_callback,
     create_button,
-    create_danger_button,
-    create_hbox,
     create_primary_button,
-    create_vbox,
 )
+from ui.common.audio_player_launcher import open_or_activate_audio_player
+from ui.common.text_viewer_launcher import (
+    open_or_activate_text_viewer,
+    resolve_text_viewer_initial_mode,
+)
+from ui.common.translation_task_options import enqueue_event_translation_task
 from ui.constants import (
     CALENDAR_ADD_ACCOUNT_DIALOG_MIN_WIDTH,
     NAV_SYMBOL_NEXT,
     NAV_SYMBOL_PREV,
     PAGE_COMPACT_SPACING,
     PAGE_DENSE_SPACING,
-    PAGE_LAYOUT_SPACING,
     ROLE_CALENDAR_NAV_ACTION,
     ROLE_CALENDAR_PRIMARY_ACTION,
     ROLE_CALENDAR_UTILITY_ACTION,
@@ -137,6 +132,7 @@ class CalendarHubWidget(BaseWidget):
         self.connected_accounts: Dict[str, Optional[str]] = {}
         self._manual_sync_thread: Optional[threading.Thread] = None
         self._oauth_connect_thread: Optional[threading.Thread] = None
+        self._audio_player_dialogs: Dict[str, QDialog] = {}
         self._text_viewer_dialogs: Dict[str, QDialog] = {}
 
         # Setup UI
@@ -481,12 +477,16 @@ class CalendarHubWidget(BaseWidget):
         event_data = None
         if event:
             auto_transcribe = False
+            enable_translation = False
+            translation_target_lang = None
             try:
                 from data.database.models import AutoTaskConfig
 
                 config = AutoTaskConfig.get_by_event_id(self.calendar_manager.db, event.id)
                 if config:
                     auto_transcribe = config.enable_transcription
+                    enable_translation = config.enable_translation
+                    translation_target_lang = config.translation_target_language
             except Exception as e:
                 logger.warning(f"Failed to fetch AutoTaskConfig for event {event.id}: {e}")
 
@@ -501,6 +501,8 @@ class CalendarHubWidget(BaseWidget):
                 "description": event.description,
                 "reminder_minutes": event.reminder_minutes,
                 "auto_transcribe": auto_transcribe,
+                "enable_translation": enable_translation,
+                "translation_target_lang": translation_target_lang,
             }
         elif default_date:
             now = now_local()
@@ -569,6 +571,7 @@ class CalendarHubWidget(BaseWidget):
             allow_retranscribe=allow_retranscribe,
             is_past=is_past,
             is_translation_available=is_translation_available,
+            recording_path=recording_path,
             transcript_path=transcript_path,
             translation_path=translation_path,
         )
@@ -582,6 +585,15 @@ class CalendarHubWidget(BaseWidget):
         if event and (transcript_path or translation_path):
             dialog.view_text_requested.connect(
                 lambda requester, p=transcript_path, tr=translation_path: self._open_event_text_viewer(
+                    transcript_path=p,
+                    translation_path=tr,
+                    parent_hint=requester,
+                )
+            )
+        if event and recording_path:
+            dialog.view_recording_requested.connect(
+                lambda requester, file_path, p=transcript_path, tr=translation_path: self._on_view_recording(
+                    file_path=file_path,
                     transcript_path=p,
                     translation_path=tr,
                     parent_hint=requester,
@@ -724,8 +736,6 @@ class CalendarHubWidget(BaseWidget):
 
     def show_add_account_dialog(self):
         """Show dialog to add external calendar account."""
-        from core.qt_imports import QDialog, QPushButton, QVBoxLayout
-
         # Create simple provider selection dialog
         dialog = QDialog(self)
         dialog.setWindowTitle(self.i18n.t("calendar_hub.widget.add_calendar_account"))
@@ -1422,8 +1432,6 @@ class CalendarHubWidget(BaseWidget):
     def _update_sync_status(self):
         """Update sync status label with last sync time."""
         try:
-            from datetime import datetime
-
             from data.database.models import CalendarSyncStatus
 
             # Get most recent sync time from all accounts
@@ -1551,105 +1559,49 @@ class CalendarHubWidget(BaseWidget):
         parent_hint: Optional[QWidget] = None,
     ) -> None:
         """Open reusable transcript/translation viewer from Calendar Hub."""
-        from ui.common.transcript_translation_viewer import (
-            VIEW_MODE_COMPARE,
-            VIEW_MODE_TRANSCRIPT,
-            VIEW_MODE_TRANSLATION,
-            TranscriptTranslationViewerDialog,
+        initial_mode = resolve_text_viewer_initial_mode(
+            transcript_path=transcript_path,
+            translation_path=translation_path,
         )
-
-        if not transcript_path and not translation_path:
-            self.show_warning(self.i18n.t("common.warning"), self.i18n.t("viewer.file_not_found"))
-            return
-
-        if transcript_path and translation_path:
-            initial_mode = VIEW_MODE_COMPARE
-        elif translation_path:
-            initial_mode = VIEW_MODE_TRANSLATION
-        else:
-            initial_mode = VIEW_MODE_TRANSCRIPT
-        cache_key = f"{transcript_path or ''}|{translation_path or ''}"
-        existing_dialog = self._text_viewer_dialogs.get(cache_key)
-        if existing_dialog:
-            viewer = getattr(existing_dialog, "viewer", None)
-            if viewer is not None:
-                viewer.set_view_mode(initial_mode)
-            existing_dialog.show()
-            existing_dialog.raise_()
-            existing_dialog.activateWindow()
-            return
-
-        dialog_parent = parent_hint if parent_hint is not None else self
-        dialog = TranscriptTranslationViewerDialog(
+        open_or_activate_text_viewer(
             i18n=self.i18n,
+            dialog_cache=self._text_viewer_dialogs,
+            parent=self,
             transcript_path=transcript_path,
             translation_path=translation_path,
             initial_mode=initial_mode,
             title_key="timeline.translation_viewer_title",
-            parent=dialog_parent,
+            show_warning=self.show_warning,
+            parent_hint=parent_hint,
+            logger=logger,
         )
-        self._text_viewer_dialogs[cache_key] = dialog
-
-        def _cleanup_dialog(*_):
-            tracked_dialog = self._text_viewer_dialogs.get(cache_key)
-            if tracked_dialog is dialog:
-                self._text_viewer_dialogs.pop(cache_key, None)
-
-        dialog.finished.connect(_cleanup_dialog)
-        dialog.destroyed.connect(_cleanup_dialog)
-        dialog.show()
-        dialog.raise_()
-        dialog.activateWindow()
 
     def _on_translate_transcript_requested(self, *, event_id: str, transcript_path: str) -> None:
         """Queue transcript translation task and persist result into event attachments."""
-        if not self.transcription_manager:
-            return
-        if not transcript_path:
-            self.show_warning(self.i18n.t("common.warning"), self.i18n.t("viewer.file_not_found"))
-            return
-        if getattr(self.transcription_manager, "translation_engine", None) is None:
-            self.show_warning(
+        enqueue_event_translation_task(
+            transcription_manager=self.transcription_manager,
+            settings_manager=self._get_settings_manager(),
+            event_id=event_id,
+            transcript_path=transcript_path,
+            logger=logger,
+            context_label="calendar transcript translation",
+            on_missing_transcript=lambda: self.show_warning(
+                self.i18n.t("common.warning"),
+                self.i18n.t("viewer.file_not_found"),
+            ),
+            on_translation_unavailable=lambda: self.show_warning(
                 self.i18n.t("common.warning"),
                 self.i18n.t("timeline.translation_not_available"),
-            )
-            return
-
-        source_lang = TRANSLATION_LANGUAGE_AUTO
-        target_lang = DEFAULT_TRANSLATION_TARGET_LANGUAGE
-        resolved_languages = resolve_translation_languages_from_settings(
-            self._get_settings_manager()
-        )
-        source_lang = resolved_languages.get(
-            "translation_source_lang", TRANSLATION_LANGUAGE_AUTO
-        )
-        target_lang = resolved_languages.get(
-            "translation_target_lang", DEFAULT_TRANSLATION_TARGET_LANGUAGE
-        )
-
-        output_suffix = Path(transcript_path).suffix.lower()
-        output_format = "md" if output_suffix == ".md" else "txt"
-        options = {
-            "event_id": event_id,
-            "translation_source_lang": source_lang,
-            "translation_target_lang": target_lang,
-            "output_format": output_format,
-        }
-
-        try:
-            self.transcription_manager.add_translation_task(transcript_path, options=options)
-            self.show_info(self.i18n.t("common.info"), self.i18n.t("timeline.translation_queued"))
-        except Exception as exc:  # noqa: BLE001
-            logger.error(
-                "Failed to queue calendar transcript translation for event %s: %s",
-                event_id,
-                exc,
-                exc_info=True,
-            )
-            self.show_error(
+            ),
+            on_queued=lambda: self.show_info(
+                self.i18n.t("common.info"),
+                self.i18n.t("timeline.translation_queued"),
+            ),
+            on_failed=lambda exc: self.show_error(
                 self.i18n.t("common.error"),
                 self.i18n.t("timeline.translation_failed", error=str(exc)),
-            )
+            ),
+        )
 
     def _on_secondary_transcribe_requested(
         self, event_id: str, recording_path: str, dialog_data: Optional[Dict[str, Any]] = None
@@ -1698,3 +1650,27 @@ class CalendarHubWidget(BaseWidget):
         }
 
         self.transcription_manager.add_task(recording_path, options=options)
+
+    def _on_view_recording(
+        self,
+        *,
+        file_path: str,
+        transcript_path: Optional[str] = None,
+        translation_path: Optional[str] = None,
+        parent_hint: Optional[QWidget] = None,
+    ) -> None:
+        """Open or focus recording playback dialog for calendar event artifacts."""
+        dialog_parent = parent_hint if parent_hint is not None else self
+        cache_key = file_path if parent_hint is None else f"{file_path}::{id(parent_hint)}"
+        open_or_activate_audio_player(
+            file_path=file_path,
+            i18n=self.i18n,
+            parent=dialog_parent,
+            dialog_cache=self._audio_player_dialogs,
+            logger=logger,
+            show_warning=self.show_warning,
+            show_error=self.show_error,
+            transcript_path=transcript_path,
+            translation_path=translation_path,
+            cache_key=cache_key,
+        )

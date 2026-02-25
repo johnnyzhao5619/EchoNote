@@ -11,7 +11,7 @@ from ui.constants import (
     AUDIO_PLAYER_HEADER_MAX_HEIGHT,
     AUDIO_PLAYER_TRANSCRIPT_MIN_HEIGHT,
 )
-from ui.timeline.audio_player import AudioPlayer
+from ui.common.audio_player import AudioPlayer
 
 pytestmark = pytest.mark.ui
 

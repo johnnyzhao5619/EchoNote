@@ -13,6 +13,8 @@ from PySide6.QtWidgets import QPushButton, QTextEdit
 from ui.calendar_hub.event_dialog import EventDialog
 from ui.calendar_hub.oauth_dialog import OAuthDialog
 from ui.constants import (
+    CALENDAR_EVENT_DIALOG_DEFAULT_HEIGHT,
+    CALENDAR_EVENT_DIALOG_MIN_HEIGHT,
     CALENDAR_EVENT_DESCRIPTION_MAX_HEIGHT,
     CALENDAR_OAUTH_INSTRUCTIONS_MAX_HEIGHT,
 )
@@ -23,6 +25,12 @@ pytestmark = pytest.mark.ui
 def test_event_dialog_description_height_uses_constant(qapp, mock_i18n):
     dialog = EventDialog(i18n=mock_i18n, connected_accounts={})
     assert dialog.description_input.maximumHeight() == CALENDAR_EVENT_DESCRIPTION_MAX_HEIGHT
+
+
+def test_event_dialog_height_uses_constants(qapp, mock_i18n):
+    dialog = EventDialog(i18n=mock_i18n, connected_accounts={})
+    assert dialog.minimumHeight() == CALENDAR_EVENT_DIALOG_MIN_HEIGHT
+    assert dialog.height() >= CALENDAR_EVENT_DIALOG_DEFAULT_HEIGHT
 
 
 def test_oauth_dialog_instruction_height_uses_constant(qapp, mock_i18n):
@@ -76,11 +84,13 @@ def test_event_dialog_shows_transcript_actions_for_edit_mode(qapp, mock_i18n):
         i18n=mock_i18n,
         connected_accounts={},
         event_data={"id": "evt-1", "title": "Demo Event"},
+        recording_path="/tmp/demo_recording.wav",
         transcript_path="/tmp/demo_transcript.txt",
         is_translation_available=True,
     )
 
     button_texts = {btn.text() for btn in dialog.findChildren(QPushButton)}
+    assert "timeline.play_recording" in button_texts
     assert "calendar_hub.event_dialog.view_transcript_translation" in button_texts
     assert "timeline.translate_transcript" in button_texts
 
@@ -90,11 +100,15 @@ def test_event_dialog_transcript_actions_emit_signals(qapp, mock_i18n):
         i18n=mock_i18n,
         connected_accounts={},
         event_data={"id": "evt-2", "title": "Demo Event"},
+        recording_path="/tmp/demo_recording.wav",
         transcript_path="/tmp/demo_transcript.txt",
         is_translation_available=True,
     )
 
-    received = {"view": 0, "translate": 0}
+    received = {"play": 0, "view": 0, "translate": 0}
+    dialog.view_recording_requested.connect(
+        lambda _requester, _path: received.__setitem__("play", received["play"] + 1)
+    )
     dialog.view_text_requested.connect(
         lambda _requester: received.__setitem__("view", received["view"] + 1)
     )
@@ -103,11 +117,14 @@ def test_event_dialog_transcript_actions_emit_signals(qapp, mock_i18n):
     )
 
     for btn in dialog.findChildren(QPushButton):
+        if btn.text() == "timeline.play_recording":
+            btn.click()
         if btn.text() == "calendar_hub.event_dialog.view_transcript_translation":
             btn.click()
         if btn.text() == "timeline.translate_transcript":
             btn.click()
 
+    assert received["play"] == 1
     assert received["view"] == 1
     assert received["translate"] == 1
 

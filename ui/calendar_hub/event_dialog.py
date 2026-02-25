@@ -20,21 +20,18 @@ Provides dialog for creating and editing calendar events.
 """
 
 import logging
-from datetime import datetime
 from typing import Any, Dict, Optional
 
 from core.qt_imports import (
     QCheckBox,
     QComboBox,
-    QDate,
     QDateTime,
     QDateTimeEdit,
     QDialog,
-    QFileDialog,
+    QFrame,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
-    QLabel,
     QLineEdit,
     QLocale,
     QMessageBox,
@@ -42,7 +39,6 @@ from core.qt_imports import (
     QScrollArea,
     Qt,
     QTextEdit,
-    QTime,
     QVBoxLayout,
     QWidget,
     Signal,
@@ -57,19 +53,21 @@ from ui.base_widgets import (
 )
 from ui.constants import (
     CALENDAR_EVENT_DESCRIPTION_MAX_HEIGHT,
+    CALENDAR_EVENT_DIALOG_DEFAULT_HEIGHT,
+    CALENDAR_EVENT_DIALOG_MIN_HEIGHT,
     CALENDAR_EVENT_DIALOG_MIN_WIDTH,
     PAGE_COMPACT_SPACING,
+    PAGE_LAYOUT_SPACING,
     ROLE_DIALOG_PRIMARY_ACTION,
     ROLE_DIALOG_SECONDARY_ACTION,
     ROLE_DANGER,
-    ROLE_EVENT_DESCRIPTION,
-    ROLE_EVENT_META,
+    ROLE_TIMELINE_RECORDING_ACTION,
     ROLE_TIMELINE_SECONDARY_TRANSCRIBE_ACTION,
     ROLE_TIMELINE_TRANSCRIPT_ACTION,
     ROLE_TIMELINE_TRANSLATION_ACTION,
 )
 from utils.i18n import I18nQtManager
-from utils.time_utils import to_local_datetime, to_utc_iso
+from utils.time_utils import to_local_datetime
 
 logger = logging.getLogger("echonote.ui.event_dialog")
 
@@ -83,6 +81,7 @@ class EventDialog(QDialog):
 
     secondary_transcribe_requested = Signal(object)
     view_text_requested = Signal(object)
+    view_recording_requested = Signal(object, str)
     translate_transcript_requested = Signal()
 
     def __init__(
@@ -94,6 +93,7 @@ class EventDialog(QDialog):
         allow_retranscribe: bool = False,
         is_past: bool = False,
         is_translation_available: bool = True,
+        recording_path: Optional[str] = None,
         transcript_path: Optional[str] = None,
         translation_path: Optional[str] = None,
     ):
@@ -116,6 +116,7 @@ class EventDialog(QDialog):
         self.allow_retranscribe = allow_retranscribe
         self.is_past = is_past
         self.is_translation_available = is_translation_available
+        self.recording_path = recording_path or ""
         self.transcript_path = transcript_path or ""
         self.translation_path = translation_path or ""
 
@@ -143,18 +144,40 @@ class EventDialog(QDialog):
         )
         self.setWindowTitle(title)
         self.setMinimumWidth(CALENDAR_EVENT_DIALOG_MIN_WIDTH)
+        self.setMinimumHeight(CALENDAR_EVENT_DIALOG_MIN_HEIGHT)
+        self.resize(CALENDAR_EVENT_DIALOG_MIN_WIDTH, CALENDAR_EVENT_DIALOG_DEFAULT_HEIGHT)
 
         # Main layout
         layout = QVBoxLayout(self)
+        layout.setSpacing(PAGE_LAYOUT_SPACING)
+
+        content_widget = QWidget(self)
+        content_layout = QVBoxLayout(content_widget)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(PAGE_LAYOUT_SPACING)
 
         # Create form
         form = self._create_form()
-        layout.addLayout(form)
+        content_layout.addLayout(form)
 
         # Create sync options (if accounts connected)
         if self.connected_accounts and not self.is_edit_mode:
             sync_group = self._create_sync_options()
-            layout.addWidget(sync_group)
+            content_layout.addWidget(sync_group)
+
+        artifact_actions = self._create_artifact_actions()
+        if artifact_actions is not None:
+            content_layout.addWidget(artifact_actions)
+
+        content_layout.addStretch()
+
+        content_scroll = QScrollArea(self)
+        content_scroll.setWidgetResizable(True)
+        content_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        content_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        content_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        content_scroll.setWidget(content_widget)
+        layout.addWidget(content_scroll, stretch=1)
 
         # Create buttons
         buttons = self._create_buttons()
@@ -299,6 +322,64 @@ class EventDialog(QDialog):
 
         return form
 
+    def _create_artifact_actions(self) -> Optional[QWidget]:
+        """Create edit-only artifact action rows to keep footer concise."""
+        if not self.is_edit_mode:
+            return None
+
+        action_buttons: list[QPushButton] = []
+
+        if self.recording_path:
+            play_recording_btn = create_button(self.i18n.t("timeline.play_recording"))
+            play_recording_btn.setProperty("role", ROLE_TIMELINE_RECORDING_ACTION)
+            connect_button_with_callback(play_recording_btn, self._on_view_recording_clicked)
+            action_buttons.append(play_recording_btn)
+
+        if self.allow_retranscribe:
+            retranscribe_btn = create_button(
+                self.i18n.t("timeline.secondary_transcribe", default="Secondary Transcription (HQ)")
+            )
+            retranscribe_btn.setProperty("role", ROLE_TIMELINE_SECONDARY_TRANSCRIBE_ACTION)
+            connect_button_with_callback(retranscribe_btn, self._on_secondary_transcribe_clicked)
+            action_buttons.append(retranscribe_btn)
+
+        if self.transcript_path or self.translation_path:
+            view_text_btn = create_button(
+                self.i18n.t(
+                    "calendar_hub.event_dialog.view_transcript_translation",
+                    default="View Transcript/Translation",
+                )
+            )
+            view_text_btn.setProperty("role", ROLE_TIMELINE_TRANSCRIPT_ACTION)
+            connect_button_with_callback(view_text_btn, self._on_view_text_clicked)
+            action_buttons.append(view_text_btn)
+
+        if self.transcript_path and self.is_translation_available:
+            translate_btn = create_button(
+                self.i18n.t("timeline.translate_transcript", default="Translate Transcript")
+            )
+            translate_btn.setProperty("role", ROLE_TIMELINE_TRANSLATION_ACTION)
+            connect_button_with_callback(translate_btn, self._on_translate_transcript_clicked)
+            action_buttons.append(translate_btn)
+
+        if not action_buttons:
+            return None
+
+        container = QWidget(self)
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(PAGE_COMPACT_SPACING)
+
+        row_size = 3
+        for start in range(0, len(action_buttons), row_size):
+            row = create_hbox(spacing=PAGE_COMPACT_SPACING)
+            for button in action_buttons[start : start + row_size]:
+                row.addWidget(button)
+            row.addStretch()
+            layout.addLayout(row)
+
+        return container
+
     def _on_translation_toggled(self, state: int):
         """Handle translation checkbox toggle."""
         is_enabled = bool(state)
@@ -344,43 +425,6 @@ class EventDialog(QDialog):
             delete_btn.setProperty("role", ROLE_DANGER)
             connect_button_with_callback(delete_btn, self._on_delete_clicked)
             buttons_layout.addWidget(delete_btn)
-
-            # Check if we should show secondary transcription button
-            if self.allow_retranscribe:
-                retranscribe_btn = create_button(
-                    self.i18n.t(
-                        "timeline.secondary_transcribe", default="Secondary Transcription (HQ)"
-                    )
-                )
-                retranscribe_btn.setProperty("role", ROLE_TIMELINE_SECONDARY_TRANSCRIBE_ACTION)
-                connect_button_with_callback(
-                    retranscribe_btn, self._on_secondary_transcribe_clicked
-                )
-                buttons_layout.addWidget(retranscribe_btn)
-
-            if self.transcript_path or self.translation_path:
-                view_text_btn = create_button(
-                    self.i18n.t(
-                        "calendar_hub.event_dialog.view_transcript_translation",
-                        default="View Transcript/Translation",
-                    )
-                )
-                view_text_btn.setProperty("role", ROLE_TIMELINE_TRANSCRIPT_ACTION)
-                connect_button_with_callback(view_text_btn, self._on_view_text_clicked)
-                buttons_layout.addWidget(view_text_btn)
-
-                if self.transcript_path and self.is_translation_available:
-                    translate_btn = create_button(
-                        self.i18n.t(
-                            "timeline.translate_transcript",
-                            default="Translate Transcript",
-                        )
-                    )
-                    translate_btn.setProperty("role", ROLE_TIMELINE_TRANSLATION_ACTION)
-                    connect_button_with_callback(
-                        translate_btn, self._on_translate_transcript_clicked
-                    )
-                    buttons_layout.addWidget(translate_btn)
 
         buttons_layout.addStretch()
 
@@ -502,6 +546,11 @@ class EventDialog(QDialog):
         """Open transcript/translation viewer without leaving dialog."""
         self.view_text_requested.emit(self)
 
+    def _on_view_recording_clicked(self):
+        """Open recording player without leaving dialog."""
+        if self.recording_path:
+            self.view_recording_requested.emit(self, self.recording_path)
+
     def _on_translate_transcript_clicked(self):
         """Request transcript translation for current event."""
         self.translate_transcript_requested.emit()
@@ -619,8 +668,6 @@ class EventDialog(QDialog):
             title: Dialog title
             message: Warning message
         """
-        from core.qt_imports import QMessageBox
-
         msg_box = QMessageBox(self)
         msg_box.setIcon(QMessageBox.Icon.Warning)
         msg_box.setWindowTitle(title)

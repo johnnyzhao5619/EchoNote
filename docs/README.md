@@ -35,6 +35,7 @@ For contributors and developers:
 - **[Contributing Guide](CONTRIBUTING.md)** - How to contribute to the project
 - **[CI/CD Guide](CI_CD_GUIDE.md)** - Continuous integration and deployment
 - Settings architecture note: translation defaults are managed in `ui/settings/translation_page.py`, while realtime recording controls remain in `ui/settings/realtime_page.py`.
+- Shared playback architecture note: reusable audio playback lives in `ui/common/audio_player.py` and is opened via `ui/common/audio_player_launcher.py`.
 
 ---
 
@@ -124,4 +125,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 ---
 
 **Last Updated**: February 17, 2026  
-**Version**: v1.4.3
+**Version**: v1.4.4

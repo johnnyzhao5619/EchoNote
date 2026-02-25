@@ -115,7 +115,8 @@ _PRESET_MODELS: List[Tuple[str, str, str, str, str, int]] = [
     ("opus-mt-zh-en", "zh", "en", "中文 → English", "Helsinki-NLP/opus-mt-zh-en", 312),
     ("opus-mt-en-zh", "en", "zh", "English → 中文", "Helsinki-NLP/opus-mt-en-zh", 312),
     ("opus-mt-ja-en", "ja", "en", "日本語 → English", "Helsinki-NLP/opus-mt-ja-en", 312),
-    ("opus-mt-en-ja", "en", "ja", "English → 日本語", "Helsinki-NLP/opus-mt-en-ja", 312),
+    # Note: Helsinki-NLP uses `jap` (not `ja`) in this repo id.
+    ("opus-mt-en-ja", "en", "ja", "English → 日本語", "Helsinki-NLP/opus-mt-en-jap", 312),
     ("opus-mt-ko-en", "ko", "en", "한국어 → English", "Helsinki-NLP/opus-mt-ko-en", 312),
     ("opus-mt-en-ko", "en", "ko", "English → 한국어", "Helsinki-NLP/opus-mt-en-ko", 312),
     ("opus-mt-fr-en", "fr", "en", "Français → English", "Helsinki-NLP/opus-mt-fr-en", 300),

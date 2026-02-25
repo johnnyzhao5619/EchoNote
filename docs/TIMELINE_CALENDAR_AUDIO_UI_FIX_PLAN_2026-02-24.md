@@ -7,7 +7,7 @@
 ## 已完成审查范围（改前全量阅读）
 - 时间线：`ui/timeline/event_card.py`、`ui/timeline/widget.py`、`ui/base_widgets.py`
 - 查看器：`ui/common/transcript_translation_viewer.py`、`ui/timeline/transcript_viewer.py`
-- 音频播放：`ui/timeline/audio_player.py`
+- 音频播放：`ui/common/audio_player.py`
 - 日历中心：`ui/calendar_hub/widget.py`、`ui/calendar_hub/event_dialog.py`、`ui/calendar_hub/calendar_view.py`
 - 主题契约：`resources/themes/theme_outline.json`、`tests/unit/test_theme_outline_contract.py`、`ui/common/theme.py`、`docs/THEME_OUTLINE_GUIDE.md`
 - 文案：`resources/translations/zh_CN.json`、`resources/translations/en_US.json`

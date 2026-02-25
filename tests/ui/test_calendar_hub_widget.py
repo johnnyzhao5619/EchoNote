@@ -72,3 +72,81 @@ def test_calendar_hub_edit_dialog_delete_routes_to_delete_handler(qapp, mock_i18
         widget._show_event_dialog(event)
 
     mock_delete_event.assert_called_once_with("event-123")
+
+
+def test_calendar_hub_edit_dialog_prefills_translation_auto_task(qapp, mock_i18n):
+    calendar_manager = MagicMock()
+    calendar_manager.get_events.return_value = []
+    calendar_manager.db = MagicMock()
+    oauth_manager = MagicMock()
+    transcription_manager = MagicMock()
+    transcription_manager.translation_engine = object()
+
+    event = SimpleNamespace(
+        id="event-translation",
+        title="Test Event",
+        event_type="event",
+        start_time="2026-02-19T10:00:00",
+        end_time="2026-02-19T11:00:00",
+        location=None,
+        attendees=[],
+        description=None,
+        reminder_minutes=None,
+    )
+
+    with patch.object(CalendarHubWidget, "_load_connected_accounts", return_value=None):
+        widget = CalendarHubWidget(
+            calendar_manager,
+            oauth_manager,
+            mock_i18n,
+            transcription_manager=transcription_manager,
+        )
+
+    captured = {}
+
+    class _CaptureDialog:
+        def __init__(self, *args, **_kwargs):
+            captured["event_data"] = args[2] if len(args) > 2 else None
+
+        def exec(self):
+            return QDialog.DialogCode.Rejected
+
+    mock_config = SimpleNamespace(
+        enable_transcription=True,
+        enable_translation=True,
+        translation_target_language="fr",
+    )
+
+    with (
+        patch("data.database.models.AutoTaskConfig.get_by_event_id", return_value=mock_config),
+        patch("data.database.models.EventAttachment.get_by_event_id", return_value=[]),
+        patch("ui.calendar_hub.event_dialog.EventDialog", _CaptureDialog),
+    ):
+        widget._show_event_dialog(event)
+
+    assert captured["event_data"]["auto_transcribe"] is True
+    assert captured["event_data"]["enable_translation"] is True
+    assert captured["event_data"]["translation_target_lang"] == "fr"
+
+
+def test_calendar_hub_view_recording_prefers_requester_as_dialog_parent(qapp, mock_i18n):
+    calendar_manager = MagicMock()
+    calendar_manager.get_events.return_value = []
+    oauth_manager = MagicMock()
+
+    with patch.object(CalendarHubWidget, "_load_connected_accounts", return_value=None):
+        widget = CalendarHubWidget(calendar_manager, oauth_manager, mock_i18n)
+
+    requester = QDialog()
+    with patch("ui.calendar_hub.widget.open_or_activate_audio_player") as mock_open_audio:
+        widget._on_view_recording(
+            file_path="/tmp/demo_recording.wav",
+            transcript_path="/tmp/demo_transcript.txt",
+            translation_path="/tmp/demo_translation.txt",
+            parent_hint=requester,
+        )
+
+    mock_open_audio.assert_called_once()
+    kwargs = mock_open_audio.call_args.kwargs
+    assert kwargs["parent"] is requester
+    assert kwargs["cache_key"].startswith("/tmp/demo_recording.wav::")

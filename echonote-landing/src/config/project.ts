@@ -4,7 +4,7 @@ import type { ProjectConfig } from '../types'
 const GITHUB_OWNER = 'johnnyzhao5619'
 const GITHUB_REPO = 'EchoNote'
 const PROJECT_NAME = 'EchoNote'
-const PROJECT_RELEASE_TAG = 'v1.4.3'
+const PROJECT_RELEASE_TAG = 'v1.4.4'
 const BASE_URL = `https://${GITHUB_OWNER}.github.io/${GITHUB_REPO}`
 const GITHUB_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`
 const DOCS_URL = `${GITHUB_URL}/tree/main/docs`

@@ -4,6 +4,15 @@ All notable changes to EchoNote will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.4.4] - 2026-02-25
+
+### Changed
+
+- Released `v1.4.4` with calendar/timeline event dialog and playback workflow refinements: shared audio player ownership moved to `ui/common`, launcher/cache activation behavior unified, and dialog foreground interaction made consistent.
+- Fixed future-event/edit-event translation option persistence path and completed shared translation enqueue flow to remove duplicated logic between Timeline and Calendar Hub.
+- Added regression coverage for shared dialog launchers and translation task option helpers; synchronized project, packaging, documentation, and landing metadata version references to `v1.4.4`.
+
 ## [1.4.3] - 2026-02-25
 
 ### Changed
@@ -12,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refined translation defaults and override logic: settings defaults are used when page-level values are unset, while explicit values on batch/realtime pages take precedence.
 - Improved settings information architecture and visual density by reducing redundant cross-links and clarifying module boundaries for transcription, realtime recording, and translation.
 - Fixed language selection option hygiene by removing non-product placeholder entries and keeping only valid locale choices.
+- Refactored reusable audio playback ownership: moved audio player implementation to `ui/common/audio_player.py` and unified launcher import path to remove timeline/common layering duplication.
 - Synchronized project, packaging, documentation, and landing metadata version references to `v1.4.3` for release consistency.
 
 ## [1.4.2] - 2026-02-24

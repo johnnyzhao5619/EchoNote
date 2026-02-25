@@ -34,9 +34,9 @@
   - `engines/translation/`：翻译引擎。
 - `ui/`：桌面端界面层（PySide6）。
   - `ui/realtime_record/`：实时录音页面与浮动窗。
-  - `ui/timeline/`：时间线与音频播放器（`audio_player.py`）。
+  - `ui/timeline/`：时间线页面与事件卡片（`widget.py`、`event_card.py`、`transcript_viewer.py`）。
   - `ui/settings/`：设置页面（含 `translation_page.py` 独立翻译默认设置页）。
-  - `ui/common/`：通用组件。
+  - `ui/common/`：通用组件（含音频播放器 `audio_player.py` 与启动器 `audio_player_launcher.py`）。
   - `ui/constants.py`：UI尺寸、角色常量与密度基线。
 - `resources/`：主题与国际化资源。
   - `resources/themes/light.qss`、`resources/themes/dark.qss`：主题样式。
@@ -53,7 +53,7 @@
 ## 常用定位建议
 
 - 查“实时录音/浮动窗”：优先看 `ui/realtime_record/` + `core/realtime/` + `resources/themes/*qss`。
-- 查“时间线音频播放”：优先看 `ui/timeline/audio_player.py` + 相关 `ui/common/` 组件。
+- 查“时间线音频播放”：优先看 `ui/common/audio_player.py` + `ui/common/audio_player_launcher.py` + `ui/timeline/widget.py`。
 - 查“主题覆盖缺失”：先对照 `ui/constants.py` 的 role，再查双主题与 `theme_outline.json`。
 - 查“版本发布遗漏”：先看 `config/__version__.py`，再按发布清单同步其他文件。
 
@@ -64,7 +64,7 @@
 - 主题契约与角色覆盖：`resources/themes/theme_outline.json`、`tests/unit/test_theme_outline_contract.py`、`ui/constants.py`
 - 实时录音偏好设置：`core/settings/manager.py`、`ui/settings/realtime_page.py`、`config/default_config.json`
 - 翻译默认设置：`ui/settings/translation_page.py`、`core/settings/manager.py`、`config/default_config.json`
-- 时间线音频播放器：`ui/timeline/audio_player.py`、`ui/timeline/transcript_viewer.py`、`tests/ui/test_timeline_audio_player.py`
+- 时间线音频播放器：`ui/common/audio_player.py`、`ui/common/audio_player_launcher.py`、`ui/timeline/transcript_viewer.py`、`tests/ui/test_timeline_audio_player.py`
 - 翻译引擎接入：`utils/app_initializer.py`、`engines/translation/`、`core/realtime/recorder.py`
 - 版本号与发布：`config/__version__.py`、`CHANGELOG.md`、`scripts/build_config.py`、`pyproject.toml`
 
