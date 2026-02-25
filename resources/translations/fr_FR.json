@@ -364,15 +364,15 @@
     "delete": {
       "confirm_title": "Supprimer l'événement",
       "confirm_message": "Vous allez supprimer : {title}",
-      "confirm_hint": "La suppression retire l'événement et ses pièces jointes (enregistrement/transcription). Vous pouvez exporter avant suppression.",
-      "export_then_delete": "Exporter puis supprimer",
-      "delete_now": "Supprimer seulement",
+      "confirm_hint": "Choisissez la portée :\n- Supprimer seulement l'événement (conserver les fichiers)\n- Supprimer l'événement et les fichiers\nVous pouvez aussi exporter puis tout supprimer.",
+      "export_then_delete": "Exporter puis tout supprimer",
+      "delete_now": "Supprimer l'événement",
       "second_confirm_title": "Deuxième confirmation",
       "second_confirm_message": "Veuillez confirmer à nouveau la suppression de \"{title}\".\\n\\nCette action est irréversible.",
       "export_dialog_title": "Exporter l'événement",
       "export_file_filter": "Fichiers JSON (*.json)",
-      "delete_event_only": "Delete Event Only (Keep Attachments)",
-      "delete_with_artifacts": "Delete Event + Attachments"
+      "delete_event_only": "Supprimer l'événement (garder les fichiers)",
+      "delete_with_artifacts": "Supprimer événement + fichiers"
     },
     "warning": {
       "sync_failed": "Échec de synchronisation du calendrier : {error}"

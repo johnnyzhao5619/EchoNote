@@ -95,3 +95,38 @@ def test_future_cards_insert_farthest_first(widget):
         card.calendar_event.id for card in widget.event_cards if hasattr(card, "calendar_event")
     ]
     assert ordered_ids[:2] == ["far", "near"]
+
+
+def test_translate_transcript_prompts_language_before_queue(widget):
+    """Manual timeline translation should prompt language pair and queue with overrides."""
+    selected_languages = {
+        "translation_source_lang": "fr",
+        "translation_target_lang": "zh",
+    }
+    with (
+        patch(
+            "ui.timeline.widget.prompt_event_translation_languages",
+            return_value=selected_languages,
+        ) as mock_prompt,
+        patch("ui.timeline.widget.enqueue_event_translation_task", return_value=True) as mock_enqueue,
+    ):
+        widget._on_translate_transcript_requested("evt-1", "/tmp/transcript.txt")
+
+    mock_prompt.assert_called_once()
+    enqueue_kwargs = mock_enqueue.call_args.kwargs
+    assert enqueue_kwargs["translation_source_lang"] == "fr"
+    assert enqueue_kwargs["translation_target_lang"] == "zh"
+
+
+def test_translate_transcript_prompt_cancelled_skips_queue(widget):
+    """Cancelling language prompt should not enqueue translation task."""
+    with (
+        patch(
+            "ui.timeline.widget.prompt_event_translation_languages",
+            return_value=None,
+        ),
+        patch("ui.timeline.widget.enqueue_event_translation_task") as mock_enqueue,
+    ):
+        widget._on_translate_transcript_requested("evt-1", "/tmp/transcript.txt")
+
+    mock_enqueue.assert_not_called()

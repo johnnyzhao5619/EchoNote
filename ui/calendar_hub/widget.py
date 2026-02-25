@@ -58,7 +58,10 @@ from ui.common.text_viewer_launcher import (
     open_or_activate_text_viewer,
     resolve_text_viewer_initial_mode,
 )
-from ui.common.translation_task_options import enqueue_event_translation_task
+from ui.common.translation_task_options import (
+    enqueue_event_translation_task,
+    prompt_event_translation_languages,
+)
 from ui.constants import (
     CALENDAR_ADD_ACCOUNT_DIALOG_MIN_WIDTH,
     NAV_SYMBOL_NEXT,
@@ -1579,9 +1582,18 @@ class CalendarHubWidget(BaseWidget):
 
     def _on_translate_transcript_requested(self, *, event_id: str, transcript_path: str) -> None:
         """Queue transcript translation task and persist result into event attachments."""
+        settings_manager = self._get_settings_manager()
+        selected_languages = prompt_event_translation_languages(
+            parent=self,
+            i18n=self.i18n,
+            settings_manager=settings_manager,
+        )
+        if selected_languages is None:
+            return
+
         enqueue_event_translation_task(
             transcription_manager=self.transcription_manager,
-            settings_manager=self._get_settings_manager(),
+            settings_manager=settings_manager,
             event_id=event_id,
             transcript_path=transcript_path,
             logger=logger,
@@ -1602,6 +1614,8 @@ class CalendarHubWidget(BaseWidget):
                 self.i18n.t("common.error"),
                 self.i18n.t("timeline.translation_failed", error=str(exc)),
             ),
+            translation_source_lang=selected_languages.get("translation_source_lang"),
+            translation_target_lang=selected_languages.get("translation_target_lang"),
         )
 
     def _on_secondary_transcribe_requested(

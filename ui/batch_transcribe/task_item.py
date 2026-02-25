@@ -388,6 +388,11 @@ class TaskItem(BaseWidget):
         elif status == "failed":
             self.retry_btn.setVisible(True)
             self.delete_btn.setVisible(True)
+        elif status == "cancelled":
+            self.delete_btn.setVisible(True)
+        else:
+            # Unknown terminal states should still allow cleanup from UI.
+            self.delete_btn.setVisible(True)
 
     def set_processing_paused(self, paused: bool):
         """Update pause/resume state for processing tasks."""

@@ -33,3 +33,11 @@ def test_task_item_partial_update_preserves_filename(qapp, mock_i18n):
 
     assert widget.task_data.get("file_name") == "demo.wav"
     assert widget.filename_label.text() == "demo.wav"
+
+
+def test_task_item_cancelled_state_keeps_delete_entry(qapp, mock_i18n):
+    """Cancelled tasks should still expose delete action for cleanup."""
+    task = {"id": "task-cancelled", "file_name": "demo.wav", "status": "cancelled"}
+    widget = TaskItem(task_data=task, i18n=mock_i18n)
+
+    assert not widget.delete_btn.isHidden()

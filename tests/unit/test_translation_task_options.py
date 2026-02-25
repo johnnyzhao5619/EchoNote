@@ -20,6 +20,19 @@ def test_build_event_translation_task_options_uses_markdown_output_for_md_file()
     assert options["output_format"] == "md"
 
 
+def test_build_event_translation_task_options_accepts_language_overrides():
+    options = build_event_translation_task_options(
+        settings_manager=None,
+        event_id="evt-2",
+        transcript_path="/tmp/transcript.txt",
+        source_lang="fr",
+        target_lang="zh",
+    )
+
+    assert options["translation_source_lang"] == "fr"
+    assert options["translation_target_lang"] == "zh"
+
+
 def test_enqueue_event_translation_task_returns_false_when_manager_missing():
     queued = enqueue_event_translation_task(
         transcription_manager=None,
@@ -119,3 +132,24 @@ def test_enqueue_event_translation_task_invokes_failure_callback_when_submit_fai
     on_failed.assert_called_once()
     assert isinstance(on_failed.call_args.args[0], RuntimeError)
     logger.error.assert_called_once()
+
+
+def test_enqueue_event_translation_task_uses_explicit_language_overrides():
+    transcription_manager = Mock()
+    transcription_manager.translation_engine = object()
+
+    queued = enqueue_event_translation_task(
+        transcription_manager=transcription_manager,
+        settings_manager=None,
+        event_id="evt-1",
+        transcript_path="/tmp/transcript.txt",
+        logger=Mock(),
+        context_label="timeline transcript translation",
+        translation_source_lang="en",
+        translation_target_lang="fr",
+    )
+
+    assert queued is True
+    _, kwargs = transcription_manager.add_translation_task.call_args
+    assert kwargs["options"]["translation_source_lang"] == "en"
+    assert kwargs["options"]["translation_target_lang"] == "fr"

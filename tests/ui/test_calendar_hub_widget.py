@@ -150,3 +150,66 @@ def test_calendar_hub_view_recording_prefers_requester_as_dialog_parent(qapp, mo
     kwargs = mock_open_audio.call_args.kwargs
     assert kwargs["parent"] is requester
     assert kwargs["cache_key"].startswith("/tmp/demo_recording.wav::")
+
+
+def test_calendar_hub_translate_transcript_prompts_language_before_queue(qapp, mock_i18n):
+    calendar_manager = MagicMock()
+    calendar_manager.get_events.return_value = []
+    oauth_manager = MagicMock()
+
+    with patch.object(CalendarHubWidget, "_load_connected_accounts", return_value=None):
+        widget = CalendarHubWidget(
+            calendar_manager,
+            oauth_manager,
+            mock_i18n,
+            transcription_manager=MagicMock(),
+        )
+
+    selected_languages = {
+        "translation_source_lang": "en",
+        "translation_target_lang": "fr",
+    }
+    with (
+        patch(
+            "ui.calendar_hub.widget.prompt_event_translation_languages",
+            return_value=selected_languages,
+        ) as mock_prompt,
+        patch("ui.calendar_hub.widget.enqueue_event_translation_task", return_value=True) as mock_enqueue,
+    ):
+        widget._on_translate_transcript_requested(
+            event_id="event-1",
+            transcript_path="/tmp/transcript.txt",
+        )
+
+    mock_prompt.assert_called_once()
+    enqueue_kwargs = mock_enqueue.call_args.kwargs
+    assert enqueue_kwargs["translation_source_lang"] == "en"
+    assert enqueue_kwargs["translation_target_lang"] == "fr"
+
+
+def test_calendar_hub_translate_transcript_prompt_cancelled_skips_queue(qapp, mock_i18n):
+    calendar_manager = MagicMock()
+    calendar_manager.get_events.return_value = []
+    oauth_manager = MagicMock()
+
+    with patch.object(CalendarHubWidget, "_load_connected_accounts", return_value=None):
+        widget = CalendarHubWidget(
+            calendar_manager,
+            oauth_manager,
+            mock_i18n,
+            transcription_manager=MagicMock(),
+        )
+
+    with (
+        patch(
+            "ui.calendar_hub.widget.prompt_event_translation_languages",
+            return_value=None,
+        ),
+        patch("ui.calendar_hub.widget.enqueue_event_translation_task") as mock_enqueue,
+    ):
+        widget._on_translate_transcript_requested(
+            event_id="event-1",
+            transcript_path="/tmp/transcript.txt",
+        )
+
+    mock_enqueue.assert_not_called()

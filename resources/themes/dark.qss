@@ -2866,36 +2866,37 @@ QPushButton[role="audio-player-control"]:disabled {
 }
 
 QSlider[role="audio-player-progress"] {
-    min-height: 22px;
+    min-height: 18px;
+    max-height: 20px;
 }
 
 QSlider[role="audio-player-progress"]::groove:horizontal {
     background: #3a3a3a;
-    height: 4px;
+    height: 5px;
     border-radius: 2px;
     border: none;
 }
 
 QSlider[role="audio-player-progress"]::handle:horizontal {
     background: #2196F3;
-    width: 14px;
-    height: 14px;
-    margin: -5px 0;
-    border-radius: 7px;
+    width: 12px;
+    height: 12px;
+    margin: -4px 0;
+    border-radius: 6px;
 }
 
 QSlider[role="audio-player-progress"]::handle:horizontal:hover {
     background: #64b5f6;
-    width: 16px;
-    height: 16px;
-    margin: -6px 0;
+    width: 14px;
+    height: 14px;
+    margin: -5px 0;
 }
 
 QSlider[role="audio-player-progress"]::handle:horizontal:pressed {
     background: #90caf9;
-    width: 16px;
-    height: 16px;
-    margin: -6px 0;
+    width: 14px;
+    height: 14px;
+    margin: -5px 0;
     border: none;
 }
 
@@ -2962,6 +2963,18 @@ QSlider[role="audio-player-volume"]::sub-page:horizontal {
 QSlider[role="audio-player-volume"]::add-page:horizontal {
     background: #3a3a3a;
     border-radius: 1px;
+}
+
+QSlider[role="audio-player-volume"]:disabled::groove:horizontal {
+    background: #292827;
+}
+
+QSlider[role="audio-player-volume"]:disabled::handle:horizontal {
+    background: #545454;
+}
+
+QSlider[role="audio-player-volume"]:disabled::sub-page:horizontal {
+    background: #6b7f95;
 }
 
 QProgressBar {

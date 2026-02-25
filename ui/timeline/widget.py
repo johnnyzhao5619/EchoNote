@@ -54,7 +54,10 @@ from ui.common.text_viewer_launcher import (
     open_or_activate_text_viewer,
     resolve_text_viewer_initial_mode,
 )
-from ui.common.translation_task_options import enqueue_event_translation_task
+from ui.common.translation_task_options import (
+    enqueue_event_translation_task,
+    prompt_event_translation_languages,
+)
 from ui.constants import (
     PAGE_COMPACT_SPACING,
     PAGE_LAYOUT_SPACING,
@@ -979,6 +982,14 @@ class TimelineWidget(BaseWidget):
 
     def _on_translate_transcript_requested(self, event_id: str, transcript_path: str):
         """Queue transcript translation task and persist translation attachment for event."""
+        selected_languages = prompt_event_translation_languages(
+            parent=self,
+            i18n=self.i18n,
+            settings_manager=self.settings_manager,
+        )
+        if selected_languages is None:
+            return
+
         def _on_queued() -> None:
             self._update_shell_message(self.i18n.t("timeline.translation_queued"))
             QTimer.singleShot(5000, lambda: self._update_shell_message(""))
@@ -1000,6 +1011,8 @@ class TimelineWidget(BaseWidget):
                 self.i18n.t("common.error"),
                 self.i18n.t("timeline.translation_failed", error=str(exc)),
             ),
+            translation_source_lang=selected_languages.get("translation_source_lang"),
+            translation_target_lang=selected_languages.get("translation_target_lang"),
         )
 
     def _update_shell_message(self, message: str) -> None:

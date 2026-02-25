@@ -5,6 +5,17 @@ All notable changes to EchoNote will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.8] - 2026-02-25
+
+### Changed
+
+- Released `v1.4.8` with batch/calendar/timeline/audio player UX and maintainability refinements.
+- Fixed batch translation task cleanup by restoring delete entry visibility for cancelled tasks.
+- Added runtime language selection prompt for manual "Translate Transcript" in both Calendar Hub and Timeline, with defaults prefilled from translation settings.
+- Improved calendar event delete confirmation readability across zh/en/fr by shortening action copy and enforcing non-truncated action-button layout.
+- Polished audio player UI density and behavior: refined progress/volume slider styling coverage for both themes, lowered collapsed initial height, and applied explicit expanded/collapsed dialog height transitions when toggling the text panel.
+- Synchronized project, packaging, documentation, and landing metadata version references to `v1.4.8`.
+
 ## [1.4.7] - 2026-02-25
 
 ### Changed

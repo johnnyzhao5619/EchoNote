@@ -27,6 +27,12 @@ from typing import Any, Callable, Optional
 from core.calendar.exceptions import SyncError
 from data.database.models import EventAttachment
 from core.qt_imports import QFileDialog, QMessageBox
+from ui.constants import (
+    CALENDAR_DELETE_ACTION_BUTTON_MIN_WIDTH,
+    CALENDAR_DELETE_DIALOG_MIN_WIDTH,
+    ROLE_DANGER,
+    ROLE_DIALOG_SECONDARY_ACTION,
+)
 
 logger = logging.getLogger("echonote.ui.calendar_event_actions")
 
@@ -143,6 +149,8 @@ def _export_event_snapshot(
 def _choose_delete_action(parent: Any, i18n: Any, event: Any) -> str:
     dialog = QMessageBox(parent)
     dialog.setIcon(QMessageBox.Icon.Warning)
+    dialog.setOption(QMessageBox.Option.DontUseNativeDialog, True)
+    dialog.setMinimumWidth(CALENDAR_DELETE_DIALOG_MIN_WIDTH)
     dialog.setWindowTitle(i18n.t("calendar.delete.confirm_title"))
     dialog.setText(i18n.t("calendar.delete.confirm_message", title=getattr(event, "title", "")))
     dialog.setInformativeText(i18n.t("calendar.delete.confirm_hint"))
@@ -160,7 +168,18 @@ def _choose_delete_action(parent: Any, i18n: Any, event: Any) -> str:
         QMessageBox.ButtonRole.DestructiveRole,
     )
     cancel_btn = dialog.addButton(i18n.t("common.cancel"), QMessageBox.ButtonRole.RejectRole)
+    button_role_map = {
+        export_btn: ROLE_DIALOG_SECONDARY_ACTION,
+        delete_event_only_btn: ROLE_DIALOG_SECONDARY_ACTION,
+        delete_with_artifacts_btn: ROLE_DANGER,
+        cancel_btn: ROLE_DIALOG_SECONDARY_ACTION,
+    }
+    for button, role in button_role_map.items():
+        button.setProperty("role", role)
+        text_width = button.fontMetrics().horizontalAdvance(button.text())
+        button.setMinimumWidth(max(CALENDAR_DELETE_ACTION_BUTTON_MIN_WIDTH, text_width + 36))
     dialog.setDefaultButton(cancel_btn)
+    dialog.setEscapeButton(cancel_btn)
 
     dialog.exec()
     clicked = dialog.clickedButton()

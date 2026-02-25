@@ -4,9 +4,11 @@
 from unittest.mock import Mock
 
 import pytest
-from PySide6.QtWidgets import QSizePolicy
+from PySide6.QtWidgets import QDialog, QSizePolicy, QVBoxLayout
 
 from ui.constants import (
+    AUDIO_PLAYER_DIALOG_DEFAULT_HEIGHT,
+    AUDIO_PLAYER_DIALOG_EXPANDED_MIN_HEIGHT,
     AUDIO_PLAYER_CONTROL_BAR_MAX_HEIGHT,
     AUDIO_PLAYER_HEADER_MAX_HEIGHT,
     AUDIO_PLAYER_TRANSCRIPT_MIN_HEIGHT,
@@ -135,4 +137,24 @@ def test_audio_player_default_layout_centers_chrome_when_transcript_hidden(qapp,
     assert not player.bottom_fill.isHidden()
     assert player.transcript_area.isHidden()
     assert player.transcript_divider.isHidden()
+    player.cleanup()
+
+
+def test_audio_player_layout_mode_resizes_parent_dialog(qapp, mock_i18n):
+    dialog = QDialog()
+    dialog.resize(640, AUDIO_PLAYER_DIALOG_DEFAULT_HEIGHT)
+    layout = QVBoxLayout(dialog)
+
+    player = AudioPlayer(
+        "/tmp/nonexistent.mp3",
+        mock_i18n,
+        auto_load=False,
+    )
+    layout.addWidget(player)
+
+    player._resize_dialog_for_layout_mode(show_transcript=True)
+    assert dialog.height() >= AUDIO_PLAYER_DIALOG_EXPANDED_MIN_HEIGHT
+
+    player._resize_dialog_for_layout_mode(show_transcript=False)
+    assert dialog.height() == AUDIO_PLAYER_DIALOG_DEFAULT_HEIGHT
     player.cleanup()

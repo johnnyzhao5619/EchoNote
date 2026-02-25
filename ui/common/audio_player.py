@@ -220,8 +220,9 @@ class AudioPlayer(BaseWidget):
         surface_layout.setSpacing(AUDIO_PLAYER_CONTENT_SPACING * 2)
 
         self.top_fill = QWidget()
-        self.top_fill.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
-        surface_layout.addWidget(self.top_fill, stretch=1)
+        self.top_fill.setFixedHeight(0)
+        self.top_fill.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        surface_layout.addWidget(self.top_fill, stretch=0)
 
         # 主信息 + 控制区域（媒体主轴）
         self.chrome_container = QWidget()
@@ -260,8 +261,9 @@ class AudioPlayer(BaseWidget):
         surface_layout.addWidget(self.chrome_container, stretch=0)
 
         self.bottom_fill = QWidget()
-        self.bottom_fill.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
-        surface_layout.addWidget(self.bottom_fill, stretch=1)
+        self.bottom_fill.setFixedHeight(0)
+        self.bottom_fill.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        surface_layout.addWidget(self.bottom_fill, stretch=0)
 
         # 文本面板下沉到底部折叠区，避免顶部信息堆叠
         self.transcript_divider = QFrame()
@@ -500,11 +502,11 @@ class AudioPlayer(BaseWidget):
         new_visible = not is_visible
 
         self._apply_layout_mode(show_transcript=new_visible)
+        self._resize_dialog_for_layout_mode(show_transcript=new_visible)
         self._sync_transcript_toggle_tooltip()
 
         self._update_format_toggle_visibility()
         if new_visible:
-            self._ensure_dialog_height_for_transcript()
             self._sync_transcript_with_playback(self.player.position())
 
     def _apply_layout_mode(self, *, show_transcript: bool) -> None:
@@ -525,15 +527,21 @@ class AudioPlayer(BaseWidget):
         )
         self.show_transcript_button.setToolTip(self.i18n.t(tooltip_key))
 
-    def _ensure_dialog_height_for_transcript(self) -> None:
-        """Grow dialog to avoid cramped overlay when transcript panel opens."""
+    def _resize_dialog_for_layout_mode(self, *, show_transcript: bool) -> None:
+        """Resize dialog to match collapsed/expanded transcript layout modes."""
         window = self.window()
         if not isinstance(window, QDialog):
             return
 
-        recommended_height = AUDIO_PLAYER_DIALOG_EXPANDED_MIN_HEIGHT
-        if window.height() < recommended_height:
-            window.resize(window.width(), recommended_height)
+        if show_transcript:
+            expanded_height = AUDIO_PLAYER_DIALOG_EXPANDED_MIN_HEIGHT
+            if window.height() < expanded_height:
+                window.resize(window.width(), expanded_height)
+            return
+
+        collapsed_height = max(window.minimumHeight(), AUDIO_PLAYER_DIALOG_DEFAULT_HEIGHT)
+        if window.height() > collapsed_height:
+            window.resize(window.width(), collapsed_height)
 
     def _skip_backward(self) -> None:
         """Seek backward by configured step."""
