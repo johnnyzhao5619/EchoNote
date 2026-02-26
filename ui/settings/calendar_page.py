@@ -29,7 +29,6 @@ from core.qt_imports import (
     QListWidget,
     QListWidgetItem,
     QMenu,
-    QMessageBox,
     QProgressBar,
     QPushButton,
     QSpinBox,
@@ -167,18 +166,13 @@ class CalendarSettingsPage(BaseSettingsPage):
         account_data = item.data(Qt.ItemDataRole.UserRole)
 
         # Confirm removal
-        reply = QMessageBox.question(
-            self,
+        if self.show_question(
             self.i18n.t("settings.calendar.confirm_remove_title"),
             self.i18n.t(
                 "settings.calendar.confirm_remove_message",
                 account=account_data.get("email", "Unknown"),
             ),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-
-        if reply == QMessageBox.StandardButton.Yes:
+        ):
             provider = account_data.get("provider")
             if not provider:
                 return

@@ -4,14 +4,12 @@ import type { ProjectConfig } from '../types'
 const GITHUB_OWNER = 'johnnyzhao5619'
 const GITHUB_REPO = 'EchoNote'
 const PROJECT_NAME = 'EchoNote'
-const PROJECT_RELEASE_TAG = 'v1.4.8'
 const BASE_URL = `https://${GITHUB_OWNER}.github.io/${GITHUB_REPO}`
 const GITHUB_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`
 const DOCS_URL = `${GITHUB_URL}/tree/main/docs`
 
 export const projectConfig: ProjectConfig = {
   name: PROJECT_NAME,
-  releaseTag: PROJECT_RELEASE_TAG,
   description:
     'A local-first desktop application for voice transcription, real-time recording, and calendar-aware timeline management.',
   githubUrl: GITHUB_URL,

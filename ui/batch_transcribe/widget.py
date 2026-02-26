@@ -61,7 +61,6 @@ from core.qt_imports import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
-    QMessageBox,
     QPlainTextEdit,
     QPushButton,
     QSize,
@@ -897,15 +896,10 @@ class BatchTranscribeWidget(BaseWidget):
             active_kind = task_kind or self._current_task_kind()
 
             # Confirm with user
-            reply = QMessageBox.question(
-                self,
+            if self.show_question(
                 self.i18n.t("batch_transcribe.clear_queue"),
                 self.i18n.t("batch_transcribe.confirm_clear_queue"),
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
-            )
-
-            if reply == QMessageBox.StandardButton.Yes:
+            ):
                 self._clear_queue_in_progress = True
                 self._set_clear_buttons_enabled(False)
 
@@ -1199,15 +1193,10 @@ class BatchTranscribeWidget(BaseWidget):
         """Handle task delete button click."""
         try:
             # Confirm deletion
-            reply = QMessageBox.question(
-                self,
+            if self.show_question(
                 self.i18n.t("common.delete"),
                 self.i18n.t("batch_transcribe.confirm_delete_task"),
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
-            )
-
-            if reply == QMessageBox.StandardButton.Yes:
+            ):
                 deleted = self.transcription_manager.delete_task(task_id)
                 if deleted:
                     self._remove_task_item(task_id)

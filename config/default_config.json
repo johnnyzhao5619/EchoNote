@@ -1,5 +1,5 @@
 {
-  "version": "1.4.8",
+  "version": "2.0.0",
   "database": {
     "path": "~/.echonote/data.db",
     "encryption_enabled": true
@@ -12,11 +12,6 @@
     "max_concurrent_tasks": 2,
     "max_retries": 3,
     "retry_delay": 1.0,
-    "task_queue": {
-      "max_concurrent_tasks": 2,
-      "max_retries": 3,
-      "retry_delay": 1.0
-    },
     "faster_whisper": {
       "model_size": "base",
       "device": "auto",

@@ -94,10 +94,7 @@ class APIKeyValidator:
             # Use simple API call to test key
             # Note: This requires valid audio data, using minimal test request here
             async with httpx.AsyncClient(timeout=timeout) as client:
-                # Test API endpoint accessibility
-                test_url = f"https://speech.googleapis.com/v1/speech:recognize?key={api_key}"
-
-                # Send a minimal test request
+                # Pass API key via header to avoid exposure in server logs and proxy logs
                 test_data = {
                     "config": {
                         "encoding": "LINEAR16",
@@ -107,7 +104,11 @@ class APIKeyValidator:
                     "audio": {"content": ""},  # Empty content returns error but validates key
                 }
 
-                response = await client.post(test_url, json=test_data)
+                response = await client.post(
+                    "https://speech.googleapis.com/v1/speech:recognize",
+                    headers={"X-Goog-Api-Key": api_key},
+                    json=test_data,
+                )
 
                 # Even if request fails, if not auth error, key is valid
                 if response.status_code == 200:

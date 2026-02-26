@@ -188,11 +188,36 @@ class BaseWidget(QWidget):
         msg_box.setIcon(QMessageBox.Icon.Information)
         msg_box.setWindowTitle(title)
         msg_box.setText(message)
-        
+
         ok_button = msg_box.addButton(self.i18n.t("common.ok"), QMessageBox.ButtonRole.AcceptRole)
         msg_box.setDefaultButton(ok_button)
-        
+
         msg_box.exec()
+
+    def show_question(self, title: str, message: str, default_yes: bool = False) -> bool:
+        """显示是/否确认对话框
+
+        封装 QMessageBox.question() 的重复模式，统一按钮文本为 i18n 译文。
+
+        Args:
+            title: 对话框标题
+            message: 提问消息
+            default_yes: 默认按钮是否为「是」，默认 False（更保守）
+
+        Returns:
+            用户点击「是」返回 True，点击「否」或关闭返回 False
+        """
+        msg_box = QMessageBox(self)
+        msg_box.setIcon(QMessageBox.Icon.Question)
+        msg_box.setWindowTitle(title)
+        msg_box.setText(message)
+
+        yes_button = msg_box.addButton(self.i18n.t("common.yes"), QMessageBox.ButtonRole.YesRole)
+        no_button = msg_box.addButton(self.i18n.t("common.no"), QMessageBox.ButtonRole.NoRole)
+        msg_box.setDefaultButton(yes_button if default_yes else no_button)
+
+        msg_box.exec()
+        return msg_box.clickedButton() == yes_button
 
     def create_page_title(self, text_key: str, layout=None) -> QLabel:
         """

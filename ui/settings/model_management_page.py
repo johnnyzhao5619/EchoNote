@@ -27,7 +27,6 @@ from core.qt_imports import (
     QFont,
     QFrame,
     QLabel,
-    QMessageBox,
     QProgressBar,
     QPushButton,
     QTabWidget,
@@ -366,12 +365,6 @@ class ModelManagementPage(BaseSettingsPage):
             logger.error(f"Model not found: {model_name}")
             return
 
-        # 显示确认对话框
-        msg_box = QMessageBox(self)
-        msg_box.setIcon(QMessageBox.Icon.Warning)
-        msg_box.setWindowTitle(self.i18n.t("settings.model_management.delete_confirm_title"))
-
-        # 构建确认消息
         confirm_text = self.i18n.t(
             "settings.model_management.delete_confirm_message",
             model=model.full_name,
@@ -379,18 +372,10 @@ class ModelManagementPage(BaseSettingsPage):
         )
         warning_text = self.i18n.t("settings.model_management.delete_warning")
 
-        msg_box.setText(confirm_text)
-        msg_box.setInformativeText(warning_text)
-
-        # 添加按钮
-        msg_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-        msg_box.setDefaultButton(QMessageBox.StandardButton.No)
-
-        # 显示对话框
-        reply = msg_box.exec()
-
-        # 如果用户确认删除
-        if reply == QMessageBox.StandardButton.Yes:
+        if self.show_question(
+            self.i18n.t("settings.model_management.delete_confirm_title"),
+            f"{confirm_text}\n\n{warning_text}",
+        ):
             self._on_delete_confirmed(model_name)
 
     def _on_delete_confirmed(self, model_name: str):
@@ -594,15 +579,10 @@ class ModelManagementPage(BaseSettingsPage):
         logger.info(f"Cancelling download for model: {model_name}")
 
         # 确认取消
-        reply = QMessageBox.question(
-            self,
+        if self.show_question(
             self.i18n.t("settings.model_management.cancel_download_title"),
             self.i18n.t("settings.model_management.cancel_download_confirm", model=model_name),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-
-        if reply == QMessageBox.StandardButton.Yes:
+        ):
             # 取消下载
             self.model_manager.cancel_download(model_name)
             logger.info(f"Cancel requested for model download: {model_name}")
@@ -814,15 +794,11 @@ class ModelManagementPage(BaseSettingsPage):
         )
 
         # 询问是否重试
-        retry_reply = QMessageBox.question(
-            self,
+        if self.show_question(
             self.i18n.t("settings.model_management.retry_title"),
             self.i18n.t("settings.model_management.retry_message"),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.Yes,
-        )
-
-        if retry_reply == QMessageBox.StandardButton.Yes:
+            default_yes=True,
+        ):
             logger.info(f"Retrying download for model: {model_name}")
             self._on_download_clicked(model_name)
 
@@ -936,16 +912,13 @@ class ModelManagementPage(BaseSettingsPage):
         if not model_info:
             return
 
-        reply = QMessageBox.question(
-            self,
+        if self.show_question(
             self.i18n.t("settings.model_management.confirm_delete_title"),
             self.i18n.t(
                 "settings.model_management.confirm_delete_message",
                 model=model_info.display_name,
             ),
-            QMessageBox.Yes | QMessageBox.No,
-        )
-        if reply == QMessageBox.Yes:
+        ):
             success = self.model_manager.delete_translation_model(model_id)
             if not success:
                 show_error_dialog(

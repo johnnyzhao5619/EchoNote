@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { projectConfig } from '../config/project'
+import { githubConfig, projectConfig } from '../config/project'
+import { useGitHubApi } from '../composables/useGitHubApi'
 import { useProjectLinks } from '../composables/useProjectLinks'
 import GitHubIcon from './icons/GitHubIcon.vue'
 
@@ -13,11 +14,16 @@ interface Props {
 const props = defineProps<Props>()
 const { t } = useI18n()
 const { heroQuickLinks } = useProjectLinks()
+const { latestRelease, fetchAll } = useGitHubApi(githubConfig.owner, githubConfig.repo)
+
+onMounted(() => {
+  void fetchAll()
+})
 
 const heroTitle = computed(() => props.title || t('hero.headline'))
 const heroDescription = computed(() => props.description || t('hero.description'))
 const releaseBadge = computed(() =>
-  t('hero.releaseBadge', { version: projectConfig.releaseTag || 'latest' }),
+  t('hero.releaseBadge', { version: latestRelease.value?.tag_name ?? 'latest' }),
 )
 </script>
 

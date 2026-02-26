@@ -37,7 +37,6 @@ from core.qt_imports import (
     QFrame,
     QHBoxLayout,
     QLabel,
-    QMessageBox,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
@@ -1299,19 +1298,13 @@ class CalendarHubWidget(BaseWidget):
             provider_name = self._get_provider_display_name(provider)
 
             if confirm:
-                # Confirm with user
-                reply = QMessageBox.question(
-                    self,
+                if not self.show_question(
                     self.i18n.t("dialogs.calendar_hub.disconnect_account"),
                     self.i18n.t(
                         "calendar_hub.widget.disconnect_confirm_message",
                         provider=provider_name,
                     ),
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                    QMessageBox.StandardButton.No,
-                )
-
-                if reply != QMessageBox.StandardButton.Yes:
+                ):
                     return
 
             # Disconnect provider account and remove linked local data.

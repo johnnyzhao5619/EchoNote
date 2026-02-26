@@ -69,13 +69,33 @@ class SensitiveDataFilter(logging.Filter):
         Returns:
             是否允许记录该日志
         """
-        # 检查消息中是否包含敏感关键词
+        # 检查完整格式化消息（包含 args）中是否含敏感关键词
         message = record.getMessage().lower()
 
         for keyword in self.SENSITIVE_KEYWORDS:
             if keyword in message:
-                # 替换敏感信息为 ***
-                record.msg = self._mask_sensitive_data(record.msg)
+                # 遮蔽 msg 字符串
+                record.msg = self._mask_sensitive_data(str(record.msg))
+                # 遮蔽已展开的 args（防止通过 %s 格式化泄露）
+                if record.args:
+                    if isinstance(record.args, dict):
+                        record.args = {
+                            k: self._mask_sensitive_data(str(v)) if isinstance(v, str) else v
+                            for k, v in record.args.items()
+                        }
+                    elif isinstance(record.args, tuple):
+                        record.args = tuple(
+                            self._mask_sensitive_data(str(a)) if isinstance(a, str) else a
+                            for a in record.args
+                        )
+                # 遮蔽异常 traceback 中可能出现的敏感信息
+                if record.exc_info and record.exc_info[1] is not None:
+                    exc = record.exc_info[1]
+                    exc_str = str(exc).lower()
+                    if any(kw in exc_str for kw in self.SENSITIVE_KEYWORDS):
+                        # 用无害的占位消息替换异常文本，保留类型信息
+                        record.exc_text = f"[{type(exc).__name__}: sensitive data redacted]"
+                        record.exc_info = None
                 break
 
         return True

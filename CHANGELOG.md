@@ -5,6 +5,23 @@ All notable changes to EchoNote will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-02-26
+
+### Changed
+
+- **Security**: Fixed Google Speech API key exposure — moved from URL query parameter to `X-Goog-Api-Key` request header to prevent leakage in server/proxy logs.
+- **Concurrency**: Added `threading.Lock` to global `DatabaseEncryptionHelper` singleton initialization to prevent race conditions.
+- **Logging**: Enhanced `SensitiveDataFilter` to also redact `record.args` tuple/dict and `exc_info` exception messages, not just `record.msg`.
+- **Config**: Removed duplicate `task_queue` sub-section from `config/default_config.json`; fallback chain in `TranscriptionManager` already handles resolution without it.
+- **Constants**: Extracted speech API pricing constants (`SPEECH_API_PRICE_PER_MINUTE_*`) from `UsageTracker` hardcoded strings into `config/constants.py`.
+- **UI/Dialogs**: Added `show_question()` method to `BaseWidget` encapsulating the repeated `QMessageBox.question()` Yes/No confirmation pattern with i18n button labels; replaced all 8 call sites across `batch_transcribe`, `settings`, `calendar_hub`, and `model_management` widgets; removed now-redundant `QMessageBox` imports.
+- **UI/ErrorDialog**: Removed `_fallback_text_from_key()` private static method; replaced with explicit inline English fallback strings for the crash-scenario case where `i18n=None`.
+- **UI/ErrorDialog**: Removed 3 unused imports (`QHBoxLayout`, `QScrollArea`, `Qt`) that were explicitly marked as unused in comments.
+- **Dependencies**: Added upper-bound version constraints (`<X.0.0`) to major dependencies in `pyproject.toml` to prevent silent breaking changes from future major version bumps.
+- **Landing/Hero**: Release badge version now fetched dynamically from GitHub Releases API via `useGitHubApi` composable; removed hardcoded `releaseTag` from `projectConfig` and `ProjectConfig` interface.
+- **Landing/CSS**: Extracted shared base selector group for `.ui-ghost-action`, `.ui-primary-action`, `.ui-secondary-action` eliminating repeated `inline-flex items-center gap-2 rounded-lg text-sm font-semibold transition` directives; moved all interactive UI classes into `@layer components`.
+- Synchronized project, packaging, documentation, and landing metadata version references to `v2.0.0`.
+
 ## [1.4.8] - 2026-02-25
 
 ### Changed

@@ -25,14 +25,11 @@ from typing import Optional
 from ui.base_widgets import connect_button_with_callback, create_hbox
 from ui.constants import ERROR_DIALOG_DETAILS_MAX_HEIGHT, ERROR_DIALOG_MIN_WIDTH
 from core.qt_imports import (
-    QApplication, # QApplication is used in _copy_to_clipboard, so it must be kept.
+    QApplication,
     QDialog,
-    QHBoxLayout, # Added by instruction, though not used in original code
     QLabel,
     QPushButton,
-    QScrollArea, # Added by instruction, though not used in original code
-    Qt,          # Added by instruction, though not used in original code
-    QTextEdit,   # QTextEdit is used in setup_ui, so it must be kept.
+    QTextEdit,
     QTimer,
     QVBoxLayout,
     QWidget,
@@ -159,10 +156,7 @@ class ErrorDialog(QDialog):
         clipboard.setText(error_info)
 
         # Update button text to show copied
-        if self.i18n:
-            self.copy_button.setText(self.i18n.t("common.copied"))
-        else:
-            self.copy_button.setText(self._fallback_text_from_key("common.copied"))
+        self.copy_button.setText(self.i18n.t("common.copied") if self.i18n else "Copied")
 
         # Reset button text after 2 seconds
         QTimer.singleShot(2000, self._update_copy_button_text)
@@ -177,41 +171,18 @@ class ErrorDialog(QDialog):
             showing: Whether details are currently showing
         """
         if self.i18n:
-            if showing:
-                text = self.i18n.t("common.hide_details")
-            else:
-                text = self.i18n.t("common.show_details")
+            text = self.i18n.t("common.hide_details" if showing else "common.show_details")
         else:
-            text = (
-                self._fallback_text_from_key("common.hide_details")
-                if showing
-                else self._fallback_text_from_key("common.show_details")
-            )
-
+            text = "Hide Details" if showing else "Show Details"
         self.details_button.setText(text)
 
     def _update_copy_button_text(self):
         """Update copy button text."""
-        if self.i18n:
-            text = self.i18n.t("common.copy")
-        else:
-            text = self._fallback_text_from_key("common.copy")
-
-        self.copy_button.setText(text)
+        self.copy_button.setText(self.i18n.t("common.copy") if self.i18n else "Copy")
 
     def _update_ok_button_text(self):
         """Update OK button text."""
-        if self.i18n:
-            text = self.i18n.t("common.ok")
-        else:
-            text = self._fallback_text_from_key("common.ok")
-
-        self.ok_button.setText(text)
-
-    @staticmethod
-    def _fallback_text_from_key(key: str) -> str:
-        """Generate a fallback label from an i18n key."""
-        return key.rsplit(".", maxsplit=1)[-1].replace("_", " ").title()
+        self.ok_button.setText(self.i18n.t("common.ok") if self.i18n else "OK")
 
     def _on_language_changed(self, language: str):
         """

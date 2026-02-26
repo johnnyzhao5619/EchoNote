@@ -29,7 +29,6 @@ from core.qt_imports import (
     QLabel,
     QListWidget,
     QListWidgetItem,
-    QMessageBox,
     QScrollArea,
     QStackedWidget,
     Qt,
@@ -593,14 +592,10 @@ class SettingsWidget(BaseWidget):
 
     def _confirm_discard_changes(self) -> bool:
         """Ask user to confirm discarding unsaved settings."""
-        reply = QMessageBox.question(
-            self,
+        return self.show_question(
             self.i18n.t("settings.confirm.title"),
             self.i18n.t("settings.confirm.discard_changes"),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
         )
-        return reply == QMessageBox.StandardButton.Yes
 
     def _on_cancel_clicked(self):
         """Handle cancel button click."""
@@ -611,15 +606,10 @@ class SettingsWidget(BaseWidget):
     def _on_reset_clicked(self):
         """Handle reset button click."""
         # Confirm reset
-        reply = QMessageBox.question(
-            self,
+        if self.show_question(
             self.i18n.t("settings.confirm.title"),
             self.i18n.t("settings.confirm.reset_defaults"),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-
-        if reply == QMessageBox.StandardButton.Yes:
+        ):
             try:
                 # Reset all settings to defaults
                 self.settings_manager.reset_to_default()

@@ -20,6 +20,7 @@ Provides utilities for encrypting/decrypting sensitive database fields.
 """
 
 import logging
+import threading
 from typing import Optional
 
 from data.security.encryption import SecurityManager
@@ -111,17 +112,21 @@ class DatabaseEncryptionHelper:
 
 # Global instance (will be initialized by main.py)
 _encryption_helper: Optional[DatabaseEncryptionHelper] = None
+_init_lock = threading.Lock()
 
 
 def initialize_encryption_helper(security_manager: SecurityManager):
     """
     Initialize the global encryption helper instance.
 
+    Thread-safe: uses a lock to prevent race conditions during initialization.
+
     Args:
         security_manager: SecurityManager instance
     """
     global _encryption_helper
-    _encryption_helper = DatabaseEncryptionHelper(security_manager)
+    with _init_lock:
+        _encryption_helper = DatabaseEncryptionHelper(security_manager)
     logger.info("Global database encryption helper initialized")
 
 

@@ -386,6 +386,12 @@ DEFAULT_TRANSCRIPTION_ENGINE = ENGINE_FASTER_WHISPER
 DEFAULT_OUTPUT_FORMAT = FORMAT_TXT
 DEFAULT_COMPUTE_TYPE = COMPUTE_TYPE_INT8
 
+# Cloud Speech API Pricing (USD per minute, reference pricing)
+# These are public reference prices; enterprise contracts may differ.
+SPEECH_API_PRICE_PER_MINUTE_OPENAI = "0.006"   # OpenAI Whisper API
+SPEECH_API_PRICE_PER_MINUTE_GOOGLE = "0.006"   # Google Cloud Speech-to-Text
+SPEECH_API_PRICE_PER_MINUTE_AZURE = "0.0167"   # Azure Cognitive Services Speech
+
 
 # ============================================================================
 # Realtime Recording Constants

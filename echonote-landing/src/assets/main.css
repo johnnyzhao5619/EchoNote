@@ -90,38 +90,48 @@ h4 {
   top: 1rem;
 }
 
-.ui-nav-link {
-  @apply whitespace-nowrap rounded-lg px-2.5 py-2 text-sm font-medium text-slate-600 transition;
-  @apply hover:bg-slate-100 hover:text-slate-900;
-}
+@layer components {
+  /* Nav link base */
+  .ui-nav-link {
+    @apply whitespace-nowrap rounded-lg px-2.5 py-2 text-sm font-medium text-slate-600 transition;
+    @apply hover:bg-slate-100 hover:text-slate-900;
+  }
 
-.ui-mobile-nav-link {
-  @apply rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition;
-  @apply hover:bg-slate-100 hover:text-slate-900;
-}
+  .ui-mobile-nav-link {
+    @apply rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition;
+    @apply hover:bg-slate-100 hover:text-slate-900;
+  }
 
-.ui-ghost-action {
-  @apply inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition;
-  @apply hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900;
-}
+  /* Shared base for interactive action buttons */
+  .ui-ghost-action,
+  .ui-primary-action,
+  .ui-secondary-action {
+    @apply inline-flex items-center gap-2 rounded-lg text-sm font-semibold transition;
+  }
 
-.ui-primary-action {
-  @apply inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-sm transition;
-  @apply hover:-translate-y-0.5 hover:bg-slate-800 hover:shadow-md;
-}
+  .ui-ghost-action {
+    @apply border border-slate-200 px-3 py-2 text-slate-700;
+    @apply hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900;
+  }
 
-.ui-secondary-action {
-  @apply inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition;
-  @apply hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900;
-}
+  .ui-primary-action {
+    @apply justify-center bg-slate-900 px-5 py-3 text-white shadow-sm;
+    @apply hover:-translate-y-0.5 hover:bg-slate-800 hover:shadow-md;
+  }
 
-.ui-chip-link {
-  @apply rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 transition;
-  @apply hover:border-slate-300 hover:text-slate-900;
-}
+  .ui-secondary-action {
+    @apply justify-center border border-slate-200 bg-white px-5 py-3 text-slate-700;
+    @apply hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900;
+  }
 
-.ui-inline-link {
-  @apply text-blue-700 underline underline-offset-2 transition hover:text-blue-900;
+  .ui-chip-link {
+    @apply rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 transition;
+    @apply hover:border-slate-300 hover:text-slate-900;
+  }
+
+  .ui-inline-link {
+    @apply text-blue-700 underline underline-offset-2 transition hover:text-blue-900;
+  }
 }
 
 .landing-card {

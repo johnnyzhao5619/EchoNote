@@ -25,6 +25,11 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Dict, Optional
 
+from config.constants import (
+    SPEECH_API_PRICE_PER_MINUTE_AZURE,
+    SPEECH_API_PRICE_PER_MINUTE_GOOGLE,
+    SPEECH_API_PRICE_PER_MINUTE_OPENAI,
+)
 from utils.time_utils import now_utc
 
 logger = logging.getLogger(__name__)
@@ -33,13 +38,11 @@ logger = logging.getLogger(__name__)
 class UsageTracker:
     """API Usage Tracker"""
 
-    # API pricing (per minute, in USD)
+    # API pricing (USD per minute). Reference values — see config/constants.py.
     PRICING = {
-        "openai": Decimal("0.006"),  # $0.006 per minute
-        "google": Decimal("0.006"),  # $0.006 per minute (first 60 minutes free)
-        "azure": Decimal(
-            "0.0167"
-        ),  # Azure Speech Standard (pricing reference: Azure official pricing $1.00/hour ≈ $0.0167/minute)
+        "openai": Decimal(SPEECH_API_PRICE_PER_MINUTE_OPENAI),
+        "google": Decimal(SPEECH_API_PRICE_PER_MINUTE_GOOGLE),
+        "azure": Decimal(SPEECH_API_PRICE_PER_MINUTE_AZURE),
     }
 
     def __init__(self, db_connection):

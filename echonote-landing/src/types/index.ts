@@ -36,7 +36,6 @@ export interface ProjectConfig {
   name: string
   description: string
   githubUrl: string
-  releaseTag?: string
   features: Feature[]
   howItWorks?: HowItWorksStep[]
   links: ProjectLinks
