@@ -331,6 +331,15 @@ class RealtimeRecorder:
                     started = starter(self.recording_start_time, self.sample_rate)
                     self._stream_recording_active = started if isinstance(started, bool) else False
 
+            # Eagerly load the translation model before audio capture begins so that
+            # the first transcription segment is translated without a cold-start stall.
+            if (
+                self.current_options.get("enable_translation", False)
+                and self._transcription_enabled
+                and self.translation_engine
+            ):
+                await self._preload_translation_model()
+
             # Start audio acquisition.
             self._start_audio_capture(input_source)
             await self._validate_audio_capture_startup()
@@ -610,6 +619,29 @@ class RealtimeRecorder:
                 transcription_attempts,
             )
 
+    async def _preload_translation_model(self) -> None:
+        """Eagerly load the translation model before audio capture begins.
+
+        MultiModelOpusMTEngine loads each language-pair model on first use.  Doing
+        this before recording starts means the first transcription segment is
+        translated immediately rather than after a 5-30 s cold-start stall.
+        """
+        try:
+            loader = getattr(self.translation_engine, "_loader", None)
+            if loader is None:
+                return
+            engine = loader.get()
+            if engine is None:
+                return
+            if not hasattr(engine, "_get_engine"):
+                return
+            source_lang = self.current_options.get("language", "auto")
+            target_lang = self.current_options.get("target_language", "en")
+            await engine._get_engine(source_lang, target_lang)
+            logger.info("Translation model preloaded for %s->%s", source_lang, target_lang)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Translation model preload failed (non-fatal): %s", exc)
+
     async def _process_translation_stream(self):
         """Background coroutine that consumes transcription results and translates them."""
         logger.info("Translation stream processing started")
@@ -688,10 +720,10 @@ class RealtimeRecorder:
                     logger.error(f"Error in translation stream processing: {e}")
                     if self.on_error:
                         self.on_error(f"Translation error: {e}")
-                    if self.is_recording:
-                        continue
-                    else:
-                        break
+                    # Always continue regardless of recording state.
+                    # The while-condition and sentinel-based shutdown (None) control
+                    # the exit; never break early and leave queued items untranslated.
+                    continue
         except asyncio.CancelledError:
             logger.info("Translation stream processing cancelled")
             raise
@@ -727,6 +759,18 @@ class RealtimeRecorder:
                     await self.processing_task
             finally:
                 self.processing_task = None
+
+        # Send a shutdown sentinel to the translation queue so the translation
+        # loop processes every segment that was enqueued by the (now-complete)
+        # transcription task before exiting cleanly.  Without this, a race
+        # exists where the translation loop can see an empty queue and exit
+        # before the final audio-flush adds the last transcription segment.
+        if self.translation_queue is not None and self.translation_task is not None:
+            if not self.translation_task.done():
+                try:
+                    self.translation_queue.put_nowait(None)
+                except asyncio.QueueFull:
+                    logger.warning("Translation queue full when sending shutdown sentinel")
 
         if self.translation_task:
             await self._ensure_translation_task_stopped()

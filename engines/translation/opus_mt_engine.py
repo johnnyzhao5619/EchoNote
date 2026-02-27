@@ -17,13 +17,14 @@
 
 特性：
 - 懒加载：首次调用 translate 时才加载模型和分词器（避免启动耗时）
-- 分块处理：输入超过 512 token 时自动分块翻译后拼接
+- 分块处理：基于字符预分块后再通过分词器精确验证 token 数量，保证不超过 512 token
 - 异步执行：模型推理通过 asyncio.to_thread 在线程池中执行，不阻塞事件循环
 - 内存管理：提供 close() 显式释放模型资源
 """
 
 import asyncio
 import logging
+import re
 from pathlib import Path
 from typing import List, Optional
 
@@ -33,7 +34,8 @@ logger = logging.getLogger(__name__)
 
 # MarianMT 分词器最大序列长度（token 数）
 _MAX_TOKENS = 512
-# 分块时每块最大字符数估算（1 token ≈ 4 chars，留余量）
+# 字符预分块上限。以拉丁文为基准（1 token ≈ 4 chars），但中文每字约 1–2 token，
+# 所以此处仅用于粗粒度预切，最终仍由分词器精确验证。
 _CHUNK_CHAR_LIMIT = 1500
 
 
@@ -71,7 +73,7 @@ class OpusMTEngine(TranslationEngine):
         """翻译文本。
 
         Args:
-            text: 待翻译文本（可超过 512 token，内部自动分块）
+            text: 待翻译文本（内部通过分词器精确分块，确保每块不超过 512 token）
             source_lang: 源语言代码（opus-mt 模型固定语言对，此参数仅记录日志）
             target_lang: 目标语言代码（同上）
 
@@ -83,7 +85,7 @@ class OpusMTEngine(TranslationEngine):
 
         await self._ensure_loaded()
 
-        # 分块翻译（文本过长时）
+        # 分块翻译：先按字符预分块，再用分词器精确验证 token 数量
         chunks = self._split_text(text)
         if len(chunks) == 1:
             translated = await asyncio.to_thread(self._translate_chunk, chunks[0])
@@ -94,8 +96,9 @@ class OpusMTEngine(TranslationEngine):
             translated = " ".join(parts)
 
         logger.debug(
-            "Translated %d chars (%s→%s via opus-mt)",
+            "Translated %d chars into %d chunk(s) (%s→%s via opus-mt)",
             len(text),
+            len(chunks),
             source_lang,
             target_lang,
         )
@@ -174,29 +177,75 @@ class OpusMTEngine(TranslationEngine):
         result = self._tokenizer.decode(translated_ids[0], skip_special_tokens=True)
         return result
 
-    @staticmethod
-    def _split_text(text: str) -> List[str]:
-        """按句子边界分块，使每块不超过字符限制。"""
-        if len(text) <= _CHUNK_CHAR_LIMIT:
+    def _split_text(self, text: str) -> List[str]:
+        """按句子边界分块，并用分词器精确验证每块不超过 _MAX_TOKENS。
+
+        两步策略：
+        1. 基于字符数粗粒度预分块（快速）
+        2. 对每块用分词器验证 token 数，超限则递归二分，直到符合要求
+        """
+        if not text.strip():
             return [text]
 
-        # 按句子结束符分割
-        import re
+        # ── 第一步：字符级粗粒度分块 ──────────────────────────────────────
+        if len(text) <= _CHUNK_CHAR_LIMIT:
+            char_chunks: List[str] = [text]
+        else:
+            sentences = re.split(r"(?<=[.!?。！？\n])\s*", text)
+            char_chunks = []
+            current = ""
+            for sentence in sentences:
+                if not sentence:
+                    continue
+                if len(current) + len(sentence) + 1 > _CHUNK_CHAR_LIMIT and current:
+                    char_chunks.append(current.strip())
+                    current = sentence
+                else:
+                    current = (current + " " + sentence).strip()
+            if current:
+                char_chunks.append(current)
+            if not char_chunks:
+                char_chunks = [text]
 
-        sentences = re.split(r"(?<=[.!?。！？\n])\s*", text)
-        chunks: List[str] = []
-        current = ""
-        for sentence in sentences:
-            if not sentence:
-                continue
-            if len(current) + len(sentence) + 1 > _CHUNK_CHAR_LIMIT and current:
-                chunks.append(current.strip())
-                current = sentence
-            else:
-                current = (current + " " + sentence).strip()
-        if current:
-            chunks.append(current)
-        return chunks or [text]
+        # ── 第二步：token 精确验证并递归拆分超限块 ──────────────────────────
+        # _ensure_loaded() 已在调用方 translate() 中执行，分词器必然可用
+        if self._tokenizer is None:
+            return char_chunks
+
+        result: List[str] = []
+        for chunk in char_chunks:
+            result.extend(self._split_to_token_limit(chunk))
+        return result or [text]
+
+    def _split_to_token_limit(self, text: str) -> List[str]:
+        """递归将文本拆分直至每块均不超过 _MAX_TOKENS（含特殊 token）。"""
+        token_ids = self._tokenizer.encode(text, add_special_tokens=True)
+        if len(token_ids) <= _MAX_TOKENS:
+            return [text]
+
+        # 在中间区域寻找句子边界作为分割点
+        mid = len(text) // 2
+        window_start = max(0, mid - len(text) // 4)
+        window_end = min(len(text), mid + len(text) // 4)
+        window = text[window_start:window_end]
+
+        boundary = re.search(r"[.!?。！？\n]", window)
+        split_pos = (window_start + boundary.end()) if boundary else mid
+
+        # 防止退化：分割点必须在首尾之间
+        if split_pos <= 0 or split_pos >= len(text):
+            split_pos = mid
+
+        left = text[:split_pos].strip()
+        right = text[split_pos:].strip()
+
+        result: List[str] = []
+        if left:
+            result.extend(self._split_to_token_limit(left))
+        if right:
+            result.extend(self._split_to_token_limit(right))
+        # 兜底：若拆分后均为空，按字符中点强制切分
+        return result if result else [text[:mid], text[mid:]]
 
 
 class MultiModelOpusMTEngine(TranslationEngine):
@@ -232,7 +281,7 @@ class MultiModelOpusMTEngine(TranslationEngine):
         engine = await self._get_engine(source_lang, target_lang)
         if not engine:
             logger.warning("No Opus-MT model available for %s -> %s", source_lang, target_lang)
-            return text  # 返回原文作为 fallback
+            return ""  # Return empty string; callers treat "" as "no translation available"
 
         return await engine.translate(text, source_lang, target_lang)
 

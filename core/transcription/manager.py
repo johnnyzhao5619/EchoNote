@@ -45,6 +45,7 @@ from ui.common.notification import get_notification_manager
 logger = logging.getLogger("echonote.transcription.manager")
 
 TEXT_TRANSLATION_SUFFIXES = frozenset({".txt", ".md"})
+TRANSLATION_OUTPUT_FORMATS = frozenset({"txt", "md"})
 TRANSLATION_TASK_ENGINE = "translation"
 TRANSLATION_TASK_KIND = "translation"
 TRANSCRIPTION_TASK_KIND = "transcription"
@@ -201,7 +202,9 @@ class TranscriptionManager:
             event_type: Type of event (task_added, task_updated, task_deleted)
             data: Event data
         """
-        for listener in self.event_listeners:
+        # Snapshot the list before iterating to avoid RuntimeError if a listener
+        # is added or removed concurrently from another thread.
+        for listener in list(self.event_listeners):
             try:
                 listener(event_type, data)
             except Exception as e:
@@ -427,8 +430,10 @@ class TranscriptionManager:
         output_format = (options.get("output_format") or "").strip().lower()
         if not output_format:
             output_format = "md" if suffix == ".md" else "txt"
-        if output_format not in {"txt", "md"}:
-            raise ValueError("Translation output_format must be one of: txt, md")
+        if output_format not in TRANSLATION_OUTPUT_FORMATS:
+            raise ValueError(
+                f"Translation output_format must be one of: {', '.join(sorted(TRANSLATION_OUTPUT_FORMATS))}"
+            )
 
         from config.constants import TASK_STATUS_PENDING
 
@@ -1256,8 +1261,10 @@ class TranscriptionManager:
         _persist_progress(90.0, "Saving results")
 
         output_format = (task.output_format or "txt").lower()
-        if output_format not in {"txt", "md"}:
-            raise ValueError("Translation output_format must be one of: txt, md")
+        if output_format not in TRANSLATION_OUTPUT_FORMATS:
+            raise ValueError(
+                f"Translation output_format must be one of: {', '.join(sorted(TRANSLATION_OUTPUT_FORMATS))}"
+            )
 
         event_id = runtime_options.get("event_id")
         if task.output_path:
@@ -1629,8 +1636,10 @@ class TranscriptionManager:
     def _write_translation_output(self, *, text: str, output_format: str, output_path: Path) -> None:
         """Write translated text to output format without transcription-specific conversion."""
         normalized_format = output_format.lower()
-        if normalized_format not in {"txt", "md"}:
-            raise ValueError("Translation output_format must be one of: txt, md")
+        if normalized_format not in TRANSLATION_OUTPUT_FORMATS:
+            raise ValueError(
+                f"Translation output_format must be one of: {', '.join(sorted(TRANSLATION_OUTPUT_FORMATS))}"
+            )
         self._write_translation_file(output_path, text)
 
     @staticmethod

@@ -87,6 +87,7 @@
     "paste_output_format_label": "Format de sortie",
     "paste_text_placeholder": "Collez ici le texte à traduire...",
     "paste_text_empty": "Collez du texte avant de créer la tâche.",
+    "add_task_failed": "Échec de l'ajout de la tâche : {error}",
     "task_kind_transcription": "Type : Transcription",
     "task_kind_translation": "Type : Traduction",
     "go_to_download": "Aller au téléchargement des modèles",
@@ -242,8 +243,14 @@
       "plan_system_audio_available": "Entrées audio système détectées ({system_names}). Passez à l'une d'elles pour les réunions.",
       "plan_no_system_audio": "Aucun loopback détecté. {install_hint} Conseil réunion : sortie -> loopback, micro -> physique."
     },
-    "secondary_transcription_prompt_title": "Improve Transcript Quality",
-    "secondary_transcription_prompt_message": "Run a high-quality retranscription from the recording and replace the current realtime transcript? If a translation already exists, it will be regenerated from the new transcript and overwrite the old translation."
+    "secondary_transcription_prompt_title": "Améliorer la qualité de la transcription",
+    "secondary_transcription_prompt_message": "Lancer une retranscription de haute qualité à partir de l'enregistrement et remplacer la transcription actuelle ? Si une traduction existe déjà, elle sera régénérée à partir de la nouvelle transcription.",
+    "start_secondary_transcription": "Retranscrire avec un meilleur modèle",
+    "secondary_transcription_in_progress": "Retranscription en cours...",
+    "secondary_transcription_done": "Retranscription terminée.",
+    "secondary_transcription_failed": "Retranscription échouée : {error}",
+    "secondary_transcription_cancelled": "Retranscription annulée.",
+    "secondary_transcription_no_output": "Retranscription terminée mais le fichier de sortie est introuvable."
   },
   "calendar_hub": {
     "title": "Centre calendrier",

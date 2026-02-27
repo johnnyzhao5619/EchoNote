@@ -245,7 +245,8 @@ class RealtimeFloatingOverlay(QDialog):
         normalized = " ".join((text or "").strip().split())
         if len(normalized) <= MAX_PREVIEW_LENGTH:
             return normalized
-        return normalized[: MAX_PREVIEW_LENGTH - 1] + "..."
+        # Show the most recent content (tail) so the preview stays current.
+        return "..." + normalized[-(MAX_PREVIEW_LENGTH - 3):]
 
     def _on_close_clicked(self) -> None:
         self.hide()

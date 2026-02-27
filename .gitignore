@@ -131,6 +131,9 @@ dmypy.json
 # Kiro AI Assistant
 .kiro/
 
+# Claude Code AI Assistant
+.claude/
+
 # EchoNote specific
 # User data directory
 .echonote/

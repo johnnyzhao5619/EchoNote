@@ -5,6 +5,16 @@ All notable changes to EchoNote will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2026-02-26
+
+### Fixed
+
+- **Realtime/Translation**: Fixed `else: break` in `_process_translation_stream` exception handler — any exception occurring after recording stopped (e.g. transient network error) would exit the loop immediately, abandoning all remaining queued transcription segments. Changed to `continue` so the while-condition and sentinel-based shutdown control loop exit exclusively.
+- **Realtime/Translation**: Fixed race condition in `stop_recording` where the translation task could observe an empty queue (`is_recording=False`) and exit before `processing_task`'s final audio flush had placed the last transcription segment(s) into `translation_queue`. A `None` sentinel is now sent to `translation_queue` after `processing_task` completes, ensuring all segments are translated before the translation loop exits.
+- **gitignore**: Added `.claude/` to `.gitignore` to prevent Claude Code AI assistant worktrees and session artifacts from being inadvertently committed.
+- **Tests**: Updated `test_batch_transcribe_widget` and `test_settings_widget` mock targets from the removed `QMessageBox.question` module-level path to `patch.object(widget, "show_question", ...)` following the `BaseWidget.show_question()` refactor introduced in v2.0.0.
+- Synchronized project, packaging, documentation, and landing metadata version references to `v2.0.1`.
+
 ## [2.0.0] - 2026-02-26
 
 ### Changed

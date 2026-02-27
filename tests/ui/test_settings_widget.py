@@ -141,13 +141,13 @@ class TestSettingsWidgetButtons:
         # Set unsaved changes flag
         widget.has_unsaved_changes = True
 
-        with patch("ui.settings.widget.QMessageBox.question", return_value=Mock()):
+        with patch.object(widget, "show_question", return_value=True):
             # Should not raise exception
             widget._on_cancel_clicked()
 
     def test_reset_button_click(self, widget):
         """Test reset button click."""
-        with patch("ui.settings.widget.QMessageBox.question", return_value=Mock()):
+        with patch.object(widget, "show_question", return_value=True):
             # Should not raise exception
             widget._on_reset_clicked()
 

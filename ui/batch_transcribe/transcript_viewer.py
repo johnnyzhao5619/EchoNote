@@ -197,14 +197,23 @@ class TranscriptViewerDialog(QDialog):
             raise Exception(f"Database error: {str(e)}")
 
     def _load_content(self):
-        """Load transcript content from internal storage."""
+        """Load transcript content from internal storage.
+
+        For translation tasks the output file is the authoritative source
+        (it may have been updated by a user edit).  For transcription tasks
+        the internal structured JSON is used so that the format converter can
+        render the content correctly.
+        """
         try:
             content_data = self.transcription_manager.get_task_content(self.task_id)
 
-            # Format content for display (using TXT format logic for now)
-            formatted_text = self.transcription_manager.format_converter.convert(
-                content_data, "txt"
-            )
+            task_kind = self.task_data.get("task_kind", "transcription")
+            if task_kind == "translation":
+                formatted_text = self._load_translation_display_text(content_data)
+            else:
+                formatted_text = self.transcription_manager.format_converter.convert(
+                    content_data, "txt"
+                )
 
             self._set_text_content_optimized(formatted_text)
             self.transcript_content = formatted_text
@@ -212,6 +221,30 @@ class TranscriptViewerDialog(QDialog):
         except Exception as e:
             logger.error(f"Failed to load task content: {e}")
             self._show_error_and_close(self.i18n.t("viewer.file_read_error_details", error=str(e)))
+
+    def _load_translation_display_text(self, content_data: dict) -> str:
+        """Return the translation text to display in the viewer.
+
+        Priority:
+        1. Output file on disk (reflects any post-save edits by the user)
+        2. ``"text"`` field in the internal result JSON (verbatim translated text)
+        3. Format-converter fallback (reconstructs text from segments)
+        """
+        output_path = self.task_data.get("output_path")
+        if output_path:
+            output_file = os.path.join(output_path) if not os.path.isabs(output_path) else output_path
+            if os.path.exists(output_file):
+                try:
+                    with open(output_file, "r", encoding="utf-8") as fh:
+                        return fh.read()
+                except Exception as exc:
+                    logger.warning("Could not read translation output file %s: %s", output_file, exc)
+
+        text = content_data.get("text")
+        if isinstance(text, str) and text.strip():
+            return text
+
+        return self.transcription_manager.format_converter.convert(content_data, "txt")
 
     def _optimize_text_edit(self):
         """
