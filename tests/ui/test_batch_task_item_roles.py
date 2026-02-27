@@ -41,3 +41,16 @@ def test_task_item_cancelled_state_keeps_delete_entry(qapp, mock_i18n):
     widget = TaskItem(task_data=task, i18n=mock_i18n)
 
     assert not widget.delete_btn.isHidden()
+
+
+def test_task_item_shows_quality_note_in_info_line(qapp, mock_i18n):
+    """Quality note should be visible in task info for operator diagnostics."""
+    task = {
+        "id": "task-quality",
+        "file_name": "demo.wav",
+        "status": "completed",
+        "quality_note": "Translation quality guard triggered",
+    }
+    widget = TaskItem(task_data=task, i18n=mock_i18n)
+
+    assert "Translation quality guard triggered" in widget.info_label.text()

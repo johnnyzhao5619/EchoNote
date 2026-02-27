@@ -556,6 +556,18 @@ class ModelManager(QObject):
             auto_detect: 是否尝试根据已下载的模型自动匹配源语言。
         """
         if auto_detect:
+            normalized_source = (source_lang or "").strip().lower()
+            if normalized_source and normalized_source != "auto":
+                hinted = self._translation_registry.get_by_langs(normalized_source, target_lang)
+                if hinted:
+                    logger.info(
+                        "Auto-detect translation model with source hint %s->%s: %s",
+                        normalized_source,
+                        target_lang,
+                        hinted.model_id,
+                    )
+                    return hinted
+
             # 搜索已下载的、目标语言匹配的所有模型
             downloaded = self.get_downloaded_translation_models()
             for mid in downloaded:

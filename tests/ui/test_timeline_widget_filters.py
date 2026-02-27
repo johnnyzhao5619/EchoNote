@@ -130,3 +130,27 @@ def test_translate_transcript_prompt_cancelled_skips_queue(widget):
         widget._on_translate_transcript_requested("evt-1", "/tmp/transcript.txt")
 
     mock_enqueue.assert_not_called()
+
+
+def test_secondary_transcribe_includes_translation_preferences_from_event_config(widget):
+    """Secondary transcription should carry event-level translation preferences."""
+    widget.timeline_manager.get_auto_task.return_value = {
+        "transcription_language": "ja",
+        "enable_translation": True,
+        "translation_target_language": "fr",
+    }
+    widget.transcription_manager.add_task = MagicMock(return_value="task-1")
+
+    with patch(
+        "ui.common.secondary_transcribe_dialog.select_secondary_transcribe_model",
+        return_value={"model_name": "large-v3", "model_path": "/tmp/large-v3"},
+    ):
+        widget._on_secondary_transcribe_requested("evt-1", "/tmp/recording.wav")
+
+    widget.transcription_manager.add_task.assert_called_once()
+    _, kwargs = widget.transcription_manager.add_task.call_args
+    options = kwargs["options"]
+    assert options["language"] == "ja"
+    assert options["enable_translation"] is True
+    assert options["translation_source_lang"] == "auto"
+    assert options["translation_target_lang"] == "fr"

@@ -343,6 +343,10 @@ class TaskItem(BaseWidget):
         if language:
             info_parts.append(self.i18n.t("batch_transcribe.info.language", language=language))
 
+        quality_note = (self.task_data.get("quality_note") or "").strip()
+        if quality_note:
+            info_parts.append(quality_note)
+
         self.info_label.setText(" | ".join(info_parts))
 
     def _update_error_label(self):

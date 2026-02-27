@@ -48,6 +48,7 @@ if TYPE_CHECKING:
     from ui.common.transcript_translation_viewer import TranscriptTranslationViewerDialog
 
 from core.calendar.constants import CalendarSource, EventType
+from core.settings.manager import resolve_translation_languages_from_settings
 from ui.base_widgets import BaseWidget, create_button, create_hbox, create_vbox
 from ui.common.audio_player_launcher import open_or_activate_audio_player
 from ui.common.text_viewer_launcher import (
@@ -1055,7 +1056,9 @@ class TimelineWidget(BaseWidget):
             "replace_realtime": True,
             "model_name": selected_model["model_name"],
             "model_path": selected_model["model_path"],
+            "enable_translation": False,
         }
+        translation_target_lang = None
 
         # Use event-specific language if available in auto-task config
         try:
@@ -1066,10 +1069,25 @@ class TimelineWidget(BaseWidget):
                 and config["transcription_language"] != "auto"
             ):
                 options["language"] = config["transcription_language"]
+
+            if config:
+                options["enable_translation"] = bool(config.get("enable_translation", False))
+                translation_target_lang = config.get("translation_target_language")
         except Exception as e:
             logger.warning(
                 f"Failed to fetch auto-task config for event {event_id}, using default: {e}"
             )
+
+        resolved_languages = resolve_translation_languages_from_settings(
+            self.settings_manager,
+            target_lang=translation_target_lang,
+        )
+        options["translation_source_lang"] = resolved_languages.get(
+            "translation_source_lang", "auto"
+        )
+        options["translation_target_lang"] = resolved_languages.get(
+            "translation_target_lang", "en"
+        )
 
         self.transcription_manager.add_task(recording_path, options=options)
 

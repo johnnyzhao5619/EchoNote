@@ -458,3 +458,60 @@ class TestRealtimeFloatingOverlay:
             assert overlay.windowOpacity() == pytest.approx(0.82, abs=1e-3)
         finally:
             overlay.close()
+
+
+def test_secondary_transcription_queue_passes_translation_context(
+    qapp,
+    mock_realtime_recorder,
+    mock_audio_capture,
+    mock_i18n,
+    mock_settings_manager,
+):
+    """Secondary transcription should carry translation settings for replacement quality."""
+    transcription_manager = MagicMock()
+    transcription_manager.add_task = MagicMock(return_value="task-1")
+    mock_settings_manager.get_translation_preferences.return_value = {
+        "translation_engine": "opus-mt",
+        "translation_source_lang": "auto",
+        "translation_target_lang": "en",
+    }
+
+    with patch("ui.realtime_record.widget.get_notification_manager"):
+        widget = RealtimeRecordWidget(
+            recorder=mock_realtime_recorder,
+            audio_capture=mock_audio_capture,
+            i18n_manager=mock_i18n,
+            settings_manager=mock_settings_manager,
+            transcription_manager=transcription_manager,
+        )
+
+    try:
+        source_index = widget.source_lang_combo.findData("ja")
+        target_index = widget.target_lang_combo.findData("fr")
+        assert source_index >= 0
+        assert target_index >= 0
+        widget.source_lang_combo.setCurrentIndex(source_index)
+        widget.target_lang_combo.setCurrentIndex(target_index)
+        widget.enable_translation_checkbox.setChecked(False)
+
+        with patch(
+            "ui.common.secondary_transcribe_dialog.select_secondary_transcribe_model",
+            return_value={"model_name": "large-v3", "model_path": "/tmp/large-v3"},
+        ):
+            task_id = widget._queue_secondary_transcription(
+                "/tmp/demo.wav",
+                "event-1",
+                session_result={"translation_path": "/tmp/translation_en.txt"},
+            )
+
+        assert task_id == "task-1"
+        transcription_manager.add_task.assert_called_once()
+        _, kwargs = transcription_manager.add_task.call_args
+        options = kwargs["options"]
+        assert options["event_id"] == "event-1"
+        assert options["enable_translation"] is True
+        assert options["language"] == "ja"
+        assert options["translation_source_lang"] == "ja"
+        assert options["translation_target_lang"] == "fr"
+    finally:
+        widget._cleanup_resources()

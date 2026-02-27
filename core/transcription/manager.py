@@ -167,6 +167,7 @@ class TranscriptionManager:
         self._queue_buffer_lock = threading.Lock()
         self._pending_queue_entries: Dict[str, Tuple[Callable, tuple, dict]] = {}
         self._task_engine_options: Dict[str, Dict[str, Any]] = {}
+        self._task_quality_notes: Dict[str, str] = {}
         self._task_engine_options_path = get_app_dir() / "task_engine_options.json"
         self._load_persisted_task_engine_options()
 
@@ -989,6 +990,20 @@ class TranscriptionManager:
                 task.file_path, language=task.language, **engine_kwargs
             )
             transcript_text = self._extract_transcript_text(result)
+            existing_transcript_text = ""
+            if replace_realtime and event_id:
+                existing_transcript_text = self._read_event_attachment_text(
+                    event_id=event_id,
+                    attachment_type="transcript",
+                )
+            transcript_valid, transcript_issue = self._evaluate_transcription_output(
+                result=result,
+                transcript_text=transcript_text,
+                existing_transcript_text=existing_transcript_text,
+            )
+            if not transcript_valid:
+                self._set_task_quality_note(task_id, transcript_issue)
+                raise ValueError(f"Transcription output is invalid ({transcript_issue})")
 
             ensure_not_cancelled("after completing transcription")
             logger.info(f"Transcription completed for task {task_id}, processing results")
@@ -1036,6 +1051,7 @@ class TranscriptionManager:
             # For secondary re-transcription, if a translation attachment already exists,
             # always retranslate against the refreshed transcript and overwrite it.
             should_translate = bool(runtime_options.get("enable_translation"))
+            had_existing_translation = False
             if (
                 not should_translate
                 and replace_realtime
@@ -1043,11 +1059,22 @@ class TranscriptionManager:
                 and self._event_has_attachment_type(event_id, "translation")
             ):
                 should_translate = True
+                had_existing_translation = True
 
             if self.translation_engine and should_translate:
                 try:
                     await self._translate_and_save(task, transcript_text, runtime_options)
                 except Exception as trans_exc:
+                    self._set_task_quality_note(task_id, f"translation refresh failed: {trans_exc}")
+                    if replace_realtime and event_id and had_existing_translation:
+                        if self._remove_event_attachment_by_type(
+                            event_id=event_id,
+                            attachment_type="translation",
+                        ):
+                            self._set_task_quality_note(
+                                task_id,
+                                "stale translation attachment removed after failed refresh",
+                            )
                     logger.error(
                         "Translation failed for task %s: %s", task_id, trans_exc, exc_info=True
                     )
@@ -1236,6 +1263,15 @@ class TranscriptionManager:
                 **engine_kwargs,
             )
             source_text = self._extract_transcript_text(transcribe_result)
+            source_valid, source_issue = self._evaluate_transcription_output(
+                result=transcribe_result,
+                transcript_text=source_text,
+            )
+            if not source_valid:
+                self._set_task_quality_note(task_id, source_issue)
+                raise ValueError(
+                    f"Translation source transcription is invalid ({source_issue})"
+                )
         elif suffix in TEXT_TRANSLATION_SUFFIXES:
             source_text = source_path.read_text(encoding="utf-8")
         else:
@@ -1253,6 +1289,7 @@ class TranscriptionManager:
             text=source_text,
             source_lang=source_lang,
             target_lang=target_lang,
+            task_id=task_id,
         )
         if not translated_text.strip():
             raise ValueError("Translation result is empty")
@@ -1361,6 +1398,9 @@ class TranscriptionManager:
             task_id=task.id,
             runtime_options=runtime_options,
         )
+        quality_note = self._task_quality_notes.get(task.id)
+        if quality_note:
+            payload["quality_note"] = quality_note
         return payload
 
     @staticmethod
@@ -1383,6 +1423,68 @@ class TranscriptionManager:
                 collected.append(segment_text.strip())
         return "\n".join(collected).strip()
 
+    @classmethod
+    def _evaluate_transcription_output(
+        cls,
+        *,
+        result: Dict[str, Any],
+        transcript_text: str,
+        existing_transcript_text: str = "",
+    ) -> Tuple[bool, str]:
+        """Validate transcription output quality for completeness and regression."""
+        normalized_text = transcript_text.strip()
+        if not normalized_text:
+            return False, "empty transcript text"
+
+        segments = result.get("segments")
+        if isinstance(segments, list) and segments:
+            non_empty_segments = 0
+            for segment in segments:
+                if not isinstance(segment, dict):
+                    continue
+                segment_text = segment.get("text")
+                if isinstance(segment_text, str) and segment_text.strip():
+                    non_empty_segments += 1
+            if non_empty_segments == 0:
+                return False, "no non-empty transcript segments"
+
+        if existing_transcript_text.strip() and cls._is_likely_degraded_transcript(
+            new_transcript=normalized_text,
+            previous_transcript=existing_transcript_text,
+        ):
+            return False, "secondary transcription quality regression"
+
+        return True, ""
+
+    @staticmethod
+    def _non_whitespace_length(text: str) -> int:
+        """Count non-whitespace characters."""
+        return sum(1 for char in text if not char.isspace())
+
+    @classmethod
+    def _is_likely_degraded_transcript(
+        cls, *, new_transcript: str, previous_transcript: str
+    ) -> bool:
+        """
+        Detect obvious quality regression for secondary transcription replacement.
+
+        Secondary transcription should improve or at least preserve transcript completeness.
+        """
+        new_units = cls._count_semantic_units(new_transcript)
+        previous_units = cls._count_semantic_units(previous_transcript)
+        if previous_units < 8:
+            return False
+
+        if new_units <= max(2, previous_units // 5):
+            return True
+
+        new_len = cls._non_whitespace_length(new_transcript)
+        previous_len = cls._non_whitespace_length(previous_transcript)
+        if previous_len >= 120 and new_len <= max(40, int(previous_len * 0.35)):
+            return True
+
+        return False
+
     async def _translate_and_save(
         self, task: TranscriptionTask, text: str, options: Dict[str, Any]
     ) -> None:
@@ -1403,6 +1505,7 @@ class TranscriptionManager:
             text=text,
             source_lang=source_lang,
             target_lang=target_lang,
+            task_id=task.id,
         )
 
         if not translated_text:
@@ -1471,41 +1574,104 @@ class TranscriptionManager:
         self._upsert_translation_attachment(event_id=event_id, translation_path=translation_path)
         return str(translation_path)
 
-    async def _translate_text(self, *, text: str, source_lang: str, target_lang: str) -> str:
-        """Translate text with a quality guard against degenerate masked outputs."""
+    async def _translate_text(
+        self, *, text: str, source_lang: str, target_lang: str, task_id: Optional[str] = None
+    ) -> str:
+        """Translate text with quality guards against masked/truncated outputs."""
         if not self.translation_engine:
             raise RuntimeError("Translation engine is unavailable")
 
+        effective_source_lang = self._resolve_translation_source_language(
+            source_lang=source_lang,
+            text=text,
+        )
+        if self._should_use_chunked_translation_first(text):
+            chunked_text = await self._translate_text_chunked(
+                text=text,
+                source_lang=effective_source_lang,
+                target_lang=target_lang,
+            )
+            chunked_valid, chunked_issue = self._evaluate_translation_output(
+                source_text=text,
+                translated_text=chunked_text,
+                check_truncation=False,
+            )
+            if not chunked_valid:
+                self._set_task_quality_note(task_id, chunked_issue)
+                raise ValueError(f"Translation output is invalid ({chunked_issue})")
+            return chunked_text
+
         translated_text = await self._translate_once(
             text=text,
-            source_lang=source_lang,
+            source_lang=effective_source_lang,
             target_lang=target_lang,
         )
-        if translated_text and not self._is_masked_placeholder_text(translated_text):
+        is_valid, issue = self._evaluate_translation_output(
+            source_text=text,
+            translated_text=translated_text,
+        )
+        if is_valid:
             return translated_text
 
         logger.warning(
-            "Detected degenerate translation output (source=%s, target=%s). "
+            "Detected low-quality translation output (%s; source=%s, target=%s). "
             "Retrying with chunked translation fallback.",
-            source_lang,
+            issue,
+            effective_source_lang,
             target_lang,
         )
 
-        retry_source_lang = source_lang
-        if source_lang == "auto" and self._contains_cjk(text):
-            retry_source_lang = "zh"
+        try:
+            fallback_text = await self._translate_text_chunked(
+                text=text,
+                source_lang=effective_source_lang,
+                target_lang=target_lang,
+            )
+            self._set_task_quality_note(
+                task_id,
+                self._translate(
+                    "batch_transcribe.quality.translation_chunked_fallback",
+                    default=(
+                        "Translation quality guard triggered ({issue}); "
+                        "chunked fallback applied."
+                    ),
+                    issue=issue,
+                ),
+            )
+        except ValueError as exc:
+            self._set_task_quality_note(task_id, issue)
+            raise ValueError(f"Translation output is invalid ({issue})") from exc
 
+        fallback_valid, fallback_issue = self._evaluate_translation_output(
+            source_text=text,
+            translated_text=fallback_text,
+            check_truncation=False,
+        )
+        if fallback_valid:
+            return fallback_text
+
+        if not fallback_issue:
+            fallback_issue = issue or "unknown output issue"
+        self._set_task_quality_note(task_id, fallback_issue)
+        raise ValueError(f"Translation output is invalid ({fallback_issue})")
+
+    async def _translate_text_chunked(self, *, text: str, source_lang: str, target_lang: str) -> str:
+        """Translate text by chunks and require every chunk to produce valid output."""
         chunks = self._split_translation_chunks(text)
-        fallback_parts: List[str] = []
-        for chunk in chunks:
+        if not chunks:
+            return ""
+
+        translated_parts: List[str] = []
+        total_chunks = len(chunks)
+        for index, chunk in enumerate(chunks, start=1):
             chunk_translation = await self._translate_once(
                 text=chunk,
-                source_lang=retry_source_lang,
+                source_lang=source_lang,
                 target_lang=target_lang,
             )
             if (
                 self._is_masked_placeholder_text(chunk_translation)
-                and retry_source_lang != "zh"
+                and source_lang != "zh"
                 and self._contains_cjk(chunk)
             ):
                 chunk_translation = await self._translate_once(
@@ -1514,14 +1680,18 @@ class TranscriptionManager:
                     target_lang=target_lang,
                 )
 
-            if chunk_translation.strip() and not self._is_masked_placeholder_text(chunk_translation):
-                fallback_parts.append(chunk_translation.strip())
+            normalized_chunk = chunk_translation.strip()
+            if not normalized_chunk or self._is_masked_placeholder_text(normalized_chunk):
+                raise ValueError(
+                    f"Invalid translation output for chunk {index}/{total_chunks}"
+                )
+            if self._is_likely_extremely_short_translation(chunk, normalized_chunk):
+                raise ValueError(
+                    f"Suspiciously short translation output for chunk {index}/{total_chunks}"
+                )
+            translated_parts.append(normalized_chunk)
 
-        fallback_text = "\n".join(fallback_parts).strip()
-        if fallback_text and not self._is_masked_placeholder_text(fallback_text):
-            return fallback_text
-
-        raise ValueError("Translation output is invalid (masked placeholder text)")
+        return "\n".join(translated_parts).strip()
 
     async def _translate_once(self, *, text: str, source_lang: str, target_lang: str) -> str:
         """Run a single translation engine call and normalize return value."""
@@ -1536,6 +1706,61 @@ class TranscriptionManager:
     def _contains_cjk(text: str) -> bool:
         """Return whether text contains at least one CJK Unified Ideograph."""
         return any("\u4e00" <= char <= "\u9fff" for char in text)
+
+    @staticmethod
+    def _contains_hiragana_or_katakana(text: str) -> bool:
+        """Return whether text contains Japanese Hiragana/Katakana characters."""
+        return any(
+            ("\u3040" <= char <= "\u30ff") or ("\u31f0" <= char <= "\u31ff")
+            for char in text
+        )
+
+    @staticmethod
+    def _contains_hangul(text: str) -> bool:
+        """Return whether text contains Hangul characters."""
+        return any("\uac00" <= char <= "\ud7af" for char in text)
+
+    @classmethod
+    def _resolve_translation_source_language(cls, *, source_lang: str, text: str) -> str:
+        """
+        Resolve effective source language for translation requests.
+
+        For CJK scripts, explicit language improves model selection stability
+        and avoids auto-detect mismatches on long transcript text.
+        """
+        normalized = (source_lang or "").strip().lower() or "auto"
+        if normalized != "auto":
+            return normalized
+
+        if cls._contains_hangul(text):
+            return "ko"
+        if cls._contains_hiragana_or_katakana(text):
+            return "ja"
+        if cls._contains_cjk(text):
+            return "zh"
+        return "auto"
+
+    @classmethod
+    def _should_use_chunked_translation_first(cls, text: str) -> bool:
+        """
+        Decide whether to skip one-shot translation and use chunked mode directly.
+
+        Long transcript-like inputs are translated chunk-by-chunk to minimize
+        content drops from a single large generation call.
+        """
+        normalized = text.strip()
+        if not normalized:
+            return False
+
+        source_lines = cls._count_non_empty_lines(normalized)
+        if source_lines >= 8:
+            return True
+
+        source_units = cls._count_semantic_units(normalized)
+        if source_units >= 10:
+            return True
+
+        return cls._non_whitespace_length(normalized) >= 260
 
     @staticmethod
     def _is_masked_placeholder_text(text: str) -> bool:
@@ -1555,62 +1780,129 @@ class TranscriptionManager:
         star_count = sum(1 for char in non_whitespace if char in {"*", "＊"})
         return (star_count / len(non_whitespace)) >= 0.85
 
+    @classmethod
+    def _evaluate_translation_output(
+        cls,
+        *,
+        source_text: str,
+        translated_text: str,
+        check_truncation: bool = True,
+    ) -> Tuple[bool, str]:
+        """Validate translation output and classify failure reason when invalid."""
+        normalized = translated_text.strip()
+        if not normalized:
+            return False, "empty output"
+        if cls._is_masked_placeholder_text(normalized):
+            return False, "masked placeholder text"
+        if check_truncation and cls._is_likely_truncated_translation(
+            source_text=source_text,
+            translated_text=normalized,
+        ):
+            return False, "likely truncated output"
+        return True, ""
+
+    @staticmethod
+    def _count_non_empty_lines(text: str) -> int:
+        """Count non-empty lines in text."""
+        return sum(1 for line in text.splitlines() if line.strip())
+
+    @staticmethod
+    def _count_semantic_units(text: str) -> int:
+        """
+        Count rough sentence/line units for completeness checks.
+
+        We keep this heuristic conservative to avoid false positives on short text.
+        """
+        normalized = text.replace("\r\n", "\n").replace("\r", "\n").strip()
+        if not normalized:
+            return 0
+
+        parts = [
+            part.strip()
+            for part in re.split(r"(?:\n+|(?<=[。！？.!?;；]))", normalized)
+            if part.strip()
+        ]
+        return len(parts)
+
+    @classmethod
+    def _is_likely_truncated_translation(cls, *, source_text: str, translated_text: str) -> bool:
+        """Detect likely truncation where only the beginning of source content is translated."""
+        source_normalized = source_text.strip()
+        translated_normalized = translated_text.strip()
+        if not source_normalized or not translated_normalized:
+            return True
+
+        source_lines = cls._count_non_empty_lines(source_normalized)
+        translated_lines = cls._count_non_empty_lines(translated_normalized)
+
+        source_units = cls._count_semantic_units(source_normalized)
+        translated_units = cls._count_semantic_units(translated_normalized)
+        if source_lines >= 8 and translated_lines <= 1 and source_units >= 8 and translated_units <= 2:
+            return True
+        if source_units >= 10 and translated_units <= max(2, source_units // 4):
+            return True
+
+        source_non_ws = cls._non_whitespace_length(source_normalized)
+        translated_non_ws = cls._non_whitespace_length(translated_normalized)
+        if source_non_ws >= 200 and translated_non_ws <= max(30, int(source_non_ws * 0.2)):
+            return True
+
+        return False
+
+    @classmethod
+    def _is_likely_extremely_short_translation(
+        cls, source_text: str, translated_text: str
+    ) -> bool:
+        """Detect chunk-level outputs that are implausibly short for the input."""
+        source_non_ws = cls._non_whitespace_length(source_text)
+        translated_non_ws = cls._non_whitespace_length(translated_text)
+        if source_non_ws < 80:
+            return False
+        return translated_non_ws <= max(12, int(source_non_ws * 0.08))
+
     @staticmethod
     def _split_translation_chunks(text: str, *, max_chunk_chars: int = 220) -> List[str]:
-        """Split translation input into short sentence-like chunks for retry."""
+        """Split translation input into compact chunks while preserving line boundaries."""
         normalized = text.replace("\r\n", "\n").replace("\r", "\n").strip()
         if not normalized:
             return []
 
-        # Keep newline as a hard sentence boundary, then pack into small chunks.
-        sentences = [
-            segment.strip()
-            for segment in re.split(r"(?<=[。！？.!?;；\n])", normalized)
-            if segment.strip()
-        ]
-        if not sentences:
-            sentences = [normalized]
-
         chunks: List[str] = []
-        current_parts: List[str] = []
-        current_length = 0
 
-        def flush_current() -> None:
-            nonlocal current_parts, current_length
-            if not current_parts:
+        def append_fragments(fragment: str) -> None:
+            text_part = fragment.strip()
+            if not text_part:
                 return
-            chunks.append(" ".join(current_parts).strip())
-            current_parts = []
-            current_length = 0
+            if len(text_part) <= max_chunk_chars:
+                chunks.append(text_part)
+                return
 
-        for sentence in sentences:
-            sentence_parts = [sentence]
-            if len(sentence) > max_chunk_chars:
-                sentence_parts = [
-                    part.strip()
-                    for part in re.split(r"(?<=[，,、])", sentence)
-                    if part.strip()
-                ]
-                if not sentence_parts:
-                    sentence_parts = [sentence]
+            sub_parts = [part.strip() for part in re.split(r"(?<=[，,、])", text_part) if part.strip()]
+            if not sub_parts:
+                sub_parts = [text_part]
 
-            for part in sentence_parts:
-                if len(part) > max_chunk_chars:
-                    flush_current()
-                    for start in range(0, len(part), max_chunk_chars):
-                        chunk = part[start : start + max_chunk_chars].strip()
-                        if chunk:
-                            chunks.append(chunk)
+            for sub_part in sub_parts:
+                if len(sub_part) <= max_chunk_chars:
+                    chunks.append(sub_part)
                     continue
+                for start in range(0, len(sub_part), max_chunk_chars):
+                    piece = sub_part[start : start + max_chunk_chars].strip()
+                    if piece:
+                        chunks.append(piece)
 
-                addition = len(part) + (1 if current_parts else 0)
-                if current_parts and current_length + addition > max_chunk_chars:
-                    flush_current()
-
-                current_parts.append(part)
-                current_length += addition
-
-        flush_current()
+        for line in normalized.split("\n"):
+            line_text = line.strip()
+            if not line_text:
+                continue
+            sentence_parts = [
+                segment.strip()
+                for segment in re.split(r"(?<=[。！？.!?;；])", line_text)
+                if segment.strip()
+            ]
+            if not sentence_parts:
+                sentence_parts = [line_text]
+            for sentence in sentence_parts:
+                append_fragments(sentence)
         return chunks
 
     def _resolve_translation_output_path(
@@ -1680,6 +1972,82 @@ class TranscriptionManager:
         except Exception:
             return False
 
+    def _remove_event_attachment_by_type(self, *, event_id: str, attachment_type: str) -> bool:
+        """Remove event attachment metadata for a given type."""
+        try:
+            attachment = EventAttachment.get_by_event_and_type(self.db, event_id, attachment_type)
+        except Exception as exc:
+            logger.warning(
+                "Failed to query %s attachment for event %s before delete: %s",
+                attachment_type,
+                event_id,
+                exc,
+            )
+            return False
+
+        if not attachment:
+            return False
+
+        try:
+            attachment.delete(self.db)
+            return True
+        except Exception as exc:
+            logger.warning(
+                "Failed to delete %s attachment for event %s: %s",
+                attachment_type,
+                event_id,
+                exc,
+            )
+            return False
+
+    def _read_event_attachment_text(self, *, event_id: str, attachment_type: str) -> str:
+        """Best-effort load textual attachment content for quality checks."""
+        try:
+            attachment = EventAttachment.get_by_event_and_type(self.db, event_id, attachment_type)
+        except Exception as exc:
+            logger.warning(
+                "Failed to query %s attachment for event %s: %s",
+                attachment_type,
+                event_id,
+                exc,
+            )
+            return ""
+
+        if not attachment or not attachment.file_path:
+            return ""
+
+        attachment_path = Path(attachment.file_path).expanduser()
+        if not attachment_path.exists():
+            return ""
+
+        try:
+            return attachment_path.read_text(encoding="utf-8")
+        except Exception as exc:
+            logger.warning(
+                "Failed to read %s attachment text %s for event %s: %s",
+                attachment_type,
+                attachment_path,
+                event_id,
+                exc,
+            )
+            return ""
+
+    def _set_task_quality_note(self, task_id: Optional[str], note: Optional[str]) -> None:
+        """Attach deduplicated quality notes to task payloads."""
+        if not task_id:
+            return
+        normalized = (note or "").strip()
+        if not normalized:
+            return
+
+        existing = self._task_quality_notes.get(task_id)
+        if not existing:
+            self._task_quality_notes[task_id] = normalized
+            return
+        if normalized in existing:
+            return
+        self._task_quality_notes[task_id] = f"{existing}; {normalized}"
+
     def _resolve_realtime_transcript_path(
         self, task: TranscriptionTask, event_id: Optional[str]
     ) -> Path:
@@ -1695,6 +2063,7 @@ class TranscriptionManager:
         if task_id in self._task_engine_options:
             del self._task_engine_options[task_id]
             self._persist_task_engine_options()
+        self._task_quality_notes.pop(task_id, None)
 
     def get_task_status(self, task_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -1723,6 +2092,7 @@ class TranscriptionManager:
             "output_format": task.output_format,
             "output_path": task.output_path,
             "error_message": task.error_message,
+            "quality_note": self._task_quality_notes.get(task.id),
             "created_at": task.created_at,
             "started_at": task.started_at,
             "completed_at": task.completed_at,
@@ -1797,6 +2167,7 @@ class TranscriptionManager:
         task.started_at = None
         task.completed_at = None
         task.save(self.db)
+        self._task_quality_notes.pop(task_id, None)
 
         # Re-add to queue (schedule in background event loop)
         if self._loop and self._running:
@@ -1836,6 +2207,7 @@ class TranscriptionManager:
                 "output_format": task.output_format,
                 "output_path": task.output_path,
                 "error_message": task.error_message,
+                "quality_note": self._task_quality_notes.get(task.id),
                 "created_at": task.created_at,
                 "started_at": task.started_at,
                 "completed_at": task.completed_at,
@@ -1863,6 +2235,7 @@ class TranscriptionManager:
             self._pending_queue_entries.pop(task_id, None)
         if self._task_engine_options.pop(task_id, None) is not None:
             self._persist_task_engine_options()
+        self._task_quality_notes.pop(task_id, None)
 
         from config.constants import TASK_STATUS_PROCESSING
 
@@ -2043,6 +2416,9 @@ class TranscriptionManager:
                 "status": "processing",
                 "message": message,
             }
+            quality_note = self._task_quality_notes.get(task_id)
+            if quality_note:
+                payload["quality_note"] = quality_note
             if task_kind:
                 payload["task_kind"] = task_kind
             self._notify_listeners(

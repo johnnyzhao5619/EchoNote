@@ -1634,8 +1634,36 @@ class CalendarHubWidget(BaseWidget):
             f"Submitting high-quality re-transcription from Calendar Hub for event {event_id}"
         )
         dialog_data = dialog_data or {}
-        source_lang = TRANSLATION_LANGUAGE_AUTO
-        target_lang = dialog_data.get("translation_target_lang")
+        config = None
+        try:
+            from data.database.models import AutoTaskConfig
+
+            config = AutoTaskConfig.get_by_event_id(self.calendar_manager.db, event_id)
+        except Exception as exc:
+            logger.warning(
+                "Failed to fetch auto-task config for event %s before secondary transcription: %s",
+                event_id,
+                exc,
+            )
+
+        transcription_language = str(dialog_data.get("transcription_language") or "").strip()
+        if not transcription_language and config and config.transcription_language:
+            transcription_language = str(config.transcription_language).strip()
+
+        if "enable_translation" in dialog_data:
+            enable_translation = bool(dialog_data.get("enable_translation"))
+        else:
+            enable_translation = False
+        if "enable_translation" not in dialog_data and config:
+            enable_translation = bool(config.enable_translation)
+
+        if "translation_target_lang" in dialog_data:
+            target_lang = dialog_data.get("translation_target_lang")
+        else:
+            target_lang = None
+        if target_lang is None and config and config.translation_target_language:
+            target_lang = config.translation_target_language
+
         resolved_languages = resolve_translation_languages_from_settings(
             self._get_settings_manager(),
             target_lang=target_lang,
@@ -1652,10 +1680,12 @@ class CalendarHubWidget(BaseWidget):
             "replace_realtime": True,
             "model_name": selected_model["model_name"],
             "model_path": selected_model["model_path"],
-            "enable_translation": dialog_data.get("enable_translation", False),
+            "enable_translation": enable_translation,
             "translation_source_lang": source_lang,
             "translation_target_lang": target_lang,
         }
+        if transcription_language and transcription_language != TRANSLATION_LANGUAGE_AUTO:
+            options["language"] = transcription_language
 
         self.transcription_manager.add_task(recording_path, options=options)
 

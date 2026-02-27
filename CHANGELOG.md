@@ -5,6 +5,20 @@ All notable changes to EchoNote will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.2] - 2026-02-27
+
+### Changed
+
+- Released `v2.0.2` with end-to-end quality hardening for secondary transcription and transcript translation workflows.
+- **Translation completeness**: Long transcript-like inputs now use chunked translation as the primary path (instead of best-effort one-shot first), reducing content loss risk in large generation calls.
+- **Translation model routing**: Added source-language hinting for `auto` mode in translation task processing (`ko/ja/zh` script-aware resolution) and updated Opus-MT auto-detect model selection to prefer source-hinted language pairs before target-only fallback.
+- **Chunking strategy**: Translation chunk splitting now preserves transcript line boundaries and keeps compact sentence fragments, improving fidelity and diagnosability for compare-mode review.
+- **Secondary transcription quality guard**: Realtime replacement now enforces output completeness/regression checks before overwrite; suspiciously degraded retranscription output is rejected instead of replacing existing transcript.
+- **Stale artifact prevention**: When secondary transcription triggers translation refresh and refresh fails, stale translation attachment metadata is removed to prevent UI from showing outdated translation as current output.
+- **Observability**: Added/propagated task-level `quality_note` diagnostics for quality-guard fallback/invalid-output paths and surfaced notes in batch task UI metadata.
+- **Tests**: Added regression coverage for long-text chunk-first translation, auto source-language inference, line-preserving chunk split behavior, stale translation attachment cleanup on refresh failure, and auto-detect translation model source-hint preference.
+- Synchronized project, packaging, documentation, and landing metadata version references to `v2.0.2`.
+
 ## [2.0.1] - 2026-02-26
 
 ### Fixed

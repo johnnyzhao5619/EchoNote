@@ -2563,7 +2563,11 @@ class RealtimeRecordWidget(BaseWidget):
         if not recording_path:
             return
 
-        task_id = self._queue_secondary_transcription(recording_path, event_id)
+        task_id = self._queue_secondary_transcription(
+            recording_path,
+            event_id,
+            session_result=result,
+        )
         if task_id:
             self._secondary_transcription_task_id = task_id
             self._secondary_transcribe_button.setEnabled(False)
@@ -2576,7 +2580,10 @@ class RealtimeRecordWidget(BaseWidget):
             )
 
     def _queue_secondary_transcription(
-        self, recording_path: str, event_id: str
+        self,
+        recording_path: str,
+        event_id: str,
+        session_result: Optional[Dict[str, Any]] = None,
     ) -> Optional[str]:
         """Show model-selection dialog and queue secondary transcription. Returns task_id or None."""
         from ui.common.secondary_transcribe_dialog import select_secondary_transcribe_model
@@ -2591,11 +2598,29 @@ class RealtimeRecordWidget(BaseWidget):
             return None
 
         try:
+            selected_source = self.source_lang_combo.currentData() if hasattr(
+                self, "source_lang_combo"
+            ) else None
+            selected_target = self.target_lang_combo.currentData() if hasattr(
+                self, "target_lang_combo"
+            ) else None
+            translation_source_lang, translation_target_lang = self._resolve_translation_languages(
+                source_lang=selected_source,
+                target_lang=selected_target,
+            )
+            reused_translation_requested = bool((session_result or {}).get("translation_path"))
+            enable_translation = reused_translation_requested or (
+                hasattr(self, "enable_translation_checkbox")
+                and self.enable_translation_checkbox.isChecked()
+            )
             options: Dict[str, Any] = {
                 "replace_realtime": True,
                 "event_id": event_id,
                 "model_name": selected_model["model_name"],
                 "model_path": selected_model["model_path"],
+                "enable_translation": bool(enable_translation),
+                "translation_source_lang": translation_source_lang,
+                "translation_target_lang": translation_target_lang,
             }
             if hasattr(self, "source_lang_combo"):
                 lang = self.source_lang_combo.currentData()

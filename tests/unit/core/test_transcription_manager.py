@@ -344,6 +344,89 @@ class TestTranscriptionManager:
         assert "transcript" in upsert_types
         assert "translation" in upsert_types
 
+    @pytest.mark.asyncio
+    async def test_replace_realtime_rejects_degraded_transcript_output(
+        self, manager, temp_audio_file, temp_dir
+    ):
+        """Secondary retranscription should fail instead of replacing with degraded transcript."""
+        task_id = manager.add_task(
+            str(temp_audio_file),
+            {"event_id": "evt-quality", "replace_realtime": True},
+        )
+        manager.speech_engine.transcribe_file = AsyncMock(
+            return_value={
+                "segments": [{"start": 0.0, "end": 1.0, "text": "短句"}],
+                "duration": 300.0,
+            }
+        )
+
+        existing_text = "\n".join(f"历史转写第{i}行。" for i in range(1, 13))
+        transcript_path = temp_dir / "existing_transcript.txt"
+        transcript_path.write_text(existing_text, encoding="utf-8")
+        original_content = transcript_path.read_text(encoding="utf-8")
+
+        def _get_attachment(_db, _event_id, attachment_type):
+            if attachment_type == "transcript":
+                return Mock(file_path=str(transcript_path))
+            return None
+
+        with (
+            patch.object(manager, "_send_notification"),
+            patch(
+                "core.transcription.manager.EventAttachment.get_by_event_and_type",
+                side_effect=_get_attachment,
+            ),
+            patch("core.transcription.manager.EventAttachment.upsert_for_event_type") as mock_upsert,
+            patch.object(manager, "export_result") as mock_export,
+        ):
+            await manager._process_task_async(task_id, cancel_event=asyncio.Event())
+
+        assert manager.db.tasks[task_id]["status"] == TASK_STATUS_FAILED
+        assert "quality regression" in (manager.db.tasks[task_id]["error_message"] or "")
+        assert transcript_path.read_text(encoding="utf-8") == original_content
+        mock_upsert.assert_not_called()
+        mock_export.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_replace_realtime_clears_stale_translation_attachment_when_refresh_fails(
+        self, manager, temp_audio_file, temp_dir
+    ):
+        """Failed translation refresh should remove stale translation attachment metadata."""
+        manager.translation_engine = Mock()
+        task_id = manager.add_task(
+            str(temp_audio_file),
+            {"event_id": "evt-translation-stale", "replace_realtime": True},
+        )
+
+        transcript_path = temp_dir / "existing_transcript.txt"
+        transcript_path.write_text("原始转写内容。", encoding="utf-8")
+
+        def _get_attachment(_db, _event_id, attachment_type):
+            if attachment_type == "transcript":
+                return Mock(file_path=str(transcript_path))
+            return None
+
+        with (
+            patch.object(manager, "_translate_and_save", AsyncMock(side_effect=ValueError("bad translation"))),
+            patch.object(manager, "_send_notification"),
+            patch.object(manager, "_event_has_attachment_type", return_value=True),
+            patch.object(manager, "_remove_event_attachment_by_type", return_value=True) as mock_remove,
+            patch(
+                "core.transcription.manager.EventAttachment.get_by_event_and_type",
+                side_effect=_get_attachment,
+            ),
+            patch("core.transcription.manager.EventAttachment.upsert_for_event_type"),
+        ):
+            await manager._process_task_async(task_id, cancel_event=asyncio.Event())
+
+        assert manager.db.tasks[task_id]["status"] == TASK_STATUS_COMPLETED
+        mock_remove.assert_called_once_with(
+            event_id="evt-translation-stale",
+            attachment_type="translation",
+        )
+        quality_note = manager._task_quality_notes.get(task_id, "")
+        assert "stale translation attachment removed" in quality_note
+
     def test_add_task_file_not_found(self, manager):
         """Test adding a task with non-existent file."""
         with pytest.raises(FileNotFoundError):
@@ -429,6 +512,132 @@ class TestTranscriptionManager:
         assert first_retry_call.args[1] == "zh"
 
     @pytest.mark.asyncio
+    async def test_translate_text_retries_when_output_is_likely_truncated(self, manager):
+        """Likely truncated output should trigger chunked retry for complete translation."""
+        manager.translation_engine = Mock()
+        manager.translation_engine.translate = AsyncMock(
+            side_effect=[
+                "Only the beginning was translated.",
+                "Line one translated",
+                "Line two translated",
+                "Line three translated",
+            ]
+        )
+
+        source_text = "\n".join(f"第{i}行内容。" for i in range(1, 13))
+        with (
+            patch.object(manager, "_should_use_chunked_translation_first", return_value=False),
+            patch.object(
+                manager,
+                "_split_translation_chunks",
+                return_value=["第一段", "第二段", "第三段"],
+            ),
+        ):
+            translated = await manager._translate_text(
+                text=source_text,
+                source_lang="auto",
+                target_lang="en",
+            )
+
+        assert translated == "Line one translated\nLine two translated\nLine three translated"
+        assert manager.translation_engine.translate.await_count == 4
+
+    @pytest.mark.asyncio
+    async def test_translate_text_keeps_full_single_line_output_without_retry(self, manager):
+        """Do not force chunk fallback when a one-line translation still covers all semantics."""
+        source_text = "\n".join(f"第{i}句内容。" for i in range(1, 5))
+        full_translation = (
+            "Sentence 1. Sentence 2. Sentence 3. Sentence 4. "
+            "Sentence 5."
+        )
+        manager.translation_engine = Mock()
+        manager.translation_engine.translate = AsyncMock(return_value=full_translation)
+
+        translated = await manager._translate_text(
+            text=source_text,
+            source_lang="auto",
+            target_lang="en",
+        )
+
+        assert translated == full_translation
+        assert manager.translation_engine.translate.await_count == 1
+
+    @pytest.mark.asyncio
+    async def test_translate_text_records_quality_note_when_fallback_used(self, manager):
+        """Chunked fallback should leave a quality note for UI visibility."""
+        manager.translation_engine = Mock()
+        manager.translation_engine.translate = AsyncMock(
+            side_effect=[
+                "Only beginning.",
+                "Chunk A translated",
+                "Chunk B translated",
+            ]
+        )
+
+        source_text = "\n".join(f"第{i}行内容。" for i in range(1, 13))
+        with (
+            patch.object(manager, "_should_use_chunked_translation_first", return_value=False),
+            patch.object(manager, "_split_translation_chunks", return_value=["第一段", "第二段"]),
+        ):
+            translated = await manager._translate_text(
+                text=source_text,
+                source_lang="auto",
+                target_lang="en",
+                task_id="task-with-note",
+            )
+
+        assert translated == "Chunk A translated\nChunk B translated"
+        assert "chunked fallback" in manager._task_quality_notes["task-with-note"]
+
+    @pytest.mark.asyncio
+    async def test_translate_text_uses_chunked_first_for_long_transcript(self, manager):
+        """Long transcript-like source should go through chunked translation directly."""
+        manager.translation_engine = Mock()
+        manager.translation_engine.translate = AsyncMock(
+            side_effect=["Chunk one", "Chunk two", "Chunk three"]
+        )
+
+        source_text = "\n".join(f"第{i}行内容。" for i in range(1, 13))
+        with patch.object(
+            manager,
+            "_split_translation_chunks",
+            return_value=["第一段", "第二段", "第三段"],
+        ):
+            translated = await manager._translate_text(
+                text=source_text,
+                source_lang="auto",
+                target_lang="en",
+            )
+
+        assert translated == "Chunk one\nChunk two\nChunk three"
+        assert manager.translation_engine.translate.await_count == 3
+        first_call = manager.translation_engine.translate.await_args_list[0]
+        assert first_call.args[1] == "zh"
+
+    @pytest.mark.asyncio
+    async def test_translate_text_infers_cjk_source_language_when_auto(self, manager):
+        """Auto source should infer zh for CJK text to stabilize model selection."""
+        manager.translation_engine = Mock()
+        manager.translation_engine.translate = AsyncMock(return_value="hello world")
+
+        translated = await manager._translate_text(
+            text="这是测试文本。",
+            source_lang="auto",
+            target_lang="en",
+        )
+
+        assert translated == "hello world"
+        manager.translation_engine.translate.assert_awaited_once()
+        first_call = manager.translation_engine.translate.await_args_list[0]
+        assert first_call.args[1] == "zh"
+
+    def test_split_translation_chunks_preserves_line_boundaries(self, manager):
+        """Chunk splitting should not merge independent transcript lines."""
+        text = "第一行。\n第二行。\n第三行。"
+        chunks = manager._split_translation_chunks(text, max_chunk_chars=220)
+        assert chunks == ["第一行。", "第二行。", "第三行。"]
+
+    @pytest.mark.asyncio
     async def test_translate_text_raises_when_retry_still_masked(self, manager):
         """If retry output remains masked placeholders, translation should fail explicitly."""
         masked = "* " * 40
@@ -473,6 +682,7 @@ class TestTranscriptionManager:
     def test_get_task_status_existing(self, manager, temp_audio_file):
         """Test getting status of an existing task."""
         task_id = manager.add_task(str(temp_audio_file))
+        manager._task_quality_notes[task_id] = "quality-check-note"
 
         status = manager.get_task_status(task_id)
 
@@ -481,6 +691,7 @@ class TestTranscriptionManager:
         assert status["status"] == TASK_STATUS_PENDING
         assert status["file_name"] == temp_audio_file.name
         assert status["task_kind"] == "transcription"
+        assert status["quality_note"] == "quality-check-note"
 
     def test_get_task_status_nonexistent(self, manager):
         """Test getting status of a nonexistent task."""

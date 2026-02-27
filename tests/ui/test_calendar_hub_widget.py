@@ -213,3 +213,51 @@ def test_calendar_hub_translate_transcript_prompt_cancelled_skips_queue(qapp, mo
         )
 
     mock_enqueue.assert_not_called()
+
+
+def test_calendar_hub_secondary_transcribe_uses_config_language_and_dialog_preferences(
+    qapp, mock_i18n
+):
+    calendar_manager = MagicMock()
+    calendar_manager.get_events.return_value = []
+    calendar_manager.db = MagicMock()
+    oauth_manager = MagicMock()
+    transcription_manager = MagicMock()
+    transcription_manager.add_task = MagicMock(return_value="task-1")
+
+    with patch.object(CalendarHubWidget, "_load_connected_accounts", return_value=None):
+        widget = CalendarHubWidget(
+            calendar_manager,
+            oauth_manager,
+            mock_i18n,
+            transcription_manager=transcription_manager,
+        )
+
+    config = SimpleNamespace(
+        transcription_language="ja",
+        enable_translation=True,
+        translation_target_language="de",
+    )
+    with (
+        patch(
+            "ui.common.secondary_transcribe_dialog.select_secondary_transcribe_model",
+            return_value={"model_name": "large-v3", "model_path": "/tmp/large-v3"},
+        ),
+        patch("data.database.models.AutoTaskConfig.get_by_event_id", return_value=config),
+    ):
+        widget._on_secondary_transcribe_requested(
+            event_id="event-1",
+            recording_path="/tmp/demo.wav",
+            dialog_data={
+                "enable_translation": False,
+                "translation_target_lang": "fr",
+            },
+        )
+
+    transcription_manager.add_task.assert_called_once()
+    _, kwargs = transcription_manager.add_task.call_args
+    options = kwargs["options"]
+    assert options["language"] == "ja"
+    assert options["enable_translation"] is False
+    assert options["translation_source_lang"] == "auto"
+    assert options["translation_target_lang"] == "fr"

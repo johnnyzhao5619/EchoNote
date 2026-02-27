@@ -81,3 +81,30 @@ def test_has_active_downloads_reflects_downloader_state(_mock_usage, _mock_trans
     with manager.downloader._lock:
         manager.downloader._active_flags["base"] = Event()
     assert manager.has_active_downloads() is True
+
+
+@patch("core.models.manager.TranslationModelRecord.get_all", return_value=[])
+@patch("core.models.manager.ModelUsageStats.get_all", return_value=[])
+def test_get_best_translation_model_auto_detect_prefers_source_hint(
+    _mock_usage, _mock_trans, tmp_path
+):
+    manager = ModelManager(_build_config(tmp_path / "models"), Mock())
+
+    model = manager.get_best_translation_model("zh", "en", auto_detect=True)
+
+    assert model is not None
+    assert model.model_id == "opus-mt-zh-en"
+
+
+@patch("core.models.manager.TranslationModelRecord.get_all", return_value=[])
+@patch("core.models.manager.ModelUsageStats.get_all", return_value=[])
+def test_get_best_translation_model_auto_detect_falls_back_to_downloaded_target_match(
+    _mock_usage, _mock_trans, tmp_path
+):
+    manager = ModelManager(_build_config(tmp_path / "models"), Mock())
+    manager.get_downloaded_translation_models = Mock(return_value=["opus-mt-ja-en"])
+
+    model = manager.get_best_translation_model("auto", "en", auto_detect=True)
+
+    assert model is not None
+    assert model.model_id == "opus-mt-ja-en"

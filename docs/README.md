@@ -125,4 +125,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 ---
 
 **Last Updated**: February 26, 2026
-**Version**: v2.0.1
+**Version**: v2.0.2
