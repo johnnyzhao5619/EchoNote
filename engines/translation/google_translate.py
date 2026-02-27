@@ -70,6 +70,10 @@ class GoogleTranslateEngine(TranslationEngine):
     async def translate(self, text: str, source_lang: str = "auto", target_lang: str = "en") -> str:
         """Translate text using the Google Cloud Translation API.
 
+        For long texts exceeding ``_MAX_CHARS_PER_REQUEST``, the input is split
+        into sentence-boundary chunks and each chunk is translated separately,
+        then the results are joined.
+
         Args:
             text: Input text to translate.
             source_lang: Source language code. ``"auto"`` enables detection.
@@ -81,89 +85,105 @@ class GoogleTranslateEngine(TranslationEngine):
         if not text or not text.strip():
             return ""
 
-        # Validate the target language.
+        # Validate languages up-front.
         if not self.validate_language(target_lang):
             msg = f"Unsupported target language: {target_lang}"
             logger.error(msg)
             raise ValueError(msg)
 
-        # Prepare request parameters.
-        params = {"key": self.api_key, "q": text, "target": target_lang}
+        if source_lang != "auto" and not self.validate_language(source_lang):
+            msg = f"Unsupported source language: {source_lang}"
+            logger.error(msg)
+            raise ValueError(msg)
 
-        # Include the explicit source language when provided.
+        # Split long texts into chunks to stay within per-request limits.
+        chunks = self._split_text(text)
+        if len(chunks) == 1:
+            return await self._translate_chunk(text, source_lang=source_lang, target_lang=target_lang)
+
+        parts = []
+        for chunk in chunks:
+            part = await self._translate_chunk(chunk, source_lang=source_lang, target_lang=target_lang)
+            parts.append(part)
+        return " ".join(parts)
+
+    async def _translate_chunk(
+        self, text: str, *, source_lang: str, target_lang: str
+    ) -> str:
+        """Send a single translation request as a POST JSON body.
+
+        The API key is passed as a URL query parameter; the payload (``q``,
+        ``target``, ``source``) is sent in the JSON request body.  This avoids
+        URL-length limits that arise when long texts are encoded as query
+        parameters.
+        """
+        # API key stays in the URL; content goes in the POST body.
+        url_params = {"key": self.api_key}
+        body: dict = {"q": text, "target": target_lang, "format": "text"}
         if source_lang != "auto":
-            if not self.validate_language(source_lang):
-                msg = f"Unsupported source language: {source_lang}"
-                logger.error(msg)
-                raise ValueError(msg)
-            params["source"] = source_lang
+            body["source"] = source_lang
 
-        # Retry loop.
         last_error = None
         for attempt in range(self.max_retries):
             try:
-                logger.debug(f"Translation attempt {attempt + 1}/" f"{self.max_retries}")
+                logger.debug("Translation attempt %d/%d", attempt + 1, self.max_retries)
 
-                # Send the HTTP request.
-                response = await self.client.post(self.base_url, params=params)
+                response = await self.client.post(
+                    self.base_url, params=url_params, json=body
+                )
 
-                # Inspect the response status code.
                 if response.status_code == 200:
                     data = response.json()
 
-                    # Extract translation payload.
                     if "data" in data and "translations" in data["data"]:
                         translations = data["data"]["translations"]
                         if translations:
                             translated = translations[0]["translatedText"]
                             logger.debug(
-                                f"Translation successful: "
-                                f"{text[:50]}... -> {translated[:50]}..."
+                                "Translation successful: %s... -> %s...",
+                                text[:50],
+                                translated[:50],
                             )
                             return translated
 
-                    logger.error(f"Unexpected response format: {data}")
-                    msg = "Unexpected response format from API"
-                    raise ValueError(msg)
+                    logger.error("Unexpected response format: %s", data)
+                    raise ValueError("Unexpected response format from API")
 
                 elif response.status_code == 400:
                     # Client error: do not retry.
                     error_data = response.json()
                     error_msg = error_data.get("error", {}).get("message", "Unknown error")
-                    logger.error(f"Google Translate API error (400): {error_msg}")
+                    logger.error("Google Translate API error (400): %s", error_msg)
                     raise ValueError(f"Translation failed: {error_msg}")
 
                 elif response.status_code == 403:
                     # Authentication error: do not retry.
                     logger.error("Google Translate API authentication failed (403)")
-                    msg = "Invalid API key or insufficient permissions"
-                    raise ValueError(msg)
+                    raise ValueError("Invalid API key or insufficient permissions")
 
                 elif response.status_code == 429:
-                    # Rate limit exceeded: apply exponential backoff.
+                    # Rate limit exceeded: exponential backoff.
                     logger.warning("Google Translate API rate limit exceeded (429)")
                     if attempt < self.max_retries - 1:
                         import asyncio
 
-                        await asyncio.sleep(2**attempt)  # Exponential backoff.
+                        await asyncio.sleep(2**attempt)
                         continue
-                    msg = "Translation failed: Rate limit exceeded"
-                    raise ValueError(msg)
+                    raise ValueError("Translation failed: Rate limit exceeded")
 
                 else:
-                    # Other error: retry when attempts remain.
-                    logger.warning(f"Google Translate API error " f"({response.status_code})")
+                    logger.warning("Google Translate API error (%d)", response.status_code)
                     if attempt < self.max_retries - 1:
                         import asyncio
 
                         await asyncio.sleep(1)
                         continue
-                    msg = f"Translation failed with status code: " f"{response.status_code}"
-                    raise ValueError(msg)
+                    raise ValueError(
+                        f"Translation failed with status code: {response.status_code}"
+                    )
 
             except httpx.RequestError as e:
-                # Network error: retry.
-                logger.warning(f"Network error during translation: {e}")
+                logger.warning("Network error during translation: %s", e)
                 last_error = e
                 if attempt < self.max_retries - 1:
                     import asyncio
@@ -172,17 +192,49 @@ class GoogleTranslateEngine(TranslationEngine):
                     continue
 
             except Exception as e:
-                # Propagate unexpected errors.
-                logger.error(f"Translation error: {e}")
+                logger.error("Translation error: %s", e)
                 raise
 
-        # All retries exhausted.
         if last_error:
-            msg = f"Translation failed after {self.max_retries} " f"attempts: {last_error}"
-            raise ValueError(msg)
+            raise ValueError(
+                f"Translation failed after {self.max_retries} attempts: {last_error}"
+            )
+        raise ValueError(f"Translation failed after {self.max_retries} attempts")
 
-        msg = f"Translation failed after {self.max_retries} attempts"
-        raise ValueError(msg)
+    # Maximum characters sent to the API in a single request.  Long texts are
+    # split at sentence boundaries before each chunk is translated individually.
+    _MAX_CHARS_PER_REQUEST: int = 5000
+
+    @classmethod
+    def _split_text(cls, text: str) -> List[str]:
+        """Split text into chunks not exceeding ``_MAX_CHARS_PER_REQUEST``."""
+        import re
+
+        if len(text) <= cls._MAX_CHARS_PER_REQUEST:
+            return [text]
+
+        sentences = re.split(r"(?<=[.!?。！？\n])\s*", text)
+        chunks: List[str] = []
+        current = ""
+        for sentence in sentences:
+            if not sentence:
+                continue
+            addition = len(sentence) + (1 if current else 0)
+            if current and len(current) + addition > cls._MAX_CHARS_PER_REQUEST:
+                chunks.append(current.strip())
+                current = sentence
+            else:
+                current = (current + " " + sentence).strip() if current else sentence
+        if current:
+            chunks.append(current.strip())
+
+        if not chunks:
+            # Fallback: hard split with no sentence boundary detection.
+            return [
+                text[i : i + cls._MAX_CHARS_PER_REQUEST]
+                for i in range(0, len(text), cls._MAX_CHARS_PER_REQUEST)
+            ]
+        return chunks
 
     def close(self):
         """Synchronously close the underlying HTTP client."""

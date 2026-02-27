@@ -22,6 +22,7 @@ gain adjustment, language selection, and transcription/translation display.
 
 import asyncio
 import logging
+import os
 import platform
 import re
 import threading
@@ -168,6 +169,7 @@ class RealtimeRecorderSignals(QObject):
     recording_stopped = Signal()
     recording_succeeded = Signal(dict)
     marker_added = Signal(object)
+    secondary_transcription_completed = Signal(dict)
 
 
 class RealtimeRecordWidget(BaseWidget):
@@ -209,8 +211,6 @@ class RealtimeRecordWidget(BaseWidget):
         self._worker = AsyncWorker(self)
         self._worker.start()
         self._worker.wait_until_ready()
-        self._async_thread = self._worker  # Backward-compatible alias for tests/utilities
-        self._async_loop = self._worker.loop
         self._pending_futures = set()
         self._future_lock = threading.Lock()
         self._cleanup_in_progress = False
@@ -218,10 +218,9 @@ class RealtimeRecordWidget(BaseWidget):
         self._recording_transition_in_progress = False
         self._silent_input_warning_shown = False
 
-        # Buffers
-        self._transcription_buffer = []
-        self._translation_buffer = []
-        self._buffer_lock = threading.Lock()
+        # Secondary transcription state
+        self._last_recording_result: Optional[Dict[str, Any]] = None
+        self._secondary_transcription_task_id: Optional[str] = None
 
         # Preferences
         self._recording_format = RECORDING_FORMAT_WAV
@@ -264,6 +263,12 @@ class RealtimeRecordWidget(BaseWidget):
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Failed to connect to settings_manager.setting_changed: %s", exc)
 
+        if self.transcription_manager:
+            try:
+                self.transcription_manager.add_listener(self._on_transcription_manager_event)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Failed to register transcription manager listener: %s", exc)
+
         # Set callbacks
         self.recorder.set_callbacks(
             on_transcription=self._on_transcription,
@@ -295,6 +300,9 @@ class RealtimeRecordWidget(BaseWidget):
         )
         self.signals.marker_added.connect(
             self._append_marker_item, Qt.ConnectionType.QueuedConnection
+        )
+        self.signals.secondary_transcription_completed.connect(
+            self._on_secondary_transcription_completed, Qt.ConnectionType.QueuedConnection
         )
 
         # Status Update Timer
@@ -766,6 +774,20 @@ class RealtimeRecordWidget(BaseWidget):
         self.feedback_label.setWordWrap(True)
         self.feedback_label.setVisible(False)
         layout.addWidget(self.feedback_label)
+
+        # Secondary Transcription Button (hidden until a recording with audio path completes)
+        self._secondary_transcribe_button = create_secondary_button(
+            self._tr(
+                "realtime_record.start_secondary_transcription",
+                "Re-transcribe with better model",
+            )
+        )
+        self._secondary_transcribe_button.setObjectName("secondary_transcribe_button")
+        self._secondary_transcribe_button.setVisible(False)
+        connect_button_with_callback(
+            self._secondary_transcribe_button, self._on_secondary_transcribe_requested
+        )
+        layout.addWidget(self._secondary_transcribe_button)
 
         # Status Bar
         status_bar = QWidget()
@@ -1671,6 +1693,16 @@ class RealtimeRecordWidget(BaseWidget):
             )
         if hasattr(self, "_download_warning_label"):
             self._download_warning_label.setText(self.i18n.t("common.warning"))
+        if (
+            hasattr(self, "_secondary_transcribe_button")
+            and self._secondary_transcribe_button.isVisible()
+        ):
+            self._secondary_transcribe_button.setText(
+                self._tr(
+                    "realtime_record.start_secondary_transcription",
+                    "Re-transcribe with better model",
+                )
+            )
         self._refresh_floating_mode_toggle_controls()
 
     def _floating_toggle_button_text(self) -> str:
@@ -1826,8 +1858,6 @@ class RealtimeRecordWidget(BaseWidget):
     @Slot(str)
     def _update_transcription_display(self, text: str):
         try:
-            with self._buffer_lock:
-                self._transcription_buffer.append(text)
             self.transcription_text.blockSignals(True)
             if self.transcription_text.document().isEmpty():
                 self.transcription_text.setPlainText(text)
@@ -1850,8 +1880,6 @@ class RealtimeRecordWidget(BaseWidget):
     @Slot(str)
     def _update_translation_display(self, text: str):
         try:
-            with self._buffer_lock:
-                self._translation_buffer.append(text)
             self.translation_text.blockSignals(True)
             if self.translation_text.document().isEmpty():
                 self.translation_text.setPlainText(text)
@@ -2322,14 +2350,12 @@ class RealtimeRecordWidget(BaseWidget):
                 self.settings_manager.set_setting(
                     "translation.translation_engine", TRANSLATION_ENGINE_OPUS_MT
                 )
-                # Reload engine in recorder
                 try:
-                    # MainWindow handles major engine reloads, but we can try basic injection
-                    # for the upcoming session if the recorder allows it.
-                    # Usually, the MainWindow reloads everything, but we trigger the setting save.
-                    pass
+                    self.recorder.reload_engine()
+                    self._refresh_translation_availability()
+                    logger.info("Translation engine reloaded for upcoming session")
                 except Exception as e:
-                    logger.error(f"Failed to auto-switch translation engine: {e}")
+                    logger.error("Failed to reload translation engine: %s", e, exc_info=True)
 
         options: Dict[str, Any] = {
             "language": source_lang,
@@ -2369,9 +2395,8 @@ class RealtimeRecordWidget(BaseWidget):
     def _clear_session_ui(self) -> None:
         """Reset visual state before starting a new recording session."""
         self._silent_input_warning_shown = False
-        with self._buffer_lock:
-            self._transcription_buffer.clear()
-            self._translation_buffer.clear()
+        self._last_recording_result = None
+        self._secondary_transcription_task_id = None
 
         if hasattr(self, "transcription_text"):
             self.transcription_text.clear()
@@ -2382,13 +2407,14 @@ class RealtimeRecordWidget(BaseWidget):
             self.audio_visualizer.clear()
         self._reset_markers_ui()
         self._update_status_message("", "success")
+        if hasattr(self, "_secondary_transcribe_button"):
+            self._secondary_transcribe_button.setVisible(False)
         if self._floating_overlay is not None:
             self._floating_overlay.clear_preview()
 
     def _submit_worker_task(self, coro) -> None:
         """Submit coroutine to worker loop and track lifecycle."""
         future = self._worker.submit(coro)
-        self._async_loop = self._worker.loop
         if future is None:
             coro.close()
             self.signals.error_occurred.emit(self.i18n.t("errors.unknown_error"))
@@ -2514,11 +2540,45 @@ class RealtimeRecordWidget(BaseWidget):
                 logger.warning("Failed to send success notification: %s", exc, exc_info=True)
 
         recording_path = str(result.get("recording_path") or "").strip()
-        if recording_path and self.transcription_manager:
-            self._ask_and_queue_secondary_transcription(recording_path, event_id)
+        if recording_path and self.transcription_manager and hasattr(
+            self, "_secondary_transcribe_button"
+        ):
+            self._last_recording_result = result
+            self._secondary_transcribe_button.setText(
+                self._tr(
+                    "realtime_record.start_secondary_transcription",
+                    "Re-transcribe with better model",
+                )
+            )
+            self._secondary_transcribe_button.setEnabled(True)
+            self._secondary_transcribe_button.setVisible(True)
 
-    def _ask_and_queue_secondary_transcription(self, recording_path: str, event_id: str) -> None:
-        """Prompt after recording and optionally queue high-quality retranscription."""
+    def _on_secondary_transcribe_requested(self) -> None:
+        """Handle secondary transcription button click."""
+        result = self._last_recording_result
+        if not result:
+            return
+        recording_path = str(result.get("recording_path") or "").strip()
+        event_id = str(result.get("event_id") or "").strip()
+        if not recording_path:
+            return
+
+        task_id = self._queue_secondary_transcription(recording_path, event_id)
+        if task_id:
+            self._secondary_transcription_task_id = task_id
+            self._secondary_transcribe_button.setEnabled(False)
+            self._update_status_message(
+                self._tr(
+                    "realtime_record.secondary_transcription_in_progress",
+                    "Re-transcription in progress...",
+                ),
+                "info",
+            )
+
+    def _queue_secondary_transcription(
+        self, recording_path: str, event_id: str
+    ) -> Optional[str]:
+        """Show model-selection dialog and queue secondary transcription. Returns task_id or None."""
         from ui.common.secondary_transcribe_dialog import select_secondary_transcribe_model
 
         selected_model = select_secondary_transcribe_model(
@@ -2528,10 +2588,10 @@ class RealtimeRecordWidget(BaseWidget):
             settings_manager=self.settings_manager,
         )
         if not selected_model:
-            return
+            return None
 
         try:
-            options = {
+            options: Dict[str, Any] = {
                 "replace_realtime": True,
                 "event_id": event_id,
                 "model_name": selected_model["model_name"],
@@ -2541,10 +2601,108 @@ class RealtimeRecordWidget(BaseWidget):
                 lang = self.source_lang_combo.currentData()
                 if lang and lang != TRANSLATION_LANGUAGE_AUTO:
                     options["language"] = lang
-            self.transcription_manager.add_task(file_path=recording_path, options=options)
-            logger.info("Queued secondary transcription for %s", recording_path)
+            task_id: str = self.transcription_manager.add_task(
+                file_path=recording_path, options=options
+            )
+            logger.info("Queued secondary transcription for %s (task %s)", recording_path, task_id)
+            return task_id
         except Exception as exc:
             logger.error("Failed to queue secondary transcription: %s", exc, exc_info=True)
+            return None
+
+    def _on_transcription_manager_event(self, event_type: str, data: Dict[str, Any]) -> None:
+        """Receive transcription manager events from background thread (thread-safe bridge)."""
+        try:
+            if (
+                event_type == "task_updated"
+                and data.get("status") in ("completed", "failed", "cancelled")
+                and self._secondary_transcription_task_id is not None
+                and data.get("id") == self._secondary_transcription_task_id
+            ):
+                self.signals.secondary_transcription_completed.emit(data)
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Error in transcription manager event bridge: %s", exc)
+
+    @Slot(dict)
+    def _on_secondary_transcription_completed(self, data: Dict[str, Any]) -> None:
+        """Handle secondary transcription terminal state (completed / failed / cancelled)."""
+        self._secondary_transcription_task_id = None
+        status = data.get("status", "")
+
+        # --- Failed / Cancelled: keep _last_recording_result so the user can retry ---
+        if status in ("failed", "cancelled"):
+            if hasattr(self, "_secondary_transcribe_button"):
+                self._secondary_transcribe_button.setEnabled(True)
+            if status == "cancelled":
+                self._update_status_message(
+                    self._tr(
+                        "realtime_record.secondary_transcription_cancelled",
+                        "Re-transcription was cancelled.",
+                    ),
+                    "warning",
+                )
+            else:
+                error_msg = str(data.get("error_message") or "unknown error")
+                self._update_status_message(
+                    self._tr(
+                        "realtime_record.secondary_transcription_failed",
+                        "Re-transcription failed: {error}",
+                        error=error_msg,
+                    ),
+                    "error",
+                )
+            return
+
+        # --- Completed: clear state, attempt to load and display the output file ---
+        self._last_recording_result = None
+        if hasattr(self, "_secondary_transcribe_button"):
+            self._secondary_transcribe_button.setVisible(False)
+
+        output_path = str(data.get("output_path") or "").strip()
+        if not output_path or not os.path.exists(output_path):
+            logger.warning(
+                "Secondary transcription completed but output file missing: %r", output_path
+            )
+            self._update_status_message(
+                self._tr(
+                    "realtime_record.secondary_transcription_no_output",
+                    "Re-transcription completed but output was not found.",
+                ),
+                "warning",
+            )
+            return
+
+        try:
+            with open(output_path, "r", encoding="utf-8") as fh:
+                new_text = fh.read()
+            if new_text.strip() and hasattr(self, "transcription_text"):
+                self.transcription_text.setPlainText(new_text.strip())
+                self._update_word_count_labels()
+                scrollbar = self.transcription_text.verticalScrollBar()
+                if scrollbar:
+                    scrollbar.setValue(0)
+                if self._floating_overlay is not None and self._floating_window_enabled:
+                    self._floating_overlay.update_preview_text(
+                        transcript=self.transcription_text.toPlainText()
+                    )
+        except Exception as exc:
+            logger.error("Failed to load secondary transcript from %s: %s", output_path, exc)
+            self._update_status_message(
+                self._tr(
+                    "realtime_record.secondary_transcription_no_output",
+                    "Re-transcription completed but output was not found.",
+                ),
+                "warning",
+            )
+            return
+
+        self._update_status_message(
+            self._tr(
+                "realtime_record.secondary_transcription_done",
+                "Re-transcription complete.",
+            ),
+            "success",
+        )
 
     def _refresh_event_views(self) -> None:
         """Refresh timeline and calendar views after recording event creation."""
@@ -2623,6 +2781,14 @@ class RealtimeRecordWidget(BaseWidget):
             if hasattr(self, "device_refresh_timer") and self.device_refresh_timer:
                 self.device_refresh_timer.stop()
 
+            if self.transcription_manager:
+                try:
+                    self.transcription_manager.remove_listener(
+                        self._on_transcription_manager_event
+                    )
+                except Exception:  # noqa: BLE001
+                    pass
+
             worker_loop = getattr(self._worker, "loop", None)
             if (
                 worker_loop is not None
@@ -2660,7 +2826,6 @@ class RealtimeRecordWidget(BaseWidget):
             if hasattr(self, "_worker") and self._worker:
                 self._worker.stop(timeout=WORKER_STOP_TIMEOUT_SECONDS)
                 self._worker = None
-                self._async_loop = None
 
             if self._floating_overlay is not None:
                 try:

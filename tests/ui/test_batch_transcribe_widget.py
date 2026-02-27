@@ -218,48 +218,44 @@ class TestBatchTranscribeWidget:
         # Verify the connection was made
         mock_i18n.language_changed.connect.assert_called()
 
-    @patch("ui.batch_transcribe.widget.QMessageBox.question")
     def test_clear_queue_restarts_processing(
-        self, mock_question, widget, mock_transcription_manager
+        self, widget, mock_transcription_manager
     ):
         """Clearing queue should restart processing after cleanup."""
-        mock_question.return_value = QMessageBox.StandardButton.Yes
-        mock_question.return_value = QMessageBox.StandardButton.Yes
         mock_transcription_manager.get_all_tasks.return_value = [
             {"id": "task-1", "status": TASK_STATUS_PENDING}
         ]
         mock_transcription_manager.delete_task.return_value = True
-        mock_transcription_manager.delete_task.return_value = True
 
-        with patch.object(widget, "_remove_task_item"):
+        with (
+            patch.object(widget, "show_question", return_value=True),
+            patch.object(widget, "_remove_task_item"),
+        ):
             widget._on_clear_queue()
 
         mock_transcription_manager.stop_all_tasks.assert_called_once()
         mock_transcription_manager.start_processing.assert_called()
 
-    @patch("ui.batch_transcribe.widget.QMessageBox.question")
     def test_clear_queue_only_clears_current_kind(
-        self, mock_question, widget, mock_transcription_manager
+        self, widget, mock_transcription_manager
     ):
         """Clear queue in translation tab should only clear translation tasks."""
-        mock_question.return_value = QMessageBox.StandardButton.Yes
         mock_transcription_manager.get_all_tasks.return_value = [
             {"id": "task-transcription", "status": TASK_STATUS_PENDING, "task_kind": "transcription"},
             {"id": "task-translation", "status": TASK_STATUS_PENDING, "task_kind": "translation"},
         ]
         mock_transcription_manager.delete_task.return_value = True
 
-        widget._on_clear_queue("translation")
+        with patch.object(widget, "show_question", return_value=True):
+            widget._on_clear_queue("translation")
 
         mock_transcription_manager.delete_task.assert_called_once_with("task-translation")
 
     @patch("ui.batch_transcribe.widget.QTimer.singleShot")
-    @patch("ui.batch_transcribe.widget.QMessageBox.question")
     def test_clear_queue_retries_processing_tasks(
-        self, mock_question, mock_single_shot, widget, mock_transcription_manager
+        self, mock_single_shot, widget, mock_transcription_manager
     ):
         """Clearing queue should retry deletion for in-flight processing tasks."""
-        mock_question.return_value = QMessageBox.StandardButton.Yes
         mock_transcription_manager.get_all_tasks.side_effect = [
             [{"id": "task-1", "status": TASK_STATUS_PROCESSING}],
             [{"id": "task-1", "status": TASK_STATUS_CANCELLED}],
@@ -267,22 +263,24 @@ class TestBatchTranscribeWidget:
         mock_transcription_manager.delete_task.side_effect = [False, True]
         mock_single_shot.side_effect = lambda _ms, callback: callback()
 
-        with patch.object(widget, "_remove_task_item") as mock_remove:
+        with (
+            patch.object(widget, "show_question", return_value=True),
+            patch.object(widget, "_remove_task_item") as mock_remove,
+        ):
             widget._on_clear_queue()
 
         assert mock_transcription_manager.delete_task.call_count == 2
         mock_remove.assert_called_once_with("task-1")
         mock_transcription_manager.start_processing.assert_called_once()
 
-    @patch("ui.batch_transcribe.widget.QMessageBox.question")
     def test_delete_task_failure_keeps_ui_item(
-        self, mock_question, widget, mock_transcription_manager
+        self, widget, mock_transcription_manager
     ):
         """Failed deletion should not remove the task item from UI list."""
-        mock_question.return_value = QMessageBox.StandardButton.Yes
         mock_transcription_manager.delete_task.return_value = False
 
         with (
+            patch.object(widget, "show_question", return_value=True),
             patch.object(widget, "_remove_task_item") as mock_remove,
             patch.object(widget, "_show_error"),
         ):

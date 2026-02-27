@@ -75,16 +75,9 @@ class TestRealtimeRecordWidget:
         assert hasattr(widget, "_pending_futures")
         assert isinstance(widget._pending_futures, set)
 
-    def test_widget_has_text_buffers(self, widget):
-        """Test widget has text buffers."""
-        assert hasattr(widget, "_transcription_buffer")
-        assert hasattr(widget, "_translation_buffer")
-        assert isinstance(widget._transcription_buffer, list)
-        assert isinstance(widget._translation_buffer, list)
-
-    def test_widget_has_buffer_lock(self, widget):
-        """Test widget has buffer lock for thread safety."""
-        assert hasattr(widget, "_buffer_lock")
+    def test_widget_has_future_lock(self, widget):
+        """Test widget has future lock for thread safety."""
+        assert hasattr(widget, "_future_lock")
 
     def test_widget_has_recording_preferences(self, widget):
         """Test widget has recording preferences."""
@@ -111,10 +104,10 @@ class TestRealtimeRecordWidget:
         assert widget.transcription_floating_toggle_button.property("role") == "realtime-floating-toggle"
         assert widget.translation_floating_toggle_button.property("role") == "realtime-floating-toggle"
 
-    def test_widget_has_async_loop(self, widget):
-        """Test widget has async event loop."""
-        assert hasattr(widget, "_async_loop")
-        assert hasattr(widget, "_async_thread")
+    def test_widget_has_async_worker(self, widget):
+        """Test widget has async worker."""
+        assert hasattr(widget, "_worker")
+        assert widget._worker is not None
 
     def test_recorder_callbacks_set(self, widget, mock_realtime_recorder):
         """Test recorder callbacks are set."""

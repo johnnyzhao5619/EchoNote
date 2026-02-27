@@ -879,11 +879,19 @@ class BatchTranscribeWidget(BaseWidget):
 
         options = self._build_translation_task_options()
         options["output_format"] = output_format_combo.currentData()
-        self.transcription_manager.add_translation_text_task(
-            text=text,
-            file_name=file_name_edit.text().strip() or "pasted_text.txt",
-            options=options,
-        )
+        try:
+            self.transcription_manager.add_translation_text_task(
+                text=text,
+                file_name=file_name_edit.text().strip() or "pasted_text.txt",
+                options=options,
+            )
+        except Exception as exc:
+            logger.error("Failed to add pasted translation task: %s", exc, exc_info=True)
+            self.show_error(
+                self.i18n.t("common.error"),
+                self.i18n.t("batch_transcribe.add_task_failed", error=str(exc)),
+            )
+            return
         self._notify_user(self.i18n.t("batch_transcribe.translation_queued"))
 
     def _on_clear_queue(self, task_kind: Optional[str] = None):

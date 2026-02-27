@@ -36,9 +36,13 @@ class RealtimeConfig:
     min_audio_duration: float = 3.0
 
     # Task Timeouts
+    # processing_task_timeout: time to wait for the audio transcription task to finish on stop.
     processing_task_timeout: float = 5.0
-    translation_task_timeout: float = 5.0
-    translation_task_shutdown_timeout: float = 2.0
+    # translation_task_timeout: time to wait for pending translations to drain after stop.
+    # Opus-MT model loading takes 5-30 s on first use; each segment ~1-2 s thereafter.
+    # 120 s accommodates cold-start plus a reasonable translation backlog.
+    translation_task_timeout: float = 120.0
+    translation_task_shutdown_timeout: float = 5.0
 
     # Default Paths (can be overridden by FileManager or User settings)
     base_recording_dir: Path = field(default_factory=lambda: Path.home() / "Documents" / "EchoNote")
