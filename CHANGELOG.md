@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- No unreleased changes.
+
+## [2.1.0] - 2026-03-15
+
+### Changed
+
+- Reissued `v2.1.0` on the latest `main` commit so the published tag/release now includes the full post-cut unified-workspace follow-up and workspace visual-polish closure.
 - Cleaned remaining workspace lifecycle gaps: primary text/audio references are now maintained centrally, calendar delete/provider-removal flows now detach or remove workspace assets correctly, and calendar export/auto-transcribe now read workspace artifacts instead of legacy attachment rows.
 - Removed the leftover `WorkspaceRecordingControlPanel` export/file after the shell recording dock hard switch, and propagated workspace translation refresh into already-open detached document windows so editor actions no longer keep stale language text.
 - Hardened local Text AI execution and governance: ONNX summaries now support a real greedy seq2seq path with extractive fallback, `text-ai` download/usage records persist across sessions, and workspace summary/meeting flows now record actual model usage.
@@ -22,11 +29,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added workspace collections (`all/recordings/documents/orphaned/recent`), lightweight list metadata, and orphaned-item retention semantics so preserved event artifacts remain manageable after detaching from calendar events.
 - Routed timeline/calendar artifact actions through `MainWindow.open_workspace_item()` first, with modal viewers kept only as fallback when a workspace item cannot be resolved.
 - Closed the workspace visual-density and layout-polish pass across theme/i18n/tests/docs: top-bar grouping, compact explorer shell, item metadata roles, inspector section titles, and recording-dock summary semantics now share outline-driven contracts and stable regression batches.
-
-## [2.1.0] - 2026-03-15
-
-### Changed
-
 - Released `v2.1.0` with the unified workspace hard switch: imported documents, batch transcriptions, realtime recordings, summaries, and meeting briefs now share the same persistent asset layer and desktop entry.
 - Replaced the separate batch/realtime shell pages with a single `workspace` page, while keeping timeline and calendar as views over workspace-backed assets instead of legacy attachment paths.
 - Added local Text AI runtime governance for extractive summary, ONNX summarization, and GGUF meeting-brief generation, with all outputs saved back as editable workspace assets.
