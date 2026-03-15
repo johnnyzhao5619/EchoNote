@@ -2,7 +2,7 @@
 
 /* Global Styles */
 * {
-    font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-family: "Helvetica Neue", Arial, sans-serif;
     font-size: 14px;
 }
 
@@ -490,7 +490,7 @@ QTextEdit#timeline_transcript_text {
     border: 2px solid #e1dfdd;
     border-radius: 6px;
     padding: 12px;
-    font-family: "SF Mono", "Monaco", "Consolas", "Courier New", Courier, monospace;
+    font-family: "Monaco", "Consolas", "Courier New", Courier, monospace;
     font-size: 12px;
     line-height: 1.6;
     selection-background-color: #2196F3;
@@ -506,7 +506,7 @@ QPlainTextEdit#transcription_text {
     border: 2px solid #e1dfdd;
     border-radius: 6px;
     padding: 12px;
-    font-family: "SF Mono", "Monaco", "Consolas", "Courier New", Courier, monospace;
+    font-family: "Monaco", "Consolas", "Courier New", Courier, monospace;
     font-size: 14px;
     line-height: 1.6;
     selection-background-color: #2196F3;
@@ -520,7 +520,7 @@ QPlainTextEdit#translation_text {
     border: 2px solid #e1dfdd;
     border-radius: 6px;
     padding: 12px;
-    font-family: "SF Mono", "Monaco", "Consolas", "Courier New", Courier, monospace;
+    font-family: "Monaco", "Consolas", "Courier New", Courier, monospace;
     font-size: 14px;
     line-height: 1.6;
     selection-background-color: #2196F3;
@@ -1033,7 +1033,7 @@ QTextEdit#transcript_text_edit {
     border: 2px solid #e1dfdd;
     border-radius: 8px;
     padding: 16px;
-    font-family: "SF Mono", "Monaco", "Consolas", "Courier New", Courier, monospace;
+    font-family: "Monaco", "Consolas", "Courier New", Courier, monospace;
     font-size: 14px;
     line-height: 1.8;
     selection-background-color: #2196F3;
@@ -1694,7 +1694,7 @@ QTextEdit[role="audio-player-transcript-text"] {
     border: 1px solid #e1dfdd;
     border-radius: 4px;
     padding: 8px;
-    font-family: "SF Mono", "Monaco", "Consolas", "Courier New", Courier, monospace;
+    font-family: "Monaco", "Consolas", "Courier New", Courier, monospace;
     font-size: 13px;
     line-height: 1.5;
     selection-background-color: #e3f2fd;
@@ -3033,7 +3033,7 @@ QLabel[role="realtime-duration"] {
 QLabel[role="audio-player-time"] {
     color: #5c6f8f;
     font-size: 12px;
-    font-family: "SF Mono", "Consolas", "Monaco", "Courier New", monospace;
+    font-family: "Monaco", "Consolas", "Courier New", monospace;
     font-weight: 500;
 }
 
