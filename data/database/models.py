@@ -677,12 +677,79 @@ class EventAttachment:
 
 
 @dataclass
+class WorkspaceFolder:
+    """Model for user-managed workspace folders."""
+
+    id: str = field(default_factory=generate_uuid)
+    name: str = ""
+    parent_id: Optional[str] = None
+    created_at: str = field(default_factory=current_iso_timestamp)
+    updated_at: str = field(default_factory=current_iso_timestamp)
+
+    @classmethod
+    def from_db_row(cls, row) -> "WorkspaceFolder":
+        """Create instance from database row."""
+        return cls(
+            id=row["id"],
+            name=row["name"],
+            parent_id=row["parent_id"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+
+    def save(self, db_connection):
+        """Persist workspace folder."""
+        self.updated_at = current_iso_timestamp()
+        query = """
+            INSERT INTO workspace_folders (
+                id, name, parent_id, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                name = excluded.name,
+                parent_id = excluded.parent_id,
+                created_at = excluded.created_at,
+                updated_at = excluded.updated_at
+        """
+        params = (
+            self.id,
+            self.name,
+            self.parent_id,
+            to_utc_iso(self.created_at),
+            to_utc_iso(self.updated_at),
+        )
+        db_connection.execute(query, params, commit=True)
+        logger.debug("Saved workspace folder: %s", self.id)
+
+    @staticmethod
+    def get_by_id(db_connection, folder_id: str) -> Optional["WorkspaceFolder"]:
+        """Get workspace folder by ID."""
+        result = db_connection.execute("SELECT * FROM workspace_folders WHERE id = ?", (folder_id,))
+        if result:
+            return WorkspaceFolder.from_db_row(result[0])
+        return None
+
+    @staticmethod
+    def get_all(db_connection) -> List["WorkspaceFolder"]:
+        """List all workspace folders ordered for tree rendering."""
+        rows = db_connection.execute(
+            "SELECT * FROM workspace_folders ORDER BY parent_id IS NOT NULL, name COLLATE NOCASE"
+        )
+        return [WorkspaceFolder.from_db_row(row) for row in rows]
+
+    def delete(self, db_connection):
+        """Delete workspace folder."""
+        db_connection.execute("DELETE FROM workspace_folders WHERE id = ?", (self.id,), commit=True)
+        logger.debug("Deleted workspace folder: %s", self.id)
+
+
+@dataclass
 class WorkspaceItem:
     """Model for unified workspace content items."""
 
     id: str = field(default_factory=generate_uuid)
     title: str = ""
     item_type: str = "document"
+    folder_id: Optional[str] = None
     source_kind: Optional[str] = None
     source_event_id: Optional[str] = None
     source_task_id: Optional[str] = None
@@ -699,6 +766,7 @@ class WorkspaceItem:
             id=row["id"],
             title=row["title"],
             item_type=row["item_type"],
+            folder_id=row["folder_id"],
             source_kind=row["source_kind"],
             source_event_id=row["source_event_id"],
             source_task_id=row["source_task_id"],
@@ -714,12 +782,13 @@ class WorkspaceItem:
         self.updated_at = current_iso_timestamp()
         query = """
             INSERT INTO workspace_items (
-                id, title, item_type, source_kind, source_event_id, source_task_id,
+                id, title, item_type, folder_id, source_kind, source_event_id, source_task_id,
                 status, primary_text_asset_id, primary_audio_asset_id, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 title = excluded.title,
                 item_type = excluded.item_type,
+                folder_id = excluded.folder_id,
                 source_kind = excluded.source_kind,
                 source_event_id = excluded.source_event_id,
                 source_task_id = excluded.source_task_id,
@@ -733,6 +802,7 @@ class WorkspaceItem:
             self.id,
             self.title,
             self.item_type,
+            self.folder_id,
             self.source_kind,
             self.source_event_id,
             self.source_task_id,
@@ -759,6 +829,8 @@ class WorkspaceItem:
         item_type: Optional[str] = None,
         *,
         status: Optional[str] = None,
+        folder_id: Optional[str] = None,
+        view_mode: str = "structure",
         limit: Optional[int] = None,
     ) -> List["WorkspaceItem"]:
         """List workspace items, optionally filtered by type."""
@@ -770,11 +842,20 @@ class WorkspaceItem:
         if status:
             clauses.append("status = ?")
             params.append(status)
+        if folder_id:
+            clauses.append("folder_id = ?")
+            params.append(folder_id)
 
         query = "SELECT * FROM workspace_items"
         if clauses:
             query += " WHERE " + " AND ".join(clauses)
-        query += " ORDER BY updated_at DESC"
+        if view_mode == "event":
+            query += (
+                " ORDER BY CASE WHEN source_event_id IS NULL THEN 1 ELSE 0 END, "
+                "COALESCE(source_event_id, ''), updated_at DESC"
+            )
+        else:
+            query += " ORDER BY updated_at DESC"
         if limit is not None:
             query += " LIMIT ?"
             params.append(limit)

@@ -28,8 +28,9 @@ from typing import Optional
 
 logger = logging.getLogger("echonote.database")
 
-CURRENT_SCHEMA_VERSION = 4
+CURRENT_SCHEMA_VERSION = 5
 REQUIRED_SCHEMA_TABLES = (
+    "workspace_folders",
     "workspace_items",
     "workspace_assets",
     "text_ai_model_downloads",

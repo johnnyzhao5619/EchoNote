@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from core.qt_imports import QComboBox, QLabel, QListWidget, QListWidgetItem, QVBoxLayout, Signal
+from core.qt_imports import QListWidget, QListWidgetItem, QVBoxLayout, Signal
 from ui.base_widgets import BaseWidget
 from ui.constants import ROLE_WORKSPACE_ITEM_LIST
 from utils.i18n import I18nQtManager
@@ -13,46 +13,26 @@ class WorkspaceItemList(BaseWidget):
     """Display workspace items and emit the selected item identifier."""
 
     item_selected = Signal(str)
-    collection_changed = Signal(str)
-    _COLLECTIONS = (
-        ("workspace.collection_all", "all"),
-        ("workspace.collection_recordings", "recordings"),
-        ("workspace.collection_documents", "documents"),
-        ("workspace.collection_orphaned", "orphaned"),
-        ("workspace.collection_recent", "recent"),
-    )
 
     def __init__(self, i18n: I18nQtManager, parent=None):
         super().__init__(i18n, parent)
         self.items = []
+        self._view_mode = "structure"
         self._init_ui()
 
     def _init_ui(self) -> None:
         self.setProperty("role", ROLE_WORKSPACE_ITEM_LIST)
         layout = QVBoxLayout(self)
-        self.title_label = QLabel(self.i18n.t("workspace.library_title"))
-        layout.addWidget(self.title_label)
-
-        self.collection_combo = QComboBox()
-        self._populate_collection_combo()
-        self.collection_combo.currentIndexChanged.connect(self._on_collection_changed)
-        layout.addWidget(self.collection_combo)
+        layout.setContentsMargins(0, 0, 0, 0)
 
         self.list_widget = QListWidget()
         self.list_widget.setProperty("role", ROLE_WORKSPACE_ITEM_LIST)
         self.list_widget.currentRowChanged.connect(self._on_row_changed)
         layout.addWidget(self.list_widget)
 
-    def update_translations(self) -> None:
-        self.title_label.setText(self.i18n.t("workspace.library_title"))
-        current_collection = self.current_collection()
-        self.collection_combo.blockSignals(True)
-        self.collection_combo.clear()
-        self._populate_collection_combo()
-        index = self.collection_combo.findData(current_collection)
-        if index >= 0:
-            self.collection_combo.setCurrentIndex(index)
-        self.collection_combo.blockSignals(False)
+    def set_view_mode(self, view_mode: str) -> None:
+        """Track the active library view mode for label formatting."""
+        self._view_mode = view_mode or "structure"
 
     def set_items(self, items, metadata_by_item=None) -> None:
         self.items = list(items)
@@ -81,20 +61,13 @@ class WorkspaceItemList(BaseWidget):
             return ""
         return current_item.data(0x0100) or ""
 
-    def current_collection(self) -> str:
-        return self.collection_combo.currentData() or "all"
-
-    def set_collection(self, collection: str) -> None:
-        index = self.collection_combo.findData(collection)
-        if index >= 0:
-            self.collection_combo.setCurrentIndex(index)
-
-    def _populate_collection_combo(self) -> None:
-        for label_key, value in self._COLLECTIONS:
-            self.collection_combo.addItem(self.i18n.t(label_key), value)
-
     def _format_item_label(self, item, metadata: dict) -> str:
         details = []
+        if self._view_mode == "event" and metadata.get("event_id"):
+            details.append(f"event:{metadata['event_id']}")
+        elif self._view_mode == "structure" and metadata.get("folder_name"):
+            details.append(str(metadata["folder_name"]))
+
         source = metadata.get("source")
         if source:
             details.append(str(source))
@@ -110,9 +83,6 @@ class WorkspaceItemList(BaseWidget):
         if details:
             return f"{item.title or item.id}\n" + " | ".join(details)
         return item.title or item.id
-
-    def _on_collection_changed(self, _index: int) -> None:
-        self.collection_changed.emit(self.current_collection())
 
     def _on_row_changed(self, row: int) -> None:
         if row < 0 or row >= len(self.items):

@@ -88,12 +88,28 @@ CREATE TABLE IF NOT EXISTS event_attachments (
 CREATE INDEX IF NOT EXISTS idx_attachments_event ON event_attachments (event_id);
 
 -- ============================================================================
+-- Workspace Folders Table
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS workspace_folders (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    parent_id TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (parent_id) REFERENCES workspace_folders (id) ON DELETE RESTRICT
+);
+
+CREATE INDEX IF NOT EXISTS idx_workspace_folders_parent ON workspace_folders (parent_id);
+CREATE INDEX IF NOT EXISTS idx_workspace_folders_name ON workspace_folders (name);
+
+-- ============================================================================
 -- Workspace Items Table
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS workspace_items (
     id TEXT PRIMARY KEY,
     title TEXT NOT NULL,
     item_type TEXT NOT NULL, -- recording/document/meeting_note/summary
+    folder_id TEXT,
     source_kind TEXT, -- batch_transcription/realtime_recording/manual_import/ai_generated
     source_event_id TEXT,
     source_task_id TEXT,
@@ -102,11 +118,13 @@ CREATE TABLE IF NOT EXISTS workspace_items (
     primary_audio_asset_id TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (folder_id) REFERENCES workspace_folders (id) ON DELETE SET NULL,
     FOREIGN KEY (source_event_id) REFERENCES calendar_events (id) ON DELETE SET NULL,
     FOREIGN KEY (source_task_id) REFERENCES transcription_tasks (id) ON DELETE SET NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_workspace_items_type ON workspace_items (item_type);
+CREATE INDEX IF NOT EXISTS idx_workspace_items_folder ON workspace_items (folder_id);
 CREATE INDEX IF NOT EXISTS idx_workspace_items_source_event ON workspace_items (source_event_id);
 CREATE INDEX IF NOT EXISTS idx_workspace_items_source_task ON workspace_items (source_task_id);
 CREATE INDEX IF NOT EXISTS idx_workspace_items_updated_at ON workspace_items (updated_at);
@@ -251,7 +269,7 @@ INSERT
     OR IGNORE INTO app_settings (key, value, updated_at)
 VALUES (
         'schema_version',
-        '4',
+        '5',
         CURRENT_TIMESTAMP
     );
 

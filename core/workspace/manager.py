@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from typing import List, Optional
 
-from data.database.models import WorkspaceAsset, WorkspaceItem
+from data.database.models import WorkspaceAsset, WorkspaceFolder, WorkspaceItem
 from data.storage.file_manager import FileManager
 
 from core.workspace.document_parser import DocumentParser
@@ -24,6 +24,9 @@ TEXT_ASSET_ROLE_PRIORITY = {
     "next_steps": 7,
     "outline": 8,
 }
+
+LIBRARY_VIEW_STRUCTURE = "structure"
+LIBRARY_VIEW_EVENT = "event"
 
 
 class WorkspaceManager:
@@ -81,6 +84,78 @@ class WorkspaceManager:
         )
         return item.id
 
+    def create_folder(self, name: str, *, parent_id: Optional[str] = None) -> str:
+        """Create a user-managed workspace folder."""
+        folder = WorkspaceFolder(name=name.strip(), parent_id=parent_id)
+        folder.save(self.db)
+        return folder.id
+
+    def get_folder(self, folder_id: str) -> Optional[WorkspaceFolder]:
+        """Fetch a workspace folder by identifier."""
+        return WorkspaceFolder.get_by_id(self.db, folder_id)
+
+    def list_folders(self) -> List[WorkspaceFolder]:
+        """List all workspace folders for structure rendering."""
+        return WorkspaceFolder.get_all(self.db)
+
+    def rename_folder(self, folder_id: str, name: str) -> WorkspaceFolder:
+        """Rename a workspace folder."""
+        folder = self.get_folder(folder_id)
+        if folder is None:
+            raise ValueError(f"Unknown workspace folder: {folder_id}")
+        folder.name = name.strip()
+        folder.save(self.db)
+        return folder
+
+    def move_folder(self, folder_id: str, parent_id: Optional[str]) -> WorkspaceFolder:
+        """Move a folder under a new parent folder."""
+        folder = self.get_folder(folder_id)
+        if folder is None:
+            raise ValueError(f"Unknown workspace folder: {folder_id}")
+        if parent_id == folder_id:
+            raise ValueError("Folder cannot be its own parent")
+        if parent_id is not None:
+            parent = self.get_folder(parent_id)
+            if parent is None:
+                raise ValueError(f"Unknown target folder: {parent_id}")
+            ancestor_id = parent.parent_id
+            while ancestor_id:
+                if ancestor_id == folder_id:
+                    raise ValueError("Folder move would create a cycle")
+                ancestor = self.get_folder(ancestor_id)
+                ancestor_id = ancestor.parent_id if ancestor is not None else None
+        folder.parent_id = parent_id
+        folder.save(self.db)
+        return folder
+
+    def delete_folder(self, folder_id: str) -> bool:
+        """Delete an empty workspace folder."""
+        folder = self.get_folder(folder_id)
+        if folder is None:
+            return False
+        child_folders = [item for item in self.list_folders() if item.parent_id == folder_id]
+        if child_folders:
+            return False
+        linked_items = self.db.execute(
+            "SELECT id FROM workspace_items WHERE folder_id = ? LIMIT 1",
+            (folder_id,),
+        )
+        if linked_items:
+            return False
+        folder.delete(self.db)
+        return True
+
+    def move_item_to_folder(self, item_id: str, folder_id: Optional[str]) -> WorkspaceItem:
+        """Assign a workspace item to a folder or move it back to root."""
+        item = self.get_item(item_id)
+        if item is None:
+            raise ValueError(f"Unknown workspace item: {item_id}")
+        if folder_id is not None and self.get_folder(folder_id) is None:
+            raise ValueError(f"Unknown workspace folder: {folder_id}")
+        item.folder_id = folder_id
+        item.save(self.db)
+        return item
+
     def get_item(self, item_id: str) -> Optional[WorkspaceItem]:
         """Fetch a workspace item by ID."""
         return WorkspaceItem.get_by_id(self.db, item_id)
@@ -90,6 +165,8 @@ class WorkspaceManager:
         *,
         collection: Optional[str] = None,
         item_type: Optional[str] = None,
+        view_mode: str = LIBRARY_VIEW_STRUCTURE,
+        folder_id: Optional[str] = None,
     ) -> List[WorkspaceItem]:
         """List workspace items for the requested collection."""
         resolved_collection = (collection or "all").strip().lower()
@@ -110,17 +187,22 @@ class WorkspaceManager:
             self.db,
             item_type=resolved_item_type,
             status=status,
+            folder_id=folder_id if view_mode == LIBRARY_VIEW_STRUCTURE else None,
+            view_mode=view_mode,
             limit=limit,
         )
 
     def get_item_list_metadata(self, items: List[WorkspaceItem]) -> dict[str, dict]:
         """Build lightweight list metadata for workspace items."""
         assets_by_item = self._get_assets_for_item_ids([item.id for item in items])
+        folder_names = {folder.id: folder.name for folder in self.list_folders()}
         metadata_by_item: dict[str, dict] = {}
         for item in items:
             assets = assets_by_item.get(item.id, [])
             metadata_by_item[item.id] = {
                 "source": item.source_kind or item.item_type,
+                "folder_name": folder_names.get(item.folder_id),
+                "event_id": item.source_event_id,
                 "updated_at": item.updated_at,
                 "has_audio": any(asset.asset_role == "audio" for asset in assets),
                 "has_text": any(

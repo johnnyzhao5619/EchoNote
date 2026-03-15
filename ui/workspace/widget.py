@@ -38,7 +38,7 @@ class WorkspaceWidget(BaseWidget):
         layout = QVBoxLayout(self)
         self.toolbar = WorkspaceToolbar(self.workspace_manager, self.i18n, self)
         self.toolbar.start_recording_button.hide()
-        self.library_panel = WorkspaceLibraryPanel(self.i18n, self)
+        self.library_panel = WorkspaceLibraryPanel(self.workspace_manager, self.i18n, self)
         self.item_list = self.library_panel.item_list
         self.editor_panel = WorkspaceEditorPanel(self.workspace_manager, self.i18n, parent=self)
         self.inspector_panel = WorkspaceInspectorPanel(self.workspace_manager, self.i18n, self)
@@ -68,7 +68,8 @@ class WorkspaceWidget(BaseWidget):
         content_splitter.setStretchFactor(2, 2)
 
         self.library_panel.item_selected.connect(self._on_item_selected)
-        self.library_panel.collection_changed.connect(self.refresh_items)
+        self.library_panel.view_mode_changed.connect(self.refresh_items)
+        self.library_panel.library_changed.connect(self.refresh_items)
         self.toolbar.item_open_requested.connect(self.open_item)
 
         layout.addWidget(self.toolbar)
@@ -76,7 +77,10 @@ class WorkspaceWidget(BaseWidget):
 
     def refresh_items(self) -> None:
         current_item_id = self.library_panel.current_item_id()
-        items = self.workspace_manager.list_items(collection=self.library_panel.current_collection())
+        items = self.workspace_manager.list_items(
+            view_mode=self.library_panel.current_view_mode(),
+            folder_id=self.library_panel.current_folder_id(),
+        )
         metadata_by_item = self.workspace_manager.get_item_list_metadata(items)
         self._items_by_id = {item.id: item for item in items}
         self.library_panel.set_items(items, metadata_by_item=metadata_by_item)
@@ -91,9 +95,12 @@ class WorkspaceWidget(BaseWidget):
     def open_item(self, item_id: str, asset_role: str | None = None) -> bool:
         """Refresh and focus a specific workspace item."""
         self.refresh_items()
-        if item_id and item_id not in self._items_by_id and self.library_panel.current_collection() != "all":
-            self.library_panel.set_collection("all")
-            self.refresh_items()
+        if item_id and item_id not in self._items_by_id:
+            item = self.workspace_manager.get_item(item_id)
+            if item is not None:
+                self.library_panel.set_view_mode("structure")
+                self.library_panel.select_folder(getattr(item, "folder_id", None))
+                self.refresh_items()
         if item_id and item_id in self._items_by_id:
             self.library_panel.select_item(item_id)
             self._on_item_selected(item_id)

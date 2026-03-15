@@ -8,7 +8,7 @@ import pytest
 
 from core.workspace.manager import WorkspaceManager
 from data.database.connection import DatabaseConnection
-from data.database.models import TranscriptionTask, WorkspaceAsset, WorkspaceItem
+from data.database.models import CalendarEvent, TranscriptionTask, WorkspaceAsset, WorkspaceItem
 from data.storage.file_manager import FileManager
 from ui.common.audio_player import AudioPlayer
 from ui.workspace.widget import WorkspaceWidget
@@ -262,41 +262,40 @@ def test_workspace_widget_moves_recording_controls_out_of_workspace_shell(
     assert not hasattr(widget, "recording_control_panel")
 
 
-def test_workspace_item_list_shows_collection_filter_and_metadata(
+def test_workspace_library_panel_supports_structure_and_event_views(
     qapp, mock_i18n, workspace_manager, transcription_manager
 ):
-    orphaned_item = WorkspaceItem(
-        title="Detached Notes",
-        item_type="document",
-        source_kind="workspace_note",
-        status="orphaned",
+    folder_id = workspace_manager.create_folder("Projects")
+    note_id = workspace_manager.create_note(title="Plan")
+    event = CalendarEvent(
+        title="Planning Session",
+        start_time="2026-03-15T15:00:00+00:00",
+        end_time="2026-03-15T16:00:00+00:00",
     )
-    orphaned_item.save(workspace_manager.db)
-    orphaned_asset = WorkspaceAsset(
-        item_id=orphaned_item.id,
-        asset_role="document_text",
-        text_content="Detached content",
-        content_type="text/plain",
-    )
-    orphaned_asset.save(workspace_manager.db)
+    event.save(workspace_manager.db)
+
+    note = workspace_manager.get_item(note_id)
+    assert note is not None
+    note.source_event_id = event.id
+    note.save(workspace_manager.db)
+    workspace_manager.move_item_to_folder(note_id, folder_id)
 
     widget = WorkspaceWidget(
         workspace_manager,
         mock_i18n,
         transcription_manager=transcription_manager,
     )
-
-    row_texts = [
-        widget.item_list.list_widget.item(index).text()
-        for index in range(widget.item_list.list_widget.count())
-    ]
-
-    assert widget.item_list.collection_combo.count() == 5
-    assert any("realtime_recording" in text for text in row_texts)
-    assert any("audio" in text for text in row_texts)
-    assert any("text" in text for text in row_texts)
-
-    widget.item_list.collection_combo.setCurrentIndex(3)
+    widget.show()
     qapp.processEvents()
 
-    assert widget.item_list.current_item_id() == orphaned_item.id
+    widget.library_panel.select_folder(folder_id)
+    qapp.processEvents()
+
+    assert widget.library_panel.current_view_mode() == "structure"
+    assert widget.item_list.current_item_id() == note_id
+
+    widget.library_panel.set_view_mode("event")
+    qapp.processEvents()
+
+    assert widget.library_panel.current_view_mode() == "event"
+    assert widget.item_list.list_widget.count() >= 1
