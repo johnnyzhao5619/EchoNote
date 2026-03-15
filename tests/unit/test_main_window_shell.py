@@ -9,6 +9,7 @@ from core.workspace.manager import WorkspaceManager
 from data.database.connection import DatabaseConnection
 from data.storage.file_manager import FileManager
 from ui.main_window import MainWindow
+from ui.common.realtime_recording_dock import RealtimeRecordingDock
 from ui.workspace.widget import WorkspaceWidget
 
 
@@ -167,3 +168,26 @@ def test_main_window_exposes_persistent_recording_dock_and_workspace_shell(tmp_p
         assert main_window.pages["workspace"].inspector_panel is not None
     finally:
         main_window.close()
+
+
+def test_recording_dock_supports_compact_and_full_modes():
+    app = QApplication.instance() or QApplication([])
+    realtime_recorder = Mock()
+    type(realtime_recorder).is_recording = PropertyMock(return_value=False)
+    realtime_recorder.list_input_sources.return_value = []
+    realtime_recorder.get_recording_status.return_value = {"duration": 0.0}
+    realtime_recorder.get_accumulated_transcription.return_value = ""
+    realtime_recorder.get_accumulated_translation.return_value = ""
+    dock = RealtimeRecordingDock(realtime_recorder, _build_i18n())
+    dock.show()
+    app.processEvents()
+
+    assert dock.compact_panel.start_button.isVisible()
+    assert dock.compact_panel.stop_button.isVisible()
+    assert dock.expand_button.isVisible()
+
+    dock.expand_button.click()
+    app.processEvents()
+
+    assert dock.full_panel.input_source_combo is not None
+    assert dock.full_panel.marker_button.isVisible()

@@ -178,6 +178,18 @@ class RealtimeRecorder:
         """Return ``True`` when microphone input is available."""
         return self.audio_capture is not None
 
+    def list_input_sources(self) -> List[Dict[str, Any]]:
+        """Expose available input devices for dock/session selectors."""
+        if self.audio_capture is None:
+            return []
+        getter = getattr(self.audio_capture, "get_input_devices", None)
+        if callable(getter):
+            return list(getter() or [])
+        getter = getattr(self.audio_capture, "list_devices", None)
+        if callable(getter):
+            return list(getter() or [])
+        return []
+
     def set_callbacks(
         self,
         on_transcription: Optional[Callable[[str], None]] = None,

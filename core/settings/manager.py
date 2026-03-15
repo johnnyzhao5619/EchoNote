@@ -185,6 +185,22 @@ class SettingsManager(QObject):
 
         return preferences
 
+    def get_realtime_session_defaults(self) -> Dict[str, Any]:
+        """Return a merged snapshot for runtime recording session controls."""
+        realtime_preferences = dict(self.get_realtime_preferences())
+        translation_preferences = self.get_translation_preferences()
+        realtime_preferences.setdefault("enable_transcription", True)
+        realtime_preferences.setdefault("enable_translation", False)
+        realtime_preferences["translation_source_lang"] = translation_preferences.get(
+            "translation_source_lang",
+            "auto",
+        )
+        realtime_preferences["translation_target_lang"] = translation_preferences.get(
+            "translation_target_lang",
+            "en",
+        )
+        return realtime_preferences
+
     def get_translation_preferences(self) -> Dict[str, Any]:
         """Return shared translation preferences with defaults applied."""
         from config.constants import (
