@@ -385,6 +385,7 @@ class MainWindow(QMainWindow):
                 self.managers["workspace_manager"],
                 self.i18n,
                 transcription_manager=self.managers.get("transcription_manager"),
+                realtime_recorder=self.managers.get("realtime_recorder"),
             ),
             missing_message=(
                 None

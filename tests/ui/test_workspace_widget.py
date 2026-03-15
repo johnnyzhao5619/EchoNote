@@ -229,3 +229,19 @@ def test_workspace_toolbar_new_note_creates_workspace_item(
     assert created_items[0].source_kind == "workspace_note"
     assert workspace_manager.get_primary_text_asset(created_items[0].id) is not None
     assert widget.item_list.current_item_id() == created_items[0].id
+
+
+def test_workspace_widget_embeds_realtime_recording_controls(
+    qapp, mock_i18n, workspace_manager, transcription_manager
+):
+    widget = WorkspaceWidget(
+        workspace_manager,
+        mock_i18n,
+        transcription_manager=transcription_manager,
+        realtime_recorder=Mock(),
+    )
+    widget.show()
+    qapp.processEvents()
+
+    assert widget.recording_control_panel.record_button.isVisible()
+    assert widget.recording_control_panel.stop_button.isVisible()

@@ -170,6 +170,7 @@ class RealtimeRecorder:
         self._selected_input_device_is_loopback = False
         self._selected_input_device_is_system_audio = False
         self._selected_input_device_scoped_app = ""
+        self.last_workspace_item_id: Optional[str] = None
 
         logger.info("RealtimeRecorder initialized")
 
@@ -252,6 +253,7 @@ class RealtimeRecorder:
             self.current_options["enable_translation"] = False
         self._transcription_enabled = self.current_options["enable_transcription"]
         self._apply_session_model_selection()
+        self.last_workspace_item_id = None
 
         # Validate model availability after applying per-session model override.
         engine = self._resolve_speech_engine()
@@ -893,6 +895,7 @@ class RealtimeRecorder:
             try:
                 workspace_item_id = self.workspace_manager.publish_recording_session(result)
                 result["workspace_item_id"] = workspace_item_id
+                self.last_workspace_item_id = workspace_item_id
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Failed to publish recording session to workspace: %s", exc)
 

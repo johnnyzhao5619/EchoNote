@@ -258,6 +258,7 @@ class TestRealtimeRecorderLifecycle:
         assert result["recording_path"] == "/path/to/recording.wav"
         assert result["transcript_path"] == "/path/to/transcript.txt"
         assert result["event_id"] == "event_123"
+        assert recorder.last_workspace_item_id == recorder.workspace_manager.publish_recording_session.return_value
         recorder.workspace_manager.publish_recording_session.assert_called_once()
 
     @pytest.mark.asyncio

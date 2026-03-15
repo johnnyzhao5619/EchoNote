@@ -3,6 +3,7 @@
 
 from .editor_panel import TextEditorPanel, WorkspaceEditorPanel
 from .item_list import WorkspaceItemList
+from .recording_control_panel import WorkspaceRecordingControlPanel
 from .recording_panel import WorkspaceRecordingPanel
 from .task_panel import WorkspaceTaskPanel
 from .toolbar import WorkspaceToolbar
@@ -12,6 +13,7 @@ __all__ = [
     "TextEditorPanel",
     "WorkspaceEditorPanel",
     "WorkspaceItemList",
+    "WorkspaceRecordingControlPanel",
     "WorkspaceRecordingPanel",
     "WorkspaceTaskPanel",
     "WorkspaceToolbar",
