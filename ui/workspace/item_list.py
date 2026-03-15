@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from core.qt_imports import QListWidget, QListWidgetItem, QVBoxLayout, Signal
+from core.qt_imports import QLabel, QListWidget, QListWidgetItem, QVBoxLayout, Signal
 from ui.base_widgets import BaseWidget
 from ui.constants import ROLE_WORKSPACE_ITEM_LIST
 from utils.i18n import I18nQtManager
@@ -22,10 +22,15 @@ class WorkspaceItemList(BaseWidget):
     def _init_ui(self) -> None:
         self.setProperty("role", ROLE_WORKSPACE_ITEM_LIST)
         layout = QVBoxLayout(self)
+        self.title_label = QLabel(self.i18n.t("workspace.library_title"))
+        layout.addWidget(self.title_label)
         self.list_widget = QListWidget()
         self.list_widget.setProperty("role", ROLE_WORKSPACE_ITEM_LIST)
         self.list_widget.currentRowChanged.connect(self._on_row_changed)
         layout.addWidget(self.list_widget)
+
+    def update_translations(self) -> None:
+        self.title_label.setText(self.i18n.t("workspace.library_title"))
 
     def set_items(self, items) -> None:
         self.items = list(items)
@@ -45,6 +50,12 @@ class WorkspaceItemList(BaseWidget):
             if item.data(0x0100) == item_id:
                 self.list_widget.setCurrentRow(row)
                 return
+
+    def current_item_id(self) -> str:
+        current_item = self.list_widget.currentItem()
+        if current_item is None:
+            return ""
+        return current_item.data(0x0100) or ""
 
     def _on_row_changed(self, row: int) -> None:
         if row < 0 or row >= len(self.items):

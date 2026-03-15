@@ -4,6 +4,8 @@
 from .editor_panel import TextEditorPanel, WorkspaceEditorPanel
 from .item_list import WorkspaceItemList
 from .recording_panel import WorkspaceRecordingPanel
+from .task_panel import WorkspaceTaskPanel
+from .toolbar import WorkspaceToolbar
 from .widget import WorkspaceWidget
 
 __all__ = [
@@ -11,5 +13,7 @@ __all__ = [
     "WorkspaceEditorPanel",
     "WorkspaceItemList",
     "WorkspaceRecordingPanel",
+    "WorkspaceTaskPanel",
+    "WorkspaceToolbar",
     "WorkspaceWidget",
 ]

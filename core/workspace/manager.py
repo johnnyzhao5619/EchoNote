@@ -63,6 +63,24 @@ class WorkspaceManager:
         item = self.import_service.import_document(file_path)
         return item.id
 
+    def create_note(self, *, title: str, text_content: str = "") -> str:
+        """Create a workspace-native note item backed by a document text asset."""
+        item = WorkspaceItem(
+            title=title,
+            item_type="document",
+            source_kind="workspace_note",
+            status="active",
+        )
+        item.save(self.db)
+        self.save_text_asset(
+            item.id,
+            "document_text",
+            text_content,
+            filename="note.md",
+            subfolder="notes",
+        )
+        return item.id
+
     def get_item(self, item_id: str) -> Optional[WorkspaceItem]:
         """Fetch a workspace item by ID."""
         return WorkspaceItem.get_by_id(self.db, item_id)
@@ -367,6 +385,22 @@ class WorkspaceManager:
         if removed:
             self._sync_primary_asset_refs(item)
         return removed
+
+    def get_event_cleanup_summary(self, event_id: str) -> dict:
+        """Summarize workspace items/assets linked to an event for delete confirmation."""
+        items = self._get_items_for_event(event_id)
+        assets = []
+        for item in items:
+            assets.extend(WorkspaceAsset.get_by_item_id(self.db, item.id))
+
+        asset_roles = sorted({asset.asset_role for asset in assets if asset.asset_role})
+        return {
+            "event_id": event_id,
+            "has_workspace_assets": bool(assets),
+            "linked_item_count": len(items),
+            "linked_asset_count": len(assets),
+            "asset_roles": asset_roles,
+        }
 
     def delete_event_items(self, event_id: str, *, delete_files: bool = True) -> int:
         """Delete workspace items and assets linked to an event."""

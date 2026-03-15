@@ -384,6 +384,7 @@ class MainWindow(QMainWindow):
             lambda: WorkspaceWidget(
                 self.managers["workspace_manager"],
                 self.i18n,
+                transcription_manager=self.managers.get("transcription_manager"),
             ),
             missing_message=(
                 None
