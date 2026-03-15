@@ -8,15 +8,32 @@ import inspect
 import threading
 from typing import Any
 
-from core.qt_imports import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget, Signal
+from core.qt_imports import (
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+    Qt,
+    Signal,
+)
 from ui.base_widgets import BaseWidget
 from ui.constants import (
     APP_RECORDING_DOCK_MARGINS,
     APP_RECORDING_DOCK_MIN_HEIGHT,
     PAGE_DENSE_SPACING,
+    ROLE_REALTIME_DURATION,
+    ROLE_REALTIME_RECORD_ACTION,
     ROLE_REALTIME_RECORDING_DOCK,
+    ROLE_REALTIME_SUMMARY_GROUP,
 )
-from ui.workspace.recording_session_panel import WorkspaceRecordingSessionPanel
+from ui.workspace.recording_session_panel import (
+    WorkspaceRecordingSessionPanel,
+    format_recording_input_source,
+    format_recording_status,
+    format_recording_target_language,
+)
 
 
 class _CompactRecordingPanel(QWidget):
@@ -29,25 +46,43 @@ class _CompactRecordingPanel(QWidget):
         layout.setSpacing(PAGE_DENSE_SPACING)
 
         self.start_button = QPushButton(self)
+        self.start_button.setProperty("role", ROLE_REALTIME_RECORD_ACTION)
         layout.addWidget(self.start_button)
 
         self.stop_button = QPushButton(self)
         layout.addWidget(self.stop_button)
 
-        self.status_label = QLabel(self)
-        layout.addWidget(self.status_label)
+        self.summary_group = QWidget(self)
+        self.summary_group.setProperty("role", ROLE_REALTIME_SUMMARY_GROUP)
+        summary_layout = QVBoxLayout(self.summary_group)
+        summary_layout.setContentsMargins(0, 0, 0, 0)
+        summary_layout.setSpacing(PAGE_DENSE_SPACING)
 
-        self.duration_label = QLabel(self)
-        layout.addWidget(self.duration_label)
+        self.status_label = QLabel(self.summary_group)
+        summary_layout.addWidget(self.status_label)
 
-        self.target_label = QLabel(self)
-        layout.addWidget(self.target_label)
+        summary_meta_layout = QHBoxLayout()
+        summary_meta_layout.setContentsMargins(0, 0, 0, 0)
+        summary_meta_layout.setSpacing(PAGE_DENSE_SPACING)
+
+        self.duration_label = QLabel(self.summary_group)
+        self.duration_label.setProperty("role", ROLE_REALTIME_DURATION)
+        summary_meta_layout.addWidget(self.duration_label)
+
+        self.input_label = QLabel(self.summary_group)
+        summary_meta_layout.addWidget(self.input_label)
+
+        self.target_label = QLabel(self.summary_group)
+        summary_meta_layout.addWidget(self.target_label)
+        summary_meta_layout.addStretch()
+        summary_layout.addLayout(summary_meta_layout)
+        layout.addWidget(self.summary_group, 1)
 
         layout.addStretch()
 
 
 class RealtimeRecordingDock(BaseWidget):
-    """Shell-level recording dock with reserved space for future task drawer content."""
+    """Shell-level recording dock for compact and expanded recording controls."""
 
     workspace_item_requested = Signal(str)
     realtime_settings_requested = Signal()
@@ -60,7 +95,6 @@ class RealtimeRecordingDock(BaseWidget):
         self.realtime_recorder = realtime_recorder
         self.settings_manager = settings_manager
         self._expanded = False
-        self._task_drawer_widget: QWidget | None = None
         self._busy = False
         self._recording_active = bool(getattr(realtime_recorder, "is_recording", False))
         self._init_ui()
@@ -77,13 +111,6 @@ class RealtimeRecordingDock(BaseWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(*APP_RECORDING_DOCK_MARGINS)
         layout.setSpacing(PAGE_DENSE_SPACING)
-
-        self.task_drawer_host = QWidget(self)
-        self.task_drawer_host.hide()
-        self.task_drawer_layout = QVBoxLayout(self.task_drawer_host)
-        self.task_drawer_layout.setContentsMargins(0, 0, 0, 0)
-        self.task_drawer_layout.setSpacing(PAGE_DENSE_SPACING)
-        layout.addWidget(self.task_drawer_host)
 
         self.compact_panel = _CompactRecordingPanel(self)
         self.compact_panel.start_button.clicked.connect(self._on_quick_start_clicked)
@@ -103,41 +130,27 @@ class RealtimeRecordingDock(BaseWidget):
             parent=self,
         )
         self.full_panel.start_button.clicked.connect(self._on_full_start_clicked)
-        self.full_panel.stop_button.clicked.connect(self._on_stop_clicked)
         self.full_panel.more_settings_button.clicked.connect(self.realtime_settings_requested.emit)
-        self.full_panel.hide()
-        layout.addWidget(self.full_panel)
+        self.full_panel_scroll_area = QScrollArea(self)
+        self.full_panel_scroll_area.setWidgetResizable(True)
+        self.full_panel_scroll_area.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        self.full_panel_scroll_area.setWidget(self.full_panel)
+        self.full_panel_scroll_area.hide()
+        layout.addWidget(self.full_panel_scroll_area)
 
     def update_translations(self) -> None:
         self.compact_panel.start_button.setText(self.i18n.t("workspace.record_button"))
         self.compact_panel.stop_button.setText(self.i18n.t("workspace.stop_button"))
-        self.compact_panel.status_label.setText(self._status_text())
-        self.compact_panel.duration_label.setText("00:00")
-        self.compact_panel.target_label.setText("")
         self.expand_button.setText(self.i18n.t("common.more"))
         self.full_panel.update_translations()
-
-    def set_task_drawer_widget(self, widget: QWidget | None) -> None:
-        """Attach a widget above the dock for future task-drawer reuse."""
-        if self._task_drawer_widget is widget:
-            return
-
-        if self._task_drawer_widget is not None:
-            self.task_drawer_layout.removeWidget(self._task_drawer_widget)
-            self._task_drawer_widget.setParent(None)
-
-        self._task_drawer_widget = widget
-        if widget is None:
-            self.task_drawer_host.hide()
-            return
-
-        self.task_drawer_layout.addWidget(widget)
-        self.task_drawer_host.show()
+        self.refresh_status()
 
     def set_expanded(self, expanded: bool) -> None:
         """Toggle future full-panel visibility without duplicating dock state."""
         self._expanded = bool(expanded)
-        self.full_panel.setVisible(self._expanded)
+        self.full_panel_scroll_area.setVisible(self._expanded)
 
     def refresh_status(self) -> None:
         """Refresh the compact status text from the shared recorder state."""
@@ -151,14 +164,24 @@ class RealtimeRecordingDock(BaseWidget):
             minutes = int(duration // 60)
             seconds = int(duration % 60)
             self.compact_panel.duration_label.setText(f"{minutes:02d}:{seconds:02d}")
-            self.compact_panel.target_label.setText(str(status.get("input_device_name") or "default"))
-        self.full_panel.sync_from_recorder()
+            self.compact_panel.input_label.setText(
+                format_recording_input_source(self.i18n, status.get("input_device_name"))
+            )
+        else:
+            self.compact_panel.duration_label.setText("00:00")
+            self.compact_panel.input_label.setText(
+                format_recording_input_source(self.i18n, "default")
+            )
+        self.compact_panel.status_label.setText(self._status_text())
+        self.compact_panel.target_label.setText(
+            format_recording_target_language(self.i18n, self.full_panel.selected_target_language())
+        )
+        self.full_panel.sync_from_recorder(busy=self._busy)
         self._sync_controls()
 
     def _status_text(self) -> str:
         is_recording = bool(getattr(self.realtime_recorder, "is_recording", False))
-        key = "workspace.recording_active" if is_recording else "workspace.recording_idle"
-        return self.i18n.t(key)
+        return format_recording_status(self.i18n, is_recording=is_recording, busy=self._busy)
 
     def build_realtime_session_options(self, *, quick_start: bool = False) -> dict:
         """Build session options from shared defaults and optional full-panel overrides."""
@@ -216,7 +239,7 @@ class RealtimeRecordingDock(BaseWidget):
             return
 
         self._busy = True
-        self._sync_controls()
+        self.refresh_status()
         if inspect.isawaitable(result):
             thread = threading.Thread(
                 target=self._await_result,
@@ -261,7 +284,7 @@ class RealtimeRecordingDock(BaseWidget):
     def _handle_operation_failed(self, _message: str) -> None:
         self._busy = False
         self._recording_active = bool(getattr(self.realtime_recorder, "is_recording", False))
-        self._sync_controls()
+        self.refresh_status()
 
     def _sync_controls(self) -> None:
         start_enabled = not self._busy and not self._recording_active
@@ -269,4 +292,3 @@ class RealtimeRecordingDock(BaseWidget):
         self.compact_panel.start_button.setEnabled(start_enabled)
         self.compact_panel.stop_button.setEnabled(stop_enabled)
         self.full_panel.start_button.setEnabled(start_enabled)
-        self.full_panel.stop_button.setEnabled(stop_enabled)

@@ -38,6 +38,15 @@ def _flatten_dict_key_paths(data: dict[str, Any], prefix: str = "") -> set[str]:
     return key_paths
 
 
+def _has_nested_key(data: dict[str, Any], dotted_key: str) -> bool:
+    current: Any = data
+    for part in dotted_key.split("."):
+        if not isinstance(current, dict) or part not in current:
+            return False
+        current = current[part]
+    return True
+
+
 def test_outline_declares_valid_locale_list_and_sections():
     outline = _load_outline()
     locales = outline.get("locales", [])
@@ -89,5 +98,60 @@ def test_all_locales_have_dual_view_and_detached_window_keys():
 
     for locale in locales:
         workspace = _load_locale(locale)["workspace"]
-        missing = sorted(key for key in required_keys if key not in workspace)
+        missing = sorted(key for key in required_keys if not _has_nested_key(workspace, key))
         assert not missing, f"Locale '{locale}' missing required workspace keys: {missing}"
+
+
+def test_i18n_outline_covers_workspace_task_window_and_recording_console_copy():
+    outline = _load_outline()
+    workspace_keys = set(outline.get("required_nested_keys", {}).get("workspace", []))
+
+    assert "task_window_title" in workspace_keys
+    assert "task_summary_total" in workspace_keys
+    assert "task_summary_active" in workspace_keys
+    assert "task_summary_failed" in workspace_keys
+    assert "recording_console.section_capture" in workspace_keys
+    assert "recording_console.default_input_source" in workspace_keys
+
+
+def test_i18n_outline_covers_workspace_item_meta_copy():
+    outline = _load_outline()
+    workspace_keys = set(outline.get("required_nested_keys", {}).get("workspace", []))
+
+    assert "item_meta_event" in workspace_keys
+    assert "item_meta_updated" in workspace_keys
+    assert "item_source_workspace_note" in workspace_keys
+    assert "item_source_batch_transcription" in workspace_keys
+    assert "item_source_realtime_recording" in workspace_keys
+    assert "item_source_ai_generated" in workspace_keys
+    assert "item_source_unknown" in workspace_keys
+
+
+def test_i18n_outline_covers_workspace_inspector_section_titles():
+    outline = _load_outline()
+    workspace_keys = set(outline.get("required_nested_keys", {}).get("workspace", []))
+
+    assert "inspector_section_ai" in workspace_keys
+    assert "inspector_section_media" in workspace_keys
+    assert "inspector_section_metadata" in workspace_keys
+
+
+def test_i18n_outline_covers_workspace_recording_dock_compact_copy():
+    outline = _load_outline()
+    workspace_keys = set(outline.get("required_nested_keys", {}).get("workspace", []))
+
+    assert "recording_console.apply_and_record" in workspace_keys
+
+
+def test_visual_polish_contracts_are_documented_in_project_guides():
+    agents_text = (PROJECT_ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    docs_readme_text = (PROJECT_ROOT / "docs" / "README.md").read_text(encoding="utf-8")
+    release_skill_text = (
+        PROJECT_ROOT / "skills" / "release-process" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    changelog_text = (PROJECT_ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+
+    assert "2026-03-15-workspace-visual-density-and-layout-polish-plan.md" in agents_text
+    assert "2026-03-15-workspace-visual-density-and-layout-polish-plan.md" in docs_readme_text
+    assert "pytest tests/unit/test_main_window_shell.py -v" in release_skill_text
+    assert "theme/i18n/tests/docs" in changelog_text

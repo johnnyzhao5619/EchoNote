@@ -54,3 +54,18 @@ def test_task_item_shows_quality_note_in_info_line(qapp, mock_i18n):
     widget = TaskItem(task_data=task, i18n=mock_i18n)
 
     assert "Translation quality guard triggered" in widget.info_label.text()
+
+
+def test_task_window_groups_creation_actions_task_item_exposes_task_kind_property(
+    qapp, mock_i18n
+):
+    """Task cards should expose stable task kind metadata for utility filtering."""
+    task = {
+        "id": "task-translation",
+        "file_name": "notes.txt",
+        "status": "completed",
+        "task_kind": "translation",
+    }
+    widget = TaskItem(task_data=task, i18n=mock_i18n)
+
+    assert widget.property("taskKind") == "translation"

@@ -181,16 +181,139 @@ def test_ui_roles_are_covered_by_each_theme_qss():
 def test_theme_outline_covers_workspace_roles():
     outline_roles = _load_outline_roles()
     expected_roles = {
+        "task-entry-badge",
         "workspace-surface",
+        "workspace-asset-tabs",
+        "workspace-task-summary",
+        "workspace-tool-rail",
+        "workspace-explorer-header",
         "workspace-item-list",
+        "workspace-item-title",
+        "workspace-item-meta",
+        "workspace-item-badges",
         "workspace-editor-panel",
+        "workspace-inspector-section",
         "workspace-recording-panel",
-        "workspace-asset-selector",
         "workspace-ai-action",
         "workspace-placeholder",
     }
     missing_roles = sorted(expected_roles - outline_roles)
     assert not missing_roles, f"Theme outline is missing workspace roles: {missing_roles}"
+
+
+def test_tool_rail_explorer_and_document_stage_theme_outline_covers_workspace_shell_roles():
+    outline_roles = _load_outline_roles()
+    expected_roles = {
+        "workspace-tool-rail",
+        "workspace-mode-button-group",
+        "workspace-explorer-header",
+        "workspace-context-label",
+    }
+    missing_roles = sorted(expected_roles - outline_roles)
+    assert not missing_roles, f"Theme outline is missing workspace shell roles: {missing_roles}"
+
+
+def test_theme_outline_covers_workspace_compact_shell_selectors():
+    outline = _load_theme_outline()
+    selectors = {
+        selector
+        for section in outline.get("sections", [])
+        for selector in section.get("selectors", [])
+    }
+    expected_selectors = {
+        'QWidget[role="workspace-mode-button-group"]',
+        'QLabel[role="workspace-context-label"]',
+    }
+    missing = sorted(expected_selectors - selectors)
+    assert not missing, f"Theme outline is missing workspace compact shell selectors: {missing}"
+
+
+def test_theme_outline_covers_workspace_item_row_selectors():
+    outline = _load_theme_outline()
+    selectors = {
+        selector
+        for section in outline.get("sections", [])
+        for selector in section.get("selectors", [])
+    }
+    expected_selectors = {
+        'QLabel[role="workspace-item-title"]',
+        'QLabel[role="workspace-item-meta"]',
+        'QWidget[role="workspace-item-badges"]',
+    }
+    missing = sorted(expected_selectors - selectors)
+    assert not missing, f"Theme outline is missing workspace item row selectors: {missing}"
+
+
+def test_theme_outline_covers_workspace_inspector_section_title_selector():
+    outline = _load_theme_outline()
+    selectors = {
+        selector
+        for section in outline.get("sections", [])
+        for selector in section.get("selectors", [])
+    }
+    assert 'QLabel[role="workspace-inspector-section-title"]' in selectors
+
+
+def test_theme_outline_covers_task_entry_badge_and_task_summary_selectors():
+    outline = _load_theme_outline()
+    selectors = {
+        selector
+        for section in outline.get("sections", [])
+        for selector in section.get("selectors", [])
+    }
+    expected_selectors = {
+        'QLabel[role="task-entry-badge"]',
+        'QWidget[role="workspace-task-summary"]',
+    }
+    missing = sorted(expected_selectors - selectors)
+    assert not missing, f"Theme outline is missing task utility selectors: {missing}"
+
+
+def test_theme_outline_covers_topbar_tools_selector():
+    outline = _load_theme_outline()
+    selectors = {
+        selector
+        for section in outline.get("sections", [])
+        for selector in section.get("selectors", [])
+    }
+    assert 'QWidget[role="app-topbar-tools"]' in selectors
+
+
+def test_theme_outline_covers_workspace_asset_tab_selectors():
+    outline = _load_theme_outline()
+    selectors = {
+        selector
+        for section in outline.get("sections", [])
+        for selector in section.get("selectors", [])
+    }
+    expected_selectors = {
+        'QTabWidget[role="workspace-asset-tabs"]::pane',
+        'QTabWidget[role="workspace-asset-tabs"] QTabBar::tab',
+        'QTabWidget[role="workspace-asset-tabs"] QTabBar::tab:selected',
+        'QTabWidget[role="workspace-asset-tabs"] QTabBar::tab:hover',
+    }
+    missing = sorted(expected_selectors - selectors)
+    assert not missing, f"Theme outline is missing workspace asset tab selectors: {missing}"
+
+
+def test_theme_outline_no_longer_references_workspace_asset_selector():
+    outline = _load_theme_outline()
+    selectors = {
+        selector
+        for section in outline.get("sections", [])
+        for selector in section.get("selectors", [])
+    }
+    assert 'QComboBox[role="workspace-asset-selector"]' not in selectors
+
+
+def test_theme_outline_covers_workspace_inspector_section_selector():
+    outline = _load_theme_outline()
+    selectors = {
+        selector
+        for section in outline.get("sections", [])
+        for selector in section.get("selectors", [])
+    }
+    assert 'QWidget[role="workspace-inspector-section"]' in selectors
 
 
 def test_theme_outline_covers_recording_dock_and_document_tab_roles():
@@ -211,6 +334,64 @@ def test_theme_outline_covers_recording_dock_and_document_tab_roles():
     }
     missing = sorted(expected_selectors - selectors)
     assert not missing, f"Theme outline is missing recording dock/document tab selectors: {missing}"
+
+
+def test_recording_dock_full_panel_theme_outline_covers_recording_console_section_roles():
+    outline = _load_theme_outline()
+    selectors = {
+        selector
+        for section in outline.get("sections", [])
+        for selector in section.get("selectors", [])
+    }
+    expected_selectors = {
+        'QWidget[role="realtime-console-section"]',
+        'QLabel[role="realtime-console-section-title"]',
+    }
+    missing = sorted(expected_selectors - selectors)
+    assert not missing, f"Theme outline is missing recording console selectors: {missing}"
+
+
+def test_recording_dock_full_panel_theme_outline_covers_spin_box_field_control():
+    outline = _load_theme_outline()
+    selectors = {
+        selector
+        for section in outline.get("sections", [])
+        for selector in section.get("selectors", [])
+    }
+    assert (
+        'QDoubleSpinBox[role="realtime-field-control"]' in selectors
+    ), "Theme outline must cover realtime field-control spin boxes."
+
+
+def test_recording_dock_theme_outline_covers_compact_summary_group():
+    outline = _load_theme_outline()
+    selectors = {
+        selector
+        for section in outline.get("sections", [])
+        for selector in section.get("selectors", [])
+    }
+    assert 'QWidget[role="realtime-summary-group"]' in selectors
+
+
+def test_visual_polish_contracts_cover_workspace_roles():
+    outline = _load_theme_outline()
+    selectors = {
+        selector
+        for section in outline.get("sections", [])
+        for selector in section.get("selectors", [])
+    }
+    expected_selectors = {
+        'QWidget[role="app-topbar-tools"]',
+        'QWidget[role="workspace-mode-button-group"]',
+        'QLabel[role="workspace-context-label"]',
+        'QLabel[role="workspace-item-title"]',
+        'QLabel[role="workspace-item-meta"]',
+        'QWidget[role="workspace-item-badges"]',
+        'QLabel[role="workspace-inspector-section-title"]',
+        'QWidget[role="realtime-summary-group"]',
+    }
+    missing = sorted(expected_selectors - selectors)
+    assert not missing, f"Theme outline is missing workspace visual polish selectors: {missing}"
 
 
 def test_all_themes_share_identical_role_sets():

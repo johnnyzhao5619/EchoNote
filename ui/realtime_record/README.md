@@ -44,7 +44,7 @@ Responsibilities:
 
 - Theme selectors live in `resources/themes/light.qss`, `resources/themes/dark.qss`, and `resources/themes/theme_outline.json`.
 - Translation keys stay under the `realtime_record` section in `resources/translations/*.json`.
-- Shell dock text that belongs to the workspace/realtime workflow lives under `workspace.*` where the dock and workspace share copy.
+- Shell dock text that belongs to the workspace/realtime workflow lives under `workspace.*`; the task utility window title uses `workspace.task_window_title`, and the full recording console section labels use `workspace.recording_console.section_*`.
 
 ## Maintenance Rules
 

@@ -3,6 +3,7 @@
 
 from pathlib import Path
 from unittest.mock import Mock, PropertyMock, patch
+import wave
 
 import pytest
 
@@ -14,9 +15,19 @@ from data.database.models import CalendarEvent, TranscriptionTask, WorkspaceAsse
 from data.storage.file_manager import FileManager
 from ui.common.audio_player import AudioPlayer
 from ui.main_window import MainWindow
+from ui.workspace.detached_document_window import DetachedDocumentWindow
 from ui.workspace.widget import WorkspaceWidget
 
 pytestmark = pytest.mark.ui
+
+
+def _write_valid_wav(path: Path) -> None:
+    """Create a tiny valid PCM WAV fixture for UI audio-player tests."""
+    with wave.open(str(path), "wb") as wav_file:
+        wav_file.setnchannels(1)
+        wav_file.setsampwidth(2)
+        wav_file.setframerate(8000)
+        wav_file.writeframes(b"\x00\x00" * 800)
 
 
 @pytest.fixture
@@ -30,7 +41,7 @@ def workspace_manager(tmp_path):
     item.save(db)
 
     audio_path = tmp_path / "meeting.wav"
-    audio_path.write_bytes(b"RIFF")
+    _write_valid_wav(audio_path)
     transcript_path = tmp_path / "meeting.txt"
     transcript_path.write_text("Team reviewed roadmap and decided to ship alpha next week.", encoding="utf-8")
 
@@ -249,20 +260,33 @@ def test_workspace_recording_panel_reuses_shared_audio_player(qapp, mock_i18n, w
     assert isinstance(widget.recording_panel.audio_player, AudioPlayer)
 
 
-def test_workspace_editor_panel_uses_stable_asset_labels(qapp, mock_i18n, workspace_manager):
+def test_workspace_editor_panel_uses_stable_asset_tab_labels(qapp, mock_i18n, workspace_manager):
     widget = WorkspaceWidget(workspace_manager, mock_i18n)
     item = workspace_manager.list_items()[0]
 
     widget._on_item_selected(item.id)
     labels = [
-        widget.editor_panel.asset_selector.itemText(index)
-        for index in range(widget.editor_panel.asset_selector.count())
+        widget.editor_panel.asset_tabs.tabText(index)
+        for index in range(widget.editor_panel.asset_tabs.count())
     ]
 
     assert any(label.startswith("Transcript:") for label in labels)
 
 
-def test_workspace_task_panel_renders_existing_tasks(
+def test_workspace_editor_uses_asset_tabs_and_inspector_hosts_ai_actions(
+    qapp, mock_i18n, workspace_manager
+):
+    widget = WorkspaceWidget(workspace_manager, mock_i18n)
+    item = workspace_manager.list_items()[0]
+
+    widget.open_item(item.id)
+
+    assert widget.editor_panel.asset_tabs is not None
+    assert widget.inspector_panel.summary_button is not None
+    assert widget.inspector_panel.meeting_brief_button is not None
+
+
+def test_workspace_task_window_renders_existing_tasks(
     qapp, mock_i18n, workspace_manager, transcription_manager
 ):
     main_window, _realtime_recorder = build_main_window_with_workspace(
@@ -273,13 +297,17 @@ def test_workspace_task_panel_renders_existing_tasks(
     )
 
     try:
-        assert main_window.task_panel.task_count() == 1
-        assert main_window.task_panel.task_items[0].filename_label.text() == "demo.wav"
+        main_window.task_window_button.click()
+        qapp.processEvents()
+
+        assert main_window.task_window is not None
+        assert main_window.task_window.panel.task_count() == 1
+        assert main_window.task_window.panel.task_items[0].filename_label.text() == "demo.wav"
     finally:
         main_window.close()
 
 
-def test_workspace_task_panel_updates_on_task_events(
+def test_workspace_task_window_updates_on_task_events(
     qapp, mock_i18n, workspace_manager, transcription_manager
 ):
     main_window, _realtime_recorder = build_main_window_with_workspace(
@@ -290,6 +318,9 @@ def test_workspace_task_panel_updates_on_task_events(
     )
 
     try:
+        main_window.task_window_button.click()
+        qapp.processEvents()
+
         transcription_manager.emit(
             "task_added",
             {
@@ -302,9 +333,10 @@ def test_workspace_task_panel_updates_on_task_events(
                 "task_kind": "translation",
             },
         )
+        qapp.processEvents()
 
-        assert main_window.task_panel.task_count() == 2
-        assert {item.filename_label.text() for item in main_window.task_panel.task_items} == {
+        assert main_window.task_window.panel.task_count() == 2
+        assert {item.filename_label.text() for item in main_window.task_window.panel.task_items} == {
             "demo.wav",
             "translation.txt",
         }
@@ -330,13 +362,113 @@ def test_workspace_task_view_action_routes_to_open_document_card(
     try:
         main_window.switch_page("settings")
         qapp.processEvents()
+        main_window.task_window_button.click()
+        qapp.processEvents()
 
-        main_window.task_panel.task_items[0].view_clicked.emit(task.id)
+        main_window.task_window.panel.task_items[0].view_clicked.emit(task.id)
         qapp.processEvents()
 
         assert main_window.current_page_name == "workspace"
         assert main_window.pages["workspace"].document_tabs.count() >= 1
         assert main_window.pages["workspace"].current_item_id() == workspace_item_id
+    finally:
+        main_window.close()
+
+
+def test_workspace_task_window_groups_creation_actions_and_routes_view_to_workspace(
+    qapp, mock_i18n, workspace_manager, transcription_manager
+):
+    main_window, _ = build_main_window_with_workspace(
+        qapp,
+        mock_i18n,
+        workspace_manager,
+        transcription_manager=transcription_manager,
+    )
+
+    try:
+        main_window.task_window_button.click()
+        qapp.processEvents()
+        task_window = main_window.task_window
+
+        assert task_window is not None
+        assert task_window.panel.creation_section is not None
+        assert task_window.panel.queue_filter_section is not None
+        assert task_window.panel.task_filter_tabs.count() >= 2
+        assert task_window.panel.import_file_button.isVisible()
+        assert task_window.panel.import_folder_button.isVisible()
+    finally:
+        main_window.close()
+
+
+def test_workspace_task_window_exposes_summary_counts(
+    qapp, mock_i18n, workspace_manager, transcription_manager
+):
+    failed_task = TranscriptionTask(
+        file_path="/tmp/failed.wav",
+        file_name="failed.wav",
+        file_size=2048,
+        status="failed",
+        output_format="txt",
+    )
+    failed_task.save(workspace_manager.db)
+
+    main_window, _ = build_main_window_with_workspace(
+        qapp,
+        mock_i18n,
+        workspace_manager,
+        transcription_manager=transcription_manager,
+    )
+
+    try:
+        main_window.task_window_button.click()
+        qapp.processEvents()
+        task_window = main_window.task_window
+
+        assert task_window is not None
+        assert task_window.panel.summary_section is not None
+        assert task_window.panel.summary_total_value_label.text() == "2"
+        assert task_window.panel.summary_active_value_label.text() == "1"
+        assert task_window.panel.summary_failed_value_label.text() == "1"
+    finally:
+        main_window.close()
+
+
+def test_workspace_task_window_groups_creation_actions_publish_unpublished_result(
+    qapp, mock_i18n, workspace_manager, transcription_manager, tmp_path
+):
+    task_data = transcription_manager.get_all_tasks()[0]
+    task = TranscriptionTask.get_by_id(workspace_manager.db, task_data["id"])
+    assert task is not None
+
+    output_path = tmp_path / "demo-output.txt"
+    output_path.write_text("Published transcript", encoding="utf-8")
+    task.status = "completed"
+    task.output_path = str(output_path)
+    task.save(workspace_manager.db)
+
+    main_window, _ = build_main_window_with_workspace(
+        qapp,
+        mock_i18n,
+        workspace_manager,
+        transcription_manager=transcription_manager,
+    )
+
+    try:
+        assert workspace_manager.get_item_id_by_task_id(task.id) is None
+
+        main_window.switch_page("settings")
+        qapp.processEvents()
+        main_window.task_window_button.click()
+        qapp.processEvents()
+        main_window.task_window.panel.show_warning = Mock(return_value=False)
+
+        main_window.task_window.panel.task_items[0].view_clicked.emit(task.id)
+        qapp.processEvents()
+
+        published_item_id = workspace_manager.get_item_id_by_task_id(task.id)
+        assert published_item_id is not None
+        assert main_window.current_page_name == "workspace"
+        assert main_window.pages["workspace"].current_item_id() == published_item_id
     finally:
         main_window.close()
 
@@ -351,7 +483,117 @@ def test_workspace_widget_exposes_unified_create_toolbar(
     assert widget.toolbar is not None
     assert widget.toolbar.import_document_button.isVisible()
     assert widget.toolbar.new_note_button.isVisible()
-    assert not widget.toolbar.start_recording_button.isVisible()
+    assert not hasattr(widget.toolbar, "start_recording_button")
+
+
+def test_workspace_shell_exposes_tool_rail_explorer_and_document_stage(
+    qapp, mock_i18n, workspace_manager
+):
+    widget = WorkspaceWidget(workspace_manager, mock_i18n)
+
+    assert widget.tool_rail is not None
+    assert widget.library_panel.explorer_header is not None
+    assert widget.library_panel.item_list is not None
+    assert widget.document_tabs is not None
+
+
+def test_workspace_shell_uses_single_view_mode_entry_and_document_first_splitter(
+    qapp, mock_i18n, workspace_manager
+):
+    widget = WorkspaceWidget(workspace_manager, mock_i18n)
+    widget.resize(1440, 900)
+    widget.show()
+    qapp.processEvents()
+
+    assert not hasattr(widget.library_panel, "view_mode_combo")
+    assert widget.content_splitter.sizes()[1] > widget.content_splitter.sizes()[2]
+    assert not hasattr(widget.toolbar, "start_recording_button")
+
+
+def test_workspace_tool_rail_and_explorer_header_expose_compact_mode_shell(
+    qapp, mock_i18n, workspace_manager
+):
+    widget = WorkspaceWidget(workspace_manager, mock_i18n)
+    widget.resize(1440, 900)
+    widget.show()
+    qapp.processEvents()
+
+    assert widget.tool_rail.mode_button_group is not None
+    assert widget.library_panel.context_label is not None
+    assert widget.content_splitter.sizes()[1] > widget.content_splitter.sizes()[2]
+
+
+def test_workspace_item_list_renders_structured_row_widgets(
+    qapp, mock_i18n, workspace_manager
+):
+    note_id = workspace_manager.create_note(title="Plan")
+    widget = WorkspaceWidget(workspace_manager, mock_i18n)
+    widget.show()
+    qapp.processEvents()
+
+    row_item = None
+    for row in range(widget.item_list.list_widget.count()):
+        candidate = widget.item_list.list_widget.item(row)
+        if candidate.data(0x0100) == note_id:
+            row_item = candidate
+            break
+
+    assert row_item is not None
+    row_widget = widget.item_list.list_widget.itemWidget(row_item)
+
+    assert row_widget.title_label.text() == "Plan"
+    assert row_widget.meta_label.text()
+    assert row_widget.status_badges_layout.count() >= 1
+
+
+def test_workspace_item_row_uses_dense_title_meta_and_badge_roles(
+    qapp, mock_i18n, workspace_manager
+):
+    widget = WorkspaceWidget(workspace_manager, mock_i18n)
+    row = widget.item_list.list_widget.itemWidget(widget.item_list.list_widget.item(0))
+
+    assert row.title_label.property("role") == "workspace-item-title"
+    assert row.meta_label.property("role") == "workspace-item-meta"
+    assert row.badges_widget.property("role") == "workspace-item-badges"
+
+
+def test_workspace_inspector_exposes_section_titles_and_user_facing_metadata(
+    qapp, mock_i18n, workspace_manager
+):
+    widget = WorkspaceWidget(workspace_manager, mock_i18n)
+    item = workspace_manager.list_items()[0]
+    widget.open_item(item.id)
+
+    assert widget.inspector_panel.ai_section_title.text()
+    assert widget.inspector_panel.media_section_title.text()
+    assert widget.inspector_panel.metadata_section_title.text()
+    assert "T" not in widget.inspector_panel.updated_value_label.text()
+
+
+def test_workspace_editor_keeps_blank_note_asset_tab_editable(
+    qapp, mock_i18n, workspace_manager
+):
+    note_id = workspace_manager.create_note(title="Blank Note", text_content="")
+    widget = WorkspaceWidget(workspace_manager, mock_i18n)
+
+    widget.open_item(note_id)
+
+    assert widget.editor_panel.asset_tabs.count() == 1
+    assert widget.editor_panel.edit_button.isEnabled()
+    assert widget.editor_panel.text_edit.toPlainText() == ""
+
+
+def test_detached_document_window_matches_workspace_context_stack(
+    qapp, mock_i18n, workspace_manager
+):
+    note_id = workspace_manager.create_note(title="Plan")
+    window = DetachedDocumentWindow(workspace_manager, mock_i18n, note_id)
+    window.show()
+    qapp.processEvents()
+
+    assert window.inspector_panel is not None
+    assert window.inspector_panel.recording_panel is not None
+    assert hasattr(window.editor_panel, "generate_summary")
 
 
 def test_workspace_toolbar_new_note_creates_workspace_item(
@@ -504,6 +746,28 @@ def test_recording_dock_quick_start_uses_defaults_and_more_settings_routes_to_re
         assert call_kwargs["options"]["default_gain"] == 1.6
         assert main_window.current_page_name == "settings"
         assert main_window.pages["settings"].current_page_id() == "realtime"
+    finally:
+        main_window.close()
+
+
+def test_recording_dock_full_panel_grouped_console_sections_in_main_window(
+    qapp, mock_i18n, workspace_manager
+):
+    main_window, _ = build_main_window_with_workspace(
+        qapp,
+        mock_i18n,
+        workspace_manager,
+    )
+
+    try:
+        main_window.recording_dock.set_expanded(True)
+        qapp.processEvents()
+
+        assert main_window.recording_dock.full_panel.session_summary_section is not None
+        assert main_window.recording_dock.full_panel.capture_section is not None
+        assert main_window.recording_dock.full_panel.processing_section is not None
+        assert main_window.recording_dock.full_panel.output_section is not None
+        assert main_window.recording_dock.full_panel.live_results_section is not None
     finally:
         main_window.close()
 

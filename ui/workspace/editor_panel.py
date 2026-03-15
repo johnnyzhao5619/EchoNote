@@ -11,7 +11,6 @@ from typing import Callable, Iterable, Optional
 from core.qt_imports import (
     QAction,
     QApplication,
-    QComboBox,
     QFileDialog,
     QFrame,
     QHBoxLayout,
@@ -19,6 +18,7 @@ from core.qt_imports import (
     QMenu,
     QMessageBox,
     QPushButton,
+    QTabWidget,
     QTextEdit,
     QTimer,
     QVBoxLayout,
@@ -26,13 +26,12 @@ from core.qt_imports import (
     Signal,
 )
 
-from ui.base_widgets import BaseWidget, connect_button_with_callback, create_hbox
+from ui.base_widgets import BaseWidget, connect_button_with_callback
 from ui.batch_transcribe.search_widget import SearchWidget
 from ui.common.style_utils import set_widget_state
 from ui.constants import (
     ROLE_TOOLBAR_SECONDARY_ACTION,
-    ROLE_WORKSPACE_AI_ACTION,
-    ROLE_WORKSPACE_ASSET_SELECTOR,
+    ROLE_WORKSPACE_ASSET_TABS,
     ROLE_WORKSPACE_EDITOR_PANEL,
 )
 from utils.i18n import I18nQtManager
@@ -408,22 +407,15 @@ class WorkspaceEditorPanel(TextEditorPanel):
         self.document_title_label = QLabel()
         self.layout().insertWidget(0, self.document_title_label)
 
-        self.asset_selector = QComboBox()
-        self.asset_selector.setProperty("role", ROLE_WORKSPACE_ASSET_SELECTOR)
-        self.asset_selector.currentIndexChanged.connect(self._on_asset_changed)
-        self.insert_toolbar_widget(self.asset_selector)
+        self.document_context_label = QLabel()
+        self.layout().insertWidget(1, self.document_context_label)
 
-        self.summary_button = QPushButton(self.i18n.t("workspace.generate_summary"))
-        self.summary_button.setProperty("role", ROLE_WORKSPACE_AI_ACTION)
-        connect_button_with_callback(self.summary_button, self._generate_summary)
-        self.insert_toolbar_widget(self.summary_button)
-
-        self.meeting_brief_button = QPushButton(self.i18n.t("workspace.generate_meeting_brief"))
-        self.meeting_brief_button.setProperty("role", ROLE_WORKSPACE_AI_ACTION)
-        connect_button_with_callback(self.meeting_brief_button, self._generate_meeting_brief)
-        self.insert_toolbar_widget(self.meeting_brief_button)
-
-        self.asset_selector.setMinimumWidth(180)
+        self.asset_tabs = QTabWidget()
+        self.asset_tabs.setProperty("role", ROLE_WORKSPACE_ASSET_TABS)
+        self.asset_tabs.setDocumentMode(True)
+        self.asset_tabs.setMaximumHeight(36)
+        self.asset_tabs.currentChanged.connect(self._on_asset_tab_changed)
+        self.layout().insertWidget(2, self.asset_tabs)
 
     def set_item(self, item) -> None:
         """Load editable assets for the selected workspace item."""
@@ -431,14 +423,13 @@ class WorkspaceEditorPanel(TextEditorPanel):
         self.current_asset = None
         self._text_assets = []
         self.document_title_label.setText(item.title if item is not None else "")
-        self.asset_selector.blockSignals(True)
-        self.asset_selector.clear()
+        self.asset_tabs.blockSignals(True)
+        while self.asset_tabs.count() > 0:
+            self.asset_tabs.removeTab(0)
 
         if item is not None:
             assets = self.workspace_manager.get_assets(item.id)
-            self._text_assets = [
-                asset for asset in assets if self.workspace_manager.read_asset_text(asset)
-            ]
+            self._text_assets = [asset for asset in assets if self._is_editable_text_asset(asset)]
             self._text_assets.sort(
                 key=lambda asset: (
                     WORKSPACE_ASSET_ORDER.get(asset.asset_role, 999),
@@ -448,11 +439,11 @@ class WorkspaceEditorPanel(TextEditorPanel):
             preferred_id = getattr(item, "primary_text_asset_id", None)
             selected_index = 0
             for index, asset in enumerate(self._text_assets):
-                self.asset_selector.addItem(self._label_for_asset(asset), asset.id)
+                self.asset_tabs.addTab(QWidget(self.asset_tabs), self._label_for_asset(asset))
                 if preferred_id and asset.id == preferred_id:
                     selected_index = index
             if self._text_assets:
-                self.asset_selector.setCurrentIndex(selected_index)
+                self.asset_tabs.setCurrentIndex(selected_index)
                 self.current_asset = self._text_assets[selected_index]
                 self._load_current_asset()
             else:
@@ -461,18 +452,15 @@ class WorkspaceEditorPanel(TextEditorPanel):
         else:
             self.set_document_context(display_name="workspace", file_path=None)
             self.set_text_content("")
+            self.document_context_label.setText("")
 
-        self.asset_selector.blockSignals(False)
+        self.asset_tabs.blockSignals(False)
         self._update_action_states()
 
     def update_translations(self) -> None:
         super().update_translations()
-        if hasattr(self, "summary_button"):
-            self.summary_button.setText(self.i18n.t("workspace.generate_summary"))
-        if hasattr(self, "meeting_brief_button"):
-            self.meeting_brief_button.setText(self.i18n.t("workspace.generate_meeting_brief"))
 
-    def _on_asset_changed(self, index: int) -> None:
+    def _on_asset_tab_changed(self, index: int) -> None:
         if index < 0 or index >= len(self._text_assets):
             return
         self.current_asset = self._text_assets[index]
@@ -489,6 +477,7 @@ class WorkspaceEditorPanel(TextEditorPanel):
             save_handler=self._save_current_asset,
             export_formats=("txt", "md"),
         )
+        self.document_context_label.setText(self._label_for_asset(self.current_asset))
         self.set_text_content(self.workspace_manager.read_asset_text(self.current_asset))
 
     def _save_current_asset(self, text_content: str) -> None:
@@ -518,12 +507,20 @@ class WorkspaceEditorPanel(TextEditorPanel):
     def _select_asset_role(self, asset_role: str) -> None:
         for index, asset in enumerate(self._text_assets):
             if asset.asset_role == asset_role:
-                self.asset_selector.setCurrentIndex(index)
+                self.asset_tabs.setCurrentIndex(index)
                 break
 
     def select_asset_role(self, asset_role: str) -> None:
         """Public wrapper used by workspace routing helpers."""
         self._select_asset_role(asset_role)
+
+    def generate_summary(self) -> None:
+        """Public inspector-facing summary command."""
+        self._generate_summary()
+
+    def generate_meeting_brief(self) -> None:
+        """Public inspector-facing meeting brief command."""
+        self._generate_meeting_brief()
 
     def _label_for_asset(self, asset) -> str:
         role_label = WORKSPACE_ASSET_LABELS.get(
@@ -533,14 +530,26 @@ class WorkspaceEditorPanel(TextEditorPanel):
         file_name = Path(asset.file_path).name if asset.file_path else role_label
         return f"{role_label}: {file_name}"
 
+    def _is_editable_text_asset(self, asset) -> bool:
+        """Return whether the asset should surface as an editable text tab."""
+        if asset is None:
+            return False
+        if asset.asset_role in WORKSPACE_ASSET_ORDER:
+            return True
+        content_type = (getattr(asset, "content_type", "") or "").lower()
+        if content_type.startswith(("audio/", "video/", "image/")):
+            return False
+        try:
+            return bool(self.workspace_manager.read_asset_text(asset))
+        except (UnicodeDecodeError, OSError, ValueError) as exc:
+            logger.debug("Skipping non-text workspace asset %s: %s", getattr(asset, "id", ""), exc)
+            return False
+
     def _update_action_states(self) -> None:
-        has_item = self.current_item is not None
         self.edit_button.setEnabled(self.current_asset is not None)
         self.copy_button.setEnabled(self.current_asset is not None)
         self.export_button.setEnabled(self.current_asset is not None)
         self.search_button.setEnabled(self.current_asset is not None)
-        self.summary_button.setEnabled(has_item)
-        self.meeting_brief_button.setEnabled(has_item)
 
     def current_item_id(self) -> str:
         """Expose the currently loaded workspace item identifier."""

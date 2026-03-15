@@ -36,7 +36,7 @@
   - `engines/translation/`：翻译引擎。
   - `engines/text_ai/`：本地文本 AI 能力（extractive、ONNX 摘要、GGUF 会议整理 runtime）。
 - `ui/`：桌面端界面层（PySide6）。
-  - `ui/workspace/`：统一 workspace 工作台（顶部创建入口、结构/事件双视图文档库、文件夹管理、批量任务队列、卡片/标签式文本编辑、独立窗口、录音回放与 AI 操作）。
+- `ui/workspace/`：统一 workspace 工作台（顶部创建入口、局部工具轨、结构/事件双视图文档库、文件夹管理、壳层级批量任务工具窗口、卡片/标签式文本编辑、独立窗口、录音回放与 AI 操作）。
   - `ui/realtime_record/`：实时录音浮动窗与音频可视化组件（主录音入口已硬切到应用壳层底座与 `ui/common/realtime_recording_dock.py`）。
   - `ui/timeline/`：时间线页面与事件卡片（`widget.py`、`event_card.py`、`transcript_viewer.py`）。
   - `ui/settings/`：设置页面（含 `translation_page.py` 与 `workspace_ai_page.py` 独立默认设置页）。
@@ -58,13 +58,15 @@
 ## 常用定位建议
 
 - 查“统一工作台/文档资产”：优先看 `core/workspace/` + `ui/workspace/` + `data/database/models.py`。
-- 查“工作台批量转写/转译任务”：优先看 `ui/workspace/task_panel.py` + `core/transcription/manager.py` + `ui/batch_transcribe/task_item.py` + `ui/workspace/editor_panel.py`。
-- 查“工作台创建入口/录音主控”：优先看 `ui/workspace/toolbar.py` + `ui/common/realtime_recording_dock.py` + `ui/workspace/recording_session_panel.py` + `core/realtime/recorder.py` + `core/workspace/manager.py`。
+- 查“工作台批量转写/转译任务”：优先看 `ui/workspace/task_window.py` + `ui/workspace/task_panel.py` + `ui/main_window.py` + `core/transcription/manager.py` + `ui/batch_transcribe/task_item.py` + `ui/workspace/editor_panel.py`。
+- 查“工作台创建入口/录音主控”：优先看 `ui/workspace/toolbar.py` + `ui/workspace/tool_rail.py` + `ui/common/realtime_recording_dock.py` + `ui/workspace/recording_session_panel.py` + `core/realtime/recorder.py` + `core/workspace/manager.py`。
 - 查“实时录音/浮动窗”：优先看 `ui/common/realtime_recording_dock.py` + `ui/realtime_record/` + `core/realtime/` + `resources/themes/*qss`；录音落盘与资产发布再看 `core/workspace/manager.py`。
-- 查“文档库双视图/文件夹管理”：优先看 `ui/workspace/library_panel.py` + `ui/workspace/item_list.py` + `core/workspace/manager.py` + `data/database/models.py`。
+- 查“文档库双视图/文件夹管理”：优先看 `ui/workspace/tool_rail.py` + `ui/workspace/library_panel.py` + `ui/workspace/item_list.py` + `core/workspace/manager.py` + `data/database/models.py`。
 - 查“文档标签页/独立窗口”：优先看 `ui/workspace/widget.py` + `ui/workspace/editor_panel.py` + `ui/workspace/detached_document_window.py`。
 - 查“时间线音频播放”：优先看 `ui/common/audio_player.py` + `ui/common/audio_player_launcher.py` + `ui/timeline/widget.py`。
 - 查“本地摘要/会议整理/Text AI”：优先看 `engines/text_ai/` + `core/workspace/summary_service.py` + `core/workspace/meeting_brief_service.py` + `core/models/manager.py`。
+- 查“工作台任务窗口/录音控制台文案”：优先看 `resources/translations/i18n_outline.json` + `resources/translations/zh_CN.json` + `resources/translations/en_US.json` + `resources/translations/fr_FR.json` + `ui/workspace/task_window.py` + `ui/workspace/recording_session_panel.py`。
+- 查“工作台视觉密度/布局精修”：优先看 `docs/plans/2026-03-15-workspace-visual-density-and-layout-polish-plan.md` + `ui/constants.py` + `resources/themes/theme_outline.json` + `tests/unit/test_main_window_shell.py` + `tests/ui/test_workspace_widget.py` + `tests/unit/test_i18n_outline_contract.py` + `tests/unit/test_theme_outline_contract.py`。
 - 查“主题覆盖缺失”：先对照 `ui/constants.py` 的 role，再查双主题与 `theme_outline.json`。
 - 查“版本发布遗漏”：先看 `config/__version__.py`，再按发布清单同步其他文件。
 - 查“新功能实施计划”：优先看 `docs/plans/`，再回到对应模块代码与测试。
@@ -72,9 +74,9 @@
 ## 功能关键词到文件路径（快速索引）
 
 - 统一工作台入口：`ui/workspace/widget.py`、`ui/main_window.py`、`ui/navigation.py`
-- 工作台顶部入口与录音主控：`ui/workspace/toolbar.py`、`ui/common/realtime_recording_dock.py`、`ui/workspace/recording_session_panel.py`、`core/realtime/recorder.py`、`core/workspace/manager.py`
-- 工作台批量任务区：`ui/workspace/task_panel.py`、`core/transcription/manager.py`、`ui/batch_transcribe/task_item.py`、`ui/workspace/editor_panel.py`
-- 工作台文档库双视图：`ui/workspace/library_panel.py`、`ui/workspace/item_list.py`、`core/workspace/manager.py`、`data/database/models.py`
+- 工作台顶部入口与录音主控：`ui/workspace/toolbar.py`、`ui/workspace/tool_rail.py`、`ui/common/realtime_recording_dock.py`、`ui/workspace/recording_session_panel.py`、`core/realtime/recorder.py`、`core/workspace/manager.py`
+- 工作台批量任务区：`ui/workspace/task_window.py`、`ui/workspace/task_panel.py`、`ui/main_window.py`、`core/transcription/manager.py`、`ui/batch_transcribe/task_item.py`、`ui/workspace/editor_panel.py`
+- 工作台文档库双视图：`ui/workspace/tool_rail.py`、`ui/workspace/library_panel.py`、`ui/workspace/item_list.py`、`core/workspace/manager.py`、`data/database/models.py`
 - 工作台文档标签页与独立窗口：`ui/workspace/widget.py`、`ui/workspace/editor_panel.py`、`ui/workspace/detached_document_window.py`
 - 工作台集合筛选与条目元信息：`ui/workspace/item_list.py`、`core/workspace/manager.py`、`data/database/models.py`
 - 统一工作台资产层：`core/workspace/manager.py`、`core/workspace/import_service.py`、`data/database/models.py`
@@ -93,7 +95,8 @@
 - 翻译引擎接入：`utils/app_initializer.py`、`engines/translation/`、`core/realtime/recorder.py`
 - Text AI 引擎接入：`utils/app_initializer.py`、`engines/text_ai/`、`core/workspace/summary_service.py`
 - 版本号与发布：`config/__version__.py`、`CHANGELOG.md`、`scripts/build_config.py`、`pyproject.toml`
-- 统一工作台规划：`docs/plans/2026-03-15-workspace-experience-rearchitecture.md`、`docs/plans/2026-03-15-unified-workspace-and-local-ai.md`、`ui/main_window.py`、`ui/navigation.py`、`core/transcription/manager.py`
+- 统一工作台规划：`docs/plans/2026-03-15-workspace-polish-and-obsidian-alignment.md`、`docs/plans/archive/2026-03-15-workspace-experience-rearchitecture.md`、`docs/plans/archive/2026-03-15-unified-workspace-and-local-ai.md`、`ui/main_window.py`、`ui/navigation.py`、`core/transcription/manager.py`
+- 工作台视觉精修计划：`docs/plans/2026-03-15-workspace-visual-density-and-layout-polish-plan.md`、`ui/main_window.py`、`ui/common/realtime_recording_dock.py`、`ui/workspace/library_panel.py`、`ui/workspace/item_list.py`、`ui/workspace/inspector_panel.py`、`ui/workspace/recording_session_panel.py`、`resources/themes/theme_outline.json`、`resources/translations/i18n_outline.json`
 
 ## 结构变更同步更新要求（强制）
 
@@ -107,9 +110,15 @@
 同时要求：
 - 若新增/删除主题 role 或选择器族，必须同步更新 `resources/themes/theme_outline.json` 并通过契约测试。
 - 若新增/删除关键测试路径，必须同步更新对应测试索引与回归命令说明。
+- 工作台视觉精修相关回归命令必须拆成稳定批次，至少分别运行：
+  - `pytest tests/unit/test_main_window_shell.py -v`
+  - `pytest tests/ui/test_workspace_widget.py -v`
+  - `pytest tests/unit/test_i18n_outline_contract.py -v`
+  - `pytest tests/unit/test_theme_outline_contract.py -v`
 
 - 若新增/删除/重命名 i18n key，必须先更新 `resources/translations/i18n_outline.json`，并保证 `zh_CN/en_US/fr_FR` 结构一致。
 - 多语言更新必须遵循“大纲驱动”流程：先定 section/key，再在所有 locale 同步补齐，再执行 i18n 契约测试。
+- 工作台视觉精修完成时，必须明确确认 theme/i18n/tests/docs 已同变更收口，禁止只改 QSS 或只改单一测试。
 
 ## Release Workflow (Required)
 

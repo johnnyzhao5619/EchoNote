@@ -28,18 +28,22 @@ from ui.common.style_utils import set_widget_state
 from ui.constants import (
     APP_SEARCH_MAX_WIDTH,
     APP_SEARCH_MIN_WIDTH,
-    APP_SHELL_AUXILIARY_MARGINS,
     APP_SHELL_CONTENT_MARGINS,
     APP_STATUS_BAR_HEIGHT,
     APP_STATUS_BAR_MARGINS,
     APP_SHELL_RESOURCE_BAR_HEIGHT,
     APP_SHELL_RESOURCE_BAR_WIDTH,
     APP_STATUS_BAR_SPACING,
+    APP_TASK_ENTRY_BADGE_MIN_SIZE,
     APP_TOP_BAR_CONTROL_HEIGHT,
     APP_TOP_BAR_HEIGHT,
     APP_TOP_BAR_HINT_WIDTH,
     APP_TOP_BAR_MARGINS,
     APP_TOP_BAR_SPACING,
+    APP_TOP_BAR_TASK_ENTRY_MIN_WIDTH,
+    APP_TOP_BAR_TOOLS_SPACING,
+    ROLE_APP_TOPBAR_TOOLS,
+    ROLE_TASK_ENTRY_BADGE,
     ROLE_SHELL_RESOURCE_BAR,
     SHELL_STATUS_REFRESH_INTERVAL_MS,
     ZERO_MARGINS,
@@ -55,8 +59,10 @@ from core.qt_imports import (
     QLabel,
     QLineEdit,
     QMainWindow,
+    QMessageBox,
     QPoint,
     QProgressBar,
+    QPushButton,
     QSettings,
     QShortcut,
     QSize,
@@ -107,6 +113,8 @@ class MainWindow(QMainWindow):
         # Current page name
         self.current_page: Optional[str] = None
         self._shortcuts = []
+        self.task_window: Optional[QWidget] = None
+        self.task_panel: Optional[QWidget] = None
 
         # Setup UI
         self.setup_ui()
@@ -168,18 +176,8 @@ class MainWindow(QMainWindow):
         content_layout.addWidget(self.content_area, stretch=1)
         main_layout.addWidget(content_shell, stretch=1)
 
-        self.shell_auxiliary_host = QWidget()
-        self.shell_auxiliary_host.setObjectName("shell_auxiliary_host")
-        self.shell_auxiliary_layout = QVBoxLayout(self.shell_auxiliary_host)
-        self.shell_auxiliary_layout.setContentsMargins(*APP_SHELL_AUXILIARY_MARGINS)
-        self.shell_auxiliary_layout.setSpacing(ZERO_SPACING)
-        self.shell_auxiliary_host.hide()
-        self._shell_auxiliary_widget: Optional[QWidget] = None
-        main_layout.addWidget(self.shell_auxiliary_host)
-
         self.recording_dock = self._create_recording_dock()
         main_layout.addWidget(self.recording_dock)
-        self._attach_task_drawer()
 
         self.shell_status_bar = self._create_shell_status_bar()
         main_layout.addWidget(self.shell_status_bar)
@@ -205,6 +203,11 @@ class MainWindow(QMainWindow):
 
         logger.debug("Main window UI setup complete")
 
+    def showEvent(self, event) -> None:
+        """Keep top-bar density stable after Qt reapplies widget polish."""
+        super().showEvent(event)
+        self._enforce_top_bar_control_sizes()
+
     def _create_recording_dock(self) -> QWidget:
         """Create the persistent shell-level recording dock."""
         from ui.common.realtime_recording_dock import RealtimeRecordingDock
@@ -221,31 +224,6 @@ class MainWindow(QMainWindow):
         dock.realtime_settings_requested.connect(self._open_realtime_settings_page)
         return dock
 
-    def _attach_task_drawer(self) -> None:
-        """Attach the shared transcription task drawer above the recording dock."""
-        from ui.workspace.task_panel import WorkspaceTaskPanel
-
-        transcription_manager = self.managers.get("transcription_manager")
-        if transcription_manager is None:
-            self.task_panel = None
-            self.recording_dock.set_task_drawer_widget(None)
-            return
-
-        self.task_panel = WorkspaceTaskPanel(
-            transcription_manager,
-            self.i18n,
-            settings_manager=self.managers.get("settings_manager"),
-            workspace_manager=self.managers.get("workspace_manager"),
-            parent=self,
-        )
-        self.task_panel.workspace_item_requested.connect(
-            lambda item_id: self.open_workspace_item(item_id=item_id)
-        )
-        workspace_page = self.pages.get("workspace")
-        if workspace_page is not None and hasattr(workspace_page, "refresh_items"):
-            self.task_panel.workspace_refresh_requested.connect(workspace_page.refresh_items)
-        self.recording_dock.set_task_drawer_widget(self.task_panel)
-
     def _open_realtime_settings_page(self) -> None:
         """Route shell-level settings requests to the realtime settings page."""
         self.switch_page("settings")
@@ -253,23 +231,6 @@ class MainWindow(QMainWindow):
         show_page = getattr(settings_widget, "show_page", None)
         if callable(show_page):
             show_page("realtime")
-
-    def set_shell_auxiliary_widget(self, widget: Optional[QWidget]) -> None:
-        """Attach a widget between the page content and shell recording dock."""
-        if self._shell_auxiliary_widget is widget:
-            return
-
-        if self._shell_auxiliary_widget is not None:
-            self.shell_auxiliary_layout.removeWidget(self._shell_auxiliary_widget)
-            self._shell_auxiliary_widget.setParent(None)
-
-        self._shell_auxiliary_widget = widget
-        if widget is None:
-            self.shell_auxiliary_host.hide()
-            return
-
-        self.shell_auxiliary_layout.addWidget(widget)
-        self.shell_auxiliary_host.show()
 
     def create_sidebar(self) -> QWidget:
         """
@@ -317,23 +278,121 @@ class MainWindow(QMainWindow):
 
         layout.addStretch()
 
+        self.top_bar_right_tools = QWidget(top_bar)
+        self.top_bar_right_tools.setProperty("role", ROLE_APP_TOPBAR_TOOLS)
+        tools_layout = QHBoxLayout(self.top_bar_right_tools)
+        tools_layout.setContentsMargins(*ZERO_MARGINS)
+        tools_layout.setSpacing(APP_TOP_BAR_TOOLS_SPACING)
+
         self.global_search_input = QLineEdit()
         self.global_search_input.setObjectName("top_bar_search")
         self.global_search_input.setMinimumWidth(APP_SEARCH_MIN_WIDTH)
         self.global_search_input.setMaximumWidth(APP_SEARCH_MAX_WIDTH)
         self.global_search_input.setFixedHeight(APP_TOP_BAR_CONTROL_HEIGHT)
         self.global_search_input.returnPressed.connect(self._on_global_search_submitted)
-        layout.addWidget(self.global_search_input)
+        tools_layout.addWidget(self.global_search_input)
 
         self.search_hint_label = QLabel(self.i18n.t("app_shell.search_hint"))
         self.search_hint_label.setObjectName("top_bar_hint")
         self.search_hint_label.setFixedHeight(APP_TOP_BAR_CONTROL_HEIGHT)
         self.search_hint_label.setFixedWidth(APP_TOP_BAR_HINT_WIDTH)
         self.search_hint_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.search_hint_label)
+        tools_layout.addWidget(self.search_hint_label)
+
+        self.task_window_button = QPushButton()
+        self.task_window_button.setObjectName("top_bar_task_button")
+        self.task_window_button.setFixedHeight(APP_TOP_BAR_CONTROL_HEIGHT)
+        self.task_window_button.setMinimumWidth(APP_TOP_BAR_TASK_ENTRY_MIN_WIDTH)
+        self.task_window_button.clicked.connect(self._open_task_window)
+        self.task_window_button.setEnabled(self.managers.get("transcription_manager") is not None)
+
+        self.task_window_badge = QLabel()
+        self.task_window_badge.setProperty("role", ROLE_TASK_ENTRY_BADGE)
+        self.task_window_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.task_window_badge.setAttribute(
+            Qt.WidgetAttribute.WA_TransparentForMouseEvents,
+            True,
+        )
+        self.task_window_badge.setMinimumSize(
+            APP_TASK_ENTRY_BADGE_MIN_SIZE,
+            APP_TASK_ENTRY_BADGE_MIN_SIZE,
+        )
+        self.task_window_badge.hide()
+
+        task_button_layout = QHBoxLayout(self.task_window_button)
+        task_button_layout.setContentsMargins(0, 0, APP_TOP_BAR_SPACING, 0)
+        task_button_layout.setSpacing(0)
+        task_button_layout.addStretch()
+        task_button_layout.addWidget(
+            self.task_window_badge,
+            0,
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
+        )
+
+        tools_layout.addWidget(self.task_window_button)
+        layout.addWidget(
+            self.top_bar_right_tools,
+            0,
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
+        )
 
         self._refresh_shell_text()
         return top_bar
+
+    def _enforce_top_bar_control_sizes(self) -> None:
+        """Re-apply top-bar control sizing after theme changes."""
+        if hasattr(self, "global_search_input"):
+            self.global_search_input.setFixedHeight(APP_TOP_BAR_CONTROL_HEIGHT)
+        if hasattr(self, "search_hint_label"):
+            self.search_hint_label.setFixedHeight(APP_TOP_BAR_CONTROL_HEIGHT)
+            self.search_hint_label.setFixedWidth(APP_TOP_BAR_HINT_WIDTH)
+        if hasattr(self, "task_window_button"):
+            self.task_window_button.setMinimumHeight(APP_TOP_BAR_CONTROL_HEIGHT)
+            self.task_window_button.setMaximumHeight(APP_TOP_BAR_CONTROL_HEIGHT)
+            self.task_window_button.setMinimumWidth(APP_TOP_BAR_TASK_ENTRY_MIN_WIDTH)
+
+    def _get_or_create_task_window(self) -> Optional[QWidget]:
+        """Return the shared shell task window when transcription is available."""
+        if self.task_window is not None:
+            return self.task_window
+
+        transcription_manager = self.managers.get("transcription_manager")
+        if transcription_manager is None:
+            return None
+
+        from ui.workspace.task_window import WorkspaceTaskWindow
+
+        self.task_window = WorkspaceTaskWindow(
+            transcription_manager,
+            self.i18n,
+            settings_manager=self.managers.get("settings_manager"),
+            settings=self.settings,
+            workspace_manager=self.managers.get("workspace_manager"),
+            parent=self,
+        )
+        self.task_panel = self.task_window.panel
+        self._wire_task_panel(self.task_panel)
+        return self.task_window
+
+    def _wire_task_panel(self, panel: QWidget) -> None:
+        """Connect shared task-panel events to shell-level workspace routing."""
+        if panel is None:
+            return
+        panel.workspace_item_requested.connect(
+            lambda item_id: self.open_workspace_item(item_id=item_id)
+        )
+        workspace_page = self.pages.get("workspace")
+        if workspace_page is not None and hasattr(workspace_page, "refresh_items"):
+            panel.workspace_refresh_requested.connect(workspace_page.refresh_items)
+
+    def _open_task_window(self) -> None:
+        """Show the singleton workspace task utility window."""
+        task_window = self._get_or_create_task_window()
+        if task_window is None:
+            return
+        task_window.show()
+        task_window.raise_()
+        task_window.activateWindow()
 
     def _create_shell_status_bar(self) -> QWidget:
         """Create footer status bar used by the shell."""
@@ -606,6 +665,9 @@ class MainWindow(QMainWindow):
             self.global_search_input.setPlaceholderText(self.i18n.t("app_shell.search_placeholder"))
         if hasattr(self, "search_hint_label"):
             self.search_hint_label.setText(self.i18n.t("app_shell.search_hint"))
+        if hasattr(self, "task_window_button"):
+            self.task_window_button.setText(self.i18n.t("workspace.task_queue_title"))
+        self._refresh_task_entry_state()
         if hasattr(self, "cpu_resource_label"):
             self.cpu_resource_label.setText(self.i18n.t("app_shell.resource_cpu_label"))
         if hasattr(self, "gpu_resource_label"):
@@ -613,6 +675,14 @@ class MainWindow(QMainWindow):
         if hasattr(self, "recording_dock"):
             self.recording_dock.update_translations()
         self._update_shell_status()
+
+    def _refresh_task_entry_state(self) -> None:
+        """Refresh task utility entry feedback from the active task backlog."""
+        if not hasattr(self, "task_window_badge"):
+            return
+        active_count = self._get_active_transcription_task_count()
+        self.task_window_badge.setText(str(active_count))
+        self.task_window_badge.setVisible(active_count > 0)
 
     def _resolve_search_target(self, raw_query: str) -> Optional[str]:
         """Resolve top-bar query to a navigation page name."""
@@ -729,6 +799,7 @@ class MainWindow(QMainWindow):
         is_recording = bool(getattr(realtime_recorder, "is_recording", False))
         recording_key = "app_shell.recording_on" if is_recording else "app_shell.recording_off"
         self.record_status_label.setText(self.i18n.t(recording_key))
+        self._refresh_task_entry_state()
         if hasattr(self, "recording_dock"):
             self.recording_dock.refresh_status()
         self._update_resource_usage_status()
@@ -821,6 +892,7 @@ class MainWindow(QMainWindow):
 
                 # Update ThemeManager state
                 self.theme_manager.set_theme(theme)
+                self._enforce_top_bar_control_sizes()
 
                 # Notify all pages to update their theme-dependent elements
                 for page_name, page_widget in self.pages.items():
@@ -837,6 +909,7 @@ class MainWindow(QMainWindow):
                 logger.warning(f"Theme file not found: {theme_path}, using default")
                 # Clear stylesheet to use default
                 QApplication.instance().setStyleSheet("")
+                self._enforce_top_bar_control_sizes()
 
         except Exception as e:
             logger.error(f"Error applying theme: {e}")
@@ -1106,6 +1179,11 @@ class MainWindow(QMainWindow):
 
             if hasattr(self, "_status_timer") and self._status_timer.isActive():
                 self._status_timer.stop()
+
+            if self.task_window is not None:
+                self.task_window.deleteLater()
+                self.task_window = None
+                self.task_panel = None
 
             # Stop transcription manager
             if "transcription_manager" in self.managers:

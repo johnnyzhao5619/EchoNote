@@ -32,6 +32,9 @@ class WorkspaceRecordingPanel(BaseWidget):
         self.audio_player.hide()
         layout.addWidget(self.audio_player, 1)
 
+    def update_translations(self) -> None:
+        self.placeholder_label.setText(self.i18n.t("workspace.no_audio_asset"))
+
     def set_item(self, item) -> None:
         if item is None:
             self.audio_player.clear_media()

@@ -36,7 +36,9 @@ For contributors and developers:
 - **[CI/CD Guide](CI_CD_GUIDE.md)** - Continuous integration and deployment
 - **[Implementation Plans](plans/)** - Active architecture and rollout plans for multi-step feature work
 - Unified workspace architecture note: `core/workspace/` is now the single asset layer for imported documents, batch transcriptions, realtime recordings, summaries, and meeting briefs; the desktop entry lives in `ui/workspace/`.
-- Workspace interaction note: the `ui/workspace/` page now owns the top create-entry toolbar, the structure/event dual-view library, folder operations, the in-page batch transcription/translation task queue, the card-based multi-document editor, and detached document windows.
+- Workspace interaction note: the `ui/workspace/` page now owns the top create-entry toolbar, the local `ui/workspace/tool_rail.py`, the structure/event dual-view library with explorer header, the card-based multi-document editor, and detached document windows; the batch transcription/translation queue opens as a shell-level utility window through `ui/main_window.py` + `ui/workspace/task_window.py`, with queue content still rendered by `ui/workspace/task_panel.py`.
+- Workspace copy note: shell task-window title and recording-console section labels are now governed by `workspace.task_window_title` and `workspace.recording_console.*` in `resources/translations/*.json`, with `resources/translations/i18n_outline.json` as the outline SSOT.
+- Workspace visual polish note: top-bar tool grouping, explorer compact shell, item meta/badges, inspector section titles, and recording-dock summary semantics are all contract-driven by `ui/constants.py`, `resources/themes/theme_outline.json`, and `resources/translations/i18n_outline.json`; theme/i18n/tests/docs are expected to land in the same change.
 - Shell recording note: the primary realtime recording entry is now the persistent dock in `ui/common/realtime_recording_dock.py`, with `ui/workspace/recording_session_panel.py` providing the shared full panel and `ui/realtime_record/` reduced to floating overlay and visualization helpers.
 - Model governance note: `core/models/manager.py` now governs `speech` / `translation` / `text-ai` catalogs together, with workspace defaults exposed in `ui/settings/workspace_ai_page.py`.
 - Settings ownership note: translation defaults are managed in `ui/settings/translation_page.py`, realtime recording controls remain in `ui/settings/realtime_page.py`, and workspace summary/meeting preferences live in `ui/settings/workspace_ai_page.py`.
@@ -48,11 +50,20 @@ For contributors and developers:
 
 ## 🧭 Active Plans
 
-- **[Unified Workspace & Local AI Plan](plans/2026-03-15-unified-workspace-and-local-ai.md)** - Hard-switch plan for the new recording/document workspace, local summaries, meeting briefs, and model-management expansion
-- **[Workspace Experience Rearchitecture Plan](plans/2026-03-15-workspace-experience-rearchitecture.md)** - Current plan for adding a persistent recording dock, structure/event dual library views, and card-based multi-document editing with detached windows
+- **[Workspace Polish & Obsidian Alignment Plan](plans/2026-03-15-workspace-polish-and-obsidian-alignment.md)** - Active follow-up plan for the shell task utility window, full recording console redesign, and Obsidian-inspired note workspace alignment
+- **[Workspace Visual Density & Layout Polish Plan](plans/2026-03-15-workspace-visual-density-and-layout-polish-plan.md)** - Active execution plan for top-bar grouping, compact workspace shell density, item metadata hierarchy, inspector section titles, and recording-dock semantic deduplication
+
+## ✅ Stable Regression Batches
+
+- `pytest tests/unit/test_main_window_shell.py -v`
+- `pytest tests/ui/test_workspace_widget.py -v`
+- `pytest tests/unit/test_i18n_outline_contract.py -v`
+- `pytest tests/unit/test_theme_outline_contract.py -v`
 
 ## 🗃️ Archived Plans
 
+- **[Unified Workspace & Local AI Plan](plans/archive/2026-03-15-unified-workspace-and-local-ai.md)** - Historical hard-switch plan for the first unified recording/document workspace rollout and local AI architecture baseline
+- **[Workspace Experience Rearchitecture Plan](plans/archive/2026-03-15-workspace-experience-rearchitecture.md)** - Historical plan for the first workspace shell rebuild; superseded by the Obsidian-alignment follow-up plan
 - **[Workspace Gap Closure Plan](plans/archive/2026-03-15-workspace-gap-closure.md)** - Completed follow-up plan for closing the remaining unified workspace gaps after the hard switch
 
 ---

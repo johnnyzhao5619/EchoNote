@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Optional
 
 from engines.speech.base import AUDIO_VIDEO_SUFFIXES
@@ -18,21 +19,26 @@ from core.qt_imports import (
     QLineEdit,
     QPlainTextEdit,
     QScrollArea,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
     Qt,
     Signal,
 )
+from data.database.models import TranscriptionTask
 from ui.base_widgets import BaseWidget, create_button, create_primary_button
 from ui.batch_transcribe.task_item import TaskItem
 from ui.common.translation_task_options import prompt_event_translation_languages
-from ui.constants import ROLE_WORKSPACE_PLACEHOLDER
+from ui.constants import ROLE_WORKSPACE_PLACEHOLDER, ROLE_WORKSPACE_TASK_SUMMARY
 
 logger = logging.getLogger("echonote.ui.workspace.task_panel")
 
 _TASK_MODE_TRANSCRIPTION = "transcription"
 _TASK_MODE_TRANSLATION = "translation"
 _TEXT_TRANSLATION_SUFFIXES = (".txt", ".md")
+_TASK_FILTER_ALL = "all"
+_TASK_FILTER_PENDING = "pending"
+_TASK_FILTER_COMPLETED = "completed"
 
 
 class _PasteTranslationDialog(QDialog):
@@ -85,7 +91,7 @@ class _PasteTranslationDialog(QDialog):
 
 
 class WorkspaceTaskPanel(BaseWidget):
-    """Workspace-native task queue panel for batch transcription and translation."""
+    """Shared batch-task panel hosted by the shell-level workspace task window."""
 
     workspace_refresh_requested = Signal()
     workspace_item_requested = Signal(str)
@@ -110,45 +116,8 @@ class WorkspaceTaskPanel(BaseWidget):
 
     def _init_ui(self) -> None:
         layout = QVBoxLayout(self)
-
-        self.title_label = QLabel(self.i18n.t("workspace.task_queue_title"))
-        layout.addWidget(self.title_label)
-
-        control_layout = QHBoxLayout()
-        self.mode_label = QLabel(self.i18n.t("workspace.task_mode_label"))
-        control_layout.addWidget(self.mode_label)
-
-        self.mode_combo = QComboBox()
-        self.mode_combo.addItem(
-            self.i18n.t("batch_transcribe.mode_transcription"),
-            _TASK_MODE_TRANSCRIPTION,
-        )
-        self.mode_combo.addItem(
-            self.i18n.t("batch_transcribe.mode_translation"),
-            _TASK_MODE_TRANSLATION,
-        )
-        self.mode_combo.currentIndexChanged.connect(self._update_mode_controls)
-        control_layout.addWidget(self.mode_combo)
-        control_layout.addStretch()
-        layout.addLayout(control_layout)
-
-        action_layout = QHBoxLayout()
-        self.import_file_button = create_primary_button(self.i18n.t("batch_transcribe.import_file"))
-        self.import_file_button.clicked.connect(self._on_import_file)
-        action_layout.addWidget(self.import_file_button)
-
-        self.import_folder_button = create_button(self.i18n.t("batch_transcribe.import_folder"))
-        self.import_folder_button.clicked.connect(self._on_import_folder)
-        action_layout.addWidget(self.import_folder_button)
-
-        self.paste_text_button = create_button(self.i18n.t("batch_transcribe.paste_text"))
-        self.paste_text_button.clicked.connect(self._on_paste_text)
-        action_layout.addWidget(self.paste_text_button)
-
-        self.refresh_button = create_button(self.i18n.t("common.refresh"))
-        self.refresh_button.clicked.connect(self.refresh_tasks)
-        action_layout.addWidget(self.refresh_button)
-        layout.addLayout(action_layout)
+        self._build_header(layout)
+        self._build_summary(layout)
 
         self.task_count_label = QLabel()
         layout.addWidget(self.task_count_label)
@@ -168,9 +137,116 @@ class WorkspaceTaskPanel(BaseWidget):
         self.task_layout.addStretch()
         self.scroll_area.setWidget(self.task_container)
         layout.addWidget(self.scroll_area, 1)
+        self.task_filter_tabs.currentChanged.connect(lambda _index: self.refresh_tasks())
 
         self._update_mode_controls()
         self.update_translations()
+
+    def _build_summary(self, layout: QVBoxLayout) -> None:
+        """Build the task backlog summary strip shown above the queue."""
+        self.summary_section = QWidget(self)
+        self.summary_section.setProperty("role", ROLE_WORKSPACE_TASK_SUMMARY)
+        summary_layout = QHBoxLayout(self.summary_section)
+        summary_layout.setContentsMargins(0, 0, 0, 0)
+
+        (
+            total_widget,
+            self.summary_total_value_label,
+            self.summary_total_caption_label,
+        ) = self._build_summary_metric()
+        summary_layout.addWidget(total_widget)
+
+        (
+            active_widget,
+            self.summary_active_value_label,
+            self.summary_active_caption_label,
+        ) = self._build_summary_metric()
+        summary_layout.addWidget(active_widget)
+
+        (
+            failed_widget,
+            self.summary_failed_value_label,
+            self.summary_failed_caption_label,
+        ) = self._build_summary_metric()
+        summary_layout.addWidget(failed_widget)
+        layout.addWidget(self.summary_section)
+
+    def _build_summary_metric(self) -> tuple[QWidget, QLabel, QLabel]:
+        """Create one summary metric card with value and caption labels."""
+        metric_widget = QWidget(self.summary_section)
+        metric_layout = QVBoxLayout(metric_widget)
+        metric_layout.setContentsMargins(0, 0, 0, 0)
+        metric_layout.setSpacing(2)
+
+        value_label = QLabel("0", metric_widget)
+        caption_label = QLabel(metric_widget)
+        metric_layout.addWidget(value_label)
+        metric_layout.addWidget(caption_label)
+        return metric_widget, value_label, caption_label
+
+    def _build_header(self, layout: QVBoxLayout) -> None:
+        """Build the task utility header with creation and queue-filter layers."""
+        self.creation_section = QWidget(self)
+        creation_layout = QVBoxLayout(self.creation_section)
+        creation_layout.setContentsMargins(0, 0, 0, 0)
+
+        self.title_label = QLabel(self.i18n.t("workspace.task_queue_title"))
+        creation_layout.addWidget(self.title_label)
+
+        mode_layout = QHBoxLayout()
+        self.mode_label = QLabel(self.i18n.t("workspace.task_mode_label"))
+        mode_layout.addWidget(self.mode_label)
+
+        self.mode_combo = QComboBox()
+        self.mode_combo.addItem(
+            self.i18n.t("batch_transcribe.mode_transcription"),
+            _TASK_MODE_TRANSCRIPTION,
+        )
+        self.mode_combo.addItem(
+            self.i18n.t("batch_transcribe.mode_translation"),
+            _TASK_MODE_TRANSLATION,
+        )
+        self.mode_combo.currentIndexChanged.connect(self._update_mode_controls)
+        mode_layout.addWidget(self.mode_combo)
+        mode_layout.addStretch()
+        creation_layout.addLayout(mode_layout)
+
+        action_layout = QHBoxLayout()
+        self.import_file_button = create_primary_button(self.i18n.t("batch_transcribe.import_file"))
+        self.import_file_button.clicked.connect(self._on_import_file)
+        action_layout.addWidget(self.import_file_button)
+
+        self.import_folder_button = create_button(self.i18n.t("batch_transcribe.import_folder"))
+        self.import_folder_button.clicked.connect(self._on_import_folder)
+        action_layout.addWidget(self.import_folder_button)
+
+        self.paste_text_button = create_button(self.i18n.t("batch_transcribe.paste_text"))
+        self.paste_text_button.clicked.connect(self._on_paste_text)
+        action_layout.addWidget(self.paste_text_button)
+        action_layout.addStretch()
+        creation_layout.addLayout(action_layout)
+        layout.addWidget(self.creation_section)
+
+        self.queue_filter_section = QWidget(self)
+        queue_layout = QHBoxLayout(self.queue_filter_section)
+        queue_layout.setContentsMargins(0, 0, 0, 0)
+
+        self.task_filter_tabs = QTabWidget(self.queue_filter_section)
+        self.task_filter_tabs.setDocumentMode(True)
+        self.task_filter_tabs.setMaximumHeight(40)
+        self._task_filter_order = [
+            _TASK_FILTER_ALL,
+            _TASK_FILTER_PENDING,
+            _TASK_FILTER_COMPLETED,
+        ]
+        for _ in self._task_filter_order:
+            self.task_filter_tabs.addTab(QWidget(), "")
+        queue_layout.addWidget(self.task_filter_tabs, 1)
+
+        self.refresh_button = create_button(self.i18n.t("common.refresh"))
+        self.refresh_button.clicked.connect(self.refresh_tasks)
+        queue_layout.addWidget(self.refresh_button)
+        layout.addWidget(self.queue_filter_section)
 
     def update_translations(self) -> None:
         self.title_label.setText(self.i18n.t("workspace.task_queue_title"))
@@ -180,10 +256,17 @@ class WorkspaceTaskPanel(BaseWidget):
         self.paste_text_button.setText(self.i18n.t("batch_transcribe.paste_text"))
         self.refresh_button.setText(self.i18n.t("common.refresh"))
         self.empty_label.setText(self.i18n.t("workspace.no_tasks"))
+        self.summary_total_caption_label.setText(self.i18n.t("workspace.task_summary_total"))
+        self.summary_active_caption_label.setText(self.i18n.t("workspace.task_summary_active"))
+        self.summary_failed_caption_label.setText(self.i18n.t("workspace.task_summary_failed"))
 
         if self.mode_combo.count() >= 2:
             self.mode_combo.setItemText(0, self.i18n.t("batch_transcribe.mode_transcription"))
             self.mode_combo.setItemText(1, self.i18n.t("batch_transcribe.mode_translation"))
+        if self.task_filter_tabs.count() >= 3:
+            self.task_filter_tabs.setTabText(0, self.i18n.t("workspace.collection_all"))
+            self.task_filter_tabs.setTabText(1, self.i18n.t("batch_transcribe.status.pending"))
+            self.task_filter_tabs.setTabText(2, self.i18n.t("batch_transcribe.status.completed"))
 
         self._update_task_count_label()
 
@@ -191,9 +274,11 @@ class WorkspaceTaskPanel(BaseWidget):
         return len(self.task_items)
 
     def refresh_tasks(self) -> None:
-        tasks = []
+        all_tasks = []
         if self.transcription_manager is not None:
-            tasks = list(self.transcription_manager.get_all_tasks() or [])
+            all_tasks = list(self.transcription_manager.get_all_tasks() or [])
+        self._update_summary_labels(all_tasks)
+        tasks = self._filter_tasks(all_tasks)
 
         for item in self.task_items:
             self.task_layout.removeWidget(item)
@@ -263,8 +348,33 @@ class WorkspaceTaskPanel(BaseWidget):
             self.i18n.t("batch_transcribe.tasks_count", count=self.task_count())
         )
 
+    def _update_summary_labels(self, tasks: list[dict[str, Any]]) -> None:
+        """Refresh summary metrics from the full task backlog."""
+        active_statuses = {"pending", "processing"}
+        total_count = len(tasks)
+        active_count = sum(1 for task in tasks if task.get("status") in active_statuses)
+        failed_count = sum(1 for task in tasks if task.get("status") == "failed")
+
+        self.summary_total_value_label.setText(str(total_count))
+        self.summary_active_value_label.setText(str(active_count))
+        self.summary_failed_value_label.setText(str(failed_count))
+
     def _current_task_mode(self) -> str:
         return self.mode_combo.currentData() or _TASK_MODE_TRANSCRIPTION
+
+    def _current_task_filter(self) -> str:
+        index = self.task_filter_tabs.currentIndex()
+        if 0 <= index < len(self._task_filter_order):
+            return self._task_filter_order[index]
+        return _TASK_FILTER_ALL
+
+    def _filter_tasks(self, tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        active_filter = self._current_task_filter()
+        if active_filter == _TASK_FILTER_ALL:
+            return tasks
+        if active_filter == _TASK_FILTER_PENDING:
+            return [task for task in tasks if task.get("status") in {"pending", "processing"}]
+        return [task for task in tasks if task.get("status") == "completed"]
 
     def _build_import_file_filter(self) -> str:
         extensions = sorted(AUDIO_VIDEO_SUFFIXES)
@@ -425,7 +535,7 @@ class WorkspaceTaskPanel(BaseWidget):
         )
 
     def _on_view_task_requested(self, task_id: str) -> None:
-        item_id = self._resolve_workspace_item_id(task_id)
+        item_id = self._resolve_or_publish_workspace_item_id(task_id)
         if item_id:
             self.workspace_item_requested.emit(item_id)
             return
@@ -507,3 +617,92 @@ class WorkspaceTaskPanel(BaseWidget):
             if item_id:
                 return item_id
         return None
+
+    def _resolve_or_publish_workspace_item_id(self, task_id: str) -> Optional[str]:
+        item_id = self._resolve_workspace_item_id(task_id)
+        if item_id:
+            return item_id
+
+        if self.workspace_manager is None:
+            return None
+
+        task = self._load_publisheable_task(task_id)
+        if task is None:
+            return None
+
+        task_kind = self._resolve_task_kind(task)
+        publish_task = task
+        transcript_path = None
+        translation_path = None
+
+        if task_kind == _TASK_MODE_TRANSLATION:
+            publish_task = SimpleNamespace(
+                id=getattr(task, "id", None),
+                file_path=None,
+                file_name=getattr(task, "file_name", ""),
+                status=getattr(task, "status", "completed"),
+            )
+            if str(getattr(task, "file_path", "")).lower().endswith(_TEXT_TRANSLATION_SUFFIXES):
+                transcript_path = getattr(task, "file_path", None)
+            translation_path = getattr(task, "output_path", None)
+        else:
+            transcript_path = getattr(task, "output_path", None)
+
+        publisher = getattr(self.workspace_manager, "publish_transcription_task", None)
+        if not callable(publisher):
+            return None
+
+        item_id = publisher(
+            publish_task,
+            transcript_path=transcript_path,
+            translation_path=translation_path,
+        )
+        if item_id:
+            self.workspace_refresh_requested.emit()
+        return item_id
+
+    def _load_publisheable_task(self, task_id: str) -> Optional[TranscriptionTask]:
+        if self.workspace_manager is None or not hasattr(self.workspace_manager, "db"):
+            return None
+
+        task = TranscriptionTask.get_by_id(self.workspace_manager.db, task_id)
+        if task is not None:
+            if task.status != "completed":
+                return None
+            return task
+
+        get_task_status = getattr(self.transcription_manager, "get_task_status", None)
+        if not callable(get_task_status):
+            return None
+
+        task_data = get_task_status(task_id) or {}
+        if task_data.get("status") != "completed":
+            return None
+
+        return TranscriptionTask(
+            id=task_data.get("id") or task_id,
+            file_path=task_data.get("file_path") or "",
+            file_name=task_data.get("file_name") or "",
+            file_size=task_data.get("file_size"),
+            audio_duration=task_data.get("audio_duration"),
+            status=task_data.get("status") or "completed",
+            progress=float(task_data.get("progress") or 0.0),
+            language=task_data.get("language"),
+            engine=task_data.get("engine") or "",
+            output_format=task_data.get("output_format"),
+            output_path=task_data.get("output_path"),
+            error_message=task_data.get("error_message"),
+            created_at=task_data.get("created_at") or "",
+            started_at=task_data.get("started_at"),
+            completed_at=task_data.get("completed_at"),
+        )
+
+    def _resolve_task_kind(self, task: TranscriptionTask) -> str:
+        if getattr(task, "engine", None) == "translation":
+            return _TASK_MODE_TRANSLATION
+        get_task_status = getattr(self.transcription_manager, "get_task_status", None)
+        if callable(get_task_status):
+            task_data = get_task_status(getattr(task, "id", "")) or {}
+            if task_data.get("task_kind") == _TASK_MODE_TRANSLATION:
+                return _TASK_MODE_TRANSLATION
+        return _TASK_MODE_TRANSCRIPTION

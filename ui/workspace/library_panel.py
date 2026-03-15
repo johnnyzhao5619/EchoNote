@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 from core.qt_imports import (
-    QComboBox,
     QHBoxLayout,
     QLabel,
     QInputDialog,
@@ -12,17 +11,19 @@ from core.qt_imports import (
     QTreeWidget,
     QTreeWidgetItem,
     QVBoxLayout,
+    QWidget,
     Qt,
     Signal,
 )
 from ui.base_widgets import BaseWidget
-from ui.constants import ROLE_WORKSPACE_LIBRARY_PANEL
+from ui.constants import (
+    PAGE_DENSE_SPACING,
+    ROLE_WORKSPACE_CONTEXT_LABEL,
+    ROLE_WORKSPACE_EXPLORER_HEADER,
+    ROLE_WORKSPACE_LIBRARY_PANEL,
+)
 from ui.workspace.item_list import WorkspaceItemList
 
-_VIEW_MODES = (
-    ("workspace.structure_view", "structure"),
-    ("workspace.event_view", "event"),
-)
 _TREE_DATA_ROLE = Qt.ItemDataRole.UserRole
 
 
@@ -37,6 +38,7 @@ class WorkspaceLibraryPanel(BaseWidget):
         super().__init__(i18n, parent)
         self.workspace_manager = workspace_manager
         self.item_list = WorkspaceItemList(i18n, self)
+        self._view_mode = "structure"
         self._folder_items: dict[str, QTreeWidgetItem] = {}
         self._root_item: QTreeWidgetItem | None = None
         self._init_ui()
@@ -46,14 +48,27 @@ class WorkspaceLibraryPanel(BaseWidget):
         self.setProperty("role", ROLE_WORKSPACE_LIBRARY_PANEL)
         layout = QVBoxLayout(self)
 
-        self.title_label = QLabel(self.i18n.t("workspace.library_title"))
-        layout.addWidget(self.title_label)
+        self.explorer_header = QWidget(self)
+        self.explorer_header.setProperty("role", ROLE_WORKSPACE_EXPLORER_HEADER)
+        explorer_header_layout = QHBoxLayout(self.explorer_header)
+        explorer_header_layout.setContentsMargins(0, 0, 0, 0)
+        explorer_header_layout.setSpacing(PAGE_DENSE_SPACING)
 
-        self.view_mode_combo = QComboBox(self)
-        for label_key, mode in _VIEW_MODES:
-            self.view_mode_combo.addItem(self.i18n.t(label_key), mode)
-        self.view_mode_combo.currentIndexChanged.connect(self._on_view_mode_changed)
-        layout.addWidget(self.view_mode_combo)
+        header_text_widget = QWidget(self.explorer_header)
+        header_text_layout = QVBoxLayout(header_text_widget)
+        header_text_layout.setContentsMargins(0, 0, 0, 0)
+        header_text_layout.setSpacing(2)
+
+        self.title_label = QLabel(self.i18n.t("workspace.library_title"))
+        header_text_layout.addWidget(self.title_label)
+
+        self.context_label = QLabel(self.explorer_header)
+        self.context_label.setProperty("role", ROLE_WORKSPACE_CONTEXT_LABEL)
+        header_text_layout.addWidget(self.context_label)
+
+        explorer_header_layout.addWidget(header_text_widget, 1)
+        explorer_header_layout.addStretch()
+        layout.addWidget(self.explorer_header)
 
         folder_actions = QHBoxLayout()
         self.new_folder_button = QPushButton(self)
@@ -84,25 +99,17 @@ class WorkspaceLibraryPanel(BaseWidget):
         self.item_list.item_selected.connect(self.item_selected.emit)
         self.item_list.set_view_mode(self.current_view_mode())
         self._sync_structure_controls()
+        self._update_context_label()
         self.update_translations()
 
     def update_translations(self) -> None:
         self.title_label.setText(self.i18n.t("workspace.library_title"))
-        current_mode = self.current_view_mode()
-        self.view_mode_combo.blockSignals(True)
-        self.view_mode_combo.clear()
-        for label_key, mode in _VIEW_MODES:
-            self.view_mode_combo.addItem(self.i18n.t(label_key), mode)
-        index = self.view_mode_combo.findData(current_mode)
-        if index >= 0:
-            self.view_mode_combo.setCurrentIndex(index)
-        self.view_mode_combo.blockSignals(False)
-
         self.new_folder_button.setText(self.i18n.t("common.new"))
         self.rename_folder_button.setText(self.i18n.t("common.rename"))
         self.delete_folder_button.setText(self.i18n.t("common.delete"))
         self.move_to_folder_button.setText(self.i18n.t("common.move"))
         self._update_root_item_label()
+        self._update_context_label()
 
     def refresh_folders(self) -> None:
         """Rebuild the folder tree from the current workspace structure."""
@@ -133,6 +140,7 @@ class WorkspaceLibraryPanel(BaseWidget):
 
         self.folder_tree.blockSignals(False)
         self.select_folder(selected_folder_id)
+        self._update_context_label()
 
     def set_items(self, items, *, metadata_by_item=None) -> None:
         self.item_list.set_view_mode(self.current_view_mode())
@@ -145,12 +153,18 @@ class WorkspaceLibraryPanel(BaseWidget):
         return self.item_list.current_item_id()
 
     def current_view_mode(self) -> str:
-        return self.view_mode_combo.currentData() or "structure"
+        return self._view_mode
 
     def set_view_mode(self, view_mode: str) -> None:
-        index = self.view_mode_combo.findData(view_mode)
-        if index >= 0:
-            self.view_mode_combo.setCurrentIndex(index)
+        normalized_view_mode = view_mode if view_mode in {"structure", "event"} else "structure"
+        if normalized_view_mode == self._view_mode:
+            return
+        self._view_mode = normalized_view_mode
+        self.item_list.set_view_mode(self.current_view_mode())
+        self._sync_structure_controls()
+        self._update_context_label()
+        self.view_mode_changed.emit(self.current_view_mode())
+        self.library_changed.emit()
 
     def current_folder_id(self) -> str | None:
         current_item = self.folder_tree.currentItem()
@@ -165,13 +179,8 @@ class WorkspaceLibraryPanel(BaseWidget):
         if target_item is not None:
             self.folder_tree.setCurrentItem(target_item)
 
-    def _on_view_mode_changed(self, _index: int) -> None:
-        self.item_list.set_view_mode(self.current_view_mode())
-        self._sync_structure_controls()
-        self.view_mode_changed.emit(self.current_view_mode())
-        self.library_changed.emit()
-
     def _on_folder_selection_changed(self) -> None:
+        self._update_context_label()
         if self.current_view_mode() == "structure":
             self.library_changed.emit()
 
@@ -244,3 +253,22 @@ class WorkspaceLibraryPanel(BaseWidget):
     def _update_root_item_label(self) -> None:
         if self._root_item is not None:
             self._root_item.setText(0, self.i18n.t("workspace.library_title"))
+
+    def _update_context_label(self) -> None:
+        mode_key = (
+            "workspace.structure_view"
+            if self.current_view_mode() == "structure"
+            else "workspace.event_view"
+        )
+        context_parts = [self.i18n.t(mode_key)]
+
+        if self.current_view_mode() == "structure":
+            folder_label = self.i18n.t("workspace.library_title")
+            folder_id = self.current_folder_id()
+            if folder_id:
+                folder = self.workspace_manager.get_folder(folder_id)
+                if folder is not None and folder.name:
+                    folder_label = folder.name
+            context_parts.append(folder_label)
+
+        self.context_label.setText(" / ".join(context_parts))

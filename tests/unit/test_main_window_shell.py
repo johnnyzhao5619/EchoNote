@@ -4,10 +4,11 @@
 from unittest.mock import Mock, PropertyMock, patch
 
 import ui.main_window as main_window_module
-from core.qt_imports import QApplication
+from core.qt_imports import QApplication, QSettings
 from core.workspace.manager import WorkspaceManager
 from data.database.connection import DatabaseConnection
 from data.storage.file_manager import FileManager
+from ui.constants import APP_TOP_BAR_CONTROL_HEIGHT
 from ui.main_window import MainWindow
 from ui.common.realtime_recording_dock import RealtimeRecordingDock
 from ui.workspace.widget import WorkspaceWidget
@@ -21,6 +22,12 @@ def _build_i18n():
             "app_shell.tasks_running": "Tasks: {count} running",
             "app_shell.recording_on": "Recording: active",
             "app_shell.recording_off": "Recording: idle",
+            "workspace.recording_console.default_input_source": "System Input",
+            "workspace.recording_console.apply_and_record": "Apply Settings and Record",
+            "workspace.recording_console.target_language_auto": "Automatic",
+            "workspace.recording_console.target_language_en": "English",
+            "workspace.recording_console.target_language_zh": "Chinese",
+            "workspace.recording_console.target_language_fr": "French",
             "logging.main_window.keyboard_shortcuts_configured": "shortcuts configured",
         }
         template = mapping.get(key, key)
@@ -33,12 +40,24 @@ def _build_i18n():
     return i18n
 
 
-def build_main_window_with_workspace(tmp_path):
+def _build_transcription_manager():
+    manager = Mock()
+    manager.get_all_tasks.return_value = []
+    manager.add_listener = Mock()
+    manager.remove_listener = Mock()
+    manager.is_paused.return_value = False
+    manager.get_active_task_count.return_value = 0
+    manager._running = False
+    return manager
+
+
+def build_main_window_with_workspace(tmp_path, *, transcription_manager=None, settings_file=None):
     app = QApplication.instance() or QApplication([])
     db = DatabaseConnection(str(tmp_path / "main_window_shell.db"))
     db.initialize_schema()
     file_manager = FileManager(str(tmp_path / "files"))
     workspace_manager = WorkspaceManager(db, file_manager)
+    settings_file = settings_file or (tmp_path / "main_window_shell.ini")
 
     realtime_recorder = Mock()
     type(realtime_recorder).is_recording = PropertyMock(return_value=False)
@@ -46,7 +65,7 @@ def build_main_window_with_workspace(tmp_path):
     managers = {
         "workspace_manager": workspace_manager,
         "realtime_recorder": realtime_recorder,
-        "transcription_manager": None,
+        "transcription_manager": transcription_manager,
         "calendar_manager": None,
         "oauth_manager": None,
         "timeline_manager": None,
@@ -62,7 +81,12 @@ def build_main_window_with_workspace(tmp_path):
         content_area.addWidget(workspace_widget)
         self.pages["workspace"] = workspace_widget
 
-    with patch.object(MainWindow, "_create_pages", _create_workspace_only):
+    def _build_test_settings(*_args, **_kwargs):
+        return QSettings(str(settings_file), QSettings.Format.IniFormat)
+
+    with patch.object(MainWindow, "_create_pages", _create_workspace_only), patch.object(
+        main_window_module, "QSettings", _build_test_settings
+    ):
         window = MainWindow(managers, _build_i18n())
 
     window.show()
@@ -170,6 +194,99 @@ def test_main_window_exposes_persistent_recording_dock_and_workspace_shell(tmp_p
         main_window.close()
 
 
+def test_main_window_opens_singleton_workspace_task_window(tmp_path):
+    transcription_manager = _build_transcription_manager()
+    main_window = build_main_window_with_workspace(
+        tmp_path,
+        transcription_manager=transcription_manager,
+    )
+
+    try:
+        main_window.task_window_button.click()
+        first_window = main_window.task_window
+
+        main_window.task_window_button.click()
+
+        assert main_window.task_window is not None
+        assert main_window.task_window is first_window
+        assert main_window.task_window.isVisible()
+        assert not hasattr(main_window.recording_dock, "task_drawer_host")
+    finally:
+        main_window.close()
+
+
+def test_main_window_task_window_persists_geometry_and_drops_shell_auxiliary_host(tmp_path):
+    transcription_manager = _build_transcription_manager()
+    settings_file = tmp_path / "task_window_geometry.ini"
+    main_window = build_main_window_with_workspace(
+        tmp_path,
+        transcription_manager=transcription_manager,
+        settings_file=settings_file,
+    )
+    app = QApplication.instance() or QApplication([])
+
+    try:
+        main_window.task_window_button.click()
+        app.processEvents()
+
+        task_window = main_window.task_window
+        assert task_window is not None
+
+        task_window.resize(840, 610)
+        task_window.move(120, 160)
+        app.processEvents()
+        task_window.close()
+        app.processEvents()
+    finally:
+        main_window.close()
+
+    reopened = build_main_window_with_workspace(
+        tmp_path,
+        transcription_manager=transcription_manager,
+        settings_file=settings_file,
+    )
+    try:
+        reopened.task_window_button.click()
+        app.processEvents()
+
+        assert not hasattr(reopened, "shell_auxiliary_host")
+        assert reopened.task_window is not None
+        assert reopened.task_window.size().width() == 840
+        assert reopened.task_window.size().height() == 610
+    finally:
+        reopened.close()
+
+
+def test_main_window_task_entry_exposes_backlog_badge(tmp_path):
+    transcription_manager = _build_transcription_manager()
+    transcription_manager.get_active_task_count.return_value = 3
+    main_window = build_main_window_with_workspace(
+        tmp_path,
+        transcription_manager=transcription_manager,
+    )
+
+    try:
+        MainWindow._update_shell_status(main_window)
+
+        assert main_window.task_window_badge.text() == "3"
+        assert main_window.task_window_badge.isVisible()
+    finally:
+        transcription_manager.get_active_task_count.return_value = 0
+        main_window.close()
+
+
+def test_main_window_top_bar_groups_search_hint_and_task_entry(tmp_path):
+    main_window = build_main_window_with_workspace(tmp_path)
+
+    try:
+        assert main_window.top_bar_right_tools is not None
+        assert main_window.top_bar_right_tools.property("role") == "app-topbar-tools"
+        assert main_window.task_window_button.minimumHeight() == APP_TOP_BAR_CONTROL_HEIGHT
+        assert main_window.task_window_badge.parent() is main_window.task_window_button
+    finally:
+        main_window.close()
+
+
 def test_recording_dock_supports_compact_and_full_modes():
     app = QApplication.instance() or QApplication([])
     realtime_recorder = Mock()
@@ -191,3 +308,77 @@ def test_recording_dock_supports_compact_and_full_modes():
 
     assert dock.full_panel.input_source_combo is not None
     assert dock.full_panel.marker_button.isVisible()
+
+
+def test_recording_dock_full_panel_exposes_grouped_console_sections():
+    app = QApplication.instance() or QApplication([])
+    realtime_recorder = Mock()
+    type(realtime_recorder).is_recording = PropertyMock(return_value=False)
+    realtime_recorder.list_input_sources.return_value = []
+    realtime_recorder.get_recording_status.return_value = {"duration": 0.0}
+    realtime_recorder.get_accumulated_transcription.return_value = ""
+    realtime_recorder.get_accumulated_translation.return_value = ""
+    realtime_recorder.get_markers.return_value = []
+    dock = RealtimeRecordingDock(realtime_recorder, _build_i18n())
+    dock.show()
+    app.processEvents()
+
+    dock.set_expanded(True)
+    app.processEvents()
+
+    assert dock.full_panel.session_summary_section is not None
+    assert dock.full_panel.capture_section is not None
+    assert dock.full_panel.processing_section is not None
+    assert dock.full_panel.output_section is not None
+    assert dock.full_panel.live_results_section is not None
+
+
+def test_recording_dock_uses_single_transport_summary_and_dense_full_panel():
+    app = QApplication.instance() or QApplication([])
+    realtime_recorder = Mock()
+    type(realtime_recorder).is_recording = PropertyMock(return_value=False)
+    realtime_recorder.list_input_sources.return_value = []
+    realtime_recorder.get_recording_status.return_value = {
+        "duration": 0.0,
+        "input_device_name": "default",
+    }
+    realtime_recorder.get_accumulated_transcription.return_value = ""
+    realtime_recorder.get_accumulated_translation.return_value = ""
+    realtime_recorder.get_markers.return_value = []
+    dock = RealtimeRecordingDock(realtime_recorder, _build_i18n())
+    dock.show()
+    app.processEvents()
+
+    dock.set_expanded(True)
+    app.processEvents()
+
+    assert dock.compact_panel.summary_group is not None
+    assert dock.full_panel.session_summary_section is not None
+    assert dock.full_panel.start_button.text() == "Apply Settings and Record"
+    assert not hasattr(dock.full_panel, "stop_button")
+    assert dock.full_panel.capture_form_layout.columnCount() == 2
+
+
+def test_recording_dock_full_panel_uses_scroll_container_and_localized_summary_labels():
+    app = QApplication.instance() or QApplication([])
+    realtime_recorder = Mock()
+    type(realtime_recorder).is_recording = PropertyMock(return_value=False)
+    realtime_recorder.list_input_sources.return_value = []
+    realtime_recorder.get_recording_status.return_value = {
+        "duration": 0.0,
+        "input_device_name": "default",
+    }
+    realtime_recorder.get_accumulated_transcription.return_value = ""
+    realtime_recorder.get_accumulated_translation.return_value = ""
+    realtime_recorder.get_markers.return_value = []
+    dock = RealtimeRecordingDock(realtime_recorder, _build_i18n())
+    dock.show()
+    app.processEvents()
+
+    dock.set_expanded(True)
+    app.processEvents()
+
+    assert dock.full_panel_scroll_area is not None
+    assert dock.full_panel.gain_spin.property("role") == "realtime-field-control"
+    assert "default" not in dock.full_panel.summary_input_label.text().lower()
+    assert dock.full_panel.summary_target_label.text() == "English"

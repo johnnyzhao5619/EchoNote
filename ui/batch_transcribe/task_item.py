@@ -254,6 +254,8 @@ class TaskItem(BaseWidget):
     def update_display(self):
         """Update display based on current task data."""
         try:
+            self._update_task_kind_property()
+
             # Update filename
             self._update_filename_label()
 
@@ -284,6 +286,11 @@ class TaskItem(BaseWidget):
 
         except Exception as e:
             logger.error(f"Error updating display: {e}")
+
+    def _update_task_kind_property(self) -> None:
+        """Expose stable task-kind metadata for queue filtering and styling."""
+        task_kind = self.task_data.get("task_kind") or "transcription"
+        self.setProperty("taskKind", task_kind)
 
     def _update_status_label(self):
         """Update status label with translated text and styling."""

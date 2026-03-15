@@ -13,11 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed the leftover `WorkspaceRecordingControlPanel` export/file after the shell recording dock hard switch, and propagated workspace translation refresh into already-open detached document windows so editor actions no longer keep stale language text.
 - Hardened local Text AI execution and governance: ONNX summaries now support a real greedy seq2seq path with extractive fallback, `text-ai` download/usage records persist across sessions, and workspace summary/meeting flows now record actual model usage.
 - Stabilized workspace editor asset presentation with explicit role labels and deterministic ordering instead of ad-hoc `title()` humanization.
-- Restored batch transcription/translation queue visibility inside `ui/workspace/` by embedding a dedicated task panel with file/folder import, pasted-text translation, task progress, retry/cancel/delete, and result viewing/export.
+- Removed the stale `workspace-asset-selector` combo role from constants, QSS, and theme outline after the hard switch to dedicated workspace asset tabs, so theme/test contracts now only describe live UI paths.
+- Moved the batch transcription/translation queue out of the recording dock and into a dedicated shell utility window, reusing `ui/workspace/task_panel.py` inside `ui/workspace/task_window.py` so task import, queue monitoring, and result routing no longer compete with recording controls.
+- Restructured the workspace shell around a local tool rail and explorer header, moving import/note creation dispatch into a single widget-owned path and giving the left navigation stack a clearer “tool rail + explorer + list” hierarchy.
+- Synced workspace task-window and recording-console copy into the outline-driven i18n contract, so `workspace.task_window_title` and `workspace.recording_console.section_*` now stay aligned across docs, code, and all locales.
 - Refined shared event deletion copy so calendar hub and timeline now explicitly explain the difference between deleting the event only and cleaning linked workspace assets, including the promise that preserved assets remain visible in Workspace after detaching.
 - Added a unified workspace toolbar and in-page realtime recording controls so document import, note creation, recording, playback, and task orchestration now live in a single Notes-style shell.
 - Added workspace collections (`all/recordings/documents/orphaned/recent`), lightweight list metadata, and orphaned-item retention semantics so preserved event artifacts remain manageable after detaching from calendar events.
 - Routed timeline/calendar artifact actions through `MainWindow.open_workspace_item()` first, with modal viewers kept only as fallback when a workspace item cannot be resolved.
+- Closed the workspace visual-density and layout-polish pass across theme/i18n/tests/docs: top-bar grouping, compact explorer shell, item metadata roles, inspector section titles, and recording-dock summary semantics now share outline-driven contracts and stable regression batches.
 
 ## [2.1.0] - 2026-03-15
 

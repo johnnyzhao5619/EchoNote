@@ -12,6 +12,8 @@
 
 **Assumption:** 假定后续实现会在独立 worktree/分支中进行；当前会话仅修订计划与文档，不直接改业务代码。
 
+> **Follow-up Note (2026-03-15):** 批量任务改为独立工具窗口、完整录音控制台重构、以及更接近 Obsidian 的工作台 UI polish，已由 `docs/plans/2026-03-15-workspace-polish-and-obsidian-alignment.md` 接管。若与本文关于任务承载方式、录音面板布局或编辑器表层结构的描述冲突，以新计划为准。
+
 ## 1. 审查结论
 
 ### 1.1 当前实现的真实问题

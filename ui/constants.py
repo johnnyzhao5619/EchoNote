@@ -56,8 +56,19 @@ APP_RECORDING_DOCK_MIN_HEIGHT = 68
 APP_RECORDING_DOCK_MARGINS = (12, 8, 12, 8)
 APP_SHELL_AUXILIARY_MARGINS = (8, 0, 8, 0)
 APP_TOP_BAR_CONTROL_HEIGHT = 26
+APP_TOP_BAR_TOOLS_SPACING = 6
+APP_TOP_BAR_TASK_ENTRY_MIN_WIDTH = 118
+APP_TASK_ENTRY_BADGE_MIN_SIZE = 18
 APP_TOP_BAR_HINT_WIDTH = 50
 SHELL_STATUS_REFRESH_INTERVAL_MS = 2000
+REALTIME_CONSOLE_SECTION_SPACING = 6
+REALTIME_CONSOLE_SECTION_MARGINS = (10, 10, 10, 10)
+WORKSPACE_TOOL_RAIL_WIDTH = 64
+WORKSPACE_TOOL_RAIL_BUTTON_MIN_HEIGHT = 32
+WORKSPACE_LIBRARY_PANEL_MIN_WIDTH = 260
+WORKSPACE_EDITOR_STAGE_MIN_WIDTH = 520
+WORKSPACE_INSPECTOR_PANEL_MIN_WIDTH = 280
+WORKSPACE_CONTENT_SPLITTER_DEFAULT_SIZES = (320, 820, 300)
 
 # Unified page density constants
 PAGE_CONTENT_MARGINS = (10, 8, 10, 8)
@@ -267,10 +278,15 @@ ROLE_AUDIO_PLAYER_CONTROL = "audio-player-control"
 ROLE_AUDIO_PLAYER_PRIMARY = "audio-player-primary"
 ROLE_SIDEBAR_NAV_BUTTON = "sidebar-nav-button"
 ROLE_SHELL_RESOURCE_BAR = "shell-resource-bar"
+ROLE_APP_TOPBAR_TOOLS = "app-topbar-tools"
 
 # Realtime Record Roles
 ROLE_REALTIME_DURATION = "realtime-duration"
 ROLE_REALTIME_RECORDING_DOCK = "realtime-recording-dock"
+ROLE_REALTIME_SUMMARY_GROUP = "realtime-summary-group"
+ROLE_REALTIME_CONSOLE_SECTION = "realtime-console-section"
+ROLE_REALTIME_CONSOLE_SECTION_TITLE = "realtime-console-section-title"
+ROLE_TASK_ENTRY_BADGE = "task-entry-badge"
 ROLE_REALTIME_MARKER_ACTION = "realtime-marker-action"
 ROLE_REALTIME_RECORD_ACTION = "realtime-record-action"
 ROLE_REALTIME_FIELD_CONTROL = "realtime-field-control"
@@ -295,12 +311,22 @@ ROLE_WARNING_LARGE = "warning-large"
 
 # Workspace Roles
 ROLE_WORKSPACE_SURFACE = "workspace-surface"
+ROLE_WORKSPACE_TASK_SUMMARY = "workspace-task-summary"
+ROLE_WORKSPACE_TOOL_RAIL = "workspace-tool-rail"
+ROLE_WORKSPACE_MODE_BUTTON_GROUP = "workspace-mode-button-group"
+ROLE_WORKSPACE_EXPLORER_HEADER = "workspace-explorer-header"
+ROLE_WORKSPACE_CONTEXT_LABEL = "workspace-context-label"
 ROLE_WORKSPACE_LIBRARY_PANEL = "workspace-library-panel"
 ROLE_WORKSPACE_ITEM_LIST = "workspace-item-list"
+ROLE_WORKSPACE_ITEM_TITLE = "workspace-item-title"
+ROLE_WORKSPACE_ITEM_META = "workspace-item-meta"
+ROLE_WORKSPACE_ITEM_BADGES = "workspace-item-badges"
 ROLE_WORKSPACE_EDITOR_PANEL = "workspace-editor-panel"
+ROLE_WORKSPACE_ASSET_TABS = "workspace-asset-tabs"
 ROLE_WORKSPACE_INSPECTOR_PANEL = "workspace-inspector-panel"
+ROLE_WORKSPACE_INSPECTOR_SECTION = "workspace-inspector-section"
+ROLE_WORKSPACE_INSPECTOR_SECTION_TITLE = "workspace-inspector-section-title"
 ROLE_WORKSPACE_RECORDING_PANEL = "workspace-recording-panel"
-ROLE_WORKSPACE_ASSET_SELECTOR = "workspace-asset-selector"
 ROLE_WORKSPACE_AI_ACTION = "workspace-ai-action"
 ROLE_WORKSPACE_PLACEHOLDER = "workspace-placeholder"
 

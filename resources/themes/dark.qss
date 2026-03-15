@@ -972,8 +972,51 @@ QFrame[role="batch-viewer-toolbar"] {
     padding: 12px 20px;
 }
 
+QLabel[role="task-entry-badge"] {
+    background-color: #64a2ff;
+    color: #10233f;
+    border-radius: 9px;
+    padding: 0 6px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
 QWidget[role="workspace-surface"] {
     background-color: #1f232c;
+}
+
+QWidget[role="workspace-task-summary"] {
+    background-color: #202631;
+    border: 1px solid #323b49;
+    border-radius: 10px;
+    padding: 8px 10px;
+}
+
+QWidget[role="workspace-tool-rail"] {
+    background-color: #262b36;
+    border: 1px solid #323b49;
+    border-radius: 12px;
+    padding: 6px;
+}
+
+QWidget[role="workspace-mode-button-group"] {
+    background-color: #202631;
+    border: 1px solid #323b49;
+    border-radius: 10px;
+    padding: 4px;
+}
+
+QWidget[role="workspace-explorer-header"] {
+    background-color: #202631;
+    border: 1px solid #323b49;
+    border-radius: 10px;
+    padding: 6px 8px;
+}
+
+QLabel[role="workspace-context-label"] {
+    color: #aab6cf;
+    font-size: 11px;
+    font-weight: 600;
 }
 
 QWidget[role="workspace-library-panel"],
@@ -986,6 +1029,22 @@ QWidget[role="workspace-inspector-panel"] {
 QWidget[role="realtime-recording-dock"] {
     background-color: #262b36;
     border-top: 1px solid #323b49;
+}
+
+QWidget[role="realtime-summary-group"] {
+    background: transparent;
+}
+
+QWidget[role="realtime-console-section"] {
+    background-color: #202631;
+    border: 1px solid #323b49;
+    border-radius: 10px;
+}
+
+QLabel[role="realtime-console-section-title"] {
+    color: #ecf2ff;
+    font-size: 12px;
+    font-weight: 700;
 }
 
 QListWidget[role="workspace-item-list"] {
@@ -1013,10 +1072,49 @@ QListWidget[role="workspace-item-list"]::item:selected {
     border: 1px solid #4f6382;
 }
 
+QLabel[role="workspace-item-title"] {
+    color: #ecf2ff;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+QLabel[role="workspace-item-meta"] {
+    color: #aab6cf;
+    font-size: 11px;
+}
+
+QWidget[role="workspace-item-badges"] {
+    background: transparent;
+}
+
 QWidget[role="workspace-editor-panel"] {
     background-color: #262b36;
     border: 1px solid #323b49;
     border-radius: 12px;
+}
+
+QTabWidget[role="workspace-asset-tabs"]::pane {
+    border: none;
+    margin-top: 4px;
+}
+
+QTabWidget[role="workspace-asset-tabs"] QTabBar::tab {
+    background-color: #273140;
+    color: #bfd2f5;
+    border: 1px solid #3a4b63;
+    border-radius: 9px;
+    padding: 6px 12px;
+    margin-right: 6px;
+}
+
+QTabWidget[role="workspace-asset-tabs"] QTabBar::tab:selected {
+    background-color: #35507f;
+    color: #eff5ff;
+    border-color: #6f8fc3;
+}
+
+QTabWidget[role="workspace-asset-tabs"] QTabBar::tab:hover {
+    border-color: #6a84a8;
 }
 
 QWidget[role="workspace-recording-panel"] {
@@ -1025,22 +1123,17 @@ QWidget[role="workspace-recording-panel"] {
     border-radius: 12px;
 }
 
-QComboBox[role="workspace-asset-selector"] {
-    background-color: #2a303c;
-    border: 1px solid #48576d;
-    border-radius: 9px;
-    padding: 4px 10px;
-    min-height: 28px;
+QWidget[role="workspace-inspector-section"] {
+    background-color: #202631;
+    border: 1px solid #323b49;
+    border-radius: 10px;
+    padding: 10px;
+}
+
+QLabel[role="workspace-inspector-section-title"] {
     color: #ecf2ff;
-}
-
-QComboBox[role="workspace-asset-selector"]:hover {
-    border-color: #6680a4;
-}
-
-QComboBox[role="workspace-asset-selector"]:focus {
-    border: 2px solid #64a2ff;
-    padding: 3px 9px;
+    font-size: 12px;
+    font-weight: 700;
 }
 
 QPushButton[role="workspace-ai-action"] {
@@ -1999,6 +2092,10 @@ QLabel#top_bar_brand {
     font-weight: 700;
 }
 
+QWidget[role="app-topbar-tools"] {
+    background: transparent;
+}
+
 QLineEdit#top_bar_search {
     background-color: rgba(255, 255, 255, 0.12);
     color: #f5f8ff;
@@ -2188,6 +2285,27 @@ QPushButton:disabled {
     background-color: #2a3446;
     color: #8495b1;
     border-color: #3f4f68;
+}
+
+QPushButton#top_bar_task_button {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #eef4ff;
+    border: 1px solid rgba(214, 224, 255, 0.34);
+    border-radius: 7px;
+    padding: 0 24px 0 10px;
+    min-height: 26px;
+    max-height: 26px;
+}
+
+QPushButton#top_bar_task_button:hover {
+    background-color: rgba(255, 255, 255, 0.16);
+    border-color: rgba(214, 224, 255, 0.5);
+}
+
+QPushButton#top_bar_task_button:disabled {
+    background-color: rgba(255, 255, 255, 0.06);
+    color: rgba(232, 239, 255, 0.52);
+    border-color: rgba(214, 224, 255, 0.16);
 }
 
 QPushButton[variant="primary"],
@@ -2538,7 +2656,8 @@ QComboBox[role="timeline-filter-control"] {
     padding: 3px 8px;
 }
 
-QComboBox[role="realtime-field-control"] {
+QComboBox[role="realtime-field-control"],
+QDoubleSpinBox[role="realtime-field-control"] {
     min-height: 26px;
     padding: 3px 8px;
 }

@@ -3,13 +3,30 @@
 
 from __future__ import annotations
 
-from core.qt_imports import QAction, QSplitter, QTabWidget, QToolButton, QVBoxLayout, QWidget, Qt
+from core.qt_imports import (
+    QAction,
+    QFileDialog,
+    QHBoxLayout,
+    QSplitter,
+    QTabWidget,
+    QToolButton,
+    QVBoxLayout,
+    QWidget,
+    Qt,
+)
 from ui.base_widgets import BaseWidget
-from ui.constants import ROLE_WORKSPACE_SURFACE
+from ui.constants import (
+    ROLE_WORKSPACE_SURFACE,
+    WORKSPACE_CONTENT_SPLITTER_DEFAULT_SIZES,
+    WORKSPACE_EDITOR_STAGE_MIN_WIDTH,
+    WORKSPACE_INSPECTOR_PANEL_MIN_WIDTH,
+    WORKSPACE_LIBRARY_PANEL_MIN_WIDTH,
+)
 from ui.workspace.detached_document_window import DetachedDocumentWindow
 from ui.workspace.editor_panel import WorkspaceEditorPanel
 from ui.workspace.inspector_panel import WorkspaceInspectorPanel
 from ui.workspace.library_panel import WorkspaceLibraryPanel
+from ui.workspace.tool_rail import WorkspaceToolRail
 from ui.workspace.toolbar import WorkspaceToolbar
 
 
@@ -38,7 +55,7 @@ class WorkspaceWidget(BaseWidget):
         self.setProperty("role", ROLE_WORKSPACE_SURFACE)
         layout = QVBoxLayout(self)
         self.toolbar = WorkspaceToolbar(self.workspace_manager, self.i18n, self)
-        self.toolbar.start_recording_button.hide()
+        self.tool_rail = WorkspaceToolRail(self.i18n, self)
         self.library_panel = WorkspaceLibraryPanel(self.workspace_manager, self.i18n, self)
         self.item_list = self.library_panel.item_list
         self.document_tabs = QTabWidget(self)
@@ -55,14 +72,18 @@ class WorkspaceWidget(BaseWidget):
         self.document_tabs.setCornerWidget(self.open_in_window_button, Qt.Corner.TopRightCorner)
 
         editor_stage = QWidget(self)
+        editor_stage.setMinimumWidth(WORKSPACE_EDITOR_STAGE_MIN_WIDTH)
         editor_stage_layout = QVBoxLayout(editor_stage)
         editor_stage_layout.setContentsMargins(0, 0, 0, 0)
         editor_stage_layout.addWidget(self.document_tabs)
         self.inspector_panel = WorkspaceInspectorPanel(self.workspace_manager, self.i18n, self)
+        self.inspector_panel.setMinimumWidth(WORKSPACE_INSPECTOR_PANEL_MIN_WIDTH)
         self.recording_panel = self.inspector_panel.recording_panel
         self.task_panel = None
+        self.inspector_panel.set_editor_panel(None)
 
         left_splitter = QSplitter(Qt.Orientation.Vertical, self)
+        left_splitter.setMinimumWidth(WORKSPACE_LIBRARY_PANEL_MIN_WIDTH)
         left_splitter.addWidget(self.library_panel)
         left_splitter.setStretchFactor(0, 1)
 
@@ -72,20 +93,32 @@ class WorkspaceWidget(BaseWidget):
         content_splitter.addWidget(self.inspector_panel)
         content_splitter.setStretchFactor(0, 1)
         content_splitter.setStretchFactor(1, 2)
-        content_splitter.setStretchFactor(2, 2)
+        content_splitter.setStretchFactor(2, 1)
+        content_splitter.setSizes(list(WORKSPACE_CONTENT_SPLITTER_DEFAULT_SIZES))
+        self.content_splitter = content_splitter
 
         self.library_panel.item_selected.connect(self._on_item_selected)
         self.library_panel.view_mode_changed.connect(self.refresh_items)
+        self.library_panel.view_mode_changed.connect(self.tool_rail.set_active_view_mode)
         self.library_panel.library_changed.connect(self.refresh_items)
-        self.toolbar.item_open_requested.connect(self.open_item)
+        self.toolbar.import_document_requested.connect(self._import_document)
+        self.toolbar.new_note_requested.connect(self._create_note)
+        self.tool_rail.view_mode_requested.connect(self._set_library_view_mode)
+        self.tool_rail.toggle_inspector_requested.connect(self._toggle_inspector_panel)
 
         layout.addWidget(self.toolbar)
-        layout.addWidget(content_splitter, 1)
+        body = QWidget(self)
+        body_layout = QHBoxLayout(body)
+        body_layout.setContentsMargins(0, 0, 0, 0)
+        body_layout.addWidget(self.tool_rail)
+        body_layout.addWidget(content_splitter, 1)
+        layout.addWidget(body, 1)
         self.update_translations()
 
     def update_translations(self) -> None:
         self.toolbar.update_translations()
         self.library_panel.update_translations()
+        self.tool_rail.update_translations()
         self.inspector_panel.update_translations()
         self.open_current_item_in_window_action.setText(
             self.i18n.t("workspace.open_in_new_window")
@@ -119,6 +152,7 @@ class WorkspaceWidget(BaseWidget):
             self.open_item(items[0].id)
         else:
             self._clear_document_stage()
+        self.tool_rail.set_active_view_mode(self.library_panel.current_view_mode())
 
     def open_item(
         self,
@@ -148,6 +182,7 @@ class WorkspaceWidget(BaseWidget):
         self.document_tabs.setCurrentWidget(editor_panel)
         self.library_panel.select_item(item_id)
         self.inspector_panel.set_item(item)
+        self.inspector_panel.set_editor_panel(editor_panel)
         if asset_role == "audio":
             self.recording_panel.setFocus()
         elif asset_role:
@@ -217,6 +252,7 @@ class WorkspaceWidget(BaseWidget):
         item_id = editor_panel.current_item_id()
         item = self.workspace_manager.get_item(item_id) if item_id else None
         self.inspector_panel.set_item(item)
+        self.inspector_panel.set_editor_panel(editor_panel)
         if item_id:
             self.library_panel.select_item(item_id)
 
@@ -237,3 +273,27 @@ class WorkspaceWidget(BaseWidget):
 
     def _clear_document_stage(self) -> None:
         self.inspector_panel.set_item(None)
+        self.inspector_panel.set_editor_panel(None)
+
+    def _import_document(self) -> None:
+        file_path, _ = QFileDialog.getOpenFileName(self, self.i18n.t("workspace.import_document"))
+        if not file_path:
+            return
+        item_id = self.workspace_manager.import_document(file_path)
+        if item_id:
+            self.open_item(item_id)
+
+    def _create_note(self) -> None:
+        item_id = self.workspace_manager.create_note(
+            title=self.i18n.t("workspace.new_note_default_title")
+        )
+        if item_id:
+            self.refresh_items()
+            self.open_item(item_id)
+
+    def _set_library_view_mode(self, view_mode: str) -> None:
+        if view_mode and self.library_panel.current_view_mode() != view_mode:
+            self.library_panel.set_view_mode(view_mode)
+
+    def _toggle_inspector_panel(self) -> None:
+        self.inspector_panel.setVisible(not self.inspector_panel.isVisible())
