@@ -179,6 +179,7 @@ class MainWindow(QMainWindow):
 
         self.recording_dock = self._create_recording_dock()
         main_layout.addWidget(self.recording_dock)
+        self._attach_task_drawer()
 
         self.shell_status_bar = self._create_shell_status_bar()
         main_layout.addWidget(self.shell_status_bar)
@@ -219,6 +220,31 @@ class MainWindow(QMainWindow):
         )
         dock.realtime_settings_requested.connect(self._open_realtime_settings_page)
         return dock
+
+    def _attach_task_drawer(self) -> None:
+        """Attach the shared transcription task drawer above the recording dock."""
+        from ui.workspace.task_panel import WorkspaceTaskPanel
+
+        transcription_manager = self.managers.get("transcription_manager")
+        if transcription_manager is None:
+            self.task_panel = None
+            self.recording_dock.set_task_drawer_widget(None)
+            return
+
+        self.task_panel = WorkspaceTaskPanel(
+            transcription_manager,
+            self.i18n,
+            settings_manager=self.managers.get("settings_manager"),
+            workspace_manager=self.managers.get("workspace_manager"),
+            parent=self,
+        )
+        self.task_panel.workspace_item_requested.connect(
+            lambda item_id: self.open_workspace_item(item_id=item_id)
+        )
+        workspace_page = self.pages.get("workspace")
+        if workspace_page is not None and hasattr(workspace_page, "refresh_items"):
+            self.task_panel.workspace_refresh_requested.connect(workspace_page.refresh_items)
+        self.recording_dock.set_task_drawer_widget(self.task_panel)
 
     def _open_realtime_settings_page(self) -> None:
         """Route shell-level settings requests to the realtime settings page."""

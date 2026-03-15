@@ -25,7 +25,6 @@ from core.qt_imports import (
 )
 from ui.base_widgets import BaseWidget, create_button, create_primary_button
 from ui.batch_transcribe.task_item import TaskItem
-from ui.batch_transcribe.transcript_viewer import TranscriptViewerDialog
 from ui.common.translation_task_options import prompt_event_translation_languages
 from ui.constants import ROLE_WORKSPACE_PLACEHOLDER
 
@@ -89,13 +88,22 @@ class WorkspaceTaskPanel(BaseWidget):
     """Workspace-native task queue panel for batch transcription and translation."""
 
     workspace_refresh_requested = Signal()
+    workspace_item_requested = Signal(str)
 
-    def __init__(self, transcription_manager, i18n, *, settings_manager=None, parent=None):
+    def __init__(
+        self,
+        transcription_manager,
+        i18n,
+        *,
+        settings_manager=None,
+        workspace_manager=None,
+        parent=None,
+    ):
         super().__init__(i18n, parent)
         self.transcription_manager = transcription_manager
         self.settings_manager = settings_manager
+        self.workspace_manager = workspace_manager
         self.task_items: list[TaskItem] = []
-        self._viewer_dialogs: dict[str, TranscriptViewerDialog] = {}
         self._init_ui()
         self._attach_listener()
         self.refresh_tasks()
@@ -417,20 +425,14 @@ class WorkspaceTaskPanel(BaseWidget):
         )
 
     def _on_view_task_requested(self, task_id: str) -> None:
-        dialog = self._viewer_dialogs.get(task_id)
-        if dialog is None:
-            dialog = TranscriptViewerDialog(
-                task_id=task_id,
-                transcription_manager=self.transcription_manager,
-                db_connection=self.transcription_manager.db,
-                i18n=self.i18n,
-                settings_manager=self.settings_manager,
-                parent=self,
-            )
-            self._viewer_dialogs[task_id] = dialog
-        dialog.show()
-        dialog.raise_()
-        dialog.activateWindow()
+        item_id = self._resolve_workspace_item_id(task_id)
+        if item_id:
+            self.workspace_item_requested.emit(item_id)
+            return
+        self.show_warning(
+            self.i18n.t("common.warning"),
+            self.i18n.t("workspace.no_workspace_item"),
+        )
 
     def _on_export_task_requested(self, task_id: str) -> None:
         get_task_status = getattr(self.transcription_manager, "get_task_status", None)
@@ -485,3 +487,23 @@ class WorkspaceTaskPanel(BaseWidget):
             except Exception:  # pragma: no cover - defensive
                 logger.debug("Failed to read transcription processing pause state", exc_info=True)
         return False
+
+    def _resolve_workspace_item_id(self, task_id: str) -> Optional[str]:
+        if self.workspace_manager is None:
+            return None
+
+        resolver = getattr(self.workspace_manager, "get_item_id_by_task_id", None)
+        if callable(resolver):
+            item_id = resolver(task_id)
+            if item_id:
+                return item_id
+
+        get_task_status = getattr(self.transcription_manager, "get_task_status", None)
+        if not callable(get_task_status):
+            return None
+        task_data = get_task_status(task_id) or {}
+        for path_key in ("output_path", "file_path"):
+            item_id = self.workspace_manager.find_item_id_by_asset_path(task_data.get(path_key))
+            if item_id:
+                return item_id
+        return None

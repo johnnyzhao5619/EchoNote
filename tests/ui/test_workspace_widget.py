@@ -84,6 +84,10 @@ class StubTranscriptionManager:
     def is_paused(self):
         return False
 
+    def get_task_status(self, task_id):
+        task = TranscriptionTask.get_by_id(self.db, task_id)
+        return task.to_dict() if task is not None else None
+
     def emit(self, event_type, data):
         if event_type == "task_added":
             task = TranscriptionTask(
@@ -126,7 +130,13 @@ class _FakeSettingsPage(QWidget):
         return self._current_page
 
 
-def build_main_window_with_workspace(qapp, mock_i18n, workspace_manager):
+def build_main_window_with_workspace(
+    qapp,
+    mock_i18n,
+    workspace_manager,
+    *,
+    transcription_manager=None,
+):
     realtime_recorder = Mock()
     type(realtime_recorder).is_recording = PropertyMock(return_value=False)
     realtime_recorder.list_input_sources.return_value = [{"index": 3, "name": "Podcast Mic"}]
@@ -154,7 +164,7 @@ def build_main_window_with_workspace(qapp, mock_i18n, workspace_manager):
         "workspace_manager": workspace_manager,
         "realtime_recorder": realtime_recorder,
         "settings_manager": settings_manager,
-        "transcription_manager": None,
+        "transcription_manager": transcription_manager,
         "calendar_manager": None,
         "oauth_manager": None,
         "timeline_manager": None,
@@ -190,7 +200,7 @@ def test_workspace_widget_shows_editor_audio_and_task_regions(
     assert widget.editor_panel is not None
     assert widget.inspector_panel is not None
     assert widget.recording_panel is not None
-    assert widget.task_panel is not None
+    assert widget.task_panel is None
 
 
 def test_workspace_widget_exposes_workspace_shell(
@@ -254,35 +264,80 @@ def test_workspace_editor_panel_uses_stable_asset_labels(qapp, mock_i18n, worksp
 def test_workspace_task_panel_renders_existing_tasks(
     qapp, mock_i18n, workspace_manager, transcription_manager
 ):
-    widget = WorkspaceWidget(workspace_manager, mock_i18n, transcription_manager=transcription_manager)
+    main_window, _realtime_recorder = build_main_window_with_workspace(
+        qapp,
+        mock_i18n,
+        workspace_manager,
+        transcription_manager=transcription_manager,
+    )
 
-    assert widget.task_panel.task_count() == 1
-    assert widget.task_panel.task_items[0].filename_label.text() == "demo.wav"
+    try:
+        assert main_window.task_panel.task_count() == 1
+        assert main_window.task_panel.task_items[0].filename_label.text() == "demo.wav"
+    finally:
+        main_window.close()
 
 
 def test_workspace_task_panel_updates_on_task_events(
     qapp, mock_i18n, workspace_manager, transcription_manager
 ):
-    widget = WorkspaceWidget(workspace_manager, mock_i18n, transcription_manager=transcription_manager)
-
-    transcription_manager.emit(
-        "task_added",
-        {
-            "id": "task-2",
-            "file_name": "translation.txt",
-            "file_path": "/tmp/translation.txt",
-            "file_size": 128,
-            "status": "pending",
-            "output_format": "txt",
-            "task_kind": "translation",
-        },
+    main_window, _realtime_recorder = build_main_window_with_workspace(
+        qapp,
+        mock_i18n,
+        workspace_manager,
+        transcription_manager=transcription_manager,
     )
 
-    assert widget.task_panel.task_count() == 2
-    assert {item.filename_label.text() for item in widget.task_panel.task_items} == {
-        "demo.wav",
-        "translation.txt",
-    }
+    try:
+        transcription_manager.emit(
+            "task_added",
+            {
+                "id": "task-2",
+                "file_name": "translation.txt",
+                "file_path": "/tmp/translation.txt",
+                "file_size": 128,
+                "status": "pending",
+                "output_format": "txt",
+                "task_kind": "translation",
+            },
+        )
+
+        assert main_window.task_panel.task_count() == 2
+        assert {item.filename_label.text() for item in main_window.task_panel.task_items} == {
+            "demo.wav",
+            "translation.txt",
+        }
+    finally:
+        main_window.close()
+
+
+def test_workspace_task_view_action_routes_to_open_document_card(
+    qapp, mock_i18n, workspace_manager, transcription_manager
+):
+    task_data = transcription_manager.get_all_tasks()[0]
+    task = TranscriptionTask.get_by_id(workspace_manager.db, task_data["id"])
+    assert task is not None
+    workspace_item_id = workspace_manager.publish_transcription_task(task)
+
+    main_window, _realtime_recorder = build_main_window_with_workspace(
+        qapp,
+        mock_i18n,
+        workspace_manager,
+        transcription_manager=transcription_manager,
+    )
+
+    try:
+        main_window.switch_page("settings")
+        qapp.processEvents()
+
+        main_window.task_panel.task_items[0].view_clicked.emit(task.id)
+        qapp.processEvents()
+
+        assert main_window.current_page_name == "workspace"
+        assert main_window.pages["workspace"].document_tabs.count() >= 1
+        assert main_window.pages["workspace"].current_item_id() == workspace_item_id
+    finally:
+        main_window.close()
 
 
 def test_workspace_widget_exposes_unified_create_toolbar(

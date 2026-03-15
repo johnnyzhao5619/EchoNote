@@ -410,6 +410,11 @@ class WorkspaceManager:
         item = self._get_latest_item_for_event(event_id)
         return item.id if item is not None else None
 
+    def get_item_id_by_task_id(self, task_id: str) -> Optional[str]:
+        """Return the latest workspace item identifier for a transcription task."""
+        item = self._get_item_by_source_task_id(task_id)
+        return item.id if item is not None else None
+
     def find_item_id_by_asset_path(self, file_path: Optional[str]) -> Optional[str]:
         """Resolve a workspace item identifier from an asset file path."""
         if not file_path:

@@ -10,7 +10,6 @@ from ui.workspace.detached_document_window import DetachedDocumentWindow
 from ui.workspace.editor_panel import WorkspaceEditorPanel
 from ui.workspace.inspector_panel import WorkspaceInspectorPanel
 from ui.workspace.library_panel import WorkspaceLibraryPanel
-from ui.workspace.task_panel import WorkspaceTaskPanel
 from ui.workspace.toolbar import WorkspaceToolbar
 
 
@@ -64,18 +63,8 @@ class WorkspaceWidget(BaseWidget):
         self.task_panel = None
 
         left_splitter = QSplitter(Qt.Orientation.Vertical, self)
-        if self.transcription_manager is not None:
-            self.task_panel = WorkspaceTaskPanel(
-                self.transcription_manager,
-                self.i18n,
-                settings_manager=getattr(self.workspace_manager, "settings_manager", None),
-                parent=self,
-            )
-            self.task_panel.workspace_refresh_requested.connect(self.refresh_items)
-            left_splitter.addWidget(self.task_panel)
         left_splitter.addWidget(self.library_panel)
         left_splitter.setStretchFactor(0, 1)
-        left_splitter.setStretchFactor(1, 1)
 
         content_splitter = QSplitter(Qt.Orientation.Horizontal, self)
         content_splitter.addWidget(left_splitter)
