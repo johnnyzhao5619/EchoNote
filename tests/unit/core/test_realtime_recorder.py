@@ -217,6 +217,15 @@ class TestRealtimeRecorderInitialization:
         assert recorder.on_audio_data == audio_cb
         assert recorder.on_marker_added == marker_cb
 
+    def test_list_input_sources_uses_audio_capture_devices(self, recorder):
+        recorder.audio_capture.get_input_devices = Mock(
+            return_value=[{"index": 4, "name": "Podcast Mic"}]
+        )
+
+        devices = recorder.list_input_sources()
+
+        assert devices == [{"index": 4, "name": "Podcast Mic"}]
+
 
 class TestRealtimeRecorderLifecycle:
     @pytest.mark.asyncio

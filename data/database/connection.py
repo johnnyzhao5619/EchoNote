@@ -28,12 +28,16 @@ from typing import Optional
 
 logger = logging.getLogger("echonote.database")
 
-CURRENT_SCHEMA_VERSION = 4
+CURRENT_SCHEMA_VERSION = 5
 REQUIRED_SCHEMA_TABLES = (
+    "workspace_folders",
     "workspace_items",
     "workspace_assets",
     "text_ai_model_downloads",
 )
+REQUIRED_SCHEMA_COLUMNS = {
+    "workspace_items": ("folder_id",),
+}
 
 
 class DatabaseConnection:
@@ -326,16 +330,20 @@ class DatabaseConnection:
         """
         schema_version = self.get_version()
         missing_tables = self.get_missing_required_tables()
-        if schema_version >= CURRENT_SCHEMA_VERSION and not missing_tables:
+        missing_columns = self.get_missing_required_columns()
+        if schema_version >= CURRENT_SCHEMA_VERSION and not missing_tables and not missing_columns:
             logger.info("Database schema already up to date at version %s", schema_version)
             return False
 
         logger.info(
-            "Applying schema update. current_version=%s missing_tables=%s target_version=%s",
+            "Applying schema update. current_version=%s missing_tables=%s missing_columns=%s "
+            "target_version=%s",
             schema_version,
             missing_tables,
+            missing_columns,
             CURRENT_SCHEMA_VERSION,
         )
+        self._apply_required_column_upgrades(missing_columns)
         self.initialize_schema(schema_path=schema_path)
         return True
 
@@ -391,6 +399,32 @@ class DatabaseConnection:
     def get_missing_required_tables(self) -> list[str]:
         """Return required schema tables that are currently missing."""
         return [table_name for table_name in REQUIRED_SCHEMA_TABLES if not self.has_table(table_name)]
+
+    def get_table_columns(self, table_name: str) -> set[str]:
+        """Return the current column names for a table."""
+        if not self.has_table(table_name):
+            return set()
+        result = self.execute(f"PRAGMA table_info({table_name})")
+        return {row["name"] for row in result}
+
+    def get_missing_required_columns(self) -> dict[str, list[str]]:
+        """Return required columns missing from existing schema tables."""
+        missing: dict[str, list[str]] = {}
+        for table_name, required_columns in REQUIRED_SCHEMA_COLUMNS.items():
+            if not self.has_table(table_name):
+                continue
+            existing_columns = self.get_table_columns(table_name)
+            table_missing = [column for column in required_columns if column not in existing_columns]
+            if table_missing:
+                missing[table_name] = table_missing
+        return missing
+
+    def _apply_required_column_upgrades(self, missing_columns: dict[str, list[str]]) -> None:
+        """Add missing required columns before replaying schema.sql."""
+        workspace_item_missing = missing_columns.get("workspace_items", [])
+        if "folder_id" in workspace_item_missing:
+            self.execute("ALTER TABLE workspace_items ADD COLUMN folder_id TEXT", commit=True)
+            logger.info("Added missing workspace_items.folder_id column before schema replay")
 
     def close(self):
         """Close the database connection for the current thread."""

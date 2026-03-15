@@ -2,279 +2,52 @@
 
 ## Overview
 
-This module provides UI components for real-time audio recording, transcription, and translation.
+`ui/realtime_record/` now only contains the reusable floating overlay and audio visualization pieces for realtime capture.
 
-> **Note**
-> PyAudio is an optional dependency. When it is not installed, `AudioCapture`
-> creation will raise an `ImportError`, the application will continue running,
-> and the real-time recording UI automatically disables microphone features
-> while showing installation guidance.
+- Primary recording entry: `ui/common/realtime_recording_dock.py`
+- Shared full recording form: `ui/workspace/recording_session_panel.py`
+- Floating overlay window: `ui/realtime_record/floating_overlay.py`
+- Audio waveform component: `ui/realtime_record/audio_visualizer.py`
+
+This directory no longer owns a standalone realtime-record page. The application shell keeps recording controls mounted persistently, and the workspace consumes the same session state.
 
 ## Components
 
-### RealtimeRecordWidget
+### `RealtimeFloatingOverlay`
 
-Main widget for real-time recording interface.
+Always-on-top overlay for compact runtime visibility while recording continues in the shell dock.
 
-**Features:**
+Responsibilities:
 
-- Audio input source selection
-- Gain adjustment (0.1x - 2.0x)
-- Source and target language selection
-- Real-time transcription display
-- Real-time translation display (optional)
-- Audio waveform visualization
-- Export functionality
-- Marker capture button with timestamp list
-- Respects global realtime preferences (`realtime.recording_format` /
-  `realtime.auto_save`) provided by `SettingsManager`
-- Loopback input detection and routing guidance for system audio capture
-- Online meeting capture hints (speaker output routing + microphone routing)
+- Show recording status and duration
+- Preview transcript and translation snippets
+- Offer quick actions to reopen the main window or toggle pin-on-top
+- Reuse semantic theme roles from `ui/constants.py`
 
-### System Audio / Meeting Routing
+### `AudioVisualizer`
 
-- The device list marks likely loopback inputs with a `(Loopback)` suffix.
-- When no loopback device is detected, the widget shows setup guidance instead of silently failing.
-- For online meetings, recommended routing:
-  - meeting/video app output -> loopback input device
-  - meeting app microphone -> physical mic
-  - EchoNote input device -> loopback input
-- For mixed local-mic + remote-audio recording in one track, use an aggregate/virtual mixer input.
-- App-scoped virtual inputs (for example `Microsoft Teams Audio`) are treated as meeting/system-audio candidates, and the UI warns that they may capture only that app's playback.
-- If audio samples remain all-zero during recording, UI surfaces actionable hints and includes selected input device details.
-- On first app run, EchoNote performs a loopback availability check and shows setup guidance when loopback input is missing.
-- Setup dialog supports one-click loopback setup:
-  - macOS: installs BlackHole via system authorization prompt.
-  - Windows: downloads and launches VB-CABLE installer with UAC authorization.
-  - Linux: configures PipeWire/PulseAudio virtual sink, and can request system authorization when dependency install is needed.
+Reusable waveform/level visualization for realtime capture surfaces.
 
-**Usage:**
+Responsibilities:
 
-```python
-from PySide6.QtWidgets import QApplication
-from ui.realtime_record import RealtimeRecordWidget
-from config.app_config import ConfigManager
-from core.settings.manager import SettingsManager
-from core.realtime.recorder import RealtimeRecorder
-from engines.audio.capture import AudioCapture
-from engines.speech.faster_whisper_engine import FasterWhisperEngine
-from data.database.connection import DatabaseConnection
-from data.storage.file_manager import FileManager
-from utils.i18n import I18nQtManager
-from utils.app_initializer import initialize_translation_engine, TranslationEngineProxy
-from data.security.secrets_manager import SecretsManager
+- Render live waveform updates
+- Show audio level changes without owning recorder state
+- Stay embeddable in future recording-related widgets
 
-# Initialize dependencies
-config_manager = ConfigManager()
-audio_capture = AudioCapture()
-speech_engine = FasterWhisperEngine(model_size='base')
-secrets_manager = SecretsManager(config_manager)
-translation_loader = initialize_translation_engine(config_manager, secrets_manager)
-translation_engine = TranslationEngineProxy(translation_loader)
-db = DatabaseConnection('~/.echonote/data.db')
-file_manager = FileManager('~/.echonote')
-i18n = I18nQtManager()
-settings_manager = SettingsManager(config_manager)
+## Integration Notes
 
-# Create recorder
-recorder = RealtimeRecorder(
-    audio_capture=audio_capture,
-    speech_engine=speech_engine,
-    translation_engine=translation_engine,
-    db_connection=db,
-    file_manager=file_manager
-)
+- `MainWindow` owns the persistent dock and refreshes it from the shared realtime recorder.
+- `WorkspaceRecordingSessionPanel` is the single full-featured form for source selection, language options, markers, and live transcript/translation state.
+- `RealtimeFloatingOverlay` is an auxiliary visibility surface, not a second recording workflow.
 
-# Create widget
-widget = RealtimeRecordWidget(
-    recorder=recorder,
-    audio_capture=audio_capture,
-    i18n_manager=i18n,
-    settings_manager=settings_manager
-)
+## Theme And I18n
 
-# Show widget
-widget.show()
-```
+- Theme selectors live in `resources/themes/light.qss`, `resources/themes/dark.qss`, and `resources/themes/theme_outline.json`.
+- Translation keys stay under the `realtime_record` section in `resources/translations/*.json`.
+- Shell dock text that belongs to the workspace/realtime workflow lives under `workspace.*` where the dock and workspace share copy.
 
-> **重要提示**：要启用翻译功能，请在 Secrets 管理中配置有效的 Google API Key。应用会通过 `initialize_translation_engine(...)` 延迟加载翻译引擎；若密钥缺失，`translation_engine` 会在运行时表现为不可用，界面会自动禁用翻译相关功能。
+## Maintenance Rules
 
-### AudioVisualizer
-
-Audio waveform and volume bar visualization component.
-
-**Features:**
-
-- Real-time waveform display
-- Volume level bar
-- Color-coded volume levels (green/orange/red)
-- 30 FPS refresh rate
-
-**Usage:**
-
-```python
-from ui.realtime_record import AudioVisualizer
-import numpy as np
-
-# Create visualizer
-visualizer = AudioVisualizer()
-
-# Update with audio data
-audio_chunk = np.random.randn(512).astype(np.float32) * 0.1
-visualizer.update_audio_data(audio_chunk)
-
-# Show visualizer
-visualizer.show()
-```
-
-## Integration with Main Window
-
-```python
-from PySide6.QtWidgets import QMainWindow, QStackedWidget
-from ui.realtime_record import RealtimeRecordWidget
-
-class MainWindow(QMainWindow):
-    def __init__(self):
-        super().__init__()
-
-        # Create stacked widget for pages
-        self.stacked_widget = QStackedWidget()
-
-        # Create realtime record widget
-        self.realtime_widget = RealtimeRecordWidget(
-            recorder=self.recorder,
-            audio_capture=self.audio_capture,
-            i18n_manager=self.i18n,
-            settings_manager=self.settings_manager
-        )
-
-        # Add to stacked widget
-        self.stacked_widget.addWidget(self.realtime_widget)
-
-        self.setCentralWidget(self.stacked_widget)
-```
-
-## Signal-Slot Architecture
-
-The widget uses Qt Signals for thread-safe communication between the recorder (which runs in worker threads) and the UI (which runs in the main thread).
-
-### Signals
-
-- `transcription_updated(str)`: Emitted when new transcription text is available
-- `translation_updated(str)`: Emitted when new translation text is available
-- `error_occurred(str)`: Emitted when an error occurs
-- `status_changed(bool, float)`: Emitted when recording status changes
-- `audio_data_available(object)`: Emitted when audio data is available for visualization
-- `marker_added(object)`: Emitted when a new marker is created
-
-### Callbacks
-
-The recorder uses callbacks to notify the UI:
-
-```python
-recorder.set_callbacks(
-    on_transcription=lambda text: signals.transcription_updated.emit(text),
-    on_translation=lambda text: signals.translation_updated.emit(text),
-    on_error=lambda error: signals.error_occurred.emit(error),
-    on_audio_data=lambda audio: signals.audio_data_available.emit(audio),
-    on_marker=lambda marker: signals.marker_added.emit(marker)
-)
-```
-
-**Available Callbacks:**
-
-- `on_transcription`: Called when new transcription text is available
-- `on_translation`: Called when new translation text is available
-- `on_error`: Called when an error occurs
-- `on_audio_data`: Called with raw audio data for visualization or processing
-- `on_marker`: Called when a new marker is recorded (dict with index/offset/label)
-
-## Async/Await Support
-
-The widget dispatches coroutines to a dedicated asyncio event loop thread managed by `AsyncWorker`. 录制开关示例：
-
-```python
-def _toggle_recording(self):
-    if not self.recorder.is_recording:
-        request = self._prepare_start_request()  # collect UI state on main thread
-        self._submit_worker_task(self._start_recording(request))
-    else:
-        self._submit_worker_task(self._stop_recording())
-```
-
-`_submit_worker_task` 会将协程提交到 `AsyncWorker` 的事件循环并跟踪返回的 `Future`，便于在清理阶段安全取消或等待任务完成。这一封装确保 UI 线程保持响应，并集中管理错误处理与状态反馈。
-
-### 专用事件循环线程的生命周期
-
-- **初始化**：`AsyncWorker` 在后台线程中构建事件循环，调用 `asyncio.new_event_loop()` 与 `loop.run_forever()`，并在启动后通知循环就绪。
-- **调度执行**：`_submit_worker_task` 使用 `asyncio.run_coroutine_threadsafe` 将协程投递到该循环，并统一跟踪任务完成状态与异常日志。
-- **资源回收**：`_cleanup_resources` 采用幂等清理流程，先在 worker 循环中优雅停录，再取消残留 `Future` 并停止线程，避免悬挂任务或线程泄漏。
-
-## Internationalization
-
-The widget supports multiple languages through the i18n system:
-
-```python
-# Change language
-i18n.change_language('en_US')  # English
-```
-
-Translation keys used:
-
-- `realtime_record.title`
-- `realtime_record.audio_input`
-- `realtime_record.gain`
-- `realtime_record.source_language`
-- `realtime_record.target_language`
-- `realtime_record.enable_translation`
-- `realtime_record.start_recording`
-- `realtime_record.stop_recording`
-- `realtime_record.recording_duration`
-- `realtime_record.transcription_text`
-- `realtime_record.translation_text`
-- `realtime_record.export_transcription`
-- `realtime_record.export_translation`
-- `realtime_record.save_recording`
-- `realtime_record.add_marker`
-- `realtime_record.markers`
-- `realtime_record.markers_placeholder`
-- `realtime_record.marker_unavailable`
-- `realtime_record.marker_failed`
-- `realtime_record.marker_item`
-- `realtime_record.marker_item_with_label`
-
-## File Export
-
-The widget provides export functionality for:
-
-1. **Transcription text**: Export to .txt or .md files
-2. **Translation text**: Export to .txt or .md files
-3. **Recording audio**: Automatically saved on stop (configured in options)
-
-## Automatic Calendar Event Creation
-
-When recording stops, the widget automatically creates a calendar event with:
-
-- Title: "录音会话 - [timestamp]"
-- Type: Event
-- Start/End time: Recording session duration
-- Attachments: Links to recording and transcript files
-
-## Error Handling
-
-Errors are handled gracefully and displayed to the user:
-
-```python
-try:
-    await self.recorder.start_recording(...)
-except Exception as e:
-    logger.error(f"Failed to start recording: {e}")
-    self._show_error(f"Failed to start recording: {e}")
-```
-
-## Performance
-
-- Audio visualization runs at 30 FPS
-- Status updates every 100ms
-- Audio processing in separate threads
-- Non-blocking UI operations
+- Do not reintroduce a second standalone realtime recording page here.
+- If a new floating overlay role is added, update both QSS themes and `theme_outline.json` in the same change.
+- If a new realtime-record or shared workspace recording key is added, update `i18n_outline.json` and all locales together.

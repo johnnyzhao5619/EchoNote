@@ -28,6 +28,7 @@ from ui.common.style_utils import set_widget_state
 from ui.constants import (
     APP_SEARCH_MAX_WIDTH,
     APP_SEARCH_MIN_WIDTH,
+    APP_SHELL_AUXILIARY_MARGINS,
     APP_SHELL_CONTENT_MARGINS,
     APP_STATUS_BAR_HEIGHT,
     APP_STATUS_BAR_MARGINS,
@@ -167,6 +168,19 @@ class MainWindow(QMainWindow):
         content_layout.addWidget(self.content_area, stretch=1)
         main_layout.addWidget(content_shell, stretch=1)
 
+        self.shell_auxiliary_host = QWidget()
+        self.shell_auxiliary_host.setObjectName("shell_auxiliary_host")
+        self.shell_auxiliary_layout = QVBoxLayout(self.shell_auxiliary_host)
+        self.shell_auxiliary_layout.setContentsMargins(*APP_SHELL_AUXILIARY_MARGINS)
+        self.shell_auxiliary_layout.setSpacing(ZERO_SPACING)
+        self.shell_auxiliary_host.hide()
+        self._shell_auxiliary_widget: Optional[QWidget] = None
+        main_layout.addWidget(self.shell_auxiliary_host)
+
+        self.recording_dock = self._create_recording_dock()
+        main_layout.addWidget(self.recording_dock)
+        self._attach_task_drawer()
+
         self.shell_status_bar = self._create_shell_status_bar()
         main_layout.addWidget(self.shell_status_bar)
 
@@ -190,6 +204,72 @@ class MainWindow(QMainWindow):
         self._update_shell_status()
 
         logger.debug("Main window UI setup complete")
+
+    def _create_recording_dock(self) -> QWidget:
+        """Create the persistent shell-level recording dock."""
+        from ui.common.realtime_recording_dock import RealtimeRecordingDock
+
+        dock = RealtimeRecordingDock(
+            self.managers.get("realtime_recorder"),
+            self.i18n,
+            settings_manager=self.managers.get("settings_manager"),
+            parent=self,
+        )
+        dock.workspace_item_requested.connect(
+            lambda item_id: self.open_workspace_item(item_id=item_id)
+        )
+        dock.realtime_settings_requested.connect(self._open_realtime_settings_page)
+        return dock
+
+    def _attach_task_drawer(self) -> None:
+        """Attach the shared transcription task drawer above the recording dock."""
+        from ui.workspace.task_panel import WorkspaceTaskPanel
+
+        transcription_manager = self.managers.get("transcription_manager")
+        if transcription_manager is None:
+            self.task_panel = None
+            self.recording_dock.set_task_drawer_widget(None)
+            return
+
+        self.task_panel = WorkspaceTaskPanel(
+            transcription_manager,
+            self.i18n,
+            settings_manager=self.managers.get("settings_manager"),
+            workspace_manager=self.managers.get("workspace_manager"),
+            parent=self,
+        )
+        self.task_panel.workspace_item_requested.connect(
+            lambda item_id: self.open_workspace_item(item_id=item_id)
+        )
+        workspace_page = self.pages.get("workspace")
+        if workspace_page is not None and hasattr(workspace_page, "refresh_items"):
+            self.task_panel.workspace_refresh_requested.connect(workspace_page.refresh_items)
+        self.recording_dock.set_task_drawer_widget(self.task_panel)
+
+    def _open_realtime_settings_page(self) -> None:
+        """Route shell-level settings requests to the realtime settings page."""
+        self.switch_page("settings")
+        settings_widget = self.pages.get("settings")
+        show_page = getattr(settings_widget, "show_page", None)
+        if callable(show_page):
+            show_page("realtime")
+
+    def set_shell_auxiliary_widget(self, widget: Optional[QWidget]) -> None:
+        """Attach a widget between the page content and shell recording dock."""
+        if self._shell_auxiliary_widget is widget:
+            return
+
+        if self._shell_auxiliary_widget is not None:
+            self.shell_auxiliary_layout.removeWidget(self._shell_auxiliary_widget)
+            self._shell_auxiliary_widget.setParent(None)
+
+        self._shell_auxiliary_widget = widget
+        if widget is None:
+            self.shell_auxiliary_host.hide()
+            return
+
+        self.shell_auxiliary_layout.addWidget(widget)
+        self.shell_auxiliary_host.show()
 
     def create_sidebar(self) -> QWidget:
         """
@@ -499,13 +579,19 @@ class MainWindow(QMainWindow):
         """Expose the current page name for page-routing callers/tests."""
         return self.current_page
 
-    def open_workspace_item(self, *, item_id: str, asset_role: Optional[str] = None) -> bool:
+    def open_workspace_item(
+        self,
+        *,
+        item_id: str,
+        asset_role: Optional[str] = None,
+        view_mode: Optional[str] = None,
+    ) -> bool:
         """Switch to workspace and focus a specific item/asset when possible."""
         workspace_page = self.pages.get("workspace")
         if workspace_page is None or not hasattr(workspace_page, "open_item"):
             return False
         self.switch_page("workspace")
-        return bool(workspace_page.open_item(item_id, asset_role=asset_role))
+        return bool(workspace_page.open_item(item_id, asset_role=asset_role, view_mode=view_mode))
 
     def _get_page_title(self, page_name: str) -> str:
         """Get translated page title by page name."""
@@ -524,6 +610,8 @@ class MainWindow(QMainWindow):
             self.cpu_resource_label.setText(self.i18n.t("app_shell.resource_cpu_label"))
         if hasattr(self, "gpu_resource_label"):
             self.gpu_resource_label.setText(self.i18n.t("app_shell.resource_gpu_label"))
+        if hasattr(self, "recording_dock"):
+            self.recording_dock.update_translations()
         self._update_shell_status()
 
     def _resolve_search_target(self, raw_query: str) -> Optional[str]:
@@ -641,6 +729,8 @@ class MainWindow(QMainWindow):
         is_recording = bool(getattr(realtime_recorder, "is_recording", False))
         recording_key = "app_shell.recording_on" if is_recording else "app_shell.recording_off"
         self.record_status_label.setText(self.i18n.t(recording_key))
+        if hasattr(self, "recording_dock"):
+            self.recording_dock.refresh_status()
         self._update_resource_usage_status()
 
     def _update_resource_usage_status(self) -> None:

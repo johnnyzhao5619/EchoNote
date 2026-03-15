@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "description": "Semantic theme outline contract for all QSS themes.",
   "themes": [
     "light",
@@ -78,6 +78,7 @@
     {
       "id": "realtime_record",
       "selectors": [
+        "QWidget[role=\"realtime-recording-dock\"]",
         "QLabel[role=\"realtime-duration\"]",
         "QPushButton[role=\"realtime-marker-action\"]",
         "QPushButton[role=\"realtime-record-action\"]",
@@ -91,6 +92,15 @@
         "QLabel[role=\"realtime-floating-preview\"]",
         "QPushButton[role=\"realtime-floating-action\"]",
         "QPushButton[role=\"realtime-floating-close\"]"
+      ]
+    },
+    {
+      "id": "tabs",
+      "selectors": [
+        "QTabWidget::pane",
+        "QTabBar::tab",
+        "QTabBar::tab:selected",
+        "QTabBar::tab:hover"
       ]
     },
     {
@@ -129,8 +139,10 @@
       "id": "workspace",
       "selectors": [
         "QWidget[role=\"workspace-surface\"]",
+        "QWidget[role=\"workspace-library-panel\"]",
         "QListWidget[role=\"workspace-item-list\"]",
         "QWidget[role=\"workspace-editor-panel\"]",
+        "QWidget[role=\"workspace-inspector-panel\"]",
         "QWidget[role=\"workspace-recording-panel\"]",
         "QComboBox[role=\"workspace-asset-selector\"]",
         "QPushButton[role=\"workspace-ai-action\"]",

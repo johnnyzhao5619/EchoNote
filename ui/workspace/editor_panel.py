@@ -15,6 +15,7 @@ from core.qt_imports import (
     QFileDialog,
     QFrame,
     QHBoxLayout,
+    QLabel,
     QMenu,
     QMessageBox,
     QPushButton,
@@ -404,6 +405,9 @@ class WorkspaceEditorPanel(TextEditorPanel):
 
     def _init_workspace_controls(self) -> None:
         self.setProperty("role", ROLE_WORKSPACE_EDITOR_PANEL)
+        self.document_title_label = QLabel()
+        self.layout().insertWidget(0, self.document_title_label)
+
         self.asset_selector = QComboBox()
         self.asset_selector.setProperty("role", ROLE_WORKSPACE_ASSET_SELECTOR)
         self.asset_selector.currentIndexChanged.connect(self._on_asset_changed)
@@ -426,6 +430,7 @@ class WorkspaceEditorPanel(TextEditorPanel):
         self.current_item = item
         self.current_asset = None
         self._text_assets = []
+        self.document_title_label.setText(item.title if item is not None else "")
         self.asset_selector.blockSignals(True)
         self.asset_selector.clear()
 
@@ -536,3 +541,7 @@ class WorkspaceEditorPanel(TextEditorPanel):
         self.search_button.setEnabled(self.current_asset is not None)
         self.summary_button.setEnabled(has_item)
         self.meeting_brief_button.setEnabled(has_item)
+
+    def current_item_id(self) -> str:
+        """Expose the currently loaded workspace item identifier."""
+        return self.current_item.id if self.current_item is not None else ""

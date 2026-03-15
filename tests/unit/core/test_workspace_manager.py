@@ -291,3 +291,49 @@ def test_workspace_manager_lists_recent_collection_in_updated_order(tmp_path):
     recent_items = manager.list_items(collection="recent")
 
     assert [item.id for item in recent_items[:2]] == [recent_id, old_id]
+
+
+def test_workspace_manager_supports_folders_and_dual_library_views(tmp_path):
+    manager = build_workspace_manager(tmp_path)
+    folder_id = manager.create_folder("Projects")
+    note_id = manager.create_note(title="Plan")
+    event = CalendarEvent(
+        title="Planning Session",
+        start_time="2026-03-15T13:00:00+00:00",
+        end_time="2026-03-15T14:00:00+00:00",
+    )
+    event.save(manager.db)
+
+    note = manager.get_item(note_id)
+    assert note is not None
+    note.source_event_id = event.id
+    note.save(manager.db)
+
+    manager.move_item_to_folder(note_id, folder_id)
+
+    structure_items = manager.list_items(view_mode="structure", folder_id=folder_id)
+    event_items = manager.list_items(view_mode="event")
+
+    assert [item.id for item in structure_items] == [note_id]
+    assert note_id in [item.id for item in event_items]
+
+
+def test_workspace_manager_renames_moves_and_deletes_folders(tmp_path):
+    manager = build_workspace_manager(tmp_path)
+    source_folder_id = manager.create_folder("Projects")
+    target_folder_id = manager.create_folder("Archive")
+    child_folder_id = manager.create_folder("Sprint", parent_id=source_folder_id)
+    note_id = manager.create_note(title="Plan")
+
+    manager.rename_folder(source_folder_id, "Active Projects")
+    manager.move_folder(child_folder_id, target_folder_id)
+    manager.move_item_to_folder(note_id, target_folder_id)
+
+    renamed_folder = manager.get_folder(source_folder_id)
+    moved_folder = manager.get_folder(child_folder_id)
+
+    assert renamed_folder is not None
+    assert renamed_folder.name == "Active Projects"
+    assert moved_folder is not None
+    assert moved_folder.parent_id == target_folder_id
+    assert manager.delete_folder(source_folder_id) is True

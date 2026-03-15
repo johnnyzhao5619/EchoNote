@@ -301,6 +301,22 @@ class TestCalendarEvent:
 class TestWorkspaceModels:
     """Test workspace persistence models."""
 
+    def test_workspace_folder_round_trip(self, tmp_path):
+        """Workspace folders should persist through the database layer."""
+        from data.database.models import WorkspaceFolder
+
+        db = DatabaseConnection(str(tmp_path / "workspace_folders.db"))
+        db.initialize_schema()
+
+        folder = WorkspaceFolder(name="Projects")
+        folder.save(db)
+
+        loaded = WorkspaceFolder.get_by_id(db, folder.id)
+
+        assert loaded is not None
+        assert loaded.name == "Projects"
+        assert loaded.parent_id is None
+
     def test_workspace_item_round_trip(self, tmp_path):
         """Workspace items should persist through the database layer."""
         from data.database.models import WorkspaceItem
@@ -316,6 +332,23 @@ class TestWorkspaceModels:
         assert loaded is not None
         assert loaded.title == "Weekly Sync"
         assert loaded.item_type == "meeting_note"
+
+    def test_workspace_item_persists_folder_reference(self, tmp_path):
+        """Workspace items should retain their folder ownership reference."""
+        from data.database.models import WorkspaceFolder, WorkspaceItem
+
+        db = DatabaseConnection(str(tmp_path / "workspace_item_folder.db"))
+        db.initialize_schema()
+
+        folder = WorkspaceFolder(name="Projects")
+        folder.save(db)
+        item = WorkspaceItem(title="Plan", item_type="document", folder_id=folder.id)
+        item.save(db)
+
+        loaded = WorkspaceItem.get_by_id(db, item.id)
+
+        assert loaded is not None
+        assert loaded.folder_id == folder.id
 
     def test_workspace_asset_round_trip(self, tmp_path):
         """Workspace assets should persist and remain queryable by item."""

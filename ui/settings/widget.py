@@ -320,6 +320,14 @@ class SettingsWidget(BaseWidget):
         logger.warning("Settings category for page '%s' not found in navigation list", page_id)
         return False
 
+    def current_page_id(self) -> str | None:
+        """Return the currently selected settings page identifier."""
+        current_item = self.category_list.currentItem()
+        if current_item is None:
+            return None
+        page_id = current_item.data(Qt.ItemDataRole.UserRole)
+        return page_id if isinstance(page_id, str) else None
+
     def _get_config_manager(self):
         """Return ConfigManager attached to settings manager."""
         config_manager = getattr(self.settings_manager, "config_manager", None)

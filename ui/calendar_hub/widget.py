@@ -1757,4 +1757,4 @@ class CalendarHubWidget(BaseWidget):
             item_id = self.workspace_manager.find_item_id_by_asset_path(file_path)
         if not item_id:
             return False
-        return bool(open_workspace_item(item_id=item_id, asset_role=asset_role))
+        return bool(open_workspace_item(item_id=item_id, asset_role=asset_role, view_mode="event"))

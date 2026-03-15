@@ -78,3 +78,16 @@ def test_all_locales_have_identical_nested_key_paths():
         extra = sorted(keys - base_keys)
         assert not missing, f"Locale '{locale}' missing nested keys vs '{base_locale}': {missing[:20]}"
         assert not extra, f"Locale '{locale}' has extra nested keys vs '{base_locale}': {extra[:20]}"
+
+
+def test_all_locales_have_dual_view_and_detached_window_keys():
+    outline = _load_outline()
+    locales = outline["locales"]
+    required_keys = outline.get("required_nested_keys", {}).get("workspace", [])
+
+    assert required_keys, "i18n outline must declare required workspace rearchitecture keys"
+
+    for locale in locales:
+        workspace = _load_locale(locale)["workspace"]
+        missing = sorted(key for key in required_keys if key not in workspace)
+        assert not missing, f"Locale '{locale}' missing required workspace keys: {missing}"

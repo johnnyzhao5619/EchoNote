@@ -3,14 +3,13 @@
 
 from __future__ import annotations
 
-from core.qt_imports import QSplitter, QVBoxLayout, QWidget, Qt
+from core.qt_imports import QAction, QSplitter, QTabWidget, QToolButton, QVBoxLayout, QWidget, Qt
 from ui.base_widgets import BaseWidget
 from ui.constants import ROLE_WORKSPACE_SURFACE
+from ui.workspace.detached_document_window import DetachedDocumentWindow
 from ui.workspace.editor_panel import WorkspaceEditorPanel
-from ui.workspace.item_list import WorkspaceItemList
-from ui.workspace.recording_control_panel import WorkspaceRecordingControlPanel
-from ui.workspace.recording_panel import WorkspaceRecordingPanel
-from ui.workspace.task_panel import WorkspaceTaskPanel
+from ui.workspace.inspector_panel import WorkspaceInspectorPanel
+from ui.workspace.library_panel import WorkspaceLibraryPanel
 from ui.workspace.toolbar import WorkspaceToolbar
 
 
@@ -31,6 +30,7 @@ class WorkspaceWidget(BaseWidget):
         self.transcription_manager = transcription_manager
         self.realtime_recorder = realtime_recorder
         self._items_by_id = {}
+        self._detached_windows: dict[str, DetachedDocumentWindow] = {}
         self._init_ui()
         self.refresh_items()
 
@@ -38,91 +38,202 @@ class WorkspaceWidget(BaseWidget):
         self.setProperty("role", ROLE_WORKSPACE_SURFACE)
         layout = QVBoxLayout(self)
         self.toolbar = WorkspaceToolbar(self.workspace_manager, self.i18n, self)
-        self.item_list = WorkspaceItemList(self.i18n, self)
-        self.editor_panel = WorkspaceEditorPanel(self.workspace_manager, self.i18n, parent=self)
-        self.recording_control_panel = WorkspaceRecordingControlPanel(
-            self.realtime_recorder,
-            self.i18n,
-            self,
+        self.toolbar.start_recording_button.hide()
+        self.library_panel = WorkspaceLibraryPanel(self.workspace_manager, self.i18n, self)
+        self.item_list = self.library_panel.item_list
+        self.document_tabs = QTabWidget(self)
+        self.document_tabs.setTabsClosable(True)
+        self.document_tabs.tabCloseRequested.connect(self._close_document_tab)
+        self.document_tabs.currentChanged.connect(self._on_current_document_changed)
+
+        self.open_current_item_in_window_action = QAction(self)
+        self.open_current_item_in_window_action.triggered.connect(
+            self._open_current_item_in_detached_window
         )
-        self.recording_panel = WorkspaceRecordingPanel(self.workspace_manager, self.i18n, self)
+        self.open_in_window_button = QToolButton(self)
+        self.open_in_window_button.setDefaultAction(self.open_current_item_in_window_action)
+        self.document_tabs.setCornerWidget(self.open_in_window_button, Qt.Corner.TopRightCorner)
+
+        editor_stage = QWidget(self)
+        editor_stage_layout = QVBoxLayout(editor_stage)
+        editor_stage_layout.setContentsMargins(0, 0, 0, 0)
+        editor_stage_layout.addWidget(self.document_tabs)
+        self.inspector_panel = WorkspaceInspectorPanel(self.workspace_manager, self.i18n, self)
+        self.recording_panel = self.inspector_panel.recording_panel
         self.task_panel = None
 
         left_splitter = QSplitter(Qt.Orientation.Vertical, self)
-        if self.transcription_manager is not None:
-            self.task_panel = WorkspaceTaskPanel(
-                self.transcription_manager,
-                self.i18n,
-                settings_manager=getattr(self.workspace_manager, "settings_manager", None),
-                parent=self,
-            )
-            self.task_panel.workspace_refresh_requested.connect(self.refresh_items)
-            left_splitter.addWidget(self.task_panel)
-        left_splitter.addWidget(self.item_list)
+        left_splitter.addWidget(self.library_panel)
         left_splitter.setStretchFactor(0, 1)
-        left_splitter.setStretchFactor(1, 1)
 
         content_splitter = QSplitter(Qt.Orientation.Horizontal, self)
         content_splitter.addWidget(left_splitter)
-        content_splitter.addWidget(self.editor_panel)
-
-        recording_column = QWidget(self)
-        recording_layout = QVBoxLayout(recording_column)
-        recording_layout.setContentsMargins(0, 0, 0, 0)
-        recording_layout.addWidget(self.recording_control_panel)
-        recording_layout.addWidget(self.recording_panel, 1)
-        content_splitter.addWidget(recording_column)
+        content_splitter.addWidget(editor_stage)
+        content_splitter.addWidget(self.inspector_panel)
         content_splitter.setStretchFactor(0, 1)
         content_splitter.setStretchFactor(1, 2)
         content_splitter.setStretchFactor(2, 2)
 
-        self.item_list.item_selected.connect(self._on_item_selected)
-        self.item_list.collection_changed.connect(self.refresh_items)
+        self.library_panel.item_selected.connect(self._on_item_selected)
+        self.library_panel.view_mode_changed.connect(self.refresh_items)
+        self.library_panel.library_changed.connect(self.refresh_items)
         self.toolbar.item_open_requested.connect(self.open_item)
-        self.toolbar.recording_requested.connect(self._focus_recording_panel)
-        self.recording_control_panel.workspace_item_requested.connect(self.open_item)
 
         layout.addWidget(self.toolbar)
         layout.addWidget(content_splitter, 1)
+        self.update_translations()
+
+    def update_translations(self) -> None:
+        self.toolbar.update_translations()
+        self.library_panel.update_translations()
+        self.inspector_panel.update_translations()
+        self.open_current_item_in_window_action.setText(
+            self.i18n.t("workspace.open_in_new_window")
+        )
+        self.open_current_item_in_window_action.setToolTip(
+            self.i18n.t("workspace.open_in_new_window")
+        )
+        for index in range(self.document_tabs.count()):
+            editor_panel = self.document_tabs.widget(index)
+            if hasattr(editor_panel, "update_translations"):
+                editor_panel.update_translations()
+        for detached_window in self._detached_windows.values():
+            detached_window.update_translations()
 
     def refresh_items(self) -> None:
-        current_item_id = self.item_list.current_item_id()
-        items = self.workspace_manager.list_items(collection=self.item_list.current_collection())
+        current_item_id = self.library_panel.current_item_id()
+        items = self.workspace_manager.list_items(
+            view_mode=self.library_panel.current_view_mode(),
+            folder_id=self.library_panel.current_folder_id(),
+        )
         metadata_by_item = self.workspace_manager.get_item_list_metadata(items)
         self._items_by_id = {item.id: item for item in items}
-        self.item_list.set_items(items, metadata_by_item=metadata_by_item)
+        self.library_panel.set_items(items, metadata_by_item=metadata_by_item)
+        self._refresh_document_tabs()
         if items and current_item_id in self._items_by_id:
-            self.item_list.select_item(current_item_id)
-            self._on_item_selected(current_item_id)
+            self.library_panel.select_item(current_item_id)
+            self.open_item(current_item_id)
+        elif items and self.current_item_id():
+            self.open_item(self.current_item_id())
         elif items:
-            self._on_item_selected(items[0].id)
+            self.open_item(items[0].id)
         else:
-            self._on_item_selected("")
+            self._clear_document_stage()
 
-    def open_item(self, item_id: str, asset_role: str | None = None) -> bool:
+    def open_item(
+        self,
+        item_id: str,
+        asset_role: str | None = None,
+        view_mode: str | None = None,
+    ) -> bool:
         """Refresh and focus a specific workspace item."""
-        self.refresh_items()
-        if item_id and item_id not in self._items_by_id and self.item_list.current_collection() != "all":
-            self.item_list.set_collection("all")
+        if view_mode and self.library_panel.current_view_mode() != view_mode:
+            self.library_panel.set_view_mode(view_mode)
             self.refresh_items()
-        if item_id and item_id in self._items_by_id:
-            self.item_list.select_item(item_id)
-            self._on_item_selected(item_id)
-            if asset_role == "audio":
-                self.recording_panel.setFocus()
-            elif asset_role:
-                self.editor_panel.select_asset_role(asset_role)
-            return True
-        return False
+        if item_id not in self._items_by_id:
+            item = self.workspace_manager.get_item(item_id)
+            if item is None:
+                return False
+            if view_mode == "event":
+                self.refresh_items()
+            else:
+                self.library_panel.set_view_mode("structure")
+                self.library_panel.select_folder(getattr(item, "folder_id", None))
+                self.refresh_items()
+        item = self._items_by_id.get(item_id)
+        if item is None:
+            return False
+
+        editor_panel = self._ensure_document_tab(item_id)
+        self.document_tabs.setCurrentWidget(editor_panel)
+        self.library_panel.select_item(item_id)
+        self.inspector_panel.set_item(item)
+        if asset_role == "audio":
+            self.recording_panel.setFocus()
+        elif asset_role:
+            editor_panel.select_asset_role(asset_role)
+        return True
+
+    @property
+    def editor_panel(self) -> WorkspaceEditorPanel | None:
+        """Expose the active document editor for workspace callers/tests."""
+        current_widget = self.document_tabs.currentWidget()
+        return current_widget if isinstance(current_widget, WorkspaceEditorPanel) else None
 
     def current_item_id(self) -> str:
         """Return the currently selected workspace item identifier."""
-        return self.item_list.current_item_id()
+        editor_panel = self.editor_panel
+        if editor_panel is not None:
+            return editor_panel.current_item_id()
+        return self.library_panel.current_item_id()
 
     def _on_item_selected(self, item_id: str) -> None:
-        item = self._items_by_id.get(item_id)
-        self.editor_panel.set_item(item)
-        self.recording_panel.set_item(item)
+        if not item_id:
+            self._clear_document_stage()
+            return
+        self.open_item(item_id)
 
-    def _focus_recording_panel(self) -> None:
-        self.recording_control_panel.record_button.setFocus()
+    def _ensure_document_tab(self, item_id: str) -> WorkspaceEditorPanel:
+        for index in range(self.document_tabs.count()):
+            editor_panel = self.document_tabs.widget(index)
+            if isinstance(editor_panel, WorkspaceEditorPanel) and editor_panel.current_item_id() == item_id:
+                item = self._items_by_id.get(item_id) or self.workspace_manager.get_item(item_id)
+                if item is not None:
+                    editor_panel.set_item(item)
+                    self.document_tabs.setTabText(index, item.title or item.id)
+                return editor_panel
+
+        item = self._items_by_id.get(item_id) or self.workspace_manager.get_item(item_id)
+        editor_panel = WorkspaceEditorPanel(self.workspace_manager, self.i18n, parent=self.document_tabs)
+        editor_panel.set_item(item)
+        self.document_tabs.addTab(editor_panel, item.title if item is not None else item_id)
+        return editor_panel
+
+    def _refresh_document_tabs(self) -> None:
+        for index in range(self.document_tabs.count()):
+            editor_panel = self.document_tabs.widget(index)
+            if not isinstance(editor_panel, WorkspaceEditorPanel):
+                continue
+            item_id = editor_panel.current_item_id()
+            item = self.workspace_manager.get_item(item_id) if item_id else None
+            editor_panel.set_item(item)
+            self.document_tabs.setTabText(index, item.title if item is not None else item_id)
+
+    def _close_document_tab(self, index: int) -> None:
+        widget = self.document_tabs.widget(index)
+        self.document_tabs.removeTab(index)
+        if widget is not None:
+            widget.deleteLater()
+        if self.document_tabs.count() == 0:
+            self._clear_document_stage()
+
+    def _on_current_document_changed(self, index: int) -> None:
+        if index < 0:
+            self._clear_document_stage()
+            return
+        editor_panel = self.document_tabs.widget(index)
+        if not isinstance(editor_panel, WorkspaceEditorPanel):
+            return
+        item_id = editor_panel.current_item_id()
+        item = self.workspace_manager.get_item(item_id) if item_id else None
+        self.inspector_panel.set_item(item)
+        if item_id:
+            self.library_panel.select_item(item_id)
+
+    def _open_current_item_in_detached_window(self) -> None:
+        item_id = self.current_item_id()
+        if not item_id:
+            return
+        window = self._detached_windows.get(item_id)
+        if window is None:
+            window = DetachedDocumentWindow(self.workspace_manager, self.i18n, item_id, parent=self)
+            window.destroyed.connect(lambda _obj=None, closed_item_id=item_id: self._detached_windows.pop(closed_item_id, None))
+            self._detached_windows[item_id] = window
+        else:
+            window.load_item(item_id)
+        window.show()
+        window.raise_()
+        window.activateWindow()
+
+    def _clear_document_stage(self) -> None:
+        self.inspector_panel.set_item(None)

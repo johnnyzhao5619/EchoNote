@@ -18,9 +18,15 @@ class _MainWindowStub(QWidget):
         self.current_page_name = None
         self.open_calls = []
 
-    def open_workspace_item(self, *, item_id: str, asset_role: str | None = None) -> bool:
+    def open_workspace_item(
+        self,
+        *,
+        item_id: str,
+        asset_role: str | None = None,
+        view_mode: str | None = None,
+    ) -> bool:
         self.current_page_name = "workspace"
-        self.open_calls.append((item_id, asset_role))
+        self.open_calls.append((item_id, asset_role, view_mode))
         return True
 
 
@@ -163,7 +169,7 @@ def test_calendar_hub_view_recording_prefers_requester_as_dialog_parent(qapp, mo
     assert kwargs["cache_key"].startswith("/tmp/demo_recording.wav::")
 
 
-def test_calendar_hub_view_text_routes_to_workspace_item(qapp, mock_i18n):
+def test_calendar_hub_event_view_workspace_route_for_text(qapp, mock_i18n):
     calendar_manager = MagicMock()
     calendar_manager.get_events.return_value = []
     oauth_manager = MagicMock()
@@ -189,7 +195,7 @@ def test_calendar_hub_view_text_routes_to_workspace_item(qapp, mock_i18n):
         )
 
     assert main_window.current_page_name == "workspace"
-    assert main_window.open_calls == [("workspace-item-1", "transcript")]
+    assert main_window.open_calls == [("workspace-item-1", "transcript", "event")]
     mock_viewer.assert_not_called()
 
 
