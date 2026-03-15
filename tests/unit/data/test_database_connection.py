@@ -368,6 +368,50 @@ class TestDatabaseSchemaOperations:
         assert db.has_table("workspace_assets")
         assert db.has_table("text_ai_model_downloads")
 
+    def test_ensure_schema_current_upgrades_v4_workspace_items_without_folder_id(
+        self, tmp_path
+    ):
+        """Version 4 workspace_items should gain folder_id before schema replay."""
+        db_path = tmp_path / "legacy_v4.db"
+        db = DatabaseConnection(str(db_path))
+
+        db.execute(
+            "CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT, updated_at TEXT)",
+            commit=True,
+        )
+        db.execute(
+            "INSERT INTO app_settings VALUES ('schema_version', '4', '2024-01-01')",
+            commit=True,
+        )
+        db.execute(
+            """
+            CREATE TABLE workspace_items (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                item_type TEXT NOT NULL,
+                source_kind TEXT,
+                source_event_id TEXT,
+                source_task_id TEXT,
+                status TEXT NOT NULL DEFAULT 'active',
+                primary_text_asset_id TEXT,
+                primary_audio_asset_id TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """,
+            commit=True,
+        )
+
+        upgraded = db.ensure_schema_current()
+
+        columns = {
+            row["name"] for row in db.execute("PRAGMA table_info(workspace_items)")
+        }
+        assert upgraded is True
+        assert db.get_version() == CURRENT_SCHEMA_VERSION
+        assert "folder_id" in columns
+        assert db.has_table("workspace_folders")
+
 
 class TestDatabaseMaintenanceOperations:
     """Test maintenance operations."""
