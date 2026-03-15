@@ -128,6 +128,14 @@ class WorkspaceRecordingSessionPanel(BaseWidget):
             bool(preferences.get("create_calendar_event", True))
         )
 
+        default_input_source = preferences.get("default_input_source")
+        if default_input_source in (None, "", "default"):
+            selected_index = self.input_source_combo.findData(None)
+        else:
+            selected_index = self.input_source_combo.findData(default_input_source)
+        if selected_index >= 0:
+            self.input_source_combo.setCurrentIndex(selected_index)
+
         target_language = preferences.get("translation_target_lang", "en")
         target_index = self.translation_language_combo.findData(target_language)
         if target_index >= 0:

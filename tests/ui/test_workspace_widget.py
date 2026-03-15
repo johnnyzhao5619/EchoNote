@@ -2,15 +2,17 @@
 """UI tests for the unified workspace widget."""
 
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, PropertyMock, patch
 
 import pytest
 
+from core.qt_imports import QWidget
 from core.workspace.manager import WorkspaceManager
 from data.database.connection import DatabaseConnection
 from data.database.models import CalendarEvent, TranscriptionTask, WorkspaceAsset, WorkspaceItem
 from data.storage.file_manager import FileManager
 from ui.common.audio_player import AudioPlayer
+from ui.main_window import MainWindow
 from ui.workspace.widget import WorkspaceWidget
 
 pytestmark = pytest.mark.ui
@@ -109,6 +111,73 @@ def transcription_manager(workspace_manager):
     )
     task.save(workspace_manager.db)
     return StubTranscriptionManager(workspace_manager.db)
+
+
+class _FakeSettingsPage(QWidget):
+    def __init__(self):
+        super().__init__()
+        self._current_page = "appearance"
+
+    def show_page(self, page_id: str) -> bool:
+        self._current_page = page_id
+        return True
+
+    def current_page_id(self) -> str:
+        return self._current_page
+
+
+def build_main_window_with_workspace(qapp, mock_i18n, workspace_manager):
+    realtime_recorder = Mock()
+    type(realtime_recorder).is_recording = PropertyMock(return_value=False)
+    realtime_recorder.list_input_sources.return_value = [{"index": 3, "name": "Podcast Mic"}]
+    realtime_recorder.get_recording_status.return_value = {"duration": 0.0}
+    realtime_recorder.get_accumulated_transcription.return_value = ""
+    realtime_recorder.get_accumulated_translation.return_value = ""
+    realtime_recorder.get_markers.return_value = []
+
+    settings_manager = Mock()
+    settings_manager.get_setting.return_value = "light"
+    settings_manager.api_keys_updated = Mock()
+    settings_manager.api_keys_updated.connect = Mock()
+    settings_manager.get_realtime_session_defaults.return_value = {
+        "default_input_source": 3,
+        "default_gain": 1.6,
+        "enable_transcription": True,
+        "enable_translation": False,
+        "translation_target_lang": "fr",
+        "auto_save": True,
+        "save_transcript": True,
+        "create_calendar_event": True,
+    }
+
+    managers = {
+        "workspace_manager": workspace_manager,
+        "realtime_recorder": realtime_recorder,
+        "settings_manager": settings_manager,
+        "transcription_manager": None,
+        "calendar_manager": None,
+        "oauth_manager": None,
+        "timeline_manager": None,
+    }
+
+    def _create_workspace_and_settings(self, content_area):
+        workspace_widget = WorkspaceWidget(
+            workspace_manager,
+            self.i18n,
+            realtime_recorder=realtime_recorder,
+        )
+        settings_widget = _FakeSettingsPage()
+        content_area.addWidget(workspace_widget)
+        self.pages["workspace"] = workspace_widget
+        content_area.addWidget(settings_widget)
+        self.pages["settings"] = settings_widget
+
+    with patch.object(MainWindow, "_create_pages", _create_workspace_and_settings):
+        main_window = MainWindow(managers, mock_i18n)
+
+    main_window.show()
+    qapp.processEvents()
+    return main_window, realtime_recorder
 
 
 def test_workspace_widget_shows_editor_audio_and_task_regions(
@@ -318,3 +387,52 @@ def test_workspace_supports_document_tabs_and_detached_window(
     qapp.processEvents()
 
     assert second_id in widget._detached_windows
+
+
+def test_recording_dock_quick_start_uses_defaults_and_more_settings_routes_to_realtime_page(
+    qapp, mock_i18n, workspace_manager
+):
+    main_window, realtime_recorder = build_main_window_with_workspace(
+        qapp,
+        mock_i18n,
+        workspace_manager,
+    )
+
+    try:
+        main_window.recording_dock.compact_panel.start_button.click()
+        main_window.recording_dock.expand_button.click()
+        qapp.processEvents()
+        main_window.recording_dock.full_panel.more_settings_button.click()
+        qapp.processEvents()
+
+        realtime_recorder.start_recording.assert_called_once()
+        call_kwargs = realtime_recorder.start_recording.call_args.kwargs
+        assert call_kwargs["input_source"] == 3
+        assert call_kwargs["options"]["default_gain"] == 1.6
+        assert main_window.current_page_name == "settings"
+        assert main_window.pages["settings"].current_page_id() == "realtime"
+    finally:
+        main_window.close()
+
+
+def test_recording_dock_workspace_item_routes_generated_item_into_workspace(
+    qapp, mock_i18n, workspace_manager
+):
+    main_window, _realtime_recorder = build_main_window_with_workspace(
+        qapp,
+        mock_i18n,
+        workspace_manager,
+    )
+    note_id = workspace_manager.create_note(title="Captured Session")
+
+    try:
+        main_window.switch_page("settings")
+        qapp.processEvents()
+
+        main_window.recording_dock._handle_stop_completed({"workspace_item_id": note_id})
+        qapp.processEvents()
+
+        assert main_window.current_page_name == "workspace"
+        assert main_window.pages["workspace"].current_item_id() == note_id
+    finally:
+        main_window.close()

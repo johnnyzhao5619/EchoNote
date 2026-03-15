@@ -50,6 +50,7 @@ class RealtimeRecordingDock(BaseWidget):
     """Shell-level recording dock with reserved space for future task drawer content."""
 
     workspace_item_requested = Signal(str)
+    realtime_settings_requested = Signal()
     _start_completed = Signal(object)
     _stop_completed = Signal(object)
     _operation_failed = Signal(str)
@@ -85,7 +86,7 @@ class RealtimeRecordingDock(BaseWidget):
         layout.addWidget(self.task_drawer_host)
 
         self.compact_panel = _CompactRecordingPanel(self)
-        self.compact_panel.start_button.clicked.connect(self._on_start_clicked)
+        self.compact_panel.start_button.clicked.connect(self._on_quick_start_clicked)
         self.compact_panel.stop_button.clicked.connect(self._on_stop_clicked)
 
         self.expand_button = QPushButton(self.compact_panel)
@@ -101,8 +102,9 @@ class RealtimeRecordingDock(BaseWidget):
             settings_manager=self.settings_manager,
             parent=self,
         )
-        self.full_panel.start_button.clicked.connect(self._on_start_clicked)
+        self.full_panel.start_button.clicked.connect(self._on_full_start_clicked)
         self.full_panel.stop_button.clicked.connect(self._on_stop_clicked)
+        self.full_panel.more_settings_button.clicked.connect(self.realtime_settings_requested.emit)
         self.full_panel.hide()
         layout.addWidget(self.full_panel)
 
@@ -158,11 +160,46 @@ class RealtimeRecordingDock(BaseWidget):
         key = "workspace.recording_active" if is_recording else "workspace.recording_idle"
         return self.i18n.t(key)
 
-    def _on_start_clicked(self) -> None:
+    def build_realtime_session_options(self, *, quick_start: bool = False) -> dict:
+        """Build session options from shared defaults and optional full-panel overrides."""
+        settings_defaults = self._load_session_defaults()
+        if quick_start:
+            return settings_defaults
+        options = dict(settings_defaults)
+        options.update(self.full_panel.collect_session_options())
+        return options
+
+    def _resolve_input_source(self, *, quick_start: bool = False):
+        if quick_start:
+            source = self._load_session_defaults().get("default_input_source")
+        else:
+            source = self.full_panel.selected_input_source()
+        if source in (None, "", "default"):
+            return None
+        try:
+            return int(source)
+        except (TypeError, ValueError):
+            return source
+
+    def _load_session_defaults(self) -> dict:
+        if callable(getattr(self.settings_manager, "get_realtime_session_defaults", None)):
+            loaded = self.settings_manager.get_realtime_session_defaults()
+            if isinstance(loaded, dict):
+                return dict(loaded)
+        return {}
+
+    def _on_quick_start_clicked(self) -> None:
         self._run_recorder_call(
             "start_recording",
-            input_source=self.full_panel.selected_input_source(),
-            options=self.full_panel.collect_session_options(),
+            input_source=self._resolve_input_source(quick_start=True),
+            options=self.build_realtime_session_options(quick_start=True),
+        )
+
+    def _on_full_start_clicked(self) -> None:
+        self._run_recorder_call(
+            "start_recording",
+            input_source=self._resolve_input_source(quick_start=False),
+            options=self.build_realtime_session_options(quick_start=False),
         )
 
     def _on_stop_clicked(self) -> None:

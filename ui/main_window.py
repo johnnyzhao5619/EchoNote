@@ -208,12 +208,25 @@ class MainWindow(QMainWindow):
         """Create the persistent shell-level recording dock."""
         from ui.common.realtime_recording_dock import RealtimeRecordingDock
 
-        return RealtimeRecordingDock(
+        dock = RealtimeRecordingDock(
             self.managers.get("realtime_recorder"),
             self.i18n,
             settings_manager=self.managers.get("settings_manager"),
             parent=self,
         )
+        dock.workspace_item_requested.connect(
+            lambda item_id: self.open_workspace_item(item_id=item_id)
+        )
+        dock.realtime_settings_requested.connect(self._open_realtime_settings_page)
+        return dock
+
+    def _open_realtime_settings_page(self) -> None:
+        """Route shell-level settings requests to the realtime settings page."""
+        self.switch_page("settings")
+        settings_widget = self.pages.get("settings")
+        show_page = getattr(settings_widget, "show_page", None)
+        if callable(show_page):
+            show_page("realtime")
 
     def set_shell_auxiliary_widget(self, widget: Optional[QWidget]) -> None:
         """Attach a widget between the page content and shell recording dock."""
