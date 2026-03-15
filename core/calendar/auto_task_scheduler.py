@@ -28,7 +28,7 @@ from apscheduler.triggers.date import DateTrigger
 
 from core.calendar.manager import CalendarManager
 from core.transcription.manager import TranscriptionManager
-from data.database.models import AutoTaskConfig, CalendarEvent, EventAttachment
+from data.database.models import AutoTaskConfig, CalendarEvent
 from utils.time_utils import now_local, to_local_datetime
 
 logger = logging.getLogger("echonote.calendar.auto_task_scheduler")
@@ -170,15 +170,17 @@ class CalendarAutoTaskScheduler:
             if not config or not config.enable_transcription:
                 return
 
-            attachments = EventAttachment.get_by_event_id(self.calendar_manager.db, event_id)
-            recording_path = None
-            has_transcript = False
+            workspace_manager = getattr(self.calendar_manager, "workspace_manager", None)
+            if workspace_manager is None:
+                logger.debug(
+                    "Event %s has auto-transcribe enabled but workspace manager is unavailable.",
+                    event_id,
+                )
+                return
 
-            for attachment in attachments:
-                if attachment.attachment_type == "recording":
-                    recording_path = attachment.file_path
-                elif attachment.attachment_type in ("transcript", "translation"):
-                    has_transcript = True
+            artifacts = workspace_manager.get_event_artifacts(event_id)
+            recording_path = artifacts.get("recording")
+            has_transcript = bool(artifacts.get("transcript") or artifacts.get("translation"))
 
             if not recording_path:
                 logger.debug(f"Event {event_id} has auto-transcribe enabled but no recording.")

@@ -46,3 +46,4 @@ def test_generate_meeting_brief_writes_summary_assets(tmp_path):
     assert "action_items_asset_id" in result
     assert any(asset.asset_role == "summary" for asset in assets)
     assert any(asset.asset_role == "action_items" for asset in assets)
+    model_manager.mark_text_ai_model_used.assert_called_with("extractive-default")

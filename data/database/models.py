@@ -1309,3 +1309,114 @@ class TranslationModelRecord:
             (self.model_id,),
             commit=True,
         )
+
+
+@dataclass
+class TextAIModelRecord:
+    """Text AI 模型下载和使用记录。"""
+
+    model_id: str = ""
+    runtime: str = ""
+    provider: str = ""
+    family: str = ""
+    status: str = "not_downloaded"
+    download_path: Optional[str] = None
+    size_bytes: Optional[int] = None
+    downloaded_at: Optional[str] = None
+    last_used: Optional[str] = None
+    use_count: int = 0
+    created_at: str = field(default_factory=current_iso_timestamp)
+    updated_at: str = field(default_factory=current_iso_timestamp)
+
+    @staticmethod
+    def from_db_row(row) -> "TextAIModelRecord":
+        return TextAIModelRecord(
+            model_id=row["model_id"],
+            runtime=row["runtime"],
+            provider=row["provider"],
+            family=row["family"],
+            status=row["status"],
+            download_path=row["download_path"],
+            size_bytes=row["size_bytes"],
+            downloaded_at=row["downloaded_at"],
+            last_used=row["last_used"],
+            use_count=row["use_count"] if row["use_count"] is not None else 0,
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+
+    def save(self, db_connection) -> None:
+        """插入或更新记录。"""
+        self.updated_at = current_iso_timestamp()
+        query = """
+            INSERT INTO text_ai_model_downloads
+                (model_id, runtime, provider, family, status, download_path,
+                 size_bytes, downloaded_at, last_used, use_count, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(model_id) DO UPDATE SET
+                runtime       = excluded.runtime,
+                provider      = excluded.provider,
+                family        = excluded.family,
+                status        = excluded.status,
+                download_path = excluded.download_path,
+                size_bytes    = excluded.size_bytes,
+                downloaded_at = excluded.downloaded_at,
+                last_used     = excluded.last_used,
+                use_count     = excluded.use_count,
+                updated_at    = excluded.updated_at
+        """
+        db_connection.execute(
+            query,
+            (
+                self.model_id,
+                self.runtime,
+                self.provider,
+                self.family,
+                self.status,
+                self.download_path,
+                self.size_bytes,
+                self.downloaded_at,
+                self.last_used,
+                self.use_count,
+                self.created_at,
+                self.updated_at,
+            ),
+            commit=True,
+        )
+
+    def update_status(self, db_connection, status: str, **kwargs) -> None:
+        """快速更新状态和相关字段。"""
+        self.status = status
+        self.updated_at = current_iso_timestamp()
+        for key, value in kwargs.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
+        self.save(db_connection)
+
+    def mark_used(self, db_connection) -> None:
+        """更新使用时间和计数。"""
+        self.use_count += 1
+        self.last_used = current_iso_timestamp()
+        self.save(db_connection)
+
+    @staticmethod
+    def get_by_model_id(db_connection, model_id: str) -> Optional["TextAIModelRecord"]:
+        result = db_connection.execute(
+            "SELECT * FROM text_ai_model_downloads WHERE model_id = ?",
+            (model_id,),
+        )
+        return TextAIModelRecord.from_db_row(result[0]) if result else None
+
+    @staticmethod
+    def get_all(db_connection) -> List["TextAIModelRecord"]:
+        result = db_connection.execute(
+            "SELECT * FROM text_ai_model_downloads ORDER BY model_id"
+        )
+        return [TextAIModelRecord.from_db_row(row) for row in result]
+
+    def delete(self, db_connection) -> None:
+        db_connection.execute(
+            "DELETE FROM text_ai_model_downloads WHERE model_id = ?",
+            (self.model_id,),
+            commit=True,
+        )

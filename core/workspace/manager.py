@@ -13,6 +13,18 @@ from data.storage.file_manager import FileManager
 from core.workspace.document_parser import DocumentParser
 from core.workspace.import_service import WorkspaceImportService
 
+TEXT_ASSET_ROLE_PRIORITY = {
+    "document_text": 0,
+    "transcript": 1,
+    "meeting_brief": 2,
+    "summary": 3,
+    "translation": 4,
+    "decisions": 5,
+    "action_items": 6,
+    "next_steps": 7,
+    "outline": 8,
+}
+
 
 class WorkspaceManager:
     """High-level API for unified workspace items and assets."""
@@ -127,6 +139,9 @@ class WorkspaceManager:
         asset.content_type = self._guess_content_type(target_path)
         asset.metadata_json = json.dumps({"size_bytes": target_path.stat().st_size})
         asset.save(self.db)
+        item = self.get_item(asset.item_id)
+        if item is not None:
+            self._sync_primary_asset_refs(item)
         return asset
 
     def save_text_asset(
@@ -151,12 +166,14 @@ class WorkspaceManager:
             subdirectory=target_subdirectory,
             overwrite=True,
         )
-        return self._save_asset(
+        asset = self._save_asset(
             item,
             asset_role,
             file_path=file_path,
             text_content=text_content,
         )
+        self._sync_primary_asset_refs(item)
+        return asset
 
     def generate_summary(self, item_id: str, strategy: Optional[str] = None) -> dict:
         """Generate and persist a summary for a workspace item."""
@@ -206,7 +223,11 @@ class WorkspaceManager:
             item.primary_audio_asset_id = audio_asset.id
         if transcript_asset is not None:
             item.primary_text_asset_id = transcript_asset.id
-        item.save(self.db)
+        self._sync_primary_asset_refs(
+            item,
+            preferred_text_asset_id=transcript_asset.id if transcript_asset else None,
+            preferred_audio_asset_id=audio_asset.id if audio_asset else None,
+        )
         return item.id
 
     def publish_recording_session(self, recording_result: dict) -> str:
@@ -228,7 +249,11 @@ class WorkspaceManager:
             item.primary_audio_asset_id = audio_asset.id
         if transcript_asset is not None:
             item.primary_text_asset_id = transcript_asset.id
-        item.save(self.db)
+        self._sync_primary_asset_refs(
+            item,
+            preferred_text_asset_id=transcript_asset.id if transcript_asset else None,
+            preferred_audio_asset_id=audio_asset.id if audio_asset else None,
+        )
         return item.id
 
     def get_event_artifacts(self, event_id: str) -> dict:
@@ -324,9 +349,10 @@ class WorkspaceManager:
         asset = self._upsert_text_asset(item, asset_role, file_path)
         if asset is None:
             return None
-        if asset_role == "transcript":
-            item.primary_text_asset_id = asset.id
-        item.save(self.db)
+        self._sync_primary_asset_refs(
+            item,
+            preferred_text_asset_id=asset.id if asset_role == "transcript" else None,
+        )
         return asset.id
 
     def remove_event_asset_role(self, event_id: str, asset_role: str) -> bool:
@@ -338,7 +364,32 @@ class WorkspaceManager:
         for asset in WorkspaceAsset.get_by_item_and_role(self.db, item.id, asset_role):
             asset.delete(self.db)
             removed = True
+        if removed:
+            self._sync_primary_asset_refs(item)
         return removed
+
+    def delete_event_items(self, event_id: str, *, delete_files: bool = True) -> int:
+        """Delete workspace items and assets linked to an event."""
+        removed_count = 0
+        for item in self._get_items_for_event(event_id):
+            for asset in WorkspaceAsset.get_by_item_id(self.db, item.id):
+                if delete_files:
+                    self._delete_asset_file(asset)
+                asset.delete(self.db)
+            item.delete(self.db)
+            removed_count += 1
+        return removed_count
+
+    def detach_event_items(self, event_id: str) -> int:
+        """Preserve workspace items while removing their event linkage."""
+        detached_count = 0
+        for item in self._get_items_for_event(event_id):
+            if item.source_event_id != event_id:
+                continue
+            item.source_event_id = None
+            item.save(self.db)
+            detached_count += 1
+        return detached_count
 
     def _resolve_transcription_item(
         self,
@@ -393,6 +444,13 @@ class WorkspaceManager:
         if rows:
             return WorkspaceItem.from_db_row(rows[0])
         return None
+
+    def _get_items_for_event(self, event_id: str) -> List[WorkspaceItem]:
+        rows = self.db.execute(
+            "SELECT * FROM workspace_items WHERE source_event_id = ? ORDER BY updated_at DESC",
+            (event_id,),
+        )
+        return [WorkspaceItem.from_db_row(row) for row in rows]
 
     def _get_assets_for_item_ids(self, item_ids: List[str]) -> dict[str, List[WorkspaceAsset]]:
         if not item_ids:
@@ -458,6 +516,80 @@ class WorkspaceManager:
         asset.content_type = self._guess_content_type(Path(file_path))
         asset.save(self.db)
         return asset
+
+    def _sync_primary_asset_refs(
+        self,
+        item: WorkspaceItem,
+        *,
+        preferred_text_asset_id: Optional[str] = None,
+        preferred_audio_asset_id: Optional[str] = None,
+    ) -> None:
+        assets = WorkspaceAsset.get_by_item_id(self.db, item.id)
+        item.primary_text_asset_id = self._select_primary_text_asset_id(
+            assets,
+            preferred_asset_id=preferred_text_asset_id or item.primary_text_asset_id,
+        )
+        item.primary_audio_asset_id = self._select_primary_audio_asset_id(
+            assets,
+            preferred_asset_id=preferred_audio_asset_id or item.primary_audio_asset_id,
+        )
+        item.save(self.db)
+
+    def _select_primary_text_asset_id(
+        self,
+        assets: List[WorkspaceAsset],
+        *,
+        preferred_asset_id: Optional[str] = None,
+    ) -> Optional[str]:
+        if preferred_asset_id and any(
+            asset.id == preferred_asset_id and asset.asset_role in TEXT_ASSET_ROLE_PRIORITY
+            for asset in assets
+        ):
+            return preferred_asset_id
+
+        ranked_assets = [
+            asset
+            for asset in assets
+            if asset.asset_role in TEXT_ASSET_ROLE_PRIORITY
+        ]
+        if not ranked_assets:
+            return None
+        ranked_assets.sort(
+            key=lambda asset: (
+                TEXT_ASSET_ROLE_PRIORITY.get(asset.asset_role, 999),
+                asset.created_at or "",
+            )
+        )
+        return ranked_assets[0].id
+
+    def _select_primary_audio_asset_id(
+        self,
+        assets: List[WorkspaceAsset],
+        *,
+        preferred_asset_id: Optional[str] = None,
+    ) -> Optional[str]:
+        if preferred_asset_id and any(
+            asset.id == preferred_asset_id and asset.asset_role == "audio" for asset in assets
+        ):
+            return preferred_asset_id
+
+        audio_assets = [asset for asset in assets if asset.asset_role == "audio"]
+        if not audio_assets:
+            return None
+        return audio_assets[-1].id
+
+    def _delete_asset_file(self, asset: WorkspaceAsset) -> None:
+        if not asset.file_path:
+            return
+        try:
+            if self.file_manager:
+                self.file_manager.delete_file(asset.file_path)
+                return
+            path = Path(asset.file_path).expanduser()
+            if path.exists():
+                path.unlink()
+        except FileNotFoundError:
+            return
 
     def _build_artifacts_from_assets(self, assets: List[WorkspaceAsset]) -> dict:
         recording = None

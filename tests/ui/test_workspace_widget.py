@@ -93,3 +93,16 @@ def test_workspace_recording_panel_reuses_shared_audio_player(qapp, mock_i18n, w
     widget = WorkspaceWidget(workspace_manager, mock_i18n)
 
     assert isinstance(widget.recording_panel.audio_player, AudioPlayer)
+
+
+def test_workspace_editor_panel_uses_stable_asset_labels(qapp, mock_i18n, workspace_manager):
+    widget = WorkspaceWidget(workspace_manager, mock_i18n)
+    item = workspace_manager.list_items()[0]
+
+    widget._on_item_selected(item.id)
+    labels = [
+        widget.editor_panel.asset_selector.itemText(index)
+        for index in range(widget.editor_panel.asset_selector.count())
+    ]
+
+    assert any(label.startswith("Transcript:") for label in labels)

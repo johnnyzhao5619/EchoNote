@@ -385,6 +385,7 @@ def main():
             sync_adapters,
             oauth_manager=oauth_manager,
             file_manager=file_manager,
+            workspace_manager=workspace_manager,
         )
         managers["calendar_manager"] = calendar_manager
         if hasattr(realtime_recorder, "set_calendar_manager"):

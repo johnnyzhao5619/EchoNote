@@ -9,11 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Hard-switched the desktop shell from separate batch-transcribe and realtime-record pages to a single `workspace` workbench backed by `workspace_items` and `workspace_assets`.
-- Redirected batch transcription, realtime recording, timeline, and calendar artifact reads/writes to the unified workspace asset layer; removed the old page-level dual-track entry points and attachment write path.
-- Added local Text AI governance across extractive summary, ONNX summarization, and GGUF meeting-brief runtimes, with persistent workspace outputs for summaries, action items, decisions, and next steps.
-- Expanded model management and settings ownership to cover `speech`, `translation`, and `text-ai`, including a dedicated Workspace AI defaults page.
-- Updated theme/documentation contracts to recognize workspace semantic roles and the new ownership map for `core/workspace/`, `core/models/`, `engines/text_ai/`, and `ui/workspace/`.
+- Cleaned remaining workspace lifecycle gaps: primary text/audio references are now maintained centrally, calendar delete/provider-removal flows now detach or remove workspace assets correctly, and calendar export/auto-transcribe now read workspace artifacts instead of legacy attachment rows.
+- Hardened local Text AI execution and governance: ONNX summaries now support a real greedy seq2seq path with extractive fallback, `text-ai` download/usage records persist across sessions, and workspace summary/meeting flows now record actual model usage.
+- Stabilized workspace editor asset presentation with explicit role labels and deterministic ordering instead of ad-hoc `title()` humanization.
 
 ## [2.1.0] - 2026-03-15
 

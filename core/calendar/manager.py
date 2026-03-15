@@ -60,6 +60,7 @@ class CalendarManager:
         sync_adapters: Optional[Dict[str, Any]] = None,
         oauth_manager: Optional["OAuthManager"] = None,
         file_manager: Optional[FileManager] = None,
+        workspace_manager=None,
     ):
         """
         Initialize the calendar manager.
@@ -74,6 +75,7 @@ class CalendarManager:
         self.sync_adapters = sync_adapters or {}
         self.oauth_manager = oauth_manager
         self.file_manager = file_manager
+        self.workspace_manager = workspace_manager
         self.calendar_auto_task_scheduler = None
         logger.info("CalendarManager initialized")
 
@@ -310,9 +312,9 @@ class CalendarManager:
 
         Args:
             event_id: Event ID to delete
-            delete_artifacts: Whether to remove event attachments.
+            delete_artifacts: Whether to remove workspace/legacy artifacts.
             delete_artifact_files: Whether to remove underlying files when
-                deleting attachments.
+                deleting artifacts.
         """
         try:
             event = CalendarEvent.get_by_id(self.db, event_id)
@@ -370,6 +372,14 @@ class CalendarManager:
                     (event_id,),
                     commit=True,
                 )
+
+            if delete_artifacts and self.workspace_manager is not None:
+                self.workspace_manager.delete_event_items(
+                    event_id,
+                    delete_files=delete_artifact_files,
+                )
+            elif not delete_artifacts and self.workspace_manager is not None:
+                self.workspace_manager.detach_event_items(event_id)
 
             if delete_artifacts:
                 attachments = EventAttachment.get_by_event_id(self.db, event_id)
@@ -890,6 +900,11 @@ class CalendarManager:
             should_delete_event = event.source == provider and remaining_link_count == 0
 
             if should_delete_event:
+                if self.workspace_manager is not None:
+                    self.workspace_manager.delete_event_items(
+                        event_id,
+                        delete_files=True,
+                    )
                 attachments = EventAttachment.get_by_event_id(self.db, event_id)
                 for attachment in attachments:
                     if self.file_manager and attachment.file_path:

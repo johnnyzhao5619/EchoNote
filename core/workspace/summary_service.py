@@ -26,6 +26,7 @@ class SummaryService:
         effective_strategy = strategy or preferences["default_summary_strategy"]
         if effective_strategy == "extractive":
             summary_text = self.extractive_engine.generate(TextAIRequest(text=text))
+            self._mark_model_used("extractive-default")
         else:
             summary_text = self._generate_abstractive_summary(text, preferences)
 
@@ -52,8 +53,11 @@ class SummaryService:
                 "Write a concise meeting summary with the most important facts and decisions.\n\n"
                 f"{text}"
             )
-            return engine.generate(TextAIRequest(text=text, prompt=prompt, max_output_tokens=256))
+            generated = engine.generate(TextAIRequest(text=text, prompt=prompt, max_output_tokens=256))
+            self._mark_model_used(model_id)
+            return generated
         except Exception:
+            self._mark_model_used("extractive-default")
             return self.extractive_engine.generate(TextAIRequest(text=text))
 
     def _get_preferences(self) -> dict:
@@ -72,3 +76,10 @@ class SummaryService:
         merged = dict(defaults)
         merged.update(loaded)
         return merged
+
+    def _mark_model_used(self, model_id: str) -> None:
+        if self.model_manager is None:
+            return
+        marker = getattr(self.model_manager, "mark_text_ai_model_used", None)
+        if callable(marker):
+            marker(model_id)

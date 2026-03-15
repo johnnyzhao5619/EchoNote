@@ -222,6 +222,27 @@ CREATE INDEX IF NOT EXISTS idx_trans_model_status
     ON translation_model_downloads (status);
 
 -- ============================================================================
+-- Text AI Model Downloads Table
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS text_ai_model_downloads (
+    model_id       TEXT PRIMARY KEY,
+    runtime        TEXT NOT NULL,
+    provider       TEXT NOT NULL,
+    family         TEXT NOT NULL,
+    status         TEXT NOT NULL DEFAULT 'not_downloaded',
+    download_path  TEXT,
+    size_bytes     INTEGER,
+    downloaded_at  TIMESTAMP,
+    last_used      TIMESTAMP,
+    use_count      INTEGER DEFAULT 0,
+    created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_text_ai_model_status
+    ON text_ai_model_downloads (status);
+
+-- ============================================================================
 -- Initial Data
 -- ============================================================================
 

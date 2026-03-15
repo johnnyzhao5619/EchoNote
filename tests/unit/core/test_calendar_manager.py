@@ -138,13 +138,20 @@ def mock_file_manager():
 
 
 @pytest.fixture
-def calendar_manager(mock_db, mock_sync_adapters, mock_file_manager):
+def mock_workspace_manager():
+    """Create workspace manager mock."""
+    return Mock()
+
+
+@pytest.fixture
+def calendar_manager(mock_db, mock_sync_adapters, mock_file_manager, mock_workspace_manager):
     """Create CalendarManager instance with mocks."""
     return CalendarManager(
         db_connection=mock_db,
         sync_adapters=mock_sync_adapters,
         oauth_manager=None,
         file_manager=mock_file_manager,
+        workspace_manager=mock_workspace_manager,
     )
 
 
@@ -156,6 +163,7 @@ class TestCalendarManagerInitialization:
         assert calendar_manager.db is not None
         assert calendar_manager.sync_adapters is not None
         assert calendar_manager.file_manager is not None
+        assert calendar_manager.workspace_manager is not None
         assert len(calendar_manager.sync_adapters) == 2
 
     def test_init_without_sync_adapters(self, mock_db):
@@ -368,6 +376,10 @@ class TestCalendarManagerDeleteEvent:
                             calendar_manager.delete_event("event_123")
 
                             assert "/path/to/file.txt" in mock_file_manager.deleted_files
+                            calendar_manager.workspace_manager.delete_event_items.assert_called_once_with(
+                                "event_123",
+                                delete_files=True,
+                            )
 
     def test_delete_event_keeps_attachments_when_requested(self, calendar_manager, mock_file_manager):
         """Deleting event-only should preserve attachment rows and files."""
@@ -389,6 +401,7 @@ class TestCalendarManagerDeleteEvent:
         mock_get_attachments.assert_not_called()
         assert mock_file_manager.deleted_files == []
         mock_attachment.delete.assert_not_called()
+        calendar_manager.workspace_manager.detach_event_items.assert_called_once_with("event_123")
 
 
 class TestCalendarManagerGetEvents:
@@ -419,7 +432,6 @@ class TestCalendarManagerGetEvents:
         with patch.object(CalendarEvent, "get_by_time_range", return_value=mock_events):
             events = calendar_manager.get_events(start_date, end_date)
             assert len(events) == 3
-
             call_args = CalendarEvent.get_by_time_range.call_args
             assert call_args is not None
             normalized_start = call_args[0][1]
@@ -429,6 +441,41 @@ class TestCalendarManagerGetEvents:
             # Queries should use timezone-aware UTC bounds to match stored event times.
             assert normalized_start.endswith("+00:00")
             assert normalized_end.endswith("+00:00")
+
+
+class TestCalendarManagerExternalRemoval:
+    """Test provider-side event removal cleanup."""
+
+    def test_remove_external_event_deletes_workspace_items(self, calendar_manager):
+        mock_event = Mock()
+        mock_event.id = "event_123"
+        mock_event.source = CalendarSource.GOOGLE
+
+        mock_link = Mock()
+        mock_link.event_id = "event_123"
+        mock_link.external_id = "google_123"
+
+        with (
+            patch.object(
+                CalendarEventLink,
+                "get_by_provider_and_external_id",
+                return_value=mock_link,
+            ),
+            patch.object(CalendarEvent, "get_by_id", return_value=mock_event),
+            patch.object(CalendarEventLink, "list_for_event", return_value=[]),
+            patch.object(EventAttachment, "get_by_event_id", return_value=[]),
+            patch.object(CalendarEvent, "delete"),
+        ):
+            calendar_manager._remove_external_event(
+                event_id=None,
+                provider=CalendarSource.GOOGLE,
+                external_id="google_123",
+            )
+
+        calendar_manager.workspace_manager.delete_event_items.assert_called_once_with(
+            "event_123",
+            delete_files=True,
+        )
 
     def test_get_events_with_filters(self, calendar_manager):
         """Test getting events with filters."""

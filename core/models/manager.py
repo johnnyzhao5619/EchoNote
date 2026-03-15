@@ -35,7 +35,7 @@ from core.models.translation_registry import (
     TranslationModelRegistry,
 )
 from data.database.connection import DatabaseConnection
-from data.database.models import ModelUsageStats, TranslationModelRecord
+from data.database.models import ModelUsageStats, TextAIModelRecord, TranslationModelRecord
 from utils.gpu_detector import GPUDetector
 from utils.time_utils import current_iso_timestamp
 
@@ -91,6 +91,7 @@ class ModelManager(QObject):
         # 刷新翻译模型本地状态
         self._refresh_translation_states()
 
+        self._ensure_text_ai_record_table()
         self._text_ai_registry = TextAIModelRegistry()
         self._text_ai_models_dir = Path(
             self._config.get(
@@ -691,14 +692,63 @@ class ModelManager(QObject):
     # ------------------------------------------------------------------
 
     def _refresh_text_ai_states(self) -> None:
-        """刷新 Text AI 模型的本地下载状态。"""
+        """刷新 Text AI 模型的本地下载状态和使用统计。"""
+        try:
+            text_ai_stats = {
+                rec.model_id: rec for rec in TextAIModelRecord.get_all(self._database)
+            }
+        except Exception as exc:
+            logger.warning("Failed to load text ai model records: %s", exc)
+            text_ai_stats = {}
+
         for model in self._text_ai_registry.get_all():
             model.ensure_local_state(self._text_ai_models_dir)
+            stats = text_ai_stats.get(model.model_id)
+            if stats:
+                model.use_count = stats.use_count
+                model.last_used = self._parse_datetime(stats.last_used)
+                if stats.downloaded_at:
+                    model.download_date = self._parse_datetime(stats.downloaded_at)
+
             registered = self._text_ai_registry._models.get(model.model_id)
             if registered:
                 registered.local_path = model.local_path
                 registered.is_downloaded = model.is_downloaded
                 registered.download_date = model.download_date
+                registered.use_count = model.use_count
+                registered.last_used = model.last_used
+
+            if stats and stats.status == "downloaded" and not model.is_downloaded:
+                stats.update_status(
+                    self._database,
+                    "not_downloaded",
+                    download_path=None,
+                    size_bytes=None,
+                    downloaded_at=None,
+                )
+            elif model.is_downloaded and model.runtime != "extractive":
+                downloaded_at = (
+                    model.download_date.isoformat() if model.download_date is not None else None
+                )
+                if stats is None:
+                    TextAIModelRecord(
+                        model_id=model.model_id,
+                        runtime=model.runtime,
+                        provider=model.provider,
+                        family=model.family,
+                        status="downloaded",
+                        download_path=model.local_path,
+                        size_bytes=int(model.size_mb * 1024 * 1024),
+                        downloaded_at=downloaded_at,
+                    ).save(self._database)
+                elif stats.status != "downloaded":
+                    stats.update_status(
+                        self._database,
+                        "downloaded",
+                        download_path=model.local_path,
+                        size_bytes=int(model.size_mb * 1024 * 1024),
+                        downloaded_at=downloaded_at,
+                    )
 
     def get_all_text_ai_models(self) -> List[TextAIModelInfo]:
         """返回所有 Text AI 模型信息。"""
@@ -736,16 +786,40 @@ class ModelManager(QObject):
         if model.runtime == "extractive":
             raise ValueError("Builtin extractive engine does not require download")
 
-        def post_cb(_path: Path) -> None:
+        record = TextAIModelRecord.get_by_model_id(
+            self._database, model_id
+        ) or TextAIModelRecord(
+            model_id=model_id,
+            runtime=model.runtime,
+            provider=model.provider,
+            family=model.family,
+        )
+
+        def pre_cb() -> None:
+            record.update_status(self._database, "downloading")
+
+        def post_cb(path: Path) -> None:
+            record.update_status(
+                self._database,
+                "downloaded",
+                download_path=str(path),
+                size_bytes=int(model.size_mb * 1024 * 1024),
+                downloaded_at=current_iso_timestamp(),
+            )
             self._refresh_text_ai_states()
             self.text_ai_models_updated.emit()
 
-        return await self._execute_download(
-            model_id,
-            model,
-            self.text_ai_downloader,
-            post_download_cb=post_cb,
-        )
+        try:
+            return await self._execute_download(
+                model_id,
+                model,
+                self.text_ai_downloader,
+                pre_download_cb=pre_cb,
+                post_download_cb=post_cb,
+            )
+        except Exception:
+            record.update_status(self._database, "failed")
+            raise
 
     def delete_text_ai_model(self, model_id: str) -> bool:
         """删除已下载的 Text AI 模型目录。"""
@@ -761,12 +835,46 @@ class ModelManager(QObject):
             path = Path(model.local_path)
             if path.exists():
                 shutil.rmtree(path, ignore_errors=True)
+            record = TextAIModelRecord.get_by_model_id(self._database, model_id)
+            if record:
+                record.update_status(
+                    self._database,
+                    "not_downloaded",
+                    download_path=None,
+                    size_bytes=None,
+                    downloaded_at=None,
+                )
             self._refresh_text_ai_states()
             self.text_ai_models_updated.emit()
             return True
         except Exception as exc:
             logger.error("Failed to delete text ai model %s: %s", model_id, exc)
             return False
+
+    def mark_text_ai_model_used(self, model_id: str) -> None:
+        """记录 Text AI 模型的使用情况。"""
+        model = self.get_text_ai_model(model_id)
+        if model is None:
+            return
+
+        record = TextAIModelRecord.get_by_model_id(
+            self._database, model_id
+        ) or TextAIModelRecord(
+            model_id=model_id,
+            runtime=model.runtime,
+            provider=model.provider,
+            family=model.family,
+            status="downloaded" if model.is_downloaded else "not_downloaded",
+            download_path=(
+                model.local_path
+                if model.local_path and not model.local_path.startswith("builtin://")
+                else None
+            ),
+            downloaded_at=current_iso_timestamp() if model.is_downloaded else None,
+        )
+        record.mark_used(self._database)
+        self._refresh_text_ai_states()
+        self.text_ai_models_updated.emit()
 
     def _on_translation_download_completed(self, name: str) -> None:
         logger.info("Translation model download completed: %s", name)
@@ -788,4 +896,31 @@ class ModelManager(QObject):
 
     def _on_text_ai_download_failed(self, name: str, error: str) -> None:
         logger.error("Text AI model download failed for %s: %s", name, error)
+        record = TextAIModelRecord.get_by_model_id(self._database, name)
+        if record:
+            record.update_status(self._database, "failed")
         self.text_ai_models_updated.emit()
+
+    def _ensure_text_ai_record_table(self) -> None:
+        """Ensure text ai model record table exists for existing databases."""
+        self._database.execute_script(
+            """
+            CREATE TABLE IF NOT EXISTS text_ai_model_downloads (
+                model_id       TEXT PRIMARY KEY,
+                runtime        TEXT NOT NULL,
+                provider       TEXT NOT NULL,
+                family         TEXT NOT NULL,
+                status         TEXT NOT NULL DEFAULT 'not_downloaded',
+                download_path  TEXT,
+                size_bytes     INTEGER,
+                downloaded_at  TIMESTAMP,
+                last_used      TIMESTAMP,
+                use_count      INTEGER DEFAULT 0,
+                created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_text_ai_model_status
+                ON text_ai_model_downloads (status);
+            """,
+            commit=True,
+        )

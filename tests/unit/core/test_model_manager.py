@@ -16,6 +16,10 @@ def _build_config(
     def _get(key, default=None):
         if key == "transcription.faster_whisper.model_dir":
             return str(models_dir)
+        if key == "translation.models_dir":
+            return str(models_dir.parent / "translation_models")
+        if key == "text_ai.models_dir":
+            return str(models_dir.parent / "text_ai_models")
         if key == "transcription.default_engine":
             return default_engine
         if key == "transcription.faster_whisper.model_size":
@@ -118,3 +122,18 @@ def test_model_manager_lists_text_ai_models(_mock_usage, _mock_trans, tmp_path):
     models = manager.get_all_text_ai_models()
 
     assert any(model.model_id == "flan-t5-small-int8" for model in models)
+
+
+def test_model_manager_tracks_text_ai_model_usage(tmp_path):
+    from data.database.connection import DatabaseConnection
+
+    db = DatabaseConnection(str(tmp_path / "models.db"))
+    db.initialize_schema()
+    manager = ModelManager(_build_config(tmp_path / "models"), db)
+
+    manager.mark_text_ai_model_used("extractive-default")
+
+    model = manager.get_text_ai_model("extractive-default")
+    assert model is not None
+    assert model.use_count == 1
+    assert model.last_used is not None

@@ -25,7 +25,6 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 
 from core.calendar.exceptions import SyncError
-from data.database.models import EventAttachment
 from core.qt_imports import QFileDialog, QMessageBox
 from ui.constants import (
     CALENDAR_DELETE_ACTION_BUTTON_MIN_WIDTH,
@@ -81,21 +80,22 @@ def _build_export_payload(event: Any, calendar_manager: Any) -> dict:
     event_id = str(getattr(event, "id", ""))
     attachments_payload = []
 
-    db = getattr(calendar_manager, "db", None)
-    if db and event_id:
+    workspace_manager = getattr(calendar_manager, "workspace_manager", None)
+    if workspace_manager and event_id:
         try:
-            attachments = EventAttachment.get_by_event_id(db, event_id)
+            artifacts = workspace_manager.get_event_artifacts(event_id)
         except Exception as exc:  # pragma: no cover - defensive
-            logger.warning("Failed to load attachments for event %s: %s", event_id, exc)
+            logger.warning("Failed to load workspace artifacts for event %s: %s", event_id, exc)
         else:
-            for attachment in attachments:
+            for asset in artifacts.get("attachments", []):
                 attachments_payload.append(
                     {
-                        "id": getattr(attachment, "id", ""),
-                        "attachment_type": getattr(attachment, "attachment_type", ""),
-                        "file_path": getattr(attachment, "file_path", ""),
-                        "file_size": getattr(attachment, "file_size", None),
-                        "created_at": _as_iso(getattr(attachment, "created_at", "")),
+                        "id": asset.get("id", ""),
+                        "asset_role": asset.get("type", ""),
+                        "file_path": asset.get("path", ""),
+                        "file_size": asset.get("size"),
+                        "created_at": _as_iso(asset.get("created_at", "")),
+                        "text_content": asset.get("text_content"),
                     }
                 )
 

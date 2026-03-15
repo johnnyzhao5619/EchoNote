@@ -132,6 +132,9 @@ class MeetingBriefService:
                 f"Template: {template}\n\n{text}"
             )
             generated = engine.generate(TextAIRequest(text=text, prompt=prompt, max_output_tokens=512))
+            marker = getattr(self.model_manager, "mark_text_ai_model_used", None)
+            if callable(marker):
+                marker(model_id)
             parsed = self._parse_structured_output(generated)
             return parsed or None
         except Exception:

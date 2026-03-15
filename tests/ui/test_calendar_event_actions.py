@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from ui.calendar_event_actions import confirm_and_delete_event
+from ui.calendar_event_actions import _build_export_payload, confirm_and_delete_event
 
 pytestmark = pytest.mark.ui
 
@@ -75,3 +75,34 @@ def test_confirm_and_delete_event_can_keep_artifacts(mock_i18n):
 
     assert result is True
     calendar_manager.delete_event.assert_called_once_with("evt-2", delete_artifacts=False)
+
+
+def test_build_export_payload_uses_workspace_assets():
+    workspace_manager = MagicMock()
+    workspace_manager.get_event_artifacts.return_value = {
+        "attachments": [
+            {
+                "id": "asset-1",
+                "type": "transcript",
+                "path": "/tmp/transcript.txt",
+                "size": 42,
+                "created_at": "2026-03-15T01:00:00+00:00",
+                "text_content": "hello",
+            }
+        ]
+    }
+    calendar_manager = SimpleNamespace(workspace_manager=workspace_manager)
+    event = SimpleNamespace(id="evt-3", title="Export", is_readonly=False)
+
+    payload = _build_export_payload(event, calendar_manager)
+
+    assert payload["attachments"] == [
+        {
+            "id": "asset-1",
+            "asset_role": "transcript",
+            "file_path": "/tmp/transcript.txt",
+            "file_size": 42,
+            "created_at": "2026-03-15T01:00:00+00:00",
+            "text_content": "hello",
+        }
+    ]

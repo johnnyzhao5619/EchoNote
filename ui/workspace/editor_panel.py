@@ -76,6 +76,32 @@ WORKSPACE_EDITOR_ROLE_SET = EditorRoleSet(
     search=ROLE_TOOLBAR_SECONDARY_ACTION,
 )
 
+WORKSPACE_ASSET_LABELS = {
+    "document_text": "Document",
+    "transcript": "Transcript",
+    "translation": "Translation",
+    "summary": "Summary",
+    "meeting_brief": "Meeting Brief",
+    "decisions": "Decisions",
+    "action_items": "Action Items",
+    "next_steps": "Next Steps",
+    "outline": "Outline",
+    "source_document": "Source Document",
+}
+
+WORKSPACE_ASSET_ORDER = {
+    "document_text": 0,
+    "transcript": 1,
+    "translation": 2,
+    "summary": 3,
+    "meeting_brief": 4,
+    "decisions": 5,
+    "action_items": 6,
+    "next_steps": 7,
+    "outline": 8,
+    "source_document": 9,
+}
+
 
 class TextEditorPanel(BaseWidget):
     """Shared text editor with search, edit, save, copy, and export actions."""
@@ -405,7 +431,15 @@ class WorkspaceEditorPanel(TextEditorPanel):
 
         if item is not None:
             assets = self.workspace_manager.get_assets(item.id)
-            self._text_assets = [asset for asset in assets if self.workspace_manager.read_asset_text(asset)]
+            self._text_assets = [
+                asset for asset in assets if self.workspace_manager.read_asset_text(asset)
+            ]
+            self._text_assets.sort(
+                key=lambda asset: (
+                    WORKSPACE_ASSET_ORDER.get(asset.asset_role, 999),
+                    asset.created_at or "",
+                )
+            )
             preferred_id = getattr(item, "primary_text_asset_id", None)
             selected_index = 0
             for index, asset in enumerate(self._text_assets):
@@ -483,7 +517,10 @@ class WorkspaceEditorPanel(TextEditorPanel):
                 break
 
     def _label_for_asset(self, asset) -> str:
-        role_label = asset.asset_role.replace("_", " ").title()
+        role_label = WORKSPACE_ASSET_LABELS.get(
+            asset.asset_role,
+            asset.asset_role.replace("_", " ").title(),
+        )
         file_name = Path(asset.file_path).name if asset.file_path else role_label
         return f"{role_label}: {file_name}"
 
