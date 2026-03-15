@@ -17,9 +17,15 @@ class _MainWindowStub(QWidget):
         self.current_page_name = None
         self.open_calls = []
 
-    def open_workspace_item(self, *, item_id: str, asset_role: str | None = None) -> bool:
+    def open_workspace_item(
+        self,
+        *,
+        item_id: str,
+        asset_role: str | None = None,
+        view_mode: str | None = None,
+    ) -> bool:
         self.current_page_name = "workspace"
-        self.open_calls.append((item_id, asset_role))
+        self.open_calls.append((item_id, asset_role, view_mode))
         return True
 
 
@@ -47,7 +53,9 @@ def test_timeline_widget_delete_event_uses_shared_flow(qapp, mock_i18n, mock_set
     assert mock_flow.call_count == 1
 
 
-def test_timeline_open_transcript_routes_to_workspace_item(qapp, mock_i18n, mock_settings_manager):
+def test_timeline_event_view_workspace_route_for_transcript(
+    qapp, mock_i18n, mock_settings_manager
+):
     timeline_manager = MagicMock()
     timeline_manager.calendar_manager = MagicMock()
     timeline_manager.workspace_manager = MagicMock()
@@ -69,5 +77,5 @@ def test_timeline_open_transcript_routes_to_workspace_item(qapp, mock_i18n, mock
     widget._on_view_transcript(event_id="event-1")
 
     assert main_window.current_page_name == "workspace"
-    assert main_window.open_calls == [("workspace-item-1", "transcript")]
+    assert main_window.open_calls == [("workspace-item-1", "transcript", "event")]
     mock_viewer.assert_not_called()

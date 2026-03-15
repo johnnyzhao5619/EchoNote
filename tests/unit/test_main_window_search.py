@@ -129,6 +129,7 @@ def test_open_workspace_item_switches_page_and_focuses_item():
         fake_window,
         item_id="workspace-item-1",
         asset_role="translation",
+        view_mode="event",
     )
 
     assert result is True
@@ -136,4 +137,5 @@ def test_open_workspace_item_switches_page_and_focuses_item():
     workspace_page.open_item.assert_called_once_with(
         "workspace-item-1",
         asset_role="translation",
+        view_mode="event",
     )

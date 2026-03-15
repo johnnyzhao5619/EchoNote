@@ -579,13 +579,19 @@ class MainWindow(QMainWindow):
         """Expose the current page name for page-routing callers/tests."""
         return self.current_page
 
-    def open_workspace_item(self, *, item_id: str, asset_role: Optional[str] = None) -> bool:
+    def open_workspace_item(
+        self,
+        *,
+        item_id: str,
+        asset_role: Optional[str] = None,
+        view_mode: Optional[str] = None,
+    ) -> bool:
         """Switch to workspace and focus a specific item/asset when possible."""
         workspace_page = self.pages.get("workspace")
         if workspace_page is None or not hasattr(workspace_page, "open_item"):
             return False
         self.switch_page("workspace")
-        return bool(workspace_page.open_item(item_id, asset_role=asset_role))
+        return bool(workspace_page.open_item(item_id, asset_role=asset_role, view_mode=view_mode))
 
     def _get_page_title(self, page_name: str) -> str:
         """Get translated page title by page name."""

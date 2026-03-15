@@ -102,15 +102,26 @@ class WorkspaceWidget(BaseWidget):
         else:
             self._clear_document_stage()
 
-    def open_item(self, item_id: str, asset_role: str | None = None) -> bool:
+    def open_item(
+        self,
+        item_id: str,
+        asset_role: str | None = None,
+        view_mode: str | None = None,
+    ) -> bool:
         """Refresh and focus a specific workspace item."""
+        if view_mode and self.library_panel.current_view_mode() != view_mode:
+            self.library_panel.set_view_mode(view_mode)
+            self.refresh_items()
         if item_id not in self._items_by_id:
             item = self.workspace_manager.get_item(item_id)
             if item is None:
                 return False
-            self.library_panel.set_view_mode("structure")
-            self.library_panel.select_folder(getattr(item, "folder_id", None))
-            self.refresh_items()
+            if view_mode == "event":
+                self.refresh_items()
+            else:
+                self.library_panel.set_view_mode("structure")
+                self.library_panel.select_folder(getattr(item, "folder_id", None))
+                self.refresh_items()
         item = self._items_by_id.get(item_id)
         if item is None:
             return False
