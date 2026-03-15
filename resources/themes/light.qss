@@ -828,6 +828,18 @@ QWidget[role="workspace-surface"] {
     background-color: #f4f6fb;
 }
 
+QWidget[role="workspace-library-panel"],
+QWidget[role="workspace-inspector-panel"] {
+    background-color: #ffffff;
+    border: 1px solid #d9deea;
+    border-radius: 12px;
+}
+
+QWidget[role="realtime-recording-dock"] {
+    background-color: #ffffff;
+    border-top: 1px solid #d9deea;
+}
+
 QListWidget[role="workspace-item-list"] {
     background-color: #ffffff;
     border: 1px solid #d9deea;

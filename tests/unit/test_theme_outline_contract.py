@@ -193,6 +193,26 @@ def test_theme_outline_covers_workspace_roles():
     assert not missing_roles, f"Theme outline is missing workspace roles: {missing_roles}"
 
 
+def test_theme_outline_covers_recording_dock_and_document_tab_roles():
+    outline = _load_theme_outline()
+    selectors = {
+        selector
+        for section in outline.get("sections", [])
+        for selector in section.get("selectors", [])
+    }
+    expected_selectors = {
+        'QWidget[role="realtime-recording-dock"]',
+        'QWidget[role="workspace-library-panel"]',
+        'QWidget[role="workspace-inspector-panel"]',
+        "QTabWidget::pane",
+        "QTabBar::tab",
+        "QTabBar::tab:selected",
+        "QTabBar::tab:hover",
+    }
+    missing = sorted(expected_selectors - selectors)
+    assert not missing, f"Theme outline is missing recording dock/document tab selectors: {missing}"
+
+
 def test_all_themes_share_identical_role_sets():
     outline = _load_theme_outline()
     theme_names = _theme_names_from_outline(outline)

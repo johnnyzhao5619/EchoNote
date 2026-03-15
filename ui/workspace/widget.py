@@ -81,6 +81,22 @@ class WorkspaceWidget(BaseWidget):
 
         layout.addWidget(self.toolbar)
         layout.addWidget(content_splitter, 1)
+        self.update_translations()
+
+    def update_translations(self) -> None:
+        self.toolbar.update_translations()
+        self.library_panel.update_translations()
+        self.inspector_panel.update_translations()
+        self.open_current_item_in_window_action.setText(
+            self.i18n.t("workspace.open_in_new_window")
+        )
+        self.open_current_item_in_window_action.setToolTip(
+            self.i18n.t("workspace.open_in_new_window")
+        )
+        for index in range(self.document_tabs.count()):
+            editor_panel = self.document_tabs.widget(index)
+            if hasattr(editor_panel, "update_translations"):
+                editor_panel.update_translations()
 
     def refresh_items(self) -> None:
         current_item_id = self.library_panel.current_item_id()

@@ -1,5 +1,5 @@
 {
-  "version": 5,
+  "version": 6,
   "description": "I18n outline contract for translation file structure parity.",
   "base_locale": "zh_CN",
   "locales": [
@@ -34,5 +34,15 @@
     "loopback",
     "wizard",
     "constants"
-  ]
+  ],
+  "required_nested_keys": {
+    "workspace": [
+      "structure_view",
+      "event_view",
+      "open_in_new_window",
+      "add_marker",
+      "delete_failed",
+      "no_workspace_item"
+    ]
+  }
 }

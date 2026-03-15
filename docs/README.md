@@ -36,12 +36,13 @@ For contributors and developers:
 - **[CI/CD Guide](CI_CD_GUIDE.md)** - Continuous integration and deployment
 - **[Implementation Plans](plans/)** - Active architecture and rollout plans for multi-step feature work
 - Unified workspace architecture note: `core/workspace/` is now the single asset layer for imported documents, batch transcriptions, realtime recordings, summaries, and meeting briefs; the desktop entry lives in `ui/workspace/`.
-- Workspace interaction note: the `ui/workspace/` page now owns the top create-entry toolbar, the long-lived asset library, the in-page batch transcription/translation task queue, and the primary realtime recording controls, reusing the legacy batch task components inside the hard-switched workspace shell.
+- Workspace interaction note: the `ui/workspace/` page now owns the top create-entry toolbar, the structure/event dual-view library, folder operations, the in-page batch transcription/translation task queue, the card-based multi-document editor, and detached document windows.
+- Shell recording note: the primary realtime recording entry is now the persistent dock in `ui/common/realtime_recording_dock.py`, with `ui/workspace/recording_session_panel.py` providing the shared full panel and `ui/realtime_record/` reduced to floating overlay and visualization helpers.
 - Model governance note: `core/models/manager.py` now governs `speech` / `translation` / `text-ai` catalogs together, with workspace defaults exposed in `ui/settings/workspace_ai_page.py`.
 - Settings ownership note: translation defaults are managed in `ui/settings/translation_page.py`, realtime recording controls remain in `ui/settings/realtime_page.py`, and workspace summary/meeting preferences live in `ui/settings/workspace_ai_page.py`.
 - Shared playback architecture note: reusable audio playback lives in `ui/common/audio_player.py` and is opened via `ui/common/audio_player_launcher.py`.
 - Shared delete-flow note: calendar hub and timeline both use `ui/calendar_event_actions.py` so event deletion copy and workspace cleanup choices stay consistent.
-- Shared routing note: timeline and calendar artifact actions now route into `MainWindow.open_workspace_item()` first, so transcript/translation/audio viewing prefers the unified workspace over ad-hoc modal viewers.
+- Shared routing note: timeline and calendar artifact actions now route into `MainWindow.open_workspace_item()` first, switching between structure/event workspace views before focusing transcript/translation/audio assets, so viewing prefers the unified workspace over ad-hoc modal viewers.
 
 ---
 
