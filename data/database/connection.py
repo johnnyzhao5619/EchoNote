@@ -28,6 +28,13 @@ from typing import Optional
 
 logger = logging.getLogger("echonote.database")
 
+CURRENT_SCHEMA_VERSION = 4
+REQUIRED_SCHEMA_TABLES = (
+    "workspace_items",
+    "workspace_assets",
+    "text_ai_model_downloads",
+)
+
 
 class DatabaseConnection:
     """
@@ -302,10 +309,35 @@ class DatabaseConnection:
         )
         if has_app_settings:
             # Ensure the schema_version matches the current schema.sql definition.
-            self.set_version(3)
-            logger.info("Database schema initialized successfully to version 3")
+            self.set_version(CURRENT_SCHEMA_VERSION)
+            logger.info(
+                "Database schema initialized successfully to version %s",
+                CURRENT_SCHEMA_VERSION,
+            )
         else:
             logger.info("Database schema initialized successfully without app_settings table")
+
+    def ensure_schema_current(self, schema_path: Optional[str] = None) -> bool:
+        """
+        Ensure the live database contains the current required schema.
+
+        Returns:
+            True if schema initialization/upgrade was executed, otherwise False.
+        """
+        schema_version = self.get_version()
+        missing_tables = self.get_missing_required_tables()
+        if schema_version >= CURRENT_SCHEMA_VERSION and not missing_tables:
+            logger.info("Database schema already up to date at version %s", schema_version)
+            return False
+
+        logger.info(
+            "Applying schema update. current_version=%s missing_tables=%s target_version=%s",
+            schema_version,
+            missing_tables,
+            CURRENT_SCHEMA_VERSION,
+        )
+        self.initialize_schema(schema_path=schema_path)
+        return True
 
     def get_version(self) -> int:
         """
@@ -347,6 +379,18 @@ class DatabaseConnection:
             commit=True,
         )
         logger.info(f"Database schema version set to {version}")
+
+    def has_table(self, table_name: str) -> bool:
+        """Return whether a table exists in the current database."""
+        result = self.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name = ?",
+            (table_name,),
+        )
+        return bool(result)
+
+    def get_missing_required_tables(self) -> list[str]:
+        """Return required schema tables that are currently missing."""
+        return [table_name for table_name in REQUIRED_SCHEMA_TABLES if not self.has_table(table_name)]
 
     def close(self):
         """Close the database connection for the current thread."""

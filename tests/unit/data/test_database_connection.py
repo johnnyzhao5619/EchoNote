@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from data.database.connection import DatabaseConnection
+from data.database.connection import CURRENT_SCHEMA_VERSION, DatabaseConnection
 
 
 class TestDatabaseConnectionInitialization:
@@ -269,7 +269,7 @@ class TestDatabaseSchemaOperations:
         result = db.execute("SELECT name FROM sqlite_master WHERE type='table'")
         table_names = [row["name"] for row in result]
         assert len(table_names) > 0
-        assert db.get_version() == 3
+        assert db.get_version() == CURRENT_SCHEMA_VERSION
 
     def test_initialize_schema_custom_path(self, tmp_path):
         """Test schema initialization with custom path."""
@@ -336,6 +336,37 @@ class TestDatabaseSchemaOperations:
 
         version = db.get_version()
         assert version == 10
+
+    def test_ensure_schema_current_upgrades_existing_database_with_missing_workspace_tables(
+        self, tmp_path
+    ):
+        """Existing databases should be upgraded even when schema_version is already set."""
+        db_path = tmp_path / "legacy.db"
+        db = DatabaseConnection(str(db_path))
+
+        db.execute(
+            "CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT, updated_at TEXT)",
+            commit=True,
+        )
+        db.execute(
+            "INSERT INTO app_settings VALUES ('schema_version', '2', '2024-01-01')",
+            commit=True,
+        )
+        db.execute(
+            "CREATE TABLE calendar_events (id TEXT PRIMARY KEY, title TEXT, event_type TEXT, "
+            "start_time TEXT, end_time TEXT, location TEXT, attendees TEXT, description TEXT, "
+            "reminder_minutes INTEGER, reminder_use_default BOOLEAN, recurrence_rule TEXT, "
+            "source TEXT, external_id TEXT, is_readonly BOOLEAN, created_at TEXT, updated_at TEXT)",
+            commit=True,
+        )
+
+        upgraded = db.ensure_schema_current()
+
+        assert upgraded is True
+        assert db.get_version() == CURRENT_SCHEMA_VERSION
+        assert db.has_table("workspace_items")
+        assert db.has_table("workspace_assets")
+        assert db.has_table("text_ai_model_downloads")
 
 
 class TestDatabaseMaintenanceOperations:

@@ -144,12 +144,8 @@ def initialize_database(config, security_manager):
 
     logger.info("Database connection initialized")
 
-    # Check if schema needs initialization
-    schema_version = db.get_version()
-    if schema_version == 0:
-        db.initialize_schema()
-    else:
-        logger.info(f"Database schema version: {schema_version}")
+    # Always reconcile the live database against the current schema contract.
+    db.ensure_schema_current()
 
     return db
 

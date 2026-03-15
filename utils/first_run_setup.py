@@ -330,9 +330,8 @@ class FirstRunSetup:
             db_encryption_key = security_manager.encryption_key[:32].hex()
             db = DatabaseConnection(str(db_path), encryption_key=db_encryption_key)
 
-            # Unified initialization logic handles versioning
-            if db.get_version() == 0:
-                db.initialize_schema()
+            # Unified initialization logic handles fresh init and schema upgrades.
+            db.ensure_schema_current()
 
             encryption_active = db.is_encryption_enabled()
             if not encryption_active:
