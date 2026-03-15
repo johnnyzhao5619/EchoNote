@@ -36,7 +36,7 @@
   - `engines/translation/`：翻译引擎。
   - `engines/text_ai/`：本地文本 AI 能力（extractive、ONNX 摘要、GGUF 会议整理 runtime）。
 - `ui/`：桌面端界面层（PySide6）。
-  - `ui/workspace/`：统一 workspace 工作台（资产列表、文本编辑、录音回放、AI 操作）。
+  - `ui/workspace/`：统一 workspace 工作台（顶部创建入口、批量任务队列、集合筛选、资产列表、文本编辑、录音控制与回放、AI 操作）。
   - `ui/realtime_record/`：实时录音浮动窗与音频可视化组件（页面入口已并入 `ui/workspace/`）。
   - `ui/timeline/`：时间线页面与事件卡片（`widget.py`、`event_card.py`、`transcript_viewer.py`）。
   - `ui/settings/`：设置页面（含 `translation_page.py` 与 `workspace_ai_page.py` 独立默认设置页）。
@@ -58,6 +58,8 @@
 ## 常用定位建议
 
 - 查“统一工作台/文档资产”：优先看 `core/workspace/` + `ui/workspace/` + `data/database/models.py`。
+- 查“工作台批量转写/转译任务”：优先看 `ui/workspace/task_panel.py` + `core/transcription/manager.py` + `ui/batch_transcribe/task_item.py` + `ui/batch_transcribe/transcript_viewer.py`。
+- 查“工作台创建入口/录音主控”：优先看 `ui/workspace/toolbar.py` + `ui/workspace/recording_control_panel.py` + `core/realtime/recorder.py` + `core/workspace/manager.py`。
 - 查“实时录音/浮动窗”：优先看 `ui/realtime_record/` + `core/realtime/` + `resources/themes/*qss`；录音落盘与资产发布再看 `core/workspace/manager.py`。
 - 查“时间线音频播放”：优先看 `ui/common/audio_player.py` + `ui/common/audio_player_launcher.py` + `ui/timeline/widget.py`。
 - 查“本地摘要/会议整理/Text AI”：优先看 `engines/text_ai/` + `core/workspace/summary_service.py` + `core/workspace/meeting_brief_service.py` + `core/models/manager.py`。
@@ -68,6 +70,9 @@
 ## 功能关键词到文件路径（快速索引）
 
 - 统一工作台入口：`ui/workspace/widget.py`、`ui/main_window.py`、`ui/navigation.py`
+- 工作台顶部入口与录音主控：`ui/workspace/toolbar.py`、`ui/workspace/recording_control_panel.py`、`core/realtime/recorder.py`、`core/workspace/manager.py`
+- 工作台批量任务区：`ui/workspace/task_panel.py`、`core/transcription/manager.py`、`ui/batch_transcribe/task_item.py`、`ui/batch_transcribe/transcript_viewer.py`
+- 工作台集合筛选与条目元信息：`ui/workspace/item_list.py`、`core/workspace/manager.py`、`data/database/models.py`
 - 统一工作台资产层：`core/workspace/manager.py`、`core/workspace/import_service.py`、`data/database/models.py`
 - 文档导入与解析：`core/workspace/document_parser.py`、`core/workspace/import_service.py`、`tests/unit/core/test_workspace_manager.py`
 - 本地摘要与会议整理：`core/workspace/summary_service.py`、`core/workspace/meeting_brief_service.py`、`engines/text_ai/`
@@ -79,6 +84,8 @@
 - 翻译默认设置：`ui/settings/translation_page.py`、`core/settings/manager.py`、`config/default_config.json`
 - Workspace AI 默认设置：`ui/settings/workspace_ai_page.py`、`core/settings/manager.py`、`config/default_config.json`
 - 时间线音频播放器：`ui/common/audio_player.py`、`ui/common/audio_player_launcher.py`、`ui/timeline/transcript_viewer.py`、`tests/ui/test_timeline_audio_player.py`
+- 事件删除与 workspace 清理提示：`ui/calendar_event_actions.py`、`core/calendar/manager.py`、`core/workspace/manager.py`、`tests/ui/test_calendar_event_actions.py`
+- 时间线/日历跳转工作台：`ui/timeline/widget.py`、`ui/calendar_hub/widget.py`、`ui/main_window.py`、`ui/workspace/widget.py`
 - 翻译引擎接入：`utils/app_initializer.py`、`engines/translation/`、`core/realtime/recorder.py`
 - Text AI 引擎接入：`utils/app_initializer.py`、`engines/text_ai/`、`core/workspace/summary_service.py`
 - 版本号与发布：`config/__version__.py`、`CHANGELOG.md`、`scripts/build_config.py`、`pyproject.toml`

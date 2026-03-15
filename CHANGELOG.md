@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cleaned remaining workspace lifecycle gaps: primary text/audio references are now maintained centrally, calendar delete/provider-removal flows now detach or remove workspace assets correctly, and calendar export/auto-transcribe now read workspace artifacts instead of legacy attachment rows.
 - Hardened local Text AI execution and governance: ONNX summaries now support a real greedy seq2seq path with extractive fallback, `text-ai` download/usage records persist across sessions, and workspace summary/meeting flows now record actual model usage.
 - Stabilized workspace editor asset presentation with explicit role labels and deterministic ordering instead of ad-hoc `title()` humanization.
+- Restored batch transcription/translation queue visibility inside `ui/workspace/` by embedding a dedicated task panel with file/folder import, pasted-text translation, task progress, retry/cancel/delete, and result viewing/export.
+- Refined shared event deletion copy so calendar hub and timeline now explicitly explain the difference between deleting the event only and cleaning linked workspace assets, including the promise that preserved assets remain visible in Workspace after detaching.
+- Added a unified workspace toolbar and in-page realtime recording controls so document import, note creation, recording, playback, and task orchestration now live in a single Notes-style shell.
+- Added workspace collections (`all/recordings/documents/orphaned/recent`), lightweight list metadata, and orphaned-item retention semantics so preserved event artifacts remain manageable after detaching from calendar events.
+- Routed timeline/calendar artifact actions through `MainWindow.open_workspace_item()` first, with modal viewers kept only as fallback when a workspace item cannot be resolved.
 
 ## [2.1.0] - 2026-03-15
 

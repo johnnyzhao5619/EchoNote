@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 5,
   "description": "I18n outline contract for translation file structure parity.",
   "base_locale": "zh_CN",
   "locales": [

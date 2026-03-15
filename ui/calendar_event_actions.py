@@ -146,14 +146,59 @@ def _export_event_snapshot(
     return str(target_path)
 
 
-def _choose_delete_action(parent: Any, i18n: Any, event: Any) -> str:
+def _get_cleanup_summary(calendar_manager: Any, event_id: str) -> dict:
+    workspace_manager = getattr(calendar_manager, "workspace_manager", None)
+    if workspace_manager is None or not event_id:
+        return {
+            "event_id": event_id,
+            "has_workspace_assets": False,
+            "linked_item_count": 0,
+            "linked_asset_count": 0,
+            "asset_roles": [],
+        }
+
+    try:
+        return workspace_manager.get_event_cleanup_summary(event_id)
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning("Failed to summarize workspace cleanup for event %s: %s", event_id, exc)
+        return {
+            "event_id": event_id,
+            "has_workspace_assets": False,
+            "linked_item_count": 0,
+            "linked_asset_count": 0,
+            "asset_roles": [],
+        }
+
+
+def _build_delete_copy(i18n: Any, event: Any, cleanup_summary: dict) -> dict[str, str]:
+    asset_roles = cleanup_summary.get("asset_roles") or []
+    asset_roles_label = ", ".join(asset_roles) if asset_roles else i18n.t("common.none")
+    has_workspace_assets = bool(cleanup_summary.get("has_workspace_assets"))
+    hint_key = (
+        "calendar.delete.confirm_hint_with_workspace"
+        if has_workspace_assets
+        else "calendar.delete.confirm_hint_without_workspace"
+    )
+    return {
+        "message": i18n.t("calendar.delete.confirm_message", title=getattr(event, "title", "")),
+        "hint": i18n.t(
+            hint_key,
+            item_count=cleanup_summary.get("linked_item_count", 0),
+            asset_count=cleanup_summary.get("linked_asset_count", 0),
+            asset_roles=asset_roles_label,
+        ),
+    }
+
+
+def _choose_delete_action(parent: Any, i18n: Any, event: Any, cleanup_summary: dict) -> str:
     dialog = QMessageBox(parent)
     dialog.setIcon(QMessageBox.Icon.Warning)
     dialog.setOption(QMessageBox.Option.DontUseNativeDialog, True)
     dialog.setMinimumWidth(CALENDAR_DELETE_DIALOG_MIN_WIDTH)
     dialog.setWindowTitle(i18n.t("calendar.delete.confirm_title"))
-    dialog.setText(i18n.t("calendar.delete.confirm_message", title=getattr(event, "title", "")))
-    dialog.setInformativeText(i18n.t("calendar.delete.confirm_hint"))
+    copy = _build_delete_copy(i18n, event, cleanup_summary)
+    dialog.setText(copy["message"])
+    dialog.setInformativeText(copy["hint"])
 
     export_btn = dialog.addButton(
         i18n.t("calendar.delete.export_then_delete"),
@@ -192,11 +237,16 @@ def _choose_delete_action(parent: Any, i18n: Any, event: Any) -> str:
     return _ACTION_CANCEL
 
 
-def _confirm_delete_second_step(parent: Any, i18n: Any, event: Any) -> bool:
+def _confirm_delete_second_step(parent: Any, i18n: Any, event: Any, action: str) -> bool:
+    message_key = (
+        "calendar.delete.second_confirm_keep_workspace"
+        if action == _ACTION_DELETE_EVENT_ONLY
+        else "calendar.delete.second_confirm_delete_workspace"
+    )
     reply = QMessageBox.question(
         parent,
         i18n.t("calendar.delete.second_confirm_title"),
-        i18n.t("calendar.delete.second_confirm_message", title=getattr(event, "title", "")),
+        i18n.t(message_key, title=getattr(event, "title", "")),
         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         QMessageBox.StandardButton.No,
     )
@@ -229,7 +279,8 @@ def confirm_and_delete_event(
         _show_warning(parent, i18n.t("common.warning"), i18n.t("calendar.error.event_not_found"))
         return False
 
-    action = _choose_delete_action(parent, i18n, event)
+    cleanup_summary = _get_cleanup_summary(calendar_manager, event_id)
+    action = _choose_delete_action(parent, i18n, event, cleanup_summary)
     if action == _ACTION_CANCEL:
         return False
 
@@ -254,7 +305,7 @@ def confirm_and_delete_event(
             i18n.t("calendar.success.event_exported", path=export_path),
         )
 
-    if not _confirm_delete_second_step(parent, i18n, event):
+    if not _confirm_delete_second_step(parent, i18n, event, action):
         return False
 
     try:

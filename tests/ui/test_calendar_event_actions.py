@@ -6,7 +6,11 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from ui.calendar_event_actions import _build_export_payload, confirm_and_delete_event
+from ui.calendar_event_actions import (
+    _build_delete_copy,
+    _build_export_payload,
+    confirm_and_delete_event,
+)
 
 pytestmark = pytest.mark.ui
 
@@ -106,3 +110,27 @@ def test_build_export_payload_uses_workspace_assets():
             "text_content": "hello",
         }
     ]
+
+
+def test_build_delete_copy_uses_workspace_summary_when_assets_exist():
+    class StubI18n:
+        def t(self, key, **kwargs):
+            return f"{key}|{kwargs}"
+
+    event = SimpleNamespace(id="evt-4", title="Delete", is_readonly=False)
+
+    copy = _build_delete_copy(
+        StubI18n(),
+        event,
+        {
+            "has_workspace_assets": True,
+            "linked_item_count": 2,
+            "linked_asset_count": 5,
+            "asset_roles": ["audio", "transcript", "translation"],
+        },
+    )
+
+    assert copy["message"] == "calendar.delete.confirm_message|{'title': 'Delete'}"
+    assert "calendar.delete.confirm_hint_with_workspace" in copy["hint"]
+    assert "'item_count': 2" in copy["hint"]
+    assert "'asset_count': 5" in copy["hint"]
