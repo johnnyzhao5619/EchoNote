@@ -115,3 +115,25 @@ def test_resolve_search_target_matches_workspace_entry():
     fake_window._resolve_settings_category = lambda _query: None
 
     assert MainWindow._resolve_search_target(fake_window, "workspace") == "workspace"
+
+
+def test_open_workspace_item_switches_page_and_focuses_item():
+    workspace_page = Mock()
+    workspace_page.open_item = Mock(return_value=True)
+
+    fake_window = Mock()
+    fake_window.pages = {"workspace": workspace_page}
+    fake_window.switch_page = Mock()
+
+    result = MainWindow.open_workspace_item(
+        fake_window,
+        item_id="workspace-item-1",
+        asset_role="translation",
+    )
+
+    assert result is True
+    fake_window.switch_page.assert_called_once_with("workspace")
+    workspace_page.open_item.assert_called_once_with(
+        "workspace-item-1",
+        asset_role="translation",
+    )

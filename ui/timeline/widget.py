@@ -897,6 +897,12 @@ class TimelineWidget(BaseWidget):
         """
         transcript_path = None
         translation_path = None
+        if self._open_workspace_item_for_artifact(
+            event_id=event_id,
+            file_path=file_path,
+            asset_role="audio",
+        ):
+            return
         if event_id:
             card = self.get_event_card_by_id(event_id)
             if card:
@@ -953,8 +959,16 @@ class TimelineWidget(BaseWidget):
             return None, file_path
         return file_path, None
 
-    def _on_view_transcript(self, file_path: str):
+    def _on_view_transcript(self, file_path: Optional[str] = None, event_id: Optional[str] = None):
         """Handle view transcript request."""
+        if self._open_workspace_item_for_artifact(
+            event_id=event_id,
+            file_path=file_path,
+            asset_role="transcript",
+        ):
+            return
+        if not file_path:
+            return
         transcript_path, translation_path = self._resolve_artifact_pair_from_path(
             file_path, preferred_mode="transcript"
         )
@@ -969,8 +983,16 @@ class TimelineWidget(BaseWidget):
             title_key="transcript.viewer_title",
         )
 
-    def _on_view_translation(self, file_path: str):
+    def _on_view_translation(self, file_path: Optional[str] = None, event_id: Optional[str] = None):
         """Handle view translation request."""
+        if self._open_workspace_item_for_artifact(
+            event_id=event_id,
+            file_path=file_path,
+            asset_role="translation",
+        ):
+            return
+        if not file_path:
+            return
         transcript_path, translation_path = self._resolve_artifact_pair_from_path(
             file_path, preferred_mode="translation"
         )
@@ -1015,6 +1037,29 @@ class TimelineWidget(BaseWidget):
             translation_source_lang=selected_languages.get("translation_source_lang"),
             translation_target_lang=selected_languages.get("translation_target_lang"),
         )
+
+    def _open_workspace_item_for_artifact(
+        self,
+        *,
+        event_id: Optional[str] = None,
+        file_path: Optional[str] = None,
+        asset_role: Optional[str] = None,
+    ) -> bool:
+        """Route artifact views into workspace when the owning item can be resolved."""
+        workspace_manager = getattr(self.timeline_manager, "workspace_manager", None)
+        main_window = self.window()
+        open_workspace_item = getattr(main_window, "open_workspace_item", None)
+        if workspace_manager is None or not callable(open_workspace_item):
+            return False
+
+        item_id = None
+        if event_id:
+            item_id = workspace_manager.get_event_item_id(event_id)
+        if item_id is None and file_path:
+            item_id = workspace_manager.find_item_id_by_asset_path(file_path)
+        if not item_id:
+            return False
+        return bool(open_workspace_item(item_id=item_id, asset_role=asset_role))
 
     def _update_shell_message(self, message: str) -> None:
         """Show a short status message on shell footer when available."""

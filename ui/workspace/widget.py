@@ -99,12 +99,25 @@ class WorkspaceWidget(BaseWidget):
         else:
             self._on_item_selected("")
 
-    def open_item(self, item_id: str) -> None:
+    def open_item(self, item_id: str, asset_role: str | None = None) -> bool:
         """Refresh and focus a specific workspace item."""
         self.refresh_items()
+        if item_id and item_id not in self._items_by_id and self.item_list.current_collection() != "all":
+            self.item_list.set_collection("all")
+            self.refresh_items()
         if item_id and item_id in self._items_by_id:
             self.item_list.select_item(item_id)
             self._on_item_selected(item_id)
+            if asset_role == "audio":
+                self.recording_panel.setFocus()
+            elif asset_role:
+                self.editor_panel.select_asset_role(asset_role)
+            return True
+        return False
+
+    def current_item_id(self) -> str:
+        """Return the currently selected workspace item identifier."""
+        return self.item_list.current_item_id()
 
     def _on_item_selected(self, item_id: str) -> None:
         item = self._items_by_id.get(item_id)

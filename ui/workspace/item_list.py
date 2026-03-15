@@ -84,6 +84,11 @@ class WorkspaceItemList(BaseWidget):
     def current_collection(self) -> str:
         return self.collection_combo.currentData() or "all"
 
+    def set_collection(self, collection: str) -> None:
+        index = self.collection_combo.findData(collection)
+        if index >= 0:
+            self.collection_combo.setCurrentIndex(index)
+
     def _populate_collection_combo(self) -> None:
         for label_key, value in self._COLLECTIONS:
             self.collection_combo.addItem(self.i18n.t(label_key), value)

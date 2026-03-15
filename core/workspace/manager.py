@@ -323,6 +323,31 @@ class WorkspaceManager:
             self._empty_artifacts_payload(),
         )
 
+    def get_event_item_id(self, event_id: str) -> Optional[str]:
+        """Return the latest workspace item identifier for an event."""
+        item = self._get_latest_item_for_event(event_id)
+        return item.id if item is not None else None
+
+    def find_item_id_by_asset_path(self, file_path: Optional[str]) -> Optional[str]:
+        """Resolve a workspace item identifier from an asset file path."""
+        if not file_path:
+            return None
+        normalized_path = str(Path(file_path).expanduser())
+        rows = self.db.execute(
+            """
+            SELECT wi.id
+            FROM workspace_assets AS wa
+            JOIN workspace_items AS wi ON wi.id = wa.item_id
+            WHERE wa.file_path = ?
+            ORDER BY wi.updated_at DESC
+            LIMIT 1
+            """,
+            (normalized_path,),
+        )
+        if not rows:
+            return None
+        return rows[0]["id"]
+
     def get_event_artifacts_map(self, event_ids: List[str]) -> dict[str, dict]:
         """Return latest workspace-backed artifacts for multiple calendar events."""
         unique_event_ids = [event_id for event_id in dict.fromkeys(event_ids) if event_id]

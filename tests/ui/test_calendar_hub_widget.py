@@ -5,11 +5,23 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
-from PySide6.QtWidgets import QDialog
+from PySide6.QtWidgets import QDialog, QWidget
 
 from ui.calendar_hub.widget import CalendarHubWidget
 
 pytestmark = pytest.mark.ui
+
+
+class _MainWindowStub(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.current_page_name = None
+        self.open_calls = []
+
+    def open_workspace_item(self, *, item_id: str, asset_role: str | None = None) -> bool:
+        self.current_page_name = "workspace"
+        self.open_calls.append((item_id, asset_role))
+        return True
 
 
 def test_calendar_view_buttons_use_semantic_role(qapp, mock_i18n):
@@ -149,6 +161,36 @@ def test_calendar_hub_view_recording_prefers_requester_as_dialog_parent(qapp, mo
     kwargs = mock_open_audio.call_args.kwargs
     assert kwargs["parent"] is requester
     assert kwargs["cache_key"].startswith("/tmp/demo_recording.wav::")
+
+
+def test_calendar_hub_view_text_routes_to_workspace_item(qapp, mock_i18n):
+    calendar_manager = MagicMock()
+    calendar_manager.get_events.return_value = []
+    oauth_manager = MagicMock()
+    workspace_manager = MagicMock()
+    workspace_manager.get_event_item_id.return_value = "workspace-item-1"
+    main_window = _MainWindowStub()
+
+    with (
+        patch.object(CalendarHubWidget, "_load_connected_accounts", return_value=None),
+        patch("ui.calendar_hub.widget.open_or_activate_text_viewer") as mock_viewer,
+    ):
+        widget = CalendarHubWidget(
+            calendar_manager,
+            oauth_manager,
+            mock_i18n,
+            workspace_manager=workspace_manager,
+            parent=main_window,
+        )
+        widget._open_event_text_viewer(
+            transcript_path="/tmp/demo_transcript.txt",
+            translation_path="/tmp/demo_translation.txt",
+            event_id="event-1",
+        )
+
+    assert main_window.current_page_name == "workspace"
+    assert main_window.open_calls == [("workspace-item-1", "transcript")]
+    mock_viewer.assert_not_called()
 
 
 def test_calendar_hub_translate_transcript_prompts_language_before_queue(qapp, mock_i18n):

@@ -516,6 +516,10 @@ class WorkspaceEditorPanel(TextEditorPanel):
                 self.asset_selector.setCurrentIndex(index)
                 break
 
+    def select_asset_role(self, asset_role: str) -> None:
+        """Public wrapper used by workspace routing helpers."""
+        self._select_asset_role(asset_role)
+
     def _label_for_asset(self, asset) -> str:
         role_label = WORKSPACE_ASSET_LABELS.get(
             asset.asset_role,

@@ -583,18 +583,20 @@ class CalendarHubWidget(BaseWidget):
             )
         if event and (transcript_path or translation_path):
             dialog.view_text_requested.connect(
-                lambda requester, p=transcript_path, tr=translation_path: self._open_event_text_viewer(
+                lambda requester, p=transcript_path, tr=translation_path, eid=event.id: self._open_event_text_viewer(
                     transcript_path=p,
                     translation_path=tr,
+                    event_id=eid,
                     parent_hint=requester,
                 )
             )
         if event and recording_path:
             dialog.view_recording_requested.connect(
-                lambda requester, file_path, p=transcript_path, tr=translation_path: self._on_view_recording(
+                lambda requester, file_path, p=transcript_path, tr=translation_path, eid=event.id: self._on_view_recording(
                     file_path=file_path,
                     transcript_path=p,
                     translation_path=tr,
+                    event_id=eid,
                     parent_hint=requester,
                 )
             )
@@ -1549,9 +1551,17 @@ class CalendarHubWidget(BaseWidget):
         *,
         transcript_path: Optional[str],
         translation_path: Optional[str],
+        event_id: Optional[str] = None,
         parent_hint: Optional[QWidget] = None,
     ) -> None:
         """Open reusable transcript/translation viewer from Calendar Hub."""
+        primary_role = "transcript" if transcript_path else "translation"
+        if self._open_workspace_item_for_artifact(
+            event_id=event_id,
+            file_path=transcript_path or translation_path,
+            asset_role=primary_role,
+        ):
+            return
         initial_mode = resolve_text_viewer_initial_mode(
             transcript_path=transcript_path,
             translation_path=translation_path,
@@ -1702,9 +1712,16 @@ class CalendarHubWidget(BaseWidget):
         file_path: str,
         transcript_path: Optional[str] = None,
         translation_path: Optional[str] = None,
+        event_id: Optional[str] = None,
         parent_hint: Optional[QWidget] = None,
     ) -> None:
         """Open or focus recording playback dialog for calendar event artifacts."""
+        if self._open_workspace_item_for_artifact(
+            event_id=event_id,
+            file_path=file_path,
+            asset_role="audio",
+        ):
+            return
         dialog_parent = parent_hint if parent_hint is not None else self
         cache_key = file_path if parent_hint is None else f"{file_path}::{id(parent_hint)}"
         open_or_activate_audio_player(
@@ -1719,3 +1736,25 @@ class CalendarHubWidget(BaseWidget):
             translation_path=translation_path,
             cache_key=cache_key,
         )
+
+    def _open_workspace_item_for_artifact(
+        self,
+        *,
+        event_id: Optional[str] = None,
+        file_path: Optional[str] = None,
+        asset_role: Optional[str] = None,
+    ) -> bool:
+        """Route event artifact actions into workspace when an item can be resolved."""
+        main_window = self.window()
+        open_workspace_item = getattr(main_window, "open_workspace_item", None)
+        if self.workspace_manager is None or not callable(open_workspace_item):
+            return False
+
+        item_id = None
+        if event_id:
+            item_id = self.workspace_manager.get_event_item_id(event_id)
+        if item_id is None and file_path:
+            item_id = self.workspace_manager.find_item_id_by_asset_path(file_path)
+        if not item_id:
+            return False
+        return bool(open_workspace_item(item_id=item_id, asset_role=asset_role))
