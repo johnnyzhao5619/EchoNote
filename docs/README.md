@@ -48,7 +48,10 @@ For contributors and developers:
 ## 🧭 Active Plans
 
 - **[Unified Workspace & Local AI Plan](plans/2026-03-15-unified-workspace-and-local-ai.md)** - Hard-switch plan for the new recording/document workspace, local summaries, meeting briefs, and model-management expansion
-- **[Workspace Gap Closure Plan](plans/2026-03-15-workspace-gap-closure.md)** - Follow-up plan for bringing workspace the rest of the way to the intended Notes-style unified text/recording/task management experience
+
+## 🗃️ Archived Plans
+
+- **[Workspace Gap Closure Plan](plans/archive/2026-03-15-workspace-gap-closure.md)** - Completed follow-up plan for closing the remaining unified workspace gaps after the hard switch
 
 ---
 
