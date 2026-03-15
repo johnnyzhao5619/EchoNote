@@ -26,6 +26,7 @@ def run_model_download(
     model_manager,
     model_name: str,
     *,
+    download_method: str = "download_model",
     logger: logging.Logger,
     on_success: Optional[Callable[[], None]] = None,
     on_error: Optional[Callable[[Exception], None]] = None,
@@ -36,7 +37,10 @@ def run_model_download(
     loop = asyncio.new_event_loop()
     try:
         asyncio.set_event_loop(loop)
-        loop.run_until_complete(model_manager.download_model(model_name))
+        download_callable = getattr(model_manager, download_method, None)
+        if not callable(download_callable):
+            raise AttributeError(f"Model manager is missing download method: {download_method}")
+        loop.run_until_complete(download_callable(model_name))
         if on_success:
             on_success()
         return True

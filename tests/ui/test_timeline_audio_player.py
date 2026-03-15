@@ -158,3 +158,19 @@ def test_audio_player_layout_mode_resizes_parent_dialog(qapp, mock_i18n):
     player._resize_dialog_for_layout_mode(show_transcript=False)
     assert dialog.height() == AUDIO_PLAYER_DIALOG_DEFAULT_HEIGHT
     player.cleanup()
+
+
+def test_audio_player_clear_media_resets_labels_and_controls(qapp, mock_i18n):
+    player = AudioPlayer(
+        "/tmp/nonexistent.mp3",
+        mock_i18n,
+        auto_load=False,
+    )
+    player._set_controls_enabled(True)
+    player.file_label.setText("meeting.wav")
+
+    player.clear_media()
+
+    assert player.file_label.text() == ""
+    assert player.play_button.isEnabled() is False
+    player.cleanup()

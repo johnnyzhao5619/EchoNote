@@ -15,8 +15,14 @@
 # limitations under the License.
 """模型管理模块公共接口。"""
 
+from .manager import ModelManager
+from .registry import ModelInfo, ModelRegistry
+from .text_ai_registry import TextAIModelInfo, TextAIModelRegistry
+
 __all__ = [
     "ModelInfo",
     "ModelRegistry",
     "ModelManager",
+    "TextAIModelInfo",
+    "TextAIModelRegistry",
 ]

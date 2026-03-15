@@ -269,6 +269,7 @@ class TestDatabaseSchemaOperations:
         result = db.execute("SELECT name FROM sqlite_master WHERE type='table'")
         table_names = [row["name"] for row in result]
         assert len(table_names) > 0
+        assert db.get_version() == 3
 
     def test_initialize_schema_custom_path(self, tmp_path):
         """Test schema initialization with custom path."""

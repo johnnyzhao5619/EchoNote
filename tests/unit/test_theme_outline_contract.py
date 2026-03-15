@@ -47,6 +47,15 @@ def _load_theme_outline() -> dict[str, Any]:
     return json.loads(THEME_OUTLINE_PATH.read_text(encoding="utf-8"))
 
 
+def _load_outline_roles() -> set[str]:
+    outline = _load_theme_outline()
+    roles: set[str] = set()
+    for section in outline.get("sections", []):
+        for selector in section.get("selectors", []):
+            roles.update(ROLE_SELECTOR_PATTERN.findall(selector))
+    return roles
+
+
 def _collect_module_str_constants(module: ast.Module) -> dict[str, str]:
     constants: dict[str, str] = {}
     for node in module.body:
@@ -167,6 +176,21 @@ def test_ui_roles_are_covered_by_each_theme_qss():
         assert (
             not missing_roles
         ), f"Theme '{theme_name}' is missing semantic role selectors: {missing_roles}"
+
+
+def test_theme_outline_covers_workspace_roles():
+    outline_roles = _load_outline_roles()
+    expected_roles = {
+        "workspace-surface",
+        "workspace-item-list",
+        "workspace-editor-panel",
+        "workspace-recording-panel",
+        "workspace-asset-selector",
+        "workspace-ai-action",
+        "workspace-placeholder",
+    }
+    missing_roles = sorted(expected_roles - outline_roles)
+    assert not missing_roles, f"Theme outline is missing workspace roles: {missing_roles}"
 
 
 def test_all_themes_share_identical_role_sets():

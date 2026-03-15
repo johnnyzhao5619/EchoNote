@@ -416,6 +416,38 @@ def initialize_audio_capture():
     return audio_capture
 
 
+def initialize_workspace_manager(db_connection, file_manager):
+    """Initialize workspace manager for the unified document/audio store."""
+    from core.workspace.manager import WorkspaceManager
+
+    return WorkspaceManager(db_connection, file_manager)
+
+
+def create_text_ai_engine(model_manager, model_id, runtime_config=None):
+    """Create a Text AI engine instance from model metadata."""
+    from engines.text_ai import ExtractiveEngine, GGUFChatEngine, OnnxSummarizer
+
+    model = model_manager.get_text_ai_model(model_id)
+    if model is None:
+        raise ValueError(f"Unknown text ai model: {model_id}")
+
+    if model.runtime == "extractive":
+        return ExtractiveEngine()
+    if model.runtime == "onnx":
+        return OnnxSummarizer(model.model_id, model_manager.get_text_ai_model_path(model.model_id))
+    if model.runtime == "gguf":
+        config = runtime_config or {}
+        runtime_command = config.get("command") or config.get("runtime_command") or []
+        return GGUFChatEngine(
+            model.model_id,
+            model_manager.get_text_ai_model_path(model.model_id),
+            runtime_command=runtime_command,
+            timeout_seconds=int(config.get("timeout_seconds", 120)),
+        )
+
+    raise ValueError(f"Unsupported text ai runtime: {model.runtime}")
+
+
 class EngineProxy:
     """Proxy class for lazy-loaded engines."""
 

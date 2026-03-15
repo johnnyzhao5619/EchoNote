@@ -3,6 +3,8 @@
 Unit tests for PySide6 migration verification.
 """
 
+from ui.navigation import NAV_ITEMS
+
 
 def test_pyside6_imports():
     """Test that UI modules use PySide6 imports correctly."""
@@ -29,3 +31,9 @@ def test_pyside6_signal_imports():
     assert Signal is not None
     test_signal = Signal()
     assert test_signal is not None
+
+
+def test_sidebar_exposes_workspace_entry():
+    page_names = [item.page_name for item in NAV_ITEMS]
+
+    assert page_names == ["workspace", "calendar_hub", "timeline", "settings"]

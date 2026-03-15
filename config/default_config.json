@@ -1,5 +1,5 @@
 {
-  "version": "2.0.2",
+  "version": "2.1.0",
   "database": {
     "path": "~/.echonote/data.db",
     "encryption_enabled": true
@@ -42,6 +42,16 @@
     "translation_engine": "none",
     "translation_source_lang": "auto",
     "translation_target_lang": "en"
+  },
+  "text_ai": {
+    "models_dir": "~/.echonote/text_ai_models"
+  },
+  "workspace_ai": {
+    "default_summary_strategy": "extractive",
+    "default_summary_model": "flan-t5-small-int8",
+    "default_meeting_model": "extractive-default",
+    "default_meeting_template": "standard",
+    "gguf_runtime_command": []
   },
   "calendar": {
     "default_view": "week",

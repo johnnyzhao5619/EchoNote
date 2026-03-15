@@ -119,7 +119,6 @@ def test_calendar_hub_edit_dialog_prefills_translation_auto_task(qapp, mock_i18n
 
     with (
         patch("data.database.models.AutoTaskConfig.get_by_event_id", return_value=mock_config),
-        patch("data.database.models.EventAttachment.get_by_event_id", return_value=[]),
         patch("ui.calendar_hub.event_dialog.EventDialog", _CaptureDialog),
     ):
         widget._show_event_dialog(event)

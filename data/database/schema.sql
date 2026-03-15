@@ -88,6 +88,50 @@ CREATE TABLE IF NOT EXISTS event_attachments (
 CREATE INDEX IF NOT EXISTS idx_attachments_event ON event_attachments (event_id);
 
 -- ============================================================================
+-- Workspace Items Table
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS workspace_items (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    item_type TEXT NOT NULL, -- recording/document/meeting_note/summary
+    source_kind TEXT, -- batch_transcription/realtime_recording/manual_import/ai_generated
+    source_event_id TEXT,
+    source_task_id TEXT,
+    status TEXT NOT NULL DEFAULT 'active',
+    primary_text_asset_id TEXT,
+    primary_audio_asset_id TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (source_event_id) REFERENCES calendar_events (id) ON DELETE SET NULL,
+    FOREIGN KEY (source_task_id) REFERENCES transcription_tasks (id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_workspace_items_type ON workspace_items (item_type);
+CREATE INDEX IF NOT EXISTS idx_workspace_items_source_event ON workspace_items (source_event_id);
+CREATE INDEX IF NOT EXISTS idx_workspace_items_source_task ON workspace_items (source_task_id);
+CREATE INDEX IF NOT EXISTS idx_workspace_items_updated_at ON workspace_items (updated_at);
+
+-- ============================================================================
+-- Workspace Assets Table
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS workspace_assets (
+    id TEXT PRIMARY KEY,
+    item_id TEXT NOT NULL,
+    asset_role TEXT NOT NULL, -- audio/transcript/translation/summary/meeting_brief/etc.
+    file_path TEXT,
+    content_type TEXT,
+    text_content TEXT,
+    metadata_json TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (item_id) REFERENCES workspace_items (id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_workspace_assets_item_id ON workspace_assets (item_id);
+CREATE INDEX IF NOT EXISTS idx_workspace_assets_role ON workspace_assets (asset_role);
+CREATE INDEX IF NOT EXISTS idx_workspace_assets_item_role ON workspace_assets (item_id, asset_role);
+
+-- ============================================================================
 -- Auto Task Configurations Table
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS auto_task_configs (
@@ -186,7 +230,7 @@ INSERT
     OR IGNORE INTO app_settings (key, value, updated_at)
 VALUES (
         'schema_version',
-        '2',
+        '3',
         CURRENT_TIMESTAMP
     );
 

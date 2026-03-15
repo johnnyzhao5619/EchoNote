@@ -16,6 +16,7 @@ from core.qt_imports import (
 )
 
 from core.models.registry import ModelInfo
+from core.models.text_ai_registry import TextAIModelInfo
 from core.models.translation_registry import TranslationModelInfo
 from ui.base_widgets import (
     create_button,
@@ -37,7 +38,7 @@ logger = logging.getLogger("echonote.ui.settings.components.model_card")
 
 class ModelCardWidget(QFrame):
     """
-    统一风格的模型卡片。支持语音模型 (ModelInfo) 和翻译模型 (TranslationModelInfo)。
+    统一风格的模型卡片。支持语音、翻译和 Text AI 模型。
     """
 
     # 信号定义
@@ -48,7 +49,7 @@ class ModelCardWidget(QFrame):
 
     def __init__(
         self,
-        model: Union[ModelInfo, TranslationModelInfo],
+        model: Union[ModelInfo, TranslationModelInfo, TextAIModelInfo],
         i18n: I18nQtManager,
         model_manager,
         parent=None,
@@ -59,20 +60,22 @@ class ModelCardWidget(QFrame):
         self.model_manager = model_manager
 
         self.is_translation = isinstance(model, TranslationModelInfo)
-        self.model_id = model.model_id if self.is_translation else model.name
+        self.is_text_ai = isinstance(model, TextAIModelInfo)
+        self.model_id = model.model_id if (self.is_translation or self.is_text_ai) else model.name
 
         self._setup_ui()
         self._update_state()
 
     def _setup_ui(self):
         self.setFrameShape(QFrame.Shape.StyledPanel)
-        self.setObjectName(f"model-card-{'translation' if self.is_translation else 'speech'}")
+        model_kind = "translation" if self.is_translation else "text-ai" if self.is_text_ai else "speech"
+        self.setObjectName(f"model-card-{model_kind}")
 
         self.main_layout = QVBoxLayout(self)
 
         # 第一行：标题和主要操作按钮
         header_layout = create_hbox()
-        title = self.model.display_name if self.is_translation else self.model.full_name
+        title = self.model.display_name if (self.is_translation or self.is_text_ai) else self.model.full_name
         self.name_label = QLabel(title)
         font = QFont()
         font.setPointSize(MODEL_MANAGEMENT_MODEL_NAME_FONT_SIZE)
@@ -132,7 +135,11 @@ class ModelCardWidget(QFrame):
             delete_btn.clicked.connect(lambda: self.delete_clicked.emit(self.model_id))
 
             # 语音模型忙碌检查
-            if not self.is_translation and self.model_manager.is_model_in_use(self.model_id):
+            if (
+                not self.is_translation
+                and not self.is_text_ai
+                and self.model_manager.is_model_in_use(self.model_id)
+            ):
                 delete_btn.setEnabled(False)
                 delete_btn.setToolTip(self.i18n.t("settings.model_management.model_in_use"))
 
@@ -153,6 +160,8 @@ class ModelCardWidget(QFrame):
                 is_downloading = self.model_manager.translation_downloader.is_downloading(
                     self.model_id
                 )
+            elif self.is_text_ai:
+                is_downloading = self.model_manager.text_ai_downloader.is_downloading(self.model_id)
             else:
                 is_downloading = self.model_manager.downloader.is_downloading(self.model_id)
 
@@ -171,6 +180,17 @@ class ModelCardWidget(QFrame):
         if self.is_translation:
             lang_text = f"{self.model.source_lang} -> {self.model.target_lang}"
             self.features_layout.addWidget(QLabel(lang_text))
+        elif self.is_text_ai:
+            runtime_text = (
+                f"{self.i18n.t('settings.model_management.runtime')}: "
+                f"{self._translate_runtime(self.model.runtime)}"
+            )
+            self.features_layout.addWidget(QLabel(runtime_text))
+            provider_text = (
+                f"{self.i18n.t('settings.model_management.provider')}: "
+                f"{self._translate_provider(self.model.provider)}"
+            )
+            self.features_layout.addWidget(QLabel(provider_text))
         else:
             speed_text = (
                 f"{self.i18n.t('settings.model_management.speed')}: "
@@ -189,7 +209,7 @@ class ModelCardWidget(QFrame):
         if self.model.is_downloaded:
             usage_count = (
                 getattr(self.model, "usage_count", 0)
-                if not self.is_translation
+                if not self.is_translation and not self.is_text_ai
                 else getattr(self.model, "use_count", 0)
             )
             usage_text = self.i18n.t("settings.model_management.usage_count", count=usage_count)
@@ -226,6 +246,22 @@ class ModelCardWidget(QFrame):
             "high": self.i18n.t("settings.model_management.accuracy_high"),
         }
         return accuracy_map.get(accuracy, accuracy)
+
+    def _translate_runtime(self, runtime: str) -> str:
+        runtime_map = {
+            "extractive": self.i18n.t("settings.model_management.runtime_extractive"),
+            "onnx": self.i18n.t("settings.model_management.runtime_onnx"),
+            "gguf": self.i18n.t("settings.model_management.runtime_gguf"),
+        }
+        return runtime_map.get(runtime, runtime)
+
+    def _translate_provider(self, provider: str) -> str:
+        provider_map = {
+            "builtin": self.i18n.t("settings.model_management.provider_builtin"),
+            "onnxruntime": self.i18n.t("settings.model_management.provider_onnxruntime"),
+            "llama_cpp": self.i18n.t("settings.model_management.provider_llama_cpp"),
+        }
+        return provider_map.get(provider, provider)
 
     def _format_relative_time(self, dt: datetime) -> str:
         now = now_utc()

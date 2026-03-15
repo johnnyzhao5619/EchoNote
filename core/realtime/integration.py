@@ -27,45 +27,6 @@ from utils.time_utils import format_localized_datetime
 
 logger = logging.getLogger(__name__)
 
-
-def save_event_attachments(db_connection, event_id: str, recording_result: Dict) -> None:
-    """Persist recording artifacts as event attachments when files exist."""
-    if not db_connection or not event_id:
-        return
-
-    try:
-        from data.database.models import EventAttachment
-    except Exception as exc:  # noqa: BLE001
-        logger.error("Failed to import EventAttachment model: %s", exc)
-        return
-
-    for key, type_code in (
-        ("recording_path", "recording"),
-        ("transcript_path", "transcript"),
-        ("translation_path", "translation"),
-    ):
-        path = recording_result.get(key)
-        if not path or not os.path.exists(path):
-            continue
-
-        try:
-            EventAttachment.upsert_for_event_type(
-                db_connection=db_connection,
-                event_id=event_id,
-                attachment_type=type_code,
-                file_path=path,
-                file_size=os.path.getsize(path),
-            )
-        except Exception as exc:  # noqa: BLE001
-            logger.error(
-                "Failed to save %s attachment for event %s: %s",
-                type_code,
-                event_id,
-                exc,
-                exc_info=True,
-            )
-
-
 class CalendarIntegration:
     """Handles calendar event updates for recording sessions."""
 
@@ -144,8 +105,6 @@ class CalendarIntegration:
                 event = CalendarEvent(**event_data)
                 event.save(self.db)
                 event_id = event.id
-
-            save_event_attachments(self.db, event_id, recording_result)
 
             logger.info(f"Calendar event created: {event_id}")
             return event_id

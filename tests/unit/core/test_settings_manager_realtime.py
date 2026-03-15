@@ -31,6 +31,13 @@ class _FakeConfigManager:
                 "translation_source_lang": "auto",
                 "translation_target_lang": "en",
             },
+            "workspace_ai": {
+                "default_summary_strategy": "extractive",
+                "default_summary_model": "flan-t5-small-int8",
+                "default_meeting_model": "extractive-default",
+                "default_meeting_template": "standard",
+                "gguf_runtime_command": [],
+            },
         }
         self._settings = {
             "realtime": {
@@ -39,6 +46,9 @@ class _FakeConfigManager:
             },
             "translation": {
                 "translation_engine": "none",
+            },
+            "workspace_ai": {
+                "default_meeting_model": "gemma-3-1b-it-gguf",
             },
         }
 
@@ -112,6 +122,15 @@ def test_get_translation_preferences_uses_unified_defaults():
     assert preferences["translation_engine"] == "none"
     assert preferences["translation_source_lang"] == "auto"
     assert preferences["translation_target_lang"] == "en"
+
+
+def test_get_workspace_ai_preferences_uses_defaults_and_overrides():
+    manager = SettingsManager(_FakeConfigManager())
+    preferences = manager.get_workspace_ai_preferences()
+
+    assert preferences["default_summary_strategy"] == "extractive"
+    assert preferences["default_summary_model"] == "flan-t5-small-int8"
+    assert preferences["default_meeting_model"] == "gemma-3-1b-it-gguf"
 
 
 def test_resolve_realtime_translation_languages_uses_runtime_overrides():

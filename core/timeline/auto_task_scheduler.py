@@ -36,7 +36,6 @@ from config.constants import (
     TIMELINE_STOP_CONFIRMATION_DELAY_MAX_MINUTES,
     TRANSLATION_ENGINE_NONE,
 )
-from core.realtime.integration import save_event_attachments
 from ui.common.notification import get_notification_manager
 from utils.i18n import I18nQtManager
 from utils.time_utils import format_localized_datetime, to_local_datetime
@@ -1063,9 +1062,6 @@ class AutoTaskScheduler:
                     if not loop.is_closed():
                         loop.close()
 
-                    # Save attachments to database
-                    self._save_event_attachments(event.id, result)
-
                     logger.info(f"Successfully stopped auto tasks for event {event.id}")
                     should_remove_active_state = True
 
@@ -1121,19 +1117,6 @@ class AutoTaskScheduler:
                 self.active_recordings.pop(event.id, None)
                 self.started_events.discard(event.id)
                 self.pending_stop_confirmations.pop(event.id, None)
-
-    def _save_event_attachments(self, event_id: str, recording_result: Dict[str, Any]):
-        """
-        Save recording and transcript as event attachments.
-
-        Args:
-            event_id: Event ID
-            recording_result: Result from stop_recording()
-        """
-        try:
-            save_event_attachments(self.db, event_id, recording_result)
-        except Exception as e:
-            logger.error(f"Failed to save attachments for event {event_id}: {e}", exc_info=True)
 
     def _cleanup_tracking_sets(self, now: datetime):
         """

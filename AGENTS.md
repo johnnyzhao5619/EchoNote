@@ -24,6 +24,8 @@
   - `config/__version__.py`：版本单一事实源（SSOT）。
   - `config/default_config.json`：默认配置。
 - `core/`：核心业务编排与管理器。
+  - `core/workspace/`：统一资产层与 workspace 服务（导入、资产读写、摘要、会议整理）。
+  - `core/models/`：模型注册、下载、状态聚合与 Text AI 模型治理。
   - `core/realtime/`：实时录音/转写集成（录音器、路由、归档等）。
   - `core/settings/`：设置读写与偏好聚合。
   - `core/timeline/`：时间线事件与任务调度。
@@ -32,10 +34,12 @@
   - `engines/audio/`：音频采集与VAD。
   - `engines/speech/`：语音识别引擎。
   - `engines/translation/`：翻译引擎。
+  - `engines/text_ai/`：本地文本 AI 能力（extractive、ONNX 摘要、GGUF 会议整理 runtime）。
 - `ui/`：桌面端界面层（PySide6）。
-  - `ui/realtime_record/`：实时录音页面与浮动窗。
+  - `ui/workspace/`：统一 workspace 工作台（资产列表、文本编辑、录音回放、AI 操作）。
+  - `ui/realtime_record/`：实时录音浮动窗与音频可视化组件（页面入口已并入 `ui/workspace/`）。
   - `ui/timeline/`：时间线页面与事件卡片（`widget.py`、`event_card.py`、`transcript_viewer.py`）。
-  - `ui/settings/`：设置页面（含 `translation_page.py` 独立翻译默认设置页）。
+  - `ui/settings/`：设置页面（含 `translation_page.py` 与 `workspace_ai_page.py` 独立默认设置页）。
   - `ui/common/`：通用组件（含音频播放器 `audio_player.py` 与启动器 `audio_player_launcher.py`）。
   - `ui/constants.py`：UI尺寸、角色常量与密度基线。
 - `resources/`：主题与国际化资源。
@@ -53,21 +57,30 @@
 
 ## 常用定位建议
 
-- 查“实时录音/浮动窗”：优先看 `ui/realtime_record/` + `core/realtime/` + `resources/themes/*qss`。
+- 查“统一工作台/文档资产”：优先看 `core/workspace/` + `ui/workspace/` + `data/database/models.py`。
+- 查“实时录音/浮动窗”：优先看 `ui/realtime_record/` + `core/realtime/` + `resources/themes/*qss`；录音落盘与资产发布再看 `core/workspace/manager.py`。
 - 查“时间线音频播放”：优先看 `ui/common/audio_player.py` + `ui/common/audio_player_launcher.py` + `ui/timeline/widget.py`。
+- 查“本地摘要/会议整理/Text AI”：优先看 `engines/text_ai/` + `core/workspace/summary_service.py` + `core/workspace/meeting_brief_service.py` + `core/models/manager.py`。
 - 查“主题覆盖缺失”：先对照 `ui/constants.py` 的 role，再查双主题与 `theme_outline.json`。
 - 查“版本发布遗漏”：先看 `config/__version__.py`，再按发布清单同步其他文件。
 - 查“新功能实施计划”：优先看 `docs/plans/`，再回到对应模块代码与测试。
 
 ## 功能关键词到文件路径（快速索引）
 
-- 录音设备刷新：`ui/realtime_record/widget.py`、`engines/audio/capture.py`、`tests/ui/test_realtime_record_widget.py`
+- 统一工作台入口：`ui/workspace/widget.py`、`ui/main_window.py`、`ui/navigation.py`
+- 统一工作台资产层：`core/workspace/manager.py`、`core/workspace/import_service.py`、`data/database/models.py`
+- 文档导入与解析：`core/workspace/document_parser.py`、`core/workspace/import_service.py`、`tests/unit/core/test_workspace_manager.py`
+- 本地摘要与会议整理：`core/workspace/summary_service.py`、`core/workspace/meeting_brief_service.py`、`engines/text_ai/`
+- Text AI 模型管理：`core/models/manager.py`、`core/models/text_ai_registry.py`、`ui/settings/model_management_page.py`、`ui/settings/workspace_ai_page.py`
+- 录音设备刷新：`ui/settings/realtime_page.py`、`engines/audio/capture.py`、`core/realtime/recorder.py`
 - 浮动窗布局：`ui/realtime_record/floating_overlay.py`、`ui/constants.py`、`resources/themes/light.qss`、`resources/themes/dark.qss`
 - 主题契约与角色覆盖：`resources/themes/theme_outline.json`、`tests/unit/test_theme_outline_contract.py`、`ui/constants.py`
 - 实时录音偏好设置：`core/settings/manager.py`、`ui/settings/realtime_page.py`、`config/default_config.json`
 - 翻译默认设置：`ui/settings/translation_page.py`、`core/settings/manager.py`、`config/default_config.json`
+- Workspace AI 默认设置：`ui/settings/workspace_ai_page.py`、`core/settings/manager.py`、`config/default_config.json`
 - 时间线音频播放器：`ui/common/audio_player.py`、`ui/common/audio_player_launcher.py`、`ui/timeline/transcript_viewer.py`、`tests/ui/test_timeline_audio_player.py`
 - 翻译引擎接入：`utils/app_initializer.py`、`engines/translation/`、`core/realtime/recorder.py`
+- Text AI 引擎接入：`utils/app_initializer.py`、`engines/text_ai/`、`core/workspace/summary_service.py`
 - 版本号与发布：`config/__version__.py`、`CHANGELOG.md`、`scripts/build_config.py`、`pyproject.toml`
 - 统一工作台规划：`docs/plans/2026-03-15-unified-workspace-and-local-ai.md`、`ui/main_window.py`、`ui/navigation.py`、`core/transcription/manager.py`
 

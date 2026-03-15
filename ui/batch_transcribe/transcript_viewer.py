@@ -50,24 +50,24 @@ from core.qt_imports import (
 
 from data.database.models import TranscriptionTask
 from ui.base_widgets import connect_button_with_callback, create_hbox
-from ui.batch_transcribe.search_widget import SearchWidget
 from ui.batch_transcribe.window_state_manager import WindowStateManager
 from ui.common.style_utils import set_widget_state
 from ui.constants import (
     CONTROL_BUTTON_MIN_HEIGHT,
     ROLE_TRANSCRIPT_FILE,
 )
+from ui.workspace.editor_panel import (
+    EDITOR_ROLE_COPY as BATCH_VIEWER_ROLE_COPY,
+    EDITOR_ROLE_EDIT as BATCH_VIEWER_ROLE_EDIT,
+    EDITOR_ROLE_EXPORT as BATCH_VIEWER_ROLE_EXPORT,
+    EDITOR_ROLE_SEARCH as BATCH_VIEWER_ROLE_SEARCH,
+    EDITOR_ROLE_TOOLBAR as BATCH_VIEWER_ROLE_TOOLBAR,
+    TextEditorPanel,
+)
 from utils.i18n import LANGUAGE_OPTION_KEYS, I18nQtManager
 from utils.time_utils import format_localized_datetime
 
 logger = logging.getLogger("echonote.ui.transcript_viewer")
-
-BATCH_VIEWER_ROLE_TOOLBAR = "batch-viewer-toolbar"
-BATCH_VIEWER_ROLE_EDIT = "batch-viewer-edit-action"
-BATCH_VIEWER_ROLE_EXPORT = "batch-viewer-export-action"
-BATCH_VIEWER_ROLE_COPY = "batch-viewer-copy-action"
-BATCH_VIEWER_ROLE_SEARCH = "batch-viewer-search-action"
-
 
 class TranscriptViewerDialog(QDialog):
     """
@@ -111,9 +111,6 @@ class TranscriptViewerDialog(QDialog):
         self.db_connection = db_connection
         self.i18n = i18n
         self.settings_manager = settings_manager
-        self.is_modified = False
-        self.is_edit_mode = False
-
         # Initialize managers
         self.window_state_manager = WindowStateManager(self)
 
@@ -121,7 +118,8 @@ class TranscriptViewerDialog(QDialog):
         self.progress_dialog = None
         self.transcript_content = ""
 
-        # Initialize text_edit to None (will be created in _init_ui)
+        # Initialize editor references (created in _init_ui)
+        self.editor_panel = None
         self.text_edit = None
 
         # Load task data
@@ -215,7 +213,7 @@ class TranscriptViewerDialog(QDialog):
                     content_data, "txt"
                 )
 
-            self._set_text_content_optimized(formatted_text)
+            self.editor_panel.set_text_content(formatted_text)
             self.transcript_content = formatted_text
 
         except Exception as e:
@@ -323,20 +321,53 @@ class TranscriptViewerDialog(QDialog):
         metadata_frame = self._create_metadata_section()
         main_layout.addWidget(metadata_frame)
 
-        # Toolbar section
-        toolbar_frame = self._create_toolbar_section()
-        main_layout.addWidget(toolbar_frame)
+        self.editor_panel = TextEditorPanel(
+            self.i18n,
+            settings_manager=self.settings_manager,
+            save_handler=self._persist_editor_content,
+            export_handler=self._export_editor_content,
+            export_formats=("txt", "srt", "md"),
+            save_success_key="viewer.save_success",
+            export_dialog_title_key="viewer.export_dialog_title",
+            export_success_key="viewer.export_success",
+            export_error_title_key="viewer.export_error",
+            search_button_key="viewer.search",
+            parent=self,
+        )
+        self.editor_panel.set_document_context(
+            display_name=self.task_data.get("file_name", "transcript"),
+            file_path=self.task_data.get("output_path"),
+        )
+        main_layout.addWidget(self.editor_panel, 1)
 
-        # Search widget (initially hidden)
-        self.search_widget = SearchWidget(None, self.i18n, self.settings_manager, self)
-        main_layout.addWidget(self.search_widget)
+        self.search_widget = self.editor_panel.search_widget
+        self.text_edit = self.editor_panel.text_edit
+        self.edit_button = self.editor_panel.edit_button
+        self.export_button = self.editor_panel.export_button
+        self.copy_button = self.editor_panel.copy_button
+        self.search_button = self.editor_panel.search_button
+        self.translate_target_combo = QComboBox()
+        self.translate_target_combo.setMinimumHeight(CONTROL_BUTTON_MIN_HEIGHT)
+        for code, label_key in LANGUAGE_OPTION_KEYS:
+            self.translate_target_combo.addItem(self.i18n.t(label_key), code)
+        resolved = resolve_translation_languages_from_settings(self.settings_manager)
+        default_target = resolved.get(
+            "translation_target_lang", DEFAULT_TRANSLATION_TARGET_LANGUAGE
+        )
+        default_index = self.translate_target_combo.findData(default_target)
+        if default_index >= 0:
+            self.translate_target_combo.setCurrentIndex(default_index)
+        self.editor_panel.insert_toolbar_widget(self.translate_target_combo)
 
-        # Text display section
-        text_frame = self._create_text_section()
-        main_layout.addWidget(text_frame, 1)  # Stretch factor 1
+        self.translate_button = QPushButton()
+        self.translate_button.setProperty("role", BATCH_VIEWER_ROLE_SEARCH)
+        self.translate_button.setMinimumHeight(CONTROL_BUTTON_MIN_HEIGHT)
+        connect_button_with_callback(self.translate_button, self._on_translate_transcript_clicked)
+        self.editor_panel.insert_toolbar_widget(self.translate_button)
 
-        # Connect search widget to text edit after text edit is created
-        self.search_widget.text_edit = self.text_edit
+        if self.task_data.get("task_kind") == "translation":
+            self.translate_target_combo.setVisible(False)
+            self.translate_button.setVisible(False)
 
         # Setup keyboard shortcuts
         self._setup_shortcuts()
@@ -560,95 +591,13 @@ class TranscriptViewerDialog(QDialog):
 
     def toggle_edit_mode(self):
         """Toggle between view and edit mode."""
-        if self.is_edit_mode:
-            # Save changes
-            self.save_changes()
-        else:
-            # Enter edit mode
-            self.is_edit_mode = True
-            self.text_edit.setReadOnly(False)
-            self.edit_button.setText(self.i18n.t("common.save"))
-            self._set_edit_button_active_state(True)
-
-            # Clear undo stack when entering edit mode for clean state
-            self.text_edit.document().clearUndoRedoStacks()
-
-            logger.debug("Entered edit mode")
+        if self.editor_panel:
+            self.editor_panel.toggle_edit_mode()
 
     def save_changes(self):
         """Save edited transcript content to file with error handling and retry option."""
-        if not self.is_modified:
-            # No changes to save, just exit edit mode
-            self.is_edit_mode = False
-            self.text_edit.setReadOnly(True)
-            self.edit_button.setText(self.i18n.t("common.edit"))
-            self._set_edit_button_active_state(False)
-            return
-
-        output_path = self.task_data["output_path"]
-        content = self.text_edit.toPlainText()
-
-        try:
-            # Validate output path exists
-            if not output_path:
-                raise ValueError(
-                    self.i18n.t("exceptions.batch_transcribe_viewer.output_path_not_set")
-                )
-
-            # Check directory exists
-            output_dir = os.path.dirname(output_path)
-            if not os.path.exists(output_dir):
-                raise FileNotFoundError(f"Directory does not exist: {output_dir}")
-
-            # Check write permission
-            if os.path.exists(output_path) and not os.access(output_path, os.W_OK):
-                raise PermissionError(f"No write permission for file: {output_path}")
-
-            # Check directory write permission if file doesn't exist
-            if not os.path.exists(output_path) and not os.access(output_dir, os.W_OK):
-                raise PermissionError(f"No write permission for directory: {output_dir}")
-
-            # Check disk space (approximate - at least 1MB free)
-            stat = shutil.disk_usage(output_dir)
-            if stat.free < 1024 * 1024:  # Less than 1MB free
-                raise OSError(
-                    self.i18n.t("exceptions.batch_transcribe_viewer.insufficient_disk_space")
-                )
-
-            # Write to file
-            with open(output_path, "w", encoding="utf-8") as f:
-                f.write(content)
-
-            # Success - update state
-            self.is_modified = False
-            self.is_edit_mode = False
-            self.text_edit.setReadOnly(True)
-            self.edit_button.setText(self.i18n.t("common.edit"))
-            self._set_edit_button_active_state(False)
-
-            # Show success notification
-            self.show_info(self.i18n.t("common.success"), self.i18n.t("viewer.save_success"))
-
-            logger.info(f"Saved changes to {output_path}")
-
-        except PermissionError as e:
-            logger.error(f"Permission error saving file: {e}", exc_info=True)
-            self._show_save_error_with_retry(self.i18n.t("viewer.save_error_permission"), str(e))
-
-        except OSError as e:
-            logger.error(f"OS error saving file: {e}", exc_info=True)
-            # Check if it's a disk full error
-            if "disk" in str(e).lower() or "space" in str(e).lower():
-                error_msg = self.i18n.t("viewer.save_error_disk_full")
-            else:
-                error_msg = self.i18n.t("viewer.save_error_details", error=str(e))
-            self._show_save_error_with_retry(error_msg, str(e))
-
-        except Exception as e:
-            logger.error(f"Unexpected error saving file: {e}", exc_info=True)
-            self._show_save_error_with_retry(
-                self.i18n.t("viewer.save_error_details", error=str(e)), str(e)
-            )
+        if self.editor_panel:
+            self.editor_panel.save_changes()
 
     def _show_save_error_with_retry(self, error_msg: str, details: str):
         """
@@ -690,20 +639,8 @@ class TranscriptViewerDialog(QDialog):
         Tracks modification state and manages undo stack size
         for optimal performance.
         """
-        if self.is_edit_mode:
-            self.is_modified = True
-
-            # Limit undo stack size for very large documents
-            # to prevent excessive memory usage
-            doc = self.text_edit.document()
-            if doc.characterCount() > 100000:
-                # For large documents, limit undo stack
-                # This is a trade-off between memory and undo capability
-                if doc.availableUndoSteps() > 100:
-                    # Keep only last 100 undo steps
-                    logger.debug("Trimming undo stack for large document")
-                    # Note: Qt doesn't provide direct stack trimming,
-                    # but the stack will naturally limit itself
+        if self.editor_panel and self.editor_panel.is_edit_mode:
+            logger.debug("Editor content changed while transcript viewer is in edit mode")
 
     def _setup_shortcuts(self):
         """Setup keyboard shortcuts for editing operations."""
@@ -723,19 +660,18 @@ class TranscriptViewerDialog(QDialog):
 
     def _handle_save_shortcut(self):
         """Handle Ctrl+S shortcut."""
-        if self.is_edit_mode and self.is_modified:
-            self.save_changes()
+        if self.editor_panel and self.editor_panel.is_edit_mode and self.editor_panel.is_modified:
+            self.editor_panel.save_changes()
 
     def _handle_search_shortcut(self):
         """Handle Ctrl+F shortcut to open search widget."""
-        self._toggle_search()
+        if self.editor_panel:
+            self.editor_panel.toggle_search()
 
     def _toggle_search(self):
         """Toggle search widget visibility."""
-        if self.search_widget.isVisible():
-            self.search_widget.hide_search()
-        else:
-            self.search_widget.show_search()
+        if self.editor_panel:
+            self.editor_panel.toggle_search()
 
     def _text_context_menu_event(self, event):
         """Handle context menu event for text edit."""
@@ -749,36 +685,8 @@ class TranscriptViewerDialog(QDialog):
         Args:
             format: Target format (txt, srt, md)
         """
-        # Generate default export path
-        original_name = self.task_data.get("file_name", "transcript")
-        base_name = os.path.splitext(original_name)[0]
-
-        # Infer extension from format
-        extension = format.lower()
-        default_name = f"{base_name}.{extension}"
-
-        # Open file dialog
-        file_path, _ = QFileDialog.getSaveFileName(
-            self,
-            self.i18n.t("viewer.export_dialog_title"),
-            default_name,
-            f"{format.upper()} (*.{extension})",
-        )
-
-        if not file_path:
-            return
-
-        try:
-            # Use manager to export (which uses structured data)
-            self.transcription_manager.export_result(self.task_id, format, file_path)
-
-            self.show_info(
-                self.i18n.t("common.success"), self.i18n.t("viewer.export_success", path=file_path)
-            )
-
-        except Exception as e:
-            logger.error(f"Export failed: {e}")
-            self.show_error(self.i18n.t("viewer.export_error"), str(e))
+        if self.editor_panel:
+            self.editor_panel.export_as(format)
 
     def show_info(self, title: str, message: str):
         """Show info message box."""
@@ -798,17 +706,8 @@ class TranscriptViewerDialog(QDialog):
         # Window title
         self.setWindowTitle(self.i18n.t("viewer.title", filename=self.task_data["file_name"]))
 
-        # Toolbar buttons
-        if self.edit_button:
-            self.edit_button.setText(
-                self.i18n.t("common.save") if self.is_edit_mode else self.i18n.t("common.edit")
-            )
-        if self.copy_button:
-            self.copy_button.setText(self.i18n.t("viewer.copy_all"))
-        if self.export_button:
-            self.export_button.setText(self.i18n.t("viewer.export"))
-        if self.search_button:
-            self.search_button.setText(self.i18n.t("viewer.search"))
+        if self.editor_panel:
+            self.editor_panel.update_translations()
         if self.translate_button:
             self.translate_button.setText(self.i18n.t("timeline.translate_transcript"))
         if self.translate_target_combo:
@@ -823,11 +722,11 @@ class TranscriptViewerDialog(QDialog):
             self.translate_target_combo.blockSignals(False)
 
         # Export menu actions
-        if hasattr(self, "export_txt_action"):
+        if getattr(self, "export_txt_action", None):
             self.export_txt_action.setText(self.i18n.t("viewer.export_txt"))
-        if hasattr(self, "export_srt_action"):
+        if getattr(self, "export_srt_action", None):
             self.export_srt_action.setText(self.i18n.t("viewer.export_srt"))
-        if hasattr(self, "export_md_action"):
+        if getattr(self, "export_md_action", None):
             self.export_md_action.setText(self.i18n.t("viewer.export_md"))
 
         # Update metadata labels
@@ -914,24 +813,35 @@ class TranscriptViewerDialog(QDialog):
 
     def copy_all(self):
         """Copy all text to clipboard."""
-        if self.text_edit:
-            text = self.text_edit.toPlainText()
-            clipboard = QApplication.clipboard()
-            clipboard.setText(text)
-
-            # Show temporary feedback
-            original_text = self.copy_button.text()
-            self.copy_button.setText(self.i18n.t("common.copied"))
-            self.copy_button.setEnabled(False)
-
-            QTimer.singleShot(2000, lambda: self._reset_copy_button(original_text))
+        if self.editor_panel:
+            self.editor_panel.copy_all()
 
     def _reset_copy_button(self, text: str):
         """Reset copy button text."""
-        if self.copy_button:
-            try:
-                self.copy_button.setText(text)
-                self.copy_button.setEnabled(True)
-            except RuntimeError:
-                # Widget might be deleted
-                pass
+        if self.editor_panel:
+            self.editor_panel._reset_copy_button(text)
+
+    def _persist_editor_content(self, content: str) -> None:
+        """Persist edited transcript content to the output file."""
+        output_path = self.task_data["output_path"]
+        if not output_path:
+            raise ValueError(self.i18n.t("exceptions.batch_transcribe_viewer.output_path_not_set"))
+
+        output_dir = os.path.dirname(output_path)
+        if not os.path.exists(output_dir):
+            raise FileNotFoundError(f"Directory does not exist: {output_dir}")
+        if os.path.exists(output_path) and not os.access(output_path, os.W_OK):
+            raise PermissionError(f"No write permission for file: {output_path}")
+        if not os.path.exists(output_path) and not os.access(output_dir, os.W_OK):
+            raise PermissionError(f"No write permission for directory: {output_dir}")
+
+        stat = shutil.disk_usage(output_dir)
+        if stat.free < 1024 * 1024:
+            raise OSError(self.i18n.t("exceptions.batch_transcribe_viewer.insufficient_disk_space"))
+
+        with open(output_path, "w", encoding="utf-8") as handle:
+            handle.write(content)
+
+    def _export_editor_content(self, format_name: str, file_path: str, _text: str) -> None:
+        """Export transcript via the transcription manager to preserve format fidelity."""
+        self.transcription_manager.export_result(self.task_id, format_name, file_path)

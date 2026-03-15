@@ -19,7 +19,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional
 
-from data.database.models import AutoTaskConfig, CalendarEvent, EventAttachment
+from data.database.models import AutoTaskConfig, CalendarEvent
 from utils.time_utils import to_local_datetime, to_utc_iso
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -51,6 +51,7 @@ class TimelineManager:
         db_connection,
         i18n: Optional["I18nManager"] = None,
         translate: Optional[Callable[[str], str]] = None,
+        workspace_manager=None,
     ):
         """
         Initialize the timeline manager.
@@ -63,6 +64,7 @@ class TimelineManager:
         """
         self.calendar_manager = calendar_manager
         self.db = db_connection
+        self.workspace_manager = workspace_manager
         if i18n is not None and translate is not None:
             raise ValueError("Provide either an i18n manager or a translation callback, not both")
         self._translate_callback = translate or (i18n.t if i18n else None)
@@ -308,11 +310,10 @@ class TimelineManager:
             current_page_items = past_event_items[start_idx:end_idx]
             page_event_ids = [event.id for event in current_page_items]
 
-            attachments_map = self._get_attachments_map(page_event_ids)
+            artifacts_map = self._get_artifacts_map(page_event_ids)
 
             for event in current_page_items:
-                attachments = attachments_map.get(event.id, [])
-                artifacts = self._build_artifacts_from_attachments(attachments)
+                artifacts = artifacts_map.get(event.id, self._empty_artifacts_payload())
                 past_events.append({"event": event, "artifacts": artifacts})
 
             auto_task_map = self._get_auto_task_map(future_event_ids)
@@ -443,38 +444,38 @@ class TimelineManager:
         """Return a fresh default auto-task configuration payload."""
         return self._default_auto_task_config()
 
-    def _get_attachments_map(
-        self, event_ids: Iterable[str], base_map: Optional[Dict[str, List[EventAttachment]]] = None
-    ) -> Dict[str, List[EventAttachment]]:
-        """Fetch attachments for multiple events in a single query."""
-        attachments_map: Dict[str, List[EventAttachment]] = base_map if base_map is not None else {}
+    def _empty_artifacts_payload(self) -> Dict[str, Any]:
+        """Return the canonical empty artifact payload."""
+        return {"recording": None, "transcript": None, "translation": None, "attachments": []}
+
+    def _get_artifacts_map(
+        self, event_ids: Iterable[str], base_map: Optional[Dict[str, Dict[str, Any]]] = None
+    ) -> Dict[str, Dict[str, Any]]:
+        """Fetch workspace artifacts for multiple events in a single query."""
+        artifacts_map: Dict[str, Dict[str, Any]] = base_map if base_map is not None else {}
+        event_ids_list = list(event_ids)
+        if self.workspace_manager is None:
+            for event_id in event_ids_list:
+                artifacts_map.setdefault(event_id, self._empty_artifacts_payload())
+            return artifacts_map
 
         try:
-            event_ids_list = list(event_ids)
+            missing_ids = [
+                event_id for event_id in event_ids_list if event_id and event_id not in artifacts_map
+            ]
+            if not missing_ids:
+                return artifacts_map
 
-            unique_ids: List[str] = []
-            for event_id in event_ids_list:
-                if event_id not in attachments_map and event_id not in unique_ids:
-                    unique_ids.append(event_id)
-                else:
-                    attachments_map.setdefault(event_id, [])
+            fetched = self.workspace_manager.get_event_artifacts_map(missing_ids) or {}
+            for event_id in missing_ids:
+                artifacts_map[event_id] = fetched.get(event_id, self._empty_artifacts_payload())
 
-            if not unique_ids:
-                return attachments_map
-
-            fetched = EventAttachment.get_by_event_ids(self.db, unique_ids) or {}
-
-            for event_id in unique_ids:
-                attachments_map[event_id] = fetched.get(event_id, [])
-
-            return attachments_map
+            return artifacts_map
         except Exception as exc:  # pragma: no cover - defensive logging
-            logger.error(
-                "Failed to get attachments for events %s: %s",
-                event_ids_list,
-                exc,
-            )
-            return attachments_map
+            logger.error("Failed to get workspace artifacts for events %s: %s", event_ids_list, exc)
+            for event_id in event_ids_list:
+                artifacts_map.setdefault(event_id, self._empty_artifacts_payload())
+            return artifacts_map
 
     def _get_auto_task_map(self, event_ids: List[str]) -> Dict[str, Dict[str, Any]]:
         """Fetch auto-task configurations for multiple events at once."""
@@ -565,22 +566,22 @@ class TimelineManager:
 
             event_ids = {event.id for event in events}
 
-            attachments_map: Dict[str, List[EventAttachment]] = {}
+            artifacts_map: Dict[str, Dict[str, Any]] = {}
             if event_ids:
-                attachments_map = self._get_attachments_map(event_ids)
+                artifacts_map = self._get_artifacts_map(event_ids)
 
-            def _attachments_contain_query(
-                attachments: List[EventAttachment],
+            def _artifacts_contain_query(
+                attachments: List[Dict[str, Any]],
                 keyword_lower: str,
                 event_id: str,
             ) -> bool:
                 for attachment in attachments:
-                    if attachment.attachment_type not in {"transcript", "translation"}:
+                    if attachment.get("type") not in {"transcript", "translation"}:
                         continue
 
                     content, _ = self._read_attachment_text(
                         attachment,
-                        getattr(attachment, "event_id", event_id),
+                        event_id,
                         collect_fallback=False,
                     )
 
@@ -622,21 +623,22 @@ class TimelineManager:
                         break
 
                 if additional_events:
-                    attachments_map = self._get_attachments_map(
+                    artifacts_map = self._get_artifacts_map(
                         [event.id for event in additional_events],
-                        attachments_map,
+                        artifacts_map,
                     )
 
                     for candidate in additional_events:
-                        attachments = attachments_map.get(candidate.id, [])
-                        if _attachments_contain_query(
+                        artifacts = artifacts_map.get(candidate.id, self._empty_artifacts_payload())
+                        attachments = artifacts.get("attachments", [])
+                        if _artifacts_contain_query(
                             attachments,
                             query_lower,
                             candidate.id,
                         ):
                             events.append(candidate)
                             event_ids.add(candidate.id)
-                            attachments_map.setdefault(candidate.id, attachments)
+                            artifacts_map.setdefault(candidate.id, artifacts)
 
             future_reference_time = (
                 to_local_datetime(datetime.now()) if include_future_auto_tasks else None
@@ -646,12 +648,15 @@ class TimelineManager:
 
             results = []
             for event in events:
-                attachments = attachments_map.get(event.id, [])
-                artifacts = self._build_artifacts_from_attachments(attachments)
+                artifacts = artifacts_map.get(event.id, self._empty_artifacts_payload())
                 result_item = {
                     "event": event,
                     "artifacts": artifacts,
-                    "match_snippet": self.get_search_snippet(event, query, attachments),
+                    "match_snippet": self.get_search_snippet(
+                        event,
+                        query,
+                        artifacts.get("attachments", []),
+                    ),
                 }
 
                 if include_future_auto_tasks and future_reference_time is not None:
@@ -703,72 +708,48 @@ class TimelineManager:
             - attachments: List of all attachments
         """
         try:
-            attachments_map = self._get_attachments_map([event_id])
-            attachments = attachments_map.get(event_id, [])
-            return self._build_artifacts_from_attachments(attachments)
+            return self._get_artifacts_map([event_id]).get(event_id, self._empty_artifacts_payload())
 
         except Exception as e:
             logger.error(f"Failed to get artifacts for event {event_id}: {e}")
-            return {"recording": None, "transcript": None, "attachments": []}
-
-    @staticmethod
-    def _build_artifacts_from_attachments(attachments: List[EventAttachment]) -> Dict[str, Any]:
-        """Convert attachment objects to artifact dictionary."""
-        recording = None
-        transcript = None
-        translation = None
-
-        for attachment in attachments:
-            if attachment.attachment_type == "recording":
-                recording = attachment.file_path
-            elif attachment.attachment_type == "transcript":
-                transcript = attachment.file_path
-            elif attachment.attachment_type == "translation":
-                translation = attachment.file_path
-
-        return {
-            "recording": recording,
-            "transcript": transcript,
-            "translation": translation,
-            "attachments": [
-                {
-                    "id": a.id,
-                    "type": a.attachment_type,
-                    "path": a.file_path,
-                    "size": a.file_size,
-                    "created_at": a.created_at,
-                }
-                for a in attachments
-            ],
-        }
+            return self._empty_artifacts_payload()
 
     def _read_attachment_text(
         self,
-        attachment: EventAttachment,
+        attachment: Dict[str, Any],
         event_id: str,
         collect_fallback: bool = True,
     ) -> tuple[Optional[str], Optional[str]]:
-        """Read textual content from transcript/translation attachments."""
+        """Read textual content from workspace transcript/translation assets."""
 
-        if attachment.attachment_type not in {"transcript", "translation"}:
+        attachment_type = attachment.get("type")
+        if attachment_type not in {"transcript", "translation"}:
             return None, None
 
         fallback_message: Optional[str] = None
         try:
-            with open(attachment.file_path, "r", encoding="utf-8") as file_obj:
+            inline_text = attachment.get("text_content")
+            if isinstance(inline_text, str) and inline_text:
+                return inline_text, None
+
+            attachment_path = attachment.get("path")
+            if not attachment_path:
+                return None, None
+
+            with open(attachment_path, "r", encoding="utf-8") as file_obj:
                 return file_obj.read(), None
         except FileNotFoundError:
-            if attachment.attachment_type == "translation":
+            if attachment_type == "translation":
                 logger.warning(
                     "Translation file not found for event %s: %s",
                     event_id,
-                    attachment.file_path,
+                    attachment.get("path"),
                 )
             else:
                 logger.warning(
                     "Transcript file not found for event %s: %s",
                     event_id,
-                    attachment.file_path,
+                    attachment.get("path"),
                 )
             if collect_fallback:
                 fallback_message = self._translate(
@@ -778,13 +759,13 @@ class TimelineManager:
         except UnicodeDecodeError:
             log_message = (
                 "Failed to decode translation for event %s: %s"
-                if attachment.attachment_type == "translation"
+                if attachment_type == "translation"
                 else "Failed to decode transcript for event %s: %s"
             )
             logger.error(
                 log_message,
                 event_id,
-                attachment.file_path,
+                attachment.get("path"),
                 exc_info=True,
             )
             if collect_fallback:
@@ -795,12 +776,12 @@ class TimelineManager:
         except Exception as exc:  # pragma: no cover - defensive logging
             log_message = (
                 "Failed to read translation %s for event %s: %s"
-                if attachment.attachment_type == "translation"
+                if attachment_type == "translation"
                 else "Failed to read transcript %s for event %s: %s"
             )
             logger.warning(
                 log_message,
-                attachment.file_path,
+                attachment.get("path"),
                 event_id,
                 exc,
             )
@@ -813,7 +794,7 @@ class TimelineManager:
         return None, fallback_message
 
     def get_search_snippet(
-        self, event: CalendarEvent, query: str, attachments: Optional[List[EventAttachment]] = None
+        self, event: CalendarEvent, query: str, attachments: Optional[List[Dict[str, Any]]] = None
     ) -> Optional[str]:
         """
         Get a snippet showing where the query matched.
@@ -853,10 +834,10 @@ class TimelineManager:
         # Check transcripts
         attachments_to_check = attachments
         if attachments_to_check is None:
-            attachments_to_check = EventAttachment.get_by_event_id(self.db, event.id)
+            attachments_to_check = self.get_event_artifacts(event.id).get("attachments", [])
         fallback_message: Optional[str] = None
         for attachment in attachments_to_check:
-            if attachment.attachment_type not in {"transcript", "translation"}:
+            if attachment.get("type") not in {"transcript", "translation"}:
                 continue
 
             content, attachment_fallback = self._read_attachment_text(
@@ -879,7 +860,7 @@ class TimelineManager:
 
                 prefix_key = "timeline.snippet.transcript_prefix"
                 default_prefix = "Transcript"
-                if attachment.attachment_type == "translation":
+                if attachment.get("type") == "translation":
                     prefix_key = "timeline.snippet.translation_prefix"
                     default_prefix = "Translation"
 
@@ -927,8 +908,7 @@ class TimelineManager:
                 candidate_start = to_local_datetime(min_start)
                 candidate_end = to_local_datetime(max_end)
             else:
-                attachment_bounds = EventAttachment.get_transcript_event_bounds(
-                    self.db,
+                attachment_bounds = self._get_workspace_transcript_event_bounds(
                     limit=_MAX_TRANSCRIPT_CANDIDATES,
                     event_type=event_type,
                     source=source,
@@ -946,3 +926,54 @@ class TimelineManager:
             candidate_start, candidate_end = candidate_end, candidate_start
 
         return candidate_start, candidate_end
+
+    def _get_workspace_transcript_event_bounds(
+        self,
+        *,
+        limit: Optional[int] = None,
+        event_type: Optional[str] = None,
+        source: Optional[str] = None,
+    ) -> Optional[tuple[str, str]]:
+        """Return calendar bounds for events that already have workspace transcript assets."""
+        if self.workspace_manager is None:
+            return None
+
+        subquery = (
+            "SELECT DISTINCT wi.source_event_id "
+            "FROM workspace_items AS wi "
+            "JOIN workspace_assets AS wa ON wa.item_id = wi.id "
+            "WHERE wi.source_event_id IS NOT NULL "
+            "AND wa.asset_role IN ('transcript', 'translation')"
+        )
+        params: List[Any] = []
+        if limit:
+            subquery += " ORDER BY wi.updated_at DESC LIMIT ?"
+            params.append(limit)
+
+        query = (
+            "SELECT MIN(e.start_time) AS min_start, "
+            "MAX(COALESCE(e.end_time, e.start_time)) AS max_end "
+            "FROM calendar_events AS e "
+            "JOIN (" + subquery + ") AS wi ON e.id = wi.source_event_id"
+        )
+
+        filters = []
+        if event_type:
+            filters.append("e.event_type = ?")
+            params.append(event_type)
+        if source:
+            filters.append("e.source = ?")
+            params.append(source)
+        if filters:
+            query += " WHERE " + " AND ".join(filters)
+
+        rows = self.db.execute(query, tuple(params))
+        if not rows:
+            return None
+
+        row = rows[0]
+        min_start = row["min_start"] if isinstance(row, dict) else row[0]
+        max_end = row["max_end"] if isinstance(row, dict) else row[1]
+        if not min_start or not max_end:
+            return None
+        return min_start, max_end

@@ -369,11 +369,10 @@ class MainWindow(QMainWindow):
             content_area: Stacked widget to add pages to
         """
         # Import actual widget classes
-        from ui.batch_transcribe.widget import BatchTranscribeWidget
         from ui.calendar_hub.widget import CalendarHubWidget
-        from ui.realtime_record.widget import RealtimeRecordWidget
         from ui.settings.widget import SettingsWidget
         from ui.timeline.widget import TimelineWidget
+        from ui.workspace.widget import WorkspaceWidget
 
         # Add main window to managers for theme application in settings page.
         managers_with_window = self.managers.copy()
@@ -381,34 +380,15 @@ class MainWindow(QMainWindow):
 
         self._register_page_widget(
             content_area,
-            "batch_transcribe",
-            lambda: BatchTranscribeWidget(
-                self.managers["transcription_manager"],
+            "workspace",
+            lambda: WorkspaceWidget(
+                self.managers["workspace_manager"],
                 self.i18n,
-                self.managers.get("model_manager"),
             ),
             missing_message=(
                 None
-                if self.managers.get("transcription_manager") is not None
-                else "Transcription manager not available"
-            ),
-        )
-
-        self._register_page_widget(
-            content_area,
-            "realtime_record",
-            lambda: RealtimeRecordWidget(
-                self.managers["realtime_recorder"],
-                self.managers["audio_capture"],
-                self.i18n,
-                settings_manager=self.managers.get("settings_manager"),
-                model_manager=self.managers.get("model_manager"),
-                transcription_manager=self.managers.get("transcription_manager"),
-            ),
-            missing_message=(
-                None
-                if self.managers.get("realtime_recorder") is not None
-                else "Realtime recorder not available"
+                if self.managers.get("workspace_manager") is not None
+                else "Workspace manager not available"
             ),
         )
 
@@ -420,6 +400,7 @@ class MainWindow(QMainWindow):
                 self.managers["oauth_manager"],
                 self.i18n,
                 transcription_manager=self.managers["transcription_manager"],
+                workspace_manager=self.managers.get("workspace_manager"),
             ),
             missing_message=self._get_calendar_missing_reason(),
         )
@@ -1021,15 +1002,6 @@ class MainWindow(QMainWindow):
             if hasattr(self, "_status_timer") and self._status_timer.isActive():
                 self._status_timer.stop()
 
-            # Close all open transcript viewer windows
-            try:
-                batch_widget = self.pages.get("batch_transcribe")
-                if batch_widget and hasattr(batch_widget, "close_all_viewers"):
-                    logger.info(self.i18n.t("logging.main_window.closing_transcript_viewers"))
-                    batch_widget.close_all_viewers()
-            except Exception as e:
-                logger.error(f"Error closing transcript viewers: {e}")
-
             # Stop transcription manager
             if "transcription_manager" in self.managers:
                 try:
@@ -1054,15 +1026,7 @@ class MainWindow(QMainWindow):
             if "realtime_recorder" in self.managers:
                 try:
                     realtime_recorder = self.managers["realtime_recorder"]
-                    realtime_widget = self.pages.get("realtime_record")
-                    cleaned_by_widget = False
-                    if realtime_widget and hasattr(realtime_widget, "_cleanup_resources"):
-                        logger.info(self.i18n.t("logging.main_window.stopping_realtime_recorder"))
-                        realtime_widget._cleanup_resources()
-                        cleaned_by_widget = True
-
-                    # Fallback for exceptional cases where the page is unavailable.
-                    if not cleaned_by_widget and hasattr(realtime_recorder, "audio_capture"):
+                    if hasattr(realtime_recorder, "audio_capture"):
                         try:
                             realtime_recorder.audio_capture.stop_capture()
                         except Exception:
@@ -1225,14 +1189,6 @@ class MainWindow(QMainWindow):
                 logger.info(self.i18n.t("logging.main_window.realtime_recorder_engine_reloaded"))
             except Exception as e:
                 logger.error(f"Error reloading realtime recorder engine: {e}")
-
-        # Refresh realtime record UI availability state (e.g. translation controls)
-        realtime_widget = self.pages.get("realtime_record") if hasattr(self, "pages") else None
-        if realtime_widget and hasattr(realtime_widget, "refresh_engine_availability"):
-            try:
-                realtime_widget.refresh_engine_availability()
-            except Exception as e:
-                logger.error(f"Error refreshing realtime record engine availability: {e}")
 
         logger.info(self.i18n.t("logging.main_window.cloud_engines_reload_completed"))
 

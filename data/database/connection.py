@@ -297,9 +297,15 @@ class DatabaseConnection:
             schema_sql = f.read()
 
         self.execute_script(schema_sql, commit=True)
-        # Ensure the schema_version is set to 2 matching schema.sql
-        self.set_version(2)
-        logger.info("Database schema initialized successfully to version 2")
+        has_app_settings = self.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='app_settings'"
+        )
+        if has_app_settings:
+            # Ensure the schema_version matches the current schema.sql definition.
+            self.set_version(3)
+            logger.info("Database schema initialized successfully to version 3")
+        else:
+            logger.info("Database schema initialized successfully without app_settings table")
 
     def get_version(self) -> int:
         """

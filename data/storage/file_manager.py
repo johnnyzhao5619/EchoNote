@@ -60,6 +60,17 @@ class FileManager:
         else:
             self.recordings_dir = Path(recordings_dir).expanduser()
 
+        self.workspace_dir = self.base_dir / "Workspace"
+        self._named_directories: Dict[str, Path] = {
+            "Recordings": self.recordings_dir,
+            "Workspace": self.workspace_dir,
+            "Transcripts": self.base_dir / "Transcripts",
+            "Translations": self.base_dir / "Translations",
+            "Markers": self.base_dir / "Markers",
+            "Exports": self.base_dir / "Exports",
+            "Temp": self.base_dir / "Temp",
+        }
+
         # Create base directory structure
         self._initialize_directories()
 
@@ -67,15 +78,7 @@ class FileManager:
 
     def _initialize_directories(self):
         """Create base directory structure."""
-        directories = [
-            self.base_dir,
-            self.recordings_dir,
-            self.base_dir / "Transcripts",
-            self.base_dir / "Translations",
-            self.base_dir / "Markers",
-            self.base_dir / "Exports",
-            self.base_dir / "Temp",
-        ]
+        directories = [self.base_dir, *self._named_directories.values()]
 
         for directory in directories:
             directory.mkdir(parents=True, exist_ok=True)
@@ -89,10 +92,15 @@ class FileManager:
         if not subdirectory:
             return self.base_dir
 
-        if subdirectory == "Recordings":
-            return self.recordings_dir
+        if subdirectory in self._named_directories:
+            return self._named_directories[subdirectory]
 
         return self.base_dir / subdirectory
+
+    def get_workspace_path(self, *parts: str) -> str:
+        """Return an absolute path rooted in the unified workspace directory."""
+        path = self.workspace_dir.joinpath(*parts)
+        return str(path)
 
     def _set_file_permissions(self, file_path: Path):
         """

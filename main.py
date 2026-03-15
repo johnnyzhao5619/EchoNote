@@ -210,12 +210,20 @@ def main():
         managers["file_manager"] = file_manager
         logger.info("File manager initialized")
 
+        logger.info("Initializing workspace manager...")
+        from utils.app_initializer import initialize_workspace_manager
+
+        workspace_manager = initialize_workspace_manager(db, file_manager)
+        managers["workspace_manager"] = workspace_manager
+        logger.info("Workspace manager initialized")
+
         # Initialize settings manager
         logger.info("Initializing settings manager...")
         from core.settings.manager import SettingsManager
 
         settings_manager = SettingsManager(config)
         managers["settings_manager"] = settings_manager
+        workspace_manager.set_settings_manager(settings_manager)
         logger.info("Settings manager initialized")
 
         # Initialize usage tracker
@@ -232,6 +240,7 @@ def main():
 
         model_manager = ModelManager(config, db)
         managers["model_manager"] = model_manager
+        workspace_manager.set_model_manager(model_manager)
         logger.info("Model manager initialized")
 
         # Initialize speech engine with lazy loading
@@ -260,7 +269,10 @@ def main():
         from core.transcription.manager import TranscriptionManager
 
         transcription_manager = TranscriptionManager(
-            db, managers["speech_engine"], config.get("transcription", {})
+            db,
+            managers["speech_engine"],
+            config.get("transcription", {}),
+            workspace_manager=managers.get("workspace_manager"),
         )
         managers["transcription_manager"] = transcription_manager
         logger.info("Transcription manager initialized")
@@ -341,6 +353,7 @@ def main():
             file_manager=file_manager,
             i18n=i18n,
             config=realtime_config,
+            workspace_manager=managers.get("workspace_manager"),
         )
         managers["realtime_recorder"] = realtime_recorder
         logger.info("Realtime recorder initialized")
@@ -386,6 +399,7 @@ def main():
             calendar_manager,
             db,
             i18n=i18n,
+            workspace_manager=managers.get("workspace_manager"),
         )
         managers["timeline_manager"] = timeline_manager
         logger.info("Timeline manager initialized")

@@ -38,6 +38,7 @@ class TestFileManagerInitialization:
 
         assert (base_dir / "Recordings").exists()
         assert (base_dir / "Transcripts").exists()
+        assert (base_dir / "Workspace").exists()
         assert (base_dir / "Exports").exists()
         assert (base_dir / "Temp").exists()
 
@@ -54,6 +55,15 @@ class TestFileManagerInitialization:
 
         file_path = fm.save_file(b"audio", "sample.wav", subdirectory="Recordings")
         assert Path(file_path).parent == recordings_dir
+
+    def test_workspace_alias_resolves_to_workspace_directory(self, tmp_path):
+        """Workspace assets should use a unified root instead of scattered folders."""
+        base_dir = tmp_path / "echonote"
+        fm = FileManager(str(base_dir))
+
+        file_path = fm.save_text_file("notes", "meeting.md", subdirectory="Workspace")
+
+        assert Path(file_path).parent == base_dir / "Workspace"
 
 
 class TestFileSaveOperations:

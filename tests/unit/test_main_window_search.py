@@ -34,8 +34,7 @@ def _build_i18n():
 
     def _t(key: str, **kwargs):
         mapping = {
-            "sidebar.batch_transcribe": "Batch Transcribe",
-            "sidebar.realtime_record": "Real-time Record",
+            "sidebar.workspace": "Workspace",
             "sidebar.calendar_hub": "Calendar Hub",
             "sidebar.timeline": "Timeline",
             "sidebar.settings": "Settings",
@@ -107,3 +106,12 @@ def test_global_search_routes_to_settings_subpage():
     fake_window.switch_page.assert_called_once_with("settings")
     settings_widget.show_page.assert_called_once_with("appearance")
     fake_window._set_shell_message.assert_called_once_with("Opened Settings / Appearance")
+
+
+def test_resolve_search_target_matches_workspace_entry():
+    fake_window = Mock()
+    fake_window.i18n = _build_i18n()
+    fake_window.pages = {}
+    fake_window._resolve_settings_category = lambda _query: None
+
+    assert MainWindow._resolve_search_target(fake_window, "workspace") == "workspace"

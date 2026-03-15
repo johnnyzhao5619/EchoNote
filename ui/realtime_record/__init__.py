@@ -15,4 +15,4 @@
 # limitations under the License.
 """Real-time recording UI components."""
 
-__all__ = ["RealtimeRecordWidget", "AudioVisualizer"]
+__all__ = ["AudioVisualizer"]

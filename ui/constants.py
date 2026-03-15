@@ -289,6 +289,15 @@ ROLE_SETTINGS_CONFIG_GROUP_NESTED = "settings-config-group-nested"
 ROLE_USAGE_STATS = "usage-stats"
 ROLE_WARNING_LARGE = "warning-large"
 
+# Workspace Roles
+ROLE_WORKSPACE_SURFACE = "workspace-surface"
+ROLE_WORKSPACE_ITEM_LIST = "workspace-item-list"
+ROLE_WORKSPACE_EDITOR_PANEL = "workspace-editor-panel"
+ROLE_WORKSPACE_RECORDING_PANEL = "workspace-recording-panel"
+ROLE_WORKSPACE_ASSET_SELECTOR = "workspace-asset-selector"
+ROLE_WORKSPACE_AI_ACTION = "workspace-ai-action"
+ROLE_WORKSPACE_PLACEHOLDER = "workspace-placeholder"
+
 # Audio Roles
 ROLE_AUDIO_FILE = "audio-file"
 

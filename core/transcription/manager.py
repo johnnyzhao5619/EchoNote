@@ -35,7 +35,6 @@ from core.transcription.format_converter import FormatConverter
 from core.transcription.task_queue import TaskQueue, TaskStatus
 from data.database.connection import DatabaseConnection
 from data.database.models import (
-    EventAttachment,
     TranscriptionTask,
     current_iso_timestamp,
 )
@@ -74,6 +73,7 @@ class TranscriptionManager:
         i18n: Optional[Any] = None,
         translate: Optional[Callable[..., str]] = None,
         translation_engine: Optional[Any] = None,
+        workspace_manager: Optional[Any] = None,
     ):
         """
         Initialize transcription manager.
@@ -97,6 +97,7 @@ class TranscriptionManager:
 
         # 翻译引擎（可选），用于批量转写任务完成后自动翻译
         self.translation_engine = translation_engine
+        self.workspace_manager = workspace_manager
 
         self._default_save_path: Optional[str] = None
         raw_default_path = self.config.get("default_save_path")
@@ -1020,24 +1021,16 @@ class TranscriptionManager:
                     txt_path = self._resolve_realtime_transcript_path(task, event_id)
                     json_path = txt_path.with_suffix(".json")
 
+                    task.output_path = str(txt_path)
+                    task.output_format = txt_path.suffix.lstrip(".") or task.output_format or "txt"
+                    task.save(self.db)
+
                     with open(json_path, "w", encoding="utf-8") as f:
                         json.dump(result, f, ensure_ascii=False, indent=2)
 
                     if transcript_text:
                         with open(txt_path, "w", encoding="utf-8") as f:
                             f.write(transcript_text)
-
-                    if event_id:
-                        file_size = None
-                        if txt_path.exists():
-                            file_size = txt_path.stat().st_size
-                        EventAttachment.upsert_for_event_type(
-                            db_connection=self.db,
-                            event_id=event_id,
-                            attachment_type="transcript",
-                            file_path=str(txt_path),
-                            file_size=file_size,
-                        )
 
                     logger.info("Replaced realtime transcripts at %s", json_path)
                 except Exception as e:
@@ -1061,9 +1054,12 @@ class TranscriptionManager:
                 should_translate = True
                 had_existing_translation = True
 
+            translation_output_path: Optional[Path] = None
             if self.translation_engine and should_translate:
                 try:
-                    await self._translate_and_save(task, transcript_text, runtime_options)
+                    translation_output_path = await self._translate_and_save(
+                        task, transcript_text, runtime_options
+                    )
                 except Exception as trans_exc:
                     self._set_task_quality_note(task_id, f"translation refresh failed: {trans_exc}")
                     if replace_realtime and event_id and had_existing_translation:
@@ -1079,6 +1075,13 @@ class TranscriptionManager:
                         "Translation failed for task %s: %s", task_id, trans_exc, exc_info=True
                     )
                     # 翻译失败不影响转写任务的完成状态
+
+            self._publish_completed_task_to_workspace(
+                task,
+                event_id=event_id,
+                replace_existing=replace_realtime,
+                translation_output_path=translation_output_path,
+            )
 
             # Notify completion
             self._notify_listeners(
@@ -1487,14 +1490,14 @@ class TranscriptionManager:
 
     async def _translate_and_save(
         self, task: TranscriptionTask, text: str, options: Dict[str, Any]
-    ) -> None:
+    ) -> Optional[Path]:
         """翻译转写文本并将翻译文件路径关联到任务。
 
-        有 event_id 时通过 event_attachments 关联（attachment_type='translation'）；
+        有 event_id 时通过 workspace 关联 translation 资产；
         无 event_id 时保存至音频文件同目录，命名为 <stem>_translation_<target_lang>.<format>。
         """
         if not text.strip():
-            return
+            return None
 
         source_lang = options.get("translation_source_lang") or "auto"
         target_lang = options.get("translation_target_lang") or options.get("target_language") or "en"
@@ -1509,7 +1512,7 @@ class TranscriptionManager:
         )
 
         if not translated_text:
-            return
+            return None
 
         audio_path = Path(task.file_path)
         output_format = task.output_format or "txt"
@@ -1522,8 +1525,7 @@ class TranscriptionManager:
         self._write_translation_file(translation_path, translated_text)
 
         logger.info("Translation saved to %s", translation_path)
-
-        self._upsert_translation_attachment(event_id=event_id, translation_path=translation_path)
+        return translation_path
 
     async def translate_transcript_file(
         self,
@@ -1913,14 +1915,12 @@ class TranscriptionManager:
         event_id: Optional[str],
         extension: str,
     ) -> Path:
-        """Resolve translation output path with attachment overwrite preference."""
+        """Resolve translation output path with workspace overwrite preference."""
         normalized_extension = extension.lstrip(".") or "txt"
-        if event_id:
-            existing_attachment = EventAttachment.get_by_event_and_type(
-                self.db, event_id, "translation"
-            )
-            if existing_attachment and existing_attachment.file_path:
-                return Path(existing_attachment.file_path).expanduser().resolve()
+        if event_id and self.workspace_manager is not None:
+            existing_path = self.workspace_manager.get_event_asset_path(event_id, "translation")
+            if existing_path:
+                return Path(existing_path).expanduser().resolve()
 
         translation_filename = f"{base_path.stem}_translation_{target_lang}.{normalized_extension}"
         return base_path.parent / translation_filename
@@ -1948,52 +1948,38 @@ class TranscriptionManager:
     def _upsert_translation_attachment(
         self, *, event_id: Optional[str], translation_path: Path
     ) -> None:
-        """Upsert translation attachment record when event context is available."""
-        if not event_id:
+        """Upsert translation asset into workspace when event context is available."""
+        if not event_id or self.workspace_manager is None:
             return
         try:
-            file_size = translation_path.stat().st_size if translation_path.exists() else None
-            EventAttachment.upsert_for_event_type(
-                db_connection=self.db,
-                event_id=event_id,
-                attachment_type="translation",
-                file_path=str(translation_path),
-                file_size=file_size,
+            self.workspace_manager.publish_event_text_asset(
+                event_id,
+                "translation",
+                str(translation_path),
             )
-            logger.info("Translation attachment saved for event %s", event_id)
+            logger.info("Translation workspace asset saved for event %s", event_id)
         except Exception as exc:
-            logger.warning("Failed to save translation attachment: %s", exc)
+            logger.warning("Failed to save translation workspace asset: %s", exc)
 
     def _event_has_attachment_type(self, event_id: str, attachment_type: str) -> bool:
-        """Return whether event currently has an attachment of a specific type."""
+        """Return whether event currently has a workspace asset of a specific type."""
+        if self.workspace_manager is None:
+            return False
         try:
-            attachment = EventAttachment.get_by_event_and_type(self.db, event_id, attachment_type)
-            return bool(attachment and attachment.file_path)
+            return self.workspace_manager.has_event_asset_role(event_id, attachment_type)
         except Exception:
             return False
 
     def _remove_event_attachment_by_type(self, *, event_id: str, attachment_type: str) -> bool:
-        """Remove event attachment metadata for a given type."""
-        try:
-            attachment = EventAttachment.get_by_event_and_type(self.db, event_id, attachment_type)
-        except Exception as exc:
-            logger.warning(
-                "Failed to query %s attachment for event %s before delete: %s",
-                attachment_type,
-                event_id,
-                exc,
-            )
-            return False
-
-        if not attachment:
+        """Remove event workspace asset metadata for a given type."""
+        if self.workspace_manager is None:
             return False
 
         try:
-            attachment.delete(self.db)
-            return True
+            return self.workspace_manager.remove_event_asset_role(event_id, attachment_type)
         except Exception as exc:
             logger.warning(
-                "Failed to delete %s attachment for event %s: %s",
+                "Failed to delete %s workspace asset for event %s: %s",
                 attachment_type,
                 event_id,
                 exc,
@@ -2001,32 +1987,15 @@ class TranscriptionManager:
             return False
 
     def _read_event_attachment_text(self, *, event_id: str, attachment_type: str) -> str:
-        """Best-effort load textual attachment content for quality checks."""
+        """Best-effort load textual workspace asset content for quality checks."""
+        if self.workspace_manager is None:
+            return ""
         try:
-            attachment = EventAttachment.get_by_event_and_type(self.db, event_id, attachment_type)
+            return self.workspace_manager.read_event_text_asset(event_id, attachment_type)
         except Exception as exc:
             logger.warning(
-                "Failed to query %s attachment for event %s: %s",
+                "Failed to read %s workspace asset text for event %s: %s",
                 attachment_type,
-                event_id,
-                exc,
-            )
-            return ""
-
-        if not attachment or not attachment.file_path:
-            return ""
-
-        attachment_path = Path(attachment.file_path).expanduser()
-        if not attachment_path.exists():
-            return ""
-
-        try:
-            return attachment_path.read_text(encoding="utf-8")
-        except Exception as exc:
-            logger.warning(
-                "Failed to read %s attachment text %s for event %s: %s",
-                attachment_type,
-                attachment_path,
                 event_id,
                 exc,
             )
@@ -2051,12 +2020,40 @@ class TranscriptionManager:
     def _resolve_realtime_transcript_path(
         self, task: TranscriptionTask, event_id: Optional[str]
     ) -> Path:
-        """Pick replacement transcript path, preferring existing event transcript attachment."""
-        if event_id:
-            attachment = EventAttachment.get_by_event_and_type(self.db, event_id, "transcript")
-            if attachment and attachment.file_path:
-                return Path(attachment.file_path)
+        """Pick replacement transcript path, preferring existing event transcript asset."""
+        if event_id and self.workspace_manager is not None:
+            transcript_path = self.workspace_manager.get_event_asset_path(event_id, "transcript")
+            if transcript_path:
+                return Path(transcript_path)
         return Path(task.file_path).with_suffix(".txt")
+
+    def _publish_completed_task_to_workspace(
+        self,
+        task: TranscriptionTask,
+        *,
+        event_id: Optional[str],
+        replace_existing: bool,
+        translation_output_path: Optional[Path],
+    ) -> None:
+        """Publish completed transcription artifacts into the workspace."""
+        if self.workspace_manager is None:
+            return
+        transcript_path = task.output_path if task.output_path else None
+        translation_path = str(translation_output_path) if translation_output_path else None
+        try:
+            self.workspace_manager.publish_transcription_task(
+                task,
+                transcript_path=transcript_path,
+                translation_path=translation_path,
+                event_id=event_id,
+                replace_existing=replace_existing,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Failed to publish completed task %s to workspace: %s",
+                task.id,
+                exc,
+            )
 
     def _cleanup_after_cancellation(self, task_id: str) -> None:
         """Clean up resources after task cancellation."""

@@ -9,8 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Added `docs/plans/2026-03-15-unified-workspace-and-local-ai.md` as the formal hard-switch implementation plan for the upcoming unified recording/document workspace and local AI meeting workflow.
-- Expanded documentation indexing so `docs/README.md` and `AGENTS.md` both expose the new `docs/plans/` directory and the active workspace plan entry.
+- Hard-switched the desktop shell from separate batch-transcribe and realtime-record pages to a single `workspace` workbench backed by `workspace_items` and `workspace_assets`.
+- Redirected batch transcription, realtime recording, timeline, and calendar artifact reads/writes to the unified workspace asset layer; removed the old page-level dual-track entry points and attachment write path.
+- Added local Text AI governance across extractive summary, ONNX summarization, and GGUF meeting-brief runtimes, with persistent workspace outputs for summaries, action items, decisions, and next steps.
+- Expanded model management and settings ownership to cover `speech`, `translation`, and `text-ai`, including a dedicated Workspace AI defaults page.
+- Updated theme/documentation contracts to recognize workspace semantic roles and the new ownership map for `core/workspace/`, `core/models/`, `engines/text_ai/`, and `ui/workspace/`.
+
+## [2.1.0] - 2026-03-15
+
+### Changed
+
+- Released `v2.1.0` with the unified workspace hard switch: imported documents, batch transcriptions, realtime recordings, summaries, and meeting briefs now share the same persistent asset layer and desktop entry.
+- Replaced the separate batch/realtime shell pages with a single `workspace` page, while keeping timeline and calendar as views over workspace-backed assets instead of legacy attachment paths.
+- Added local Text AI runtime governance for extractive summary, ONNX summarization, and GGUF meeting-brief generation, with all outputs saved back as editable workspace assets.
+- Expanded settings and model management to cover `speech`, `translation`, and `text-ai` together, including dedicated workspace AI defaults and local model selection paths.
+- Synchronized project, packaging, documentation, and landing metadata version references to `v2.1.0`.
 
 ## [2.0.2] - 2026-02-27
 

@@ -36,6 +36,7 @@ from core.qt_imports import (
 )
 
 from core.models.registry import ModelInfo
+from core.models.text_ai_registry import TextAIModelInfo
 from core.models.translation_registry import TranslationModelInfo
 from ui.base_widgets import (
     connect_button_with_callback,
@@ -116,6 +117,14 @@ class ModelManagementPage(BaseSettingsPage):
         # 翻译模型卡片引用
         self.translation_model_cards: Dict[str, QWidget] = {}
 
+        self.model_manager.text_ai_models_updated.connect(self._refresh_text_ai_model_list)
+        self.model_manager.text_ai_downloader.download_progress.connect(
+            self._update_download_progress
+        )
+        self.model_manager.text_ai_downloader.download_completed.connect(self._on_download_completed)
+        self.model_manager.text_ai_downloader.download_failed.connect(self._on_download_failed)
+        self.text_ai_model_cards: Dict[str, QWidget] = {}
+
         # 连接语言切换信号
         self.i18n.language_changed.connect(self.update_translations)
 
@@ -151,9 +160,15 @@ class ModelManagementPage(BaseSettingsPage):
         )
         self.go_to_translation_button.setProperty("role", ROLE_SETTINGS_INLINE_ACTION)
         self.go_to_translation_button.clicked.connect(self._on_go_to_translation_settings)
+        self.go_to_workspace_ai_button = create_button(
+            self.i18n.t("settings.model_management.go_to_workspace_ai_settings")
+        )
+        self.go_to_workspace_ai_button.setProperty("role", ROLE_SETTINGS_INLINE_ACTION)
+        self.go_to_workspace_ai_button.clicked.connect(self._on_go_to_workspace_ai_settings)
         self.related_settings_layout.addWidget(self.related_settings_label)
         self.related_settings_layout.addWidget(self.go_to_transcription_button)
         self.related_settings_layout.addWidget(self.go_to_translation_button)
+        self.related_settings_layout.addWidget(self.go_to_workspace_ai_button)
         self.related_settings_layout.addStretch()
         self.content_layout.addLayout(self.related_settings_layout)
 
@@ -239,9 +254,35 @@ class ModelManagementPage(BaseSettingsPage):
             self.translation_tab, self.i18n.t("settings.model_management.translation_tab")
         )
 
+        # ---- Text AI 模型标签页 ----
+        self.text_ai_tab = QWidget()
+        self.text_ai_layout = create_vbox(margins=(10, 10, 10, 10), spacing=20)
+        self.text_ai_tab.setLayout(self.text_ai_layout)
+
+        self.text_ai_models_title = self.add_section_title(
+            self.i18n.t("settings.model_management.text_ai_models"),
+            layout=self.text_ai_layout,
+        )
+        self.text_ai_models_desc = QLabel(self.i18n.t("settings.model_management.text_ai_models_desc"))
+        self.text_ai_models_desc.setWordWrap(True)
+        self.text_ai_models_desc.setObjectName("description_label")
+        self.text_ai_layout.addWidget(self.text_ai_models_desc)
+
+        self.text_ai_models_container = QWidget()
+        self.text_ai_models_layout = create_vbox(
+            spacing=self.MODEL_LIST_SPACING,
+            margins=ZERO_MARGINS,
+        )
+        self.text_ai_models_container.setLayout(self.text_ai_models_layout)
+        self.text_ai_layout.addWidget(self.text_ai_models_container)
+
+        self.text_ai_layout.addStretch()
+        self.tabs.addTab(self.text_ai_tab, self.i18n.t("settings.model_management.text_ai_tab"))
+
         # 刷新模型列表
         self._refresh_model_list()
         self._refresh_translation_model_list()
+        self._refresh_text_ai_model_list()
 
         logger.debug("Model management UI setup complete")
 
@@ -266,6 +307,10 @@ class ModelManagementPage(BaseSettingsPage):
             self.go_to_translation_button.setText(
                 self.i18n.t("settings.model_management.go_to_translation_settings")
             )
+        if hasattr(self, "go_to_workspace_ai_button"):
+            self.go_to_workspace_ai_button.setText(
+                self.i18n.t("settings.model_management.go_to_workspace_ai_settings")
+            )
 
         # 更新区域标题
         if hasattr(self, "downloaded_title"):
@@ -282,15 +327,23 @@ class ModelManagementPage(BaseSettingsPage):
             self.translation_models_desc.setText(
                 self.i18n.t("settings.model_management.translation_models_desc")
             )
+        if hasattr(self, "text_ai_models_title"):
+            self.text_ai_models_title.setText(self.i18n.t("settings.model_management.text_ai_models"))
+        if hasattr(self, "text_ai_models_desc"):
+            self.text_ai_models_desc.setText(
+                self.i18n.t("settings.model_management.text_ai_models_desc")
+            )
 
         # 更新标签页标题
         if hasattr(self, "tabs"):
             self.tabs.setTabText(0, self.i18n.t("settings.model_management.speech_tab"))
             self.tabs.setTabText(1, self.i18n.t("settings.model_management.translation_tab"))
+            self.tabs.setTabText(2, self.i18n.t("settings.model_management.text_ai_tab"))
 
         # 刷新整个模型列表，这会重新创建所有卡片并使用新的翻译
         self._refresh_model_list()
         self._refresh_translation_model_list()
+        self._refresh_text_ai_model_list()
 
         logger.debug("Translations updated for model management page")
 
@@ -331,7 +384,7 @@ class ModelManagementPage(BaseSettingsPage):
         logger.debug(f"Speech model list refreshed: {len(downloaded_models)} downloaded")
 
     def _create_unified_card(
-        self, model: Union[ModelInfo, TranslationModelInfo]
+        self, model: Union[ModelInfo, TranslationModelInfo, TextAIModelInfo]
     ) -> ModelCardWidget:
         """创建并配置统一的模型卡片组件。"""
         card = ModelCardWidget(model, self.i18n, self.model_manager)
@@ -341,6 +394,10 @@ class ModelManagementPage(BaseSettingsPage):
             card.download_clicked.connect(self._download_translation_model)
             card.delete_clicked.connect(self._delete_translation_model)
             card.details_clicked.connect(self._on_view_translation_details_clicked)
+        elif isinstance(model, TextAIModelInfo):
+            card.download_clicked.connect(self._download_text_ai_model)
+            card.delete_clicked.connect(self._delete_text_ai_model)
+            card.details_clicked.connect(self._on_view_text_ai_details_clicked)
         else:
             card.download_clicked.connect(self._on_download_clicked)
             card.delete_clicked.connect(self._on_delete_clicked)
@@ -583,8 +640,12 @@ class ModelManagementPage(BaseSettingsPage):
             self.i18n.t("settings.model_management.cancel_download_title"),
             self.i18n.t("settings.model_management.cancel_download_confirm", model=model_name),
         ):
-            # 取消下载
-            self.model_manager.cancel_download(model_name)
+            if model_name in self.translation_model_cards:
+                self.model_manager.cancel_translation_download(model_name)
+            elif model_name in self.text_ai_model_cards:
+                self.model_manager.cancel_text_ai_download(model_name)
+            else:
+                self.model_manager.cancel_download(model_name)
             logger.info(f"Cancel requested for model download: {model_name}")
 
     def _create_recommendation_card(self):
@@ -749,7 +810,11 @@ class ModelManagementPage(BaseSettingsPage):
     def _update_download_progress(self, model_id: str, progress: int, speed: float):
         """更新下载进度。支持语音和翻译模型。"""
         # 在语音模型卡片或翻译模型卡片中查找
-        card = self.model_cards.get(model_id) or self.translation_model_cards.get(model_id)
+        card = (
+            self.model_cards.get(model_id)
+            or self.translation_model_cards.get(model_id)
+            or self.text_ai_model_cards.get(model_id)
+        )
         if card and isinstance(card, ModelCardWidget):
             card.update_progress(progress)
 
@@ -846,6 +911,10 @@ class ModelManagementPage(BaseSettingsPage):
         """Navigate to translation settings page."""
         self._open_settings_page("translation")
 
+    def _on_go_to_workspace_ai_settings(self) -> None:
+        """Navigate to workspace AI settings page."""
+        self._open_settings_page("workspace_ai")
+
     # ------------------------------------------------------------------
     # 翻译模型（Opus-MT）管理方法
     # ------------------------------------------------------------------
@@ -875,36 +944,14 @@ class ModelManagementPage(BaseSettingsPage):
 
     def _download_translation_model(self, model_id: str) -> None:
         """触发翻译模型下载（在 QThreadPool 线程中异步运行）。"""
-        from core.qt_imports import QRunnable, QThreadPool
-
         model_info = self.model_manager.get_translation_model(model_id)
         if not model_info:
             return
-
-        model_manager = self.model_manager
-
-        def run_download() -> None:
-            import asyncio as _asyncio
-
-            loop = _asyncio.new_event_loop()
-            try:
-                _asyncio.set_event_loop(loop)
-                loop.run_until_complete(model_manager.download_translation_model(model_id))
-            except Exception as exc:  # noqa: BLE001
-                logger.error(
-                    "Translation model download failed in thread for %s: %s",
-                    model_id,
-                    exc,
-                    exc_info=True,
-                )
-            finally:
-                loop.close()
-
-        class _DownloadRunnable(QRunnable):
-            def run(self) -> None:
-                run_download()
-
-        QThreadPool.globalInstance().start(_DownloadRunnable())
+        self._run_async_download(
+            model_id,
+            download_method="download_translation_model",
+            error_message=f"Translation model download failed in thread for {model_id}",
+        )
 
     def _delete_translation_model(self, model_id: str) -> None:
         """确认后删除翻译模型。"""
@@ -927,6 +974,88 @@ class ModelManagementPage(BaseSettingsPage):
                     message=self.i18n.t("settings.model_management.delete_failed"),
                 )
 
+    @Slot()
+    def _refresh_text_ai_model_list(self):
+        """刷新 Text AI 模型列表。"""
+        if not hasattr(self, "text_ai_models_layout"):
+            return
+
+        logger.debug("Refreshing text ai model list")
+        self._clear_layout(self.text_ai_models_layout)
+        self.text_ai_model_cards.clear()
+
+        all_models = self.model_manager.get_all_text_ai_models()
+        for model in all_models:
+            card = self._create_unified_card(model)
+            self.text_ai_models_layout.addWidget(card)
+            self.text_ai_model_cards[model.model_id] = card
+
+    def _on_view_text_ai_details_clicked(self, model_id: str) -> None:
+        """处理 Text AI 模型查看详情点击。"""
+        model = self.model_manager.get_text_ai_model(model_id)
+        if model:
+            dialog = ModelDetailsDialog(model, self.i18n, self)
+            dialog.exec()
+
+    def _download_text_ai_model(self, model_id: str) -> None:
+        """触发 Text AI 模型下载。"""
+        model_info = self.model_manager.get_text_ai_model(model_id)
+        if not model_info:
+            return
+
+        self._run_async_download(
+            model_id,
+            download_method="download_text_ai_model",
+            error_message=f"Text AI model download failed in thread for {model_id}",
+        )
+
+    def _delete_text_ai_model(self, model_id: str) -> None:
+        """确认后删除 Text AI 模型。"""
+        model_info = self.model_manager.get_text_ai_model(model_id)
+        if not model_info:
+            return
+
+        if self.show_question(
+            self.i18n.t("settings.model_management.confirm_delete_title"),
+            self.i18n.t(
+                "settings.model_management.confirm_delete_message",
+                model=model_info.display_name,
+                size=model_info.size_mb,
+            ),
+        ):
+            success = self.model_manager.delete_text_ai_model(model_id)
+            if not success:
+                show_error_dialog(
+                    parent=self,
+                    title=self.i18n.t("settings.model_management.validation_error"),
+                    message=self.i18n.t("settings.model_management.delete_failed"),
+                )
+
+    def _run_async_download(
+        self,
+        model_id: str,
+        *,
+        download_method: str,
+        error_message: str,
+    ) -> None:
+        """在线程池中运行异步模型下载。"""
+        from core.qt_imports import QRunnable, QThreadPool
+
+        def run_download() -> None:
+            run_model_download(
+                self.model_manager,
+                model_id,
+                download_method=download_method,
+                logger=logger,
+                error_message=error_message,
+            )
+
+        class _DownloadRunnable(QRunnable):
+            def run(self) -> None:
+                run_download()
+
+        QThreadPool.globalInstance().start(_DownloadRunnable())
+
 
 class ModelDetailsDialog(QDialog):
     """模型详情对话框"""
@@ -935,13 +1064,16 @@ class ModelDetailsDialog(QDialog):
     MIN_HEIGHT = MODEL_DETAILS_DIALOG_MIN_HEIGHT
 
     def __init__(
-        self, model: Union[ModelInfo, TranslationModelInfo], i18n: I18nQtManager, parent=None
+        self,
+        model: Union[ModelInfo, TranslationModelInfo, TextAIModelInfo],
+        i18n: I18nQtManager,
+        parent=None,
     ):
         """
         初始化模型详情对话框
 
         Args:
-            model: 模型信息 (语音或翻译)
+            model: 模型信息 (语音、翻译或 Text AI)
             i18n: 国际化管理器
             parent: 父控件
         """
@@ -954,8 +1086,9 @@ class ModelDetailsDialog(QDialog):
         self.i18n = i18n
 
         is_translation = isinstance(model, TranslationModelInfo)
-        title = model.display_name if is_translation else model.full_name
-        name_id = model.model_id if is_translation else model.name
+        is_text_ai = isinstance(model, TextAIModelInfo)
+        title = model.display_name if (is_translation or is_text_ai) else model.full_name
+        name_id = model.model_id if (is_translation or is_text_ai) else model.name
 
         self.setWindowTitle(i18n.t("settings.model_management.details_title"))
         self.setMinimumWidth(self.MIN_WIDTH)
@@ -985,7 +1118,23 @@ class ModelDetailsDialog(QDialog):
         info_layout.addWidget(QLabel(name_id), row, 1)
         row += 1
 
-        if not is_translation:
+        if is_text_ai:
+            info_layout.addWidget(
+                QLabel(i18n.t("settings.model_management.provider") + ":"), row, 0
+            )
+            info_layout.addWidget(QLabel(model.provider), row, 1)
+            row += 1
+
+            info_layout.addWidget(
+                QLabel(i18n.t("settings.model_management.runtime") + ":"), row, 0
+            )
+            info_layout.addWidget(QLabel(model.runtime), row, 1)
+            row += 1
+
+            info_layout.addWidget(QLabel(i18n.t("settings.model_management.family") + ":"), row, 0)
+            info_layout.addWidget(QLabel(model.family), row, 1)
+            row += 1
+        elif not is_translation:
             # 模型版本（仅语音模型显示，尝试从名称提取）
             version = "v3"
             if "large-v1" in name_id:
@@ -1077,9 +1226,10 @@ class ModelDetailsDialog(QDialog):
             QLabel(i18n.t("settings.model_management.usage_count_label") + ":"), row, 0
         )
         is_translation = isinstance(model, TranslationModelInfo)
+        is_text_ai = isinstance(model, TextAIModelInfo)
         usage_count = (
             getattr(model, "usage_count", 0)
-            if not is_translation
+            if not is_translation and not is_text_ai
             else getattr(model, "use_count", 0)
         )
         info_layout.addWidget(QLabel(str(usage_count)), row, 1)

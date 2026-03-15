@@ -98,6 +98,15 @@ def mock_settings_manager():
             "translation_target_lang": "en",
         }
     )
+    manager.get_workspace_ai_preferences = Mock(
+        return_value={
+            "default_summary_strategy": "extractive",
+            "default_summary_model": "flan-t5-small-int8",
+            "default_meeting_model": "extractive-default",
+            "default_meeting_template": "standard",
+            "gguf_runtime_command": [],
+        }
+    )
     manager.setting_changed = Mock()
     manager.setting_changed.connect = Mock()
     return manager

@@ -108,3 +108,13 @@ def test_get_best_translation_model_auto_detect_falls_back_to_downloaded_target_
 
     assert model is not None
     assert model.model_id == "opus-mt-ja-en"
+
+
+@patch("core.models.manager.TranslationModelRecord.get_all", return_value=[])
+@patch("core.models.manager.ModelUsageStats.get_all", return_value=[])
+def test_model_manager_lists_text_ai_models(_mock_usage, _mock_trans, tmp_path):
+    manager = ModelManager(_build_config(tmp_path / "models"), Mock())
+
+    models = manager.get_all_text_ai_models()
+
+    assert any(model.model_id == "flan-t5-small-int8" for model in models)

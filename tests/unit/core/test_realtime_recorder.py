@@ -123,6 +123,11 @@ def mock_file_manager():
 
 
 @pytest.fixture
+def mock_workspace_manager():
+    return Mock()
+
+
+@pytest.fixture
 def mock_session_archiver():
     with patch("core.realtime.recorder.SessionArchiver") as mock_cls:
         mock_instance = Mock()
@@ -149,6 +154,7 @@ def recorder(
     mock_translation_engine,
     mock_db,
     mock_file_manager,
+    mock_workspace_manager,
     mock_session_archiver,
     mock_calendar_integration,
 ):
@@ -158,6 +164,7 @@ def recorder(
         translation_engine=mock_translation_engine,
         db_connection=mock_db,
         file_manager=mock_file_manager,
+        workspace_manager=mock_workspace_manager,
     )
 
 
@@ -251,6 +258,7 @@ class TestRealtimeRecorderLifecycle:
         assert result["recording_path"] == "/path/to/recording.wav"
         assert result["transcript_path"] == "/path/to/transcript.txt"
         assert result["event_id"] == "event_123"
+        recorder.workspace_manager.publish_recording_session.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_stop_recording_respects_processing_timeout_config(self, recorder, event_loop):

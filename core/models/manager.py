@@ -29,6 +29,7 @@ from core.qt_imports import QCoreApplication, QObject, QTimer, Signal
 from config.app_config import ConfigManager, get_app_dir
 from core.models.downloader import ModelDownloader
 from core.models.registry import ModelInfo, ModelRegistry
+from core.models.text_ai_registry import TextAIModelInfo, TextAIModelRegistry
 from core.models.translation_registry import (
     TranslationModelInfo,
     TranslationModelRegistry,
@@ -47,6 +48,7 @@ class ModelManager(QObject):
     models_updated = Signal()
     model_validation_failed = Signal(str, str)
     translation_models_updated = Signal()
+    text_ai_models_updated = Signal()
 
     def __init__(
         self,
@@ -88,6 +90,19 @@ class ModelManager(QObject):
         self.translation_downloader.download_failed.connect(self._on_translation_download_failed)
         # 刷新翻译模型本地状态
         self._refresh_translation_states()
+
+        self._text_ai_registry = TextAIModelRegistry()
+        self._text_ai_models_dir = Path(
+            self._config.get(
+                "text_ai.models_dir",
+                str(Path.home() / ".echonote" / "text_ai_models"),
+            )
+        ).expanduser()
+        self._text_ai_models_dir.mkdir(parents=True, exist_ok=True)
+        self.text_ai_downloader = ModelDownloader(self._text_ai_models_dir, self)
+        self.text_ai_downloader.download_completed.connect(self._on_text_ai_download_completed)
+        self.text_ai_downloader.download_failed.connect(self._on_text_ai_download_failed)
+        self._refresh_text_ai_states()
 
         self._lock = threading.RLock()
         self._model_cache: Dict[str, ModelInfo] = {}
@@ -223,6 +238,16 @@ class ModelManager(QObject):
         """
         logger.info(f"Cancelling download for model: {name}")
         self.downloader.cancel(name)
+
+    def cancel_translation_download(self, model_id: str) -> None:
+        """取消正在进行的翻译模型下载。"""
+        logger.info("Cancelling translation model download: %s", model_id)
+        self.translation_downloader.cancel(model_id)
+
+    def cancel_text_ai_download(self, model_id: str) -> None:
+        """取消正在进行的 Text AI 模型下载。"""
+        logger.info("Cancelling text ai model download: %s", model_id)
+        self.text_ai_downloader.cancel(model_id)
 
     def delete_model(self, name: str) -> bool:
         """删除已下载的模型。
@@ -661,6 +686,88 @@ class ModelManager(QObject):
             logger.error("Failed to delete translation model %s: %s", model_id, exc)
             return False
 
+    # ------------------------------------------------------------------
+    # Text AI 模型管理
+    # ------------------------------------------------------------------
+
+    def _refresh_text_ai_states(self) -> None:
+        """刷新 Text AI 模型的本地下载状态。"""
+        for model in self._text_ai_registry.get_all():
+            model.ensure_local_state(self._text_ai_models_dir)
+            registered = self._text_ai_registry._models.get(model.model_id)
+            if registered:
+                registered.local_path = model.local_path
+                registered.is_downloaded = model.is_downloaded
+                registered.download_date = model.download_date
+
+    def get_all_text_ai_models(self) -> List[TextAIModelInfo]:
+        """返回所有 Text AI 模型信息。"""
+        self._refresh_text_ai_states()
+        return self._text_ai_registry.get_all()
+
+    def get_text_ai_model(self, model_id: str) -> Optional[TextAIModelInfo]:
+        """按 model_id 获取 Text AI 模型。"""
+        model = self._text_ai_registry.get_by_id(model_id)
+        if model:
+            model.ensure_local_state(self._text_ai_models_dir)
+        return model
+
+    def is_text_ai_model_downloaded(self, model_id: str) -> bool:
+        """检查 Text AI 模型是否已下载。"""
+        model = self.get_text_ai_model(model_id)
+        return bool(model and model.is_downloaded)
+
+    def get_text_ai_model_path(self, model_id: str) -> Optional[Path]:
+        """获取 Text AI 模型的本地路径。"""
+        model = self.get_text_ai_model(model_id)
+        if not model or not model.local_path or model.local_path.startswith("builtin://"):
+            return None
+        return Path(model.local_path)
+
+    def get_downloaded_text_ai_models(self) -> List[str]:
+        """返回已下载 Text AI 模型 ID 列表。"""
+        return [m.model_id for m in self.get_all_text_ai_models() if m.is_downloaded]
+
+    async def download_text_ai_model(self, model_id: str) -> Path:
+        """下载指定的 Text AI 模型。"""
+        model = self._text_ai_registry.get_by_id(model_id)
+        if not model:
+            raise ValueError(f"Unknown text ai model: {model_id}")
+        if model.runtime == "extractive":
+            raise ValueError("Builtin extractive engine does not require download")
+
+        def post_cb(_path: Path) -> None:
+            self._refresh_text_ai_states()
+            self.text_ai_models_updated.emit()
+
+        return await self._execute_download(
+            model_id,
+            model,
+            self.text_ai_downloader,
+            post_download_cb=post_cb,
+        )
+
+    def delete_text_ai_model(self, model_id: str) -> bool:
+        """删除已下载的 Text AI 模型目录。"""
+        import shutil
+
+        model = self.get_text_ai_model(model_id)
+        if not model or not model.is_downloaded or not model.local_path:
+            return False
+        if model.runtime == "extractive":
+            return False
+
+        try:
+            path = Path(model.local_path)
+            if path.exists():
+                shutil.rmtree(path, ignore_errors=True)
+            self._refresh_text_ai_states()
+            self.text_ai_models_updated.emit()
+            return True
+        except Exception as exc:
+            logger.error("Failed to delete text ai model %s: %s", model_id, exc)
+            return False
+
     def _on_translation_download_completed(self, name: str) -> None:
         logger.info("Translation model download completed: %s", name)
         self._refresh_translation_states()
@@ -673,3 +780,12 @@ class ModelManager(QObject):
         if record:
             record.update_status(self._database, "failed")
         self.translation_models_updated.emit()
+
+    def _on_text_ai_download_completed(self, name: str) -> None:
+        logger.info("Text AI model download completed: %s", name)
+        self._refresh_text_ai_states()
+        self.text_ai_models_updated.emit()
+
+    def _on_text_ai_download_failed(self, name: str, error: str) -> None:
+        logger.error("Text AI model download failed for %s: %s", name, error)
+        self.text_ai_models_updated.emit()

@@ -13,10 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""
-Batch transcription UI module.
+"""Batch transcription UI helpers."""
 
-Provides user interface for batch audio file transcription.
-"""
-
-__all__ = ["BatchTranscribeWidget"]
+__all__ = []

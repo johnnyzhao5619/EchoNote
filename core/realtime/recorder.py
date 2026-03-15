@@ -57,6 +57,7 @@ class RealtimeRecorder:
         i18n=None,
         config: Optional[RealtimeConfig] = None,
         calendar_manager=None,
+        workspace_manager=None,
     ):
         """Initialize the real-time recorder.
 
@@ -78,6 +79,7 @@ class RealtimeRecorder:
         self.speech_engine = speech_engine
         self.translation_engine = translation_engine
         self.db = db_connection
+        self.workspace_manager = workspace_manager
         # file_manager is used by session_archiver
         self.i18n = i18n
 
@@ -886,6 +888,13 @@ class RealtimeRecorder:
             if not event_id:
                 result["calendar_event_error"] = self.calendar_integration.get_last_error()
         result["create_calendar_event_requested"] = bool(create_event_requested)
+
+        if self.workspace_manager is not None:
+            try:
+                workspace_item_id = self.workspace_manager.publish_recording_session(result)
+                result["workspace_item_id"] = workspace_item_id
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Failed to publish recording session to workspace: %s", exc)
 
         self._record_model_usage_if_needed()
 

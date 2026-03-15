@@ -677,6 +677,202 @@ class EventAttachment:
 
 
 @dataclass
+class WorkspaceItem:
+    """Model for unified workspace content items."""
+
+    id: str = field(default_factory=generate_uuid)
+    title: str = ""
+    item_type: str = "document"
+    source_kind: Optional[str] = None
+    source_event_id: Optional[str] = None
+    source_task_id: Optional[str] = None
+    status: str = "active"
+    primary_text_asset_id: Optional[str] = None
+    primary_audio_asset_id: Optional[str] = None
+    created_at: str = field(default_factory=current_iso_timestamp)
+    updated_at: str = field(default_factory=current_iso_timestamp)
+
+    @classmethod
+    def from_db_row(cls, row) -> "WorkspaceItem":
+        """Create instance from database row."""
+        return cls(
+            id=row["id"],
+            title=row["title"],
+            item_type=row["item_type"],
+            source_kind=row["source_kind"],
+            source_event_id=row["source_event_id"],
+            source_task_id=row["source_task_id"],
+            status=row["status"],
+            primary_text_asset_id=row["primary_text_asset_id"],
+            primary_audio_asset_id=row["primary_audio_asset_id"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+
+    def save(self, db_connection):
+        """Persist workspace item."""
+        self.updated_at = current_iso_timestamp()
+        query = """
+            INSERT INTO workspace_items (
+                id, title, item_type, source_kind, source_event_id, source_task_id,
+                status, primary_text_asset_id, primary_audio_asset_id, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                title = excluded.title,
+                item_type = excluded.item_type,
+                source_kind = excluded.source_kind,
+                source_event_id = excluded.source_event_id,
+                source_task_id = excluded.source_task_id,
+                status = excluded.status,
+                primary_text_asset_id = excluded.primary_text_asset_id,
+                primary_audio_asset_id = excluded.primary_audio_asset_id,
+                created_at = excluded.created_at,
+                updated_at = excluded.updated_at
+        """
+        params = (
+            self.id,
+            self.title,
+            self.item_type,
+            self.source_kind,
+            self.source_event_id,
+            self.source_task_id,
+            self.status,
+            self.primary_text_asset_id,
+            self.primary_audio_asset_id,
+            to_utc_iso(self.created_at),
+            to_utc_iso(self.updated_at),
+        )
+        db_connection.execute(query, params, commit=True)
+        logger.debug("Saved workspace item: %s", self.id)
+
+    @staticmethod
+    def get_by_id(db_connection, item_id: str) -> Optional["WorkspaceItem"]:
+        """Get workspace item by ID."""
+        result = db_connection.execute("SELECT * FROM workspace_items WHERE id = ?", (item_id,))
+        if result:
+            return WorkspaceItem.from_db_row(result[0])
+        return None
+
+    @staticmethod
+    def get_all(db_connection, item_type: Optional[str] = None) -> List["WorkspaceItem"]:
+        """List workspace items, optionally filtered by type."""
+        if item_type:
+            rows = db_connection.execute(
+                "SELECT * FROM workspace_items WHERE item_type = ? ORDER BY updated_at DESC",
+                (item_type,),
+            )
+        else:
+            rows = db_connection.execute(
+                "SELECT * FROM workspace_items ORDER BY updated_at DESC"
+            )
+        return [WorkspaceItem.from_db_row(row) for row in rows]
+
+    def delete(self, db_connection):
+        """Delete workspace item."""
+        db_connection.execute("DELETE FROM workspace_items WHERE id = ?", (self.id,), commit=True)
+        logger.debug("Deleted workspace item: %s", self.id)
+
+
+@dataclass
+class WorkspaceAsset:
+    """Model for assets owned by a workspace item."""
+
+    id: str = field(default_factory=generate_uuid)
+    item_id: str = ""
+    asset_role: str = ""
+    file_path: Optional[str] = None
+    content_type: Optional[str] = None
+    text_content: Optional[str] = None
+    metadata_json: Optional[str] = None
+    created_at: str = field(default_factory=current_iso_timestamp)
+    updated_at: str = field(default_factory=current_iso_timestamp)
+
+    @classmethod
+    def from_db_row(cls, row) -> "WorkspaceAsset":
+        """Create instance from database row."""
+        return cls(
+            id=row["id"],
+            item_id=row["item_id"],
+            asset_role=row["asset_role"],
+            file_path=row["file_path"],
+            content_type=row["content_type"],
+            text_content=row["text_content"],
+            metadata_json=row["metadata_json"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+
+    def save(self, db_connection):
+        """Persist workspace asset."""
+        self.updated_at = current_iso_timestamp()
+        query = """
+            INSERT INTO workspace_assets (
+                id, item_id, asset_role, file_path, content_type, text_content,
+                metadata_json, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                item_id = excluded.item_id,
+                asset_role = excluded.asset_role,
+                file_path = excluded.file_path,
+                content_type = excluded.content_type,
+                text_content = excluded.text_content,
+                metadata_json = excluded.metadata_json,
+                created_at = excluded.created_at,
+                updated_at = excluded.updated_at
+        """
+        params = (
+            self.id,
+            self.item_id,
+            self.asset_role,
+            self.file_path,
+            self.content_type,
+            self.text_content,
+            self.metadata_json,
+            to_utc_iso(self.created_at),
+            to_utc_iso(self.updated_at),
+        )
+        db_connection.execute(query, params, commit=True)
+        logger.debug("Saved workspace asset: %s", self.id)
+
+    @staticmethod
+    def get_by_id(db_connection, asset_id: str) -> Optional["WorkspaceAsset"]:
+        """Get workspace asset by ID."""
+        result = db_connection.execute("SELECT * FROM workspace_assets WHERE id = ?", (asset_id,))
+        if result:
+            return WorkspaceAsset.from_db_row(result[0])
+        return None
+
+    @staticmethod
+    def get_by_item_id(db_connection, item_id: str) -> List["WorkspaceAsset"]:
+        """List assets for a workspace item."""
+        rows = db_connection.execute(
+            "SELECT * FROM workspace_assets WHERE item_id = ? ORDER BY created_at",
+            (item_id,),
+        )
+        return [WorkspaceAsset.from_db_row(row) for row in rows]
+
+    @staticmethod
+    def get_by_item_and_role(
+        db_connection, item_id: str, asset_role: str
+    ) -> List["WorkspaceAsset"]:
+        """List assets for a workspace item filtered by role."""
+        rows = db_connection.execute(
+            """
+            SELECT * FROM workspace_assets
+            WHERE item_id = ? AND asset_role = ?
+            ORDER BY created_at
+            """,
+            (item_id, asset_role),
+        )
+        return [WorkspaceAsset.from_db_row(row) for row in rows]
+
+    def delete(self, db_connection):
+        """Delete workspace asset."""
+        db_connection.execute("DELETE FROM workspace_assets WHERE id = ?", (self.id,), commit=True)
+        logger.debug("Deleted workspace asset: %s", self.id)
+
+
+@dataclass
 class AutoTaskConfig:
     """Model for automatic task configurations."""
 

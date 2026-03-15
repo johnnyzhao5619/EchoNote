@@ -221,6 +221,29 @@ class SettingsManager(QObject):
             or DEFAULT_TRANSLATION_TARGET_LANGUAGE,
         }
 
+    def get_workspace_ai_preferences(self) -> Dict[str, Any]:
+        """Return workspace AI defaults with overrides applied."""
+        workspace_ai_defaults = self._default_config.get("workspace_ai", {})
+        preferences = {
+            "default_summary_strategy": workspace_ai_defaults.get(
+                "default_summary_strategy", "extractive"
+            ),
+            "default_summary_model": workspace_ai_defaults.get(
+                "default_summary_model", "flan-t5-small-int8"
+            ),
+            "default_meeting_model": workspace_ai_defaults.get(
+                "default_meeting_model", "extractive-default"
+            ),
+            "default_meeting_template": workspace_ai_defaults.get(
+                "default_meeting_template", "standard"
+            ),
+            "gguf_runtime_command": workspace_ai_defaults.get("gguf_runtime_command", []),
+        }
+        current_settings = self.config_manager.get("workspace_ai", {})
+        if isinstance(current_settings, dict):
+            preferences.update(current_settings)
+        return preferences
+
     def resolve_realtime_translation_languages(
         self,
         *,

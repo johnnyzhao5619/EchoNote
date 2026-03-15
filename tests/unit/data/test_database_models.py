@@ -16,6 +16,7 @@ from config.constants import (
     TASK_STATUS_COMPLETED,
     TASK_STATUS_PENDING,
 )
+from data.database.connection import DatabaseConnection
 from data.database.models import (
     CalendarEvent,
     TranscriptionTask,
@@ -295,3 +296,51 @@ class TestCalendarEvent:
         assert event.id == "event-1"
         assert event.title == "Test Event"
         assert len(event.attendees) == 1
+
+
+class TestWorkspaceModels:
+    """Test workspace persistence models."""
+
+    def test_workspace_item_round_trip(self, tmp_path):
+        """Workspace items should persist through the database layer."""
+        from data.database.models import WorkspaceItem
+
+        db = DatabaseConnection(str(tmp_path / "workspace.db"))
+        db.initialize_schema()
+
+        item = WorkspaceItem(title="Weekly Sync", item_type="meeting_note")
+        item.save(db)
+
+        loaded = WorkspaceItem.get_by_id(db, item.id)
+
+        assert loaded is not None
+        assert loaded.title == "Weekly Sync"
+        assert loaded.item_type == "meeting_note"
+
+    def test_workspace_asset_round_trip(self, tmp_path):
+        """Workspace assets should persist and remain queryable by item."""
+        from data.database.models import WorkspaceAsset, WorkspaceItem
+
+        db = DatabaseConnection(str(tmp_path / "workspace_asset.db"))
+        db.initialize_schema()
+
+        item = WorkspaceItem(title="Interview", item_type="recording")
+        item.save(db)
+
+        asset = WorkspaceAsset(
+            item_id=item.id,
+            asset_role="transcript",
+            file_path="/tmp/interview.md",
+            content_type="text/markdown",
+            text_content="# Interview",
+        )
+        asset.save(db)
+
+        loaded = WorkspaceAsset.get_by_id(db, asset.id)
+        item_assets = WorkspaceAsset.get_by_item_id(db, item.id)
+
+        assert loaded is not None
+        assert loaded.asset_role == "transcript"
+        assert loaded.text_content == "# Interview"
+        assert len(item_assets) == 1
+        assert item_assets[0].id == asset.id

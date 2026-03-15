@@ -109,6 +109,7 @@ class CalendarHubWidget(BaseWidget):
         oauth_manager,
         i18n: I18nQtManager,
         transcription_manager: Optional[Any] = None,
+        workspace_manager: Optional[Any] = None,
         parent: Optional[QWidget] = None,
     ):
         """
@@ -125,6 +126,7 @@ class CalendarHubWidget(BaseWidget):
         self.calendar_manager = calendar_manager
         self.oauth_manager = oauth_manager
         self.transcription_manager = transcription_manager
+        self.workspace_manager = workspace_manager
         self._config_manager = None
 
         # Current view and date
@@ -532,16 +534,10 @@ class CalendarHubWidget(BaseWidget):
 
         if event:
             try:
-                from data.database.models import EventAttachment
-
-                attachments = EventAttachment.get_by_event_id(self.calendar_manager.db, event.id)
-                for attachment in attachments:
-                    if attachment.attachment_type == "recording":
-                        recording_path = attachment.file_path
-                    elif attachment.attachment_type == "transcript":
-                        transcript_path = attachment.file_path
-                    elif attachment.attachment_type == "translation":
-                        translation_path = attachment.file_path
+                artifacts = self._get_event_artifacts(event.id)
+                recording_path = artifacts.get("recording")
+                transcript_path = artifacts.get("transcript")
+                translation_path = artifacts.get("translation")
 
                 # Check if event is in the past
                 start_time = to_local_datetime(event.start_time)
@@ -552,7 +548,7 @@ class CalendarHubWidget(BaseWidget):
 
             except Exception as e:
                 logger.warning(
-                    f"Failed to fetch attachments or parse time for event {event.id}: {e}"
+                    f"Failed to fetch workspace artifacts or parse time for event {event.id}: {e}"
                 )
         elif default_date:
             # Check if default_date is in the past for new events
@@ -1610,6 +1606,17 @@ class CalendarHubWidget(BaseWidget):
             translation_source_lang=selected_languages.get("translation_source_lang"),
             translation_target_lang=selected_languages.get("translation_target_lang"),
         )
+
+    def _get_event_artifacts(self, event_id: str) -> Dict[str, Any]:
+        """Return workspace-backed artifacts for a calendar event."""
+        if self.workspace_manager is None:
+            return {
+                "recording": None,
+                "transcript": None,
+                "translation": None,
+                "attachments": [],
+            }
+        return self.workspace_manager.get_event_artifacts(event_id)
 
     def _on_secondary_transcribe_requested(
         self, event_id: str, recording_path: str, dialog_data: Optional[Dict[str, Any]] = None

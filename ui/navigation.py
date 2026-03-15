@@ -32,38 +32,31 @@ class NavigationItem:
 
 NAV_ITEMS: Tuple[NavigationItem, ...] = (
     NavigationItem(
-        page_name="batch_transcribe",
-        text_key="sidebar.batch_transcribe",
-        icon_name="file_list",
+        page_name="workspace",
+        text_key="sidebar.workspace",
+        icon_name="workspace",
         shortcut_index=1,
-        aliases=("batch", "transcribe", "queue"),
-    ),
-    NavigationItem(
-        page_name="realtime_record",
-        text_key="sidebar.realtime_record",
-        icon_name="record",
-        shortcut_index=2,
-        aliases=("record", "realtime", "mic"),
+        aliases=("workspace", "notes", "assets"),
     ),
     NavigationItem(
         page_name="calendar_hub",
         text_key="sidebar.calendar_hub",
         icon_name="calendar",
-        shortcut_index=3,
+        shortcut_index=2,
         aliases=("calendar", "schedule"),
     ),
     NavigationItem(
         page_name="timeline",
         text_key="sidebar.timeline",
         icon_name="timeline",
-        shortcut_index=4,
+        shortcut_index=3,
         aliases=("timeline", "history"),
     ),
     NavigationItem(
         page_name="settings",
         text_key="sidebar.settings",
         icon_name="settings",
-        shortcut_index=5,
+        shortcut_index=4,
         aliases=("settings", "preferences", "config"),
     ),
 )

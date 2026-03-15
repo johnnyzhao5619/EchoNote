@@ -192,6 +192,38 @@ class TestTimelineManagerGetEvents:
         assert result["past_events"] == []
         assert [item["event"].id for item in result["future_events"]] == ["event_future"]
 
+    def test_get_timeline_events_reads_workspace_artifacts(self, mock_calendar_manager, mock_db):
+        """Timeline past events should consume workspace artifacts instead of event attachments."""
+        center_time = datetime(2025, 11, 1, 12, 0, 0)
+        event = Mock()
+        event.id = "event_workspace"
+        event.title = "Workspace Event"
+        event.start_time = "2025-11-01T10:00:00"
+        event.end_time = "2025-11-01T11:00:00"
+        event.event_type = "Event"
+        event.source = "local"
+        event.attendees = []
+        mock_calendar_manager.get_events.return_value = [event]
+
+        workspace_manager = Mock()
+        workspace_manager.get_event_artifacts_map.return_value = {
+            "event_workspace": {
+                "recording": "/tmp/demo.wav",
+                "transcript": "/tmp/demo.txt",
+                "translation": None,
+                "attachments": [],
+            }
+        }
+        manager = TimelineManager(
+            calendar_manager=mock_calendar_manager,
+            db_connection=mock_db,
+            workspace_manager=workspace_manager,
+        )
+
+        result = manager.get_timeline_events(center_time, past_days=1, future_days=1)
+
+        assert result["past_events"][0]["artifacts"]["recording"] == "/tmp/demo.wav"
+
 
 class TestTimelineManagerSearch:
     """Test search functionality."""
@@ -251,29 +283,42 @@ class TestTimelineManagerArtifacts:
         """Test getting event artifacts."""
         event_id = "event_123"
 
-        with patch("data.database.models.EventAttachment.get_by_event_id", return_value=[]):
-            artifacts = timeline_manager.get_event_artifacts(event_id)
+        artifacts = timeline_manager.get_event_artifacts(event_id)
 
-            assert isinstance(artifacts, dict)
-            assert "attachments" in artifacts
+        assert isinstance(artifacts, dict)
+        assert "attachments" in artifacts
 
     def test_get_event_artifacts_with_attachments(self, timeline_manager):
-        """Test getting artifacts with attachments."""
+        """Test getting artifacts with workspace-backed attachments."""
         event_id = "event_123"
+        workspace_manager = Mock()
+        workspace_manager.get_event_artifacts_map.return_value = {
+            event_id: {
+                "recording": "/path/to/recording.wav",
+                "transcript": "/path/to/transcript.txt",
+                "translation": None,
+                "attachments": [
+                    {
+                        "id": "asset-1",
+                        "type": "audio",
+                        "path": "/path/to/recording.wav",
+                        "size": 1000,
+                        "created_at": "2025-11-01T10:00:00",
+                    }
+                ],
+            }
+        }
+        manager = TimelineManager(
+            calendar_manager=timeline_manager.calendar_manager,
+            db_connection=timeline_manager.db,
+            workspace_manager=workspace_manager,
+        )
 
-        mock_attachment = Mock()
-        mock_attachment.attachment_type = "recording"
-        mock_attachment.file_path = "/path/to/recording.wav"
-        mock_attachment.file_size = 1000
+        artifacts = manager.get_event_artifacts(event_id)
 
-        with patch(
-            "data.database.models.EventAttachment.get_by_event_id", return_value=[mock_attachment]
-        ):
-            artifacts = timeline_manager.get_event_artifacts(event_id)
-
-            # Check that artifacts dict is returned
-            assert isinstance(artifacts, dict)
-            assert "attachments" in artifacts
+        assert isinstance(artifacts, dict)
+        assert artifacts["recording"] == "/path/to/recording.wav"
+        assert artifacts["attachments"][0]["type"] == "audio"
 
 
 class TestTimelineManagerAutoTask:

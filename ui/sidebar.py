@@ -137,6 +137,7 @@ class Sidebar(BaseWidget):
     def _resolve_icon(self, item: NavigationItem):
         """Resolve a standard icon for a navigation item."""
         icon_map = {
+            "workspace": QStyle.StandardPixmap.SP_DirIcon,
             "file_list": QStyle.StandardPixmap.SP_FileDialogListView,
             "record": QStyle.StandardPixmap.SP_MediaPlay,
             "calendar": QStyle.StandardPixmap.SP_FileDialogContentsView,

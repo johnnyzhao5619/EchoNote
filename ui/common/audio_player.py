@@ -612,6 +612,26 @@ class AudioPlayer(BaseWidget):
         except Exception as e:
             self._emit_playback_error("timeline.audio_player.load_failed", error=str(e))
 
+    def clear_media(self) -> None:
+        """Reset the widget when no audio asset is available."""
+        self.player.stop()
+        self.player.setSource(QUrl())
+        self.file_path = ""
+        self._full_file_name = ""
+        self.file_label.setText("")
+        self.file_label.setToolTip("")
+        self._transcript_plain_text = ""
+        self._transcript_formatted_text = ""
+        self._translation_text = ""
+        self._transcript_segments = None
+        self._translation_segments = None
+        self._segment_timeline = []
+        self._segment_line_map = {}
+        self._active_segment_index = -1
+        self._reset_playback_state(reset_total=True)
+        self._set_controls_enabled(False)
+        self._refresh_transcript_display()
+
     def _resolve_artifact_candidates(
         self,
         audio_path: Path,

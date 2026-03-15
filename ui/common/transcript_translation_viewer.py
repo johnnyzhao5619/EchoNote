@@ -234,6 +234,19 @@ class TranscriptTranslationViewer(BaseWidget):
         self.compare_left_text.setPlainText(self.transcript_text)
         self.compare_right_text.setPlainText(self.translation_text)
 
+    def set_text_content(
+        self,
+        *,
+        transcript_text: str = "",
+        translation_text: str = "",
+    ) -> None:
+        """Replace loaded text content without relying on filesystem paths."""
+        self.transcript_text = transcript_text
+        self.translation_text = translation_text
+        self.compare_left_text.setPlainText(self.transcript_text)
+        self.compare_right_text.setPlainText(self.translation_text)
+        self._apply_available_modes()
+
     def _available_modes(self) -> list[str]:
         modes: list[str] = []
         if self.transcript_path:

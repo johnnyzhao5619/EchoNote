@@ -202,6 +202,7 @@ class SettingsWidget(BaseWidget):
         from ui.settings.timeline_page import TimelineSettingsPage
         from ui.settings.translation_page import TranslationSettingsPage
         from ui.settings.transcription_page import TranscriptionSettingsPage
+        from ui.settings.workspace_ai_page import WorkspaceAISettingsPage
 
         # Page definitions: (id, class, args)
         page_defs = [
@@ -224,6 +225,11 @@ class SettingsWidget(BaseWidget):
                 "model_management",
                 ModelManagementPage,
                 (self.settings_manager, self.i18n, self.managers.get("model_manager")),
+            ),
+            (
+                "workspace_ai",
+                WorkspaceAISettingsPage,
+                (self.settings_manager, self.i18n, self.managers),
             ),
             (
                 "calendar",
@@ -275,6 +281,7 @@ class SettingsWidget(BaseWidget):
             "transcription",
             "realtime",
             "translation",
+            "workspace_ai",
             "calendar",
             "timeline",
             "appearance",

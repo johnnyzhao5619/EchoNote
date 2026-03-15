@@ -50,11 +50,7 @@ class TestCalendarIntegration:
         mock_event_instance.id = "test_event_123"
         mock_event_cls.return_value = mock_event_instance
 
-        mock_attachment_cls = MagicMock()
-        mock_attachment_cls.upsert_for_event_type = MagicMock()
-
         mock_models.CalendarEvent = mock_event_cls
-        mock_models.EventAttachment = mock_attachment_cls
 
         # Mock datetime to ensure stable timestamps if needed,
         # but here we just need the import to work.
@@ -70,9 +66,7 @@ class TestCalendarIntegration:
 
         # Patch sys.modules to inject our mock models
         with patch.dict("sys.modules", {"data.database.models": mock_models}):
-            with patch("os.path.exists", return_value=True):
-                with patch("os.path.getsize", return_value=1024):
-                    event_id = await calendar_integration.create_event(result_data)
+            event_id = await calendar_integration.create_event(result_data)
 
         assert event_id == "test_event_123"
 
@@ -84,10 +78,6 @@ class TestCalendarIntegration:
 
         # Verify Event save
         mock_event_instance.save.assert_called_once_with(mock_db)
-
-        # Verify Attachments
-        # We expect 3 upsert calls (recording, transcript, translation)
-        assert mock_attachment_cls.upsert_for_event_type.call_count == 3
 
     @pytest.mark.asyncio
     async def test_create_event_db_failure(self, calendar_integration, mock_db):

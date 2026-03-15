@@ -972,6 +972,97 @@ QFrame[role="batch-viewer-toolbar"] {
     padding: 12px 20px;
 }
 
+QWidget[role="workspace-surface"] {
+    background-color: #1f232c;
+}
+
+QListWidget[role="workspace-item-list"] {
+    background-color: #262b36;
+    border: 1px solid #323b49;
+    border-radius: 10px;
+    padding: 6px;
+    outline: none;
+}
+
+QListWidget[role="workspace-item-list"]::item {
+    color: #ecf2ff;
+    padding: 8px 10px;
+    margin: 2px 0;
+    border-radius: 8px;
+}
+
+QListWidget[role="workspace-item-list"]::item:hover {
+    background-color: #2c3748;
+}
+
+QListWidget[role="workspace-item-list"]::item:selected {
+    background-color: #2b4068;
+    color: #ecf4ff;
+    border: 1px solid #4f6382;
+}
+
+QWidget[role="workspace-editor-panel"] {
+    background-color: #262b36;
+    border: 1px solid #323b49;
+    border-radius: 12px;
+}
+
+QWidget[role="workspace-recording-panel"] {
+    background-color: #262b36;
+    border: 1px solid #323b49;
+    border-radius: 12px;
+}
+
+QComboBox[role="workspace-asset-selector"] {
+    background-color: #2a303c;
+    border: 1px solid #48576d;
+    border-radius: 9px;
+    padding: 4px 10px;
+    min-height: 28px;
+    color: #ecf2ff;
+}
+
+QComboBox[role="workspace-asset-selector"]:hover {
+    border-color: #6680a4;
+}
+
+QComboBox[role="workspace-asset-selector"]:focus {
+    border: 2px solid #64a2ff;
+    padding: 3px 9px;
+}
+
+QPushButton[role="workspace-ai-action"] {
+    background-color: #64a2ff;
+    color: #10233f;
+    border: 1px solid #64a2ff;
+    border-radius: 9px;
+    min-width: 96px;
+}
+
+QPushButton[role="workspace-ai-action"]:hover {
+    background-color: #86b8ff;
+    border-color: #86b8ff;
+}
+
+QWidget[role="workspace-editor-panel"] QPushButton[role="toolbar-secondary-action"][state="active"] {
+    background-color: #4fb878;
+    color: #0f2617;
+    border-color: #4fb878;
+}
+
+QWidget[role="workspace-editor-panel"] QPushButton[role="toolbar-secondary-action"][state="active"]:hover {
+    background-color: #6ac98e;
+    border-color: #6ac98e;
+}
+
+QLabel[role="workspace-placeholder"] {
+    background-color: #263143;
+    color: #aab6cf;
+    border: 1px dashed #4f6382;
+    border-radius: 12px;
+    padding: 16px;
+}
+
 /* Text Frame */
 QFrame#text_frame {
     background-color: #292827;

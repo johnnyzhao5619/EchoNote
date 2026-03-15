@@ -126,6 +126,18 @@
       ]
     },
     {
+      "id": "workspace",
+      "selectors": [
+        "QWidget[role=\"workspace-surface\"]",
+        "QListWidget[role=\"workspace-item-list\"]",
+        "QWidget[role=\"workspace-editor-panel\"]",
+        "QWidget[role=\"workspace-recording-panel\"]",
+        "QComboBox[role=\"workspace-asset-selector\"]",
+        "QPushButton[role=\"workspace-ai-action\"]",
+        "QLabel[role=\"workspace-placeholder\"]"
+      ]
+    },
+    {
       "id": "batch",
       "selectors": [
         "QFrame[role=\"batch-viewer-toolbar\"]",

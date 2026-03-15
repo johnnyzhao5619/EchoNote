@@ -1,7 +1,7 @@
 <div align="center">
   <img src="resources/icons/echonote.png" alt="EchoNote Logo" width="120" height="120">
   <h1>EchoNote</h1>
-  <p><em>Intelligent Voice Transcription & Calendar Management</em></p>
+  <p><em>Unified Recording, Document Workspace & Local AI Meeting Notes</em></p>
 </div>
 
 <p align="center">
@@ -12,12 +12,12 @@
 </p>
 
 <p align="center">
-  <strong>🎙️ Transcribe • 📅 Organize • 🔒 Secure • 🌍 Multilingual</strong>
+  <strong>🎙️ Capture • 🗂️ Organize • 🧠 Summarize • 🔒 Local First</strong>
 </p>
 
 ### 🚀 Quick Start
 
-**EchoNote** is a privacy-first desktop application that provides intelligent voice transcription and calendar management with local processing capabilities.
+**EchoNote** is a privacy-first desktop application that unifies recordings, documents, transcripts, summaries, and meeting briefs in a single local-first workspace.
 
 #### Installation & Setup
 
@@ -43,7 +43,9 @@ python main.py
 
 ### 🎯 Key Features
 
-- **🎙️ Batch & Real-time Transcription**: Process audio/video files or capture live recordings
+- **🗂️ Unified Workspace**: Manage imported documents, batch transcriptions, realtime recordings, summaries, and meeting briefs in one editable asset workspace
+- **🎙️ Local Speech Pipelines**: Process audio/video files or capture live recordings, then persist transcript and translation assets back into the workspace
+- **🧠 Local Meeting AI**: Generate extractive summaries, ONNX small-model summaries, and GGUF-backed meeting briefs with editable outputs
 - **📅 Calendar Integration**: Sync with Google Calendar and Outlook, manage local events
 - **⏰ Timeline Intelligence**: Correlate events with recordings, automated task scheduling
 - **🔒 Privacy-First**: Encrypted local storage, no cloud dependency required
@@ -79,13 +81,18 @@ python main.py
 EchoNote/
 ├── main.py                # Application entry point
 ├── config/                # Configuration management & version control
-├── core/                  # Business logic domains
-├── engines/               # External service integrations
+├── core/                  # Business logic domains (workspace, models, realtime, timeline)
+├── engines/               # Audio, speech, translation, and text-ai runtimes
 ├── data/                  # Database, security, storage
-├── ui/                    # PySide6 desktop interface
+├── ui/                    # PySide6 desktop interface (workspace, timeline, settings)
 ├── utils/                 # Cross-cutting utilities
 └── tests/                 # Test suites
 ```
+
+Workspace architecture highlights:
+- `core/workspace/`: unified asset layer for `workspace_items` and `workspace_assets`
+- `engines/text_ai/`: extractive, ONNX, and GGUF local text AI runtimes
+- `ui/workspace/`: single workbench for text editing, playback, and AI actions
 
 ### 📚 Documentation
 
@@ -124,7 +131,7 @@ Released under the [Apache 2.0 License](LICENSE). PySide6 (LGPL v3) is used for 
 
 ## 📊 Project Status
 
-- **Version**: v2.0.2 (Latest release)
+- **Version**: v2.1.0 (Latest release)
 - **Test Suite**: unit / integration / UI / performance categories
 - **Code Quality**: Excellent (PEP 8 compliant, type-annotated)
 - **Documentation**: Complete and restructured

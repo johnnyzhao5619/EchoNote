@@ -35,7 +35,9 @@ For contributors and developers:
 - **[Contributing Guide](CONTRIBUTING.md)** - How to contribute to the project
 - **[CI/CD Guide](CI_CD_GUIDE.md)** - Continuous integration and deployment
 - **[Implementation Plans](plans/)** - Active architecture and rollout plans for multi-step feature work
-- Settings architecture note: translation defaults are managed in `ui/settings/translation_page.py`, while realtime recording controls remain in `ui/settings/realtime_page.py`.
+- Unified workspace architecture note: `core/workspace/` is now the single asset layer for imported documents, batch transcriptions, realtime recordings, summaries, and meeting briefs; the desktop entry lives in `ui/workspace/`.
+- Model governance note: `core/models/manager.py` now governs `speech` / `translation` / `text-ai` catalogs together, with workspace defaults exposed in `ui/settings/workspace_ai_page.py`.
+- Settings ownership note: translation defaults are managed in `ui/settings/translation_page.py`, realtime recording controls remain in `ui/settings/realtime_page.py`, and workspace summary/meeting preferences live in `ui/settings/workspace_ai_page.py`.
 - Shared playback architecture note: reusable audio playback lives in `ui/common/audio_player.py` and is opened via `ui/common/audio_player_launcher.py`.
 
 ---
@@ -132,4 +134,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 ---
 
 **Last Updated**: March 15, 2026
-**Version**: v2.0.2
+**Version**: v2.1.0
