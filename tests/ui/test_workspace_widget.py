@@ -116,10 +116,25 @@ def test_workspace_widget_shows_editor_audio_and_task_regions(
 ):
     widget = WorkspaceWidget(workspace_manager, mock_i18n, transcription_manager=transcription_manager)
 
+    assert widget.library_panel is not None
     assert widget.item_list is not None
     assert widget.editor_panel is not None
+    assert widget.inspector_panel is not None
     assert widget.recording_panel is not None
     assert widget.task_panel is not None
+
+
+def test_workspace_widget_exposes_workspace_shell(
+    qapp, mock_i18n, workspace_manager, transcription_manager
+):
+    widget = WorkspaceWidget(workspace_manager, mock_i18n, transcription_manager=transcription_manager)
+    widget.show()
+    qapp.processEvents()
+
+    assert widget.library_panel is not None
+    assert widget.inspector_panel is not None
+    assert widget.library_panel.item_list is widget.item_list
+    assert widget.inspector_panel.recording_panel is widget.recording_panel
 
 
 def test_workspace_editor_panel_save_updates_workspace_asset(qapp, mock_i18n, workspace_manager):
@@ -211,7 +226,7 @@ def test_workspace_widget_exposes_unified_create_toolbar(
     assert widget.toolbar is not None
     assert widget.toolbar.import_document_button.isVisible()
     assert widget.toolbar.new_note_button.isVisible()
-    assert widget.toolbar.start_recording_button.isVisible()
+    assert not widget.toolbar.start_recording_button.isVisible()
 
 
 def test_workspace_toolbar_new_note_creates_workspace_item(
@@ -231,7 +246,7 @@ def test_workspace_toolbar_new_note_creates_workspace_item(
     assert widget.item_list.current_item_id() == created_items[0].id
 
 
-def test_workspace_widget_embeds_realtime_recording_controls(
+def test_workspace_widget_moves_recording_controls_out_of_workspace_shell(
     qapp, mock_i18n, workspace_manager, transcription_manager
 ):
     widget = WorkspaceWidget(
@@ -243,8 +258,8 @@ def test_workspace_widget_embeds_realtime_recording_controls(
     widget.show()
     qapp.processEvents()
 
-    assert widget.recording_control_panel.record_button.isVisible()
-    assert widget.recording_control_panel.stop_button.isVisible()
+    assert widget.inspector_panel.recording_panel.isVisible()
+    assert not hasattr(widget, "recording_control_panel")
 
 
 def test_workspace_item_list_shows_collection_filter_and_metadata(

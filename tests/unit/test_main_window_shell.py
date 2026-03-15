@@ -1,10 +1,15 @@
 # SPDX-License-Identifier: Apache-2.0
 """Tests for main window shell status and shortcuts."""
 
-from unittest.mock import Mock
+from unittest.mock import Mock, PropertyMock, patch
 
 import ui.main_window as main_window_module
+from core.qt_imports import QApplication
+from core.workspace.manager import WorkspaceManager
+from data.database.connection import DatabaseConnection
+from data.storage.file_manager import FileManager
 from ui.main_window import MainWindow
+from ui.workspace.widget import WorkspaceWidget
 
 
 def _build_i18n():
@@ -25,6 +30,43 @@ def _build_i18n():
 
     i18n.t = Mock(side_effect=_t)
     return i18n
+
+
+def build_main_window_with_workspace(tmp_path):
+    app = QApplication.instance() or QApplication([])
+    db = DatabaseConnection(str(tmp_path / "main_window_shell.db"))
+    db.initialize_schema()
+    file_manager = FileManager(str(tmp_path / "files"))
+    workspace_manager = WorkspaceManager(db, file_manager)
+
+    realtime_recorder = Mock()
+    type(realtime_recorder).is_recording = PropertyMock(return_value=False)
+
+    managers = {
+        "workspace_manager": workspace_manager,
+        "realtime_recorder": realtime_recorder,
+        "transcription_manager": None,
+        "calendar_manager": None,
+        "oauth_manager": None,
+        "timeline_manager": None,
+        "settings_manager": None,
+    }
+
+    def _create_workspace_only(self, content_area):
+        workspace_widget = WorkspaceWidget(
+            workspace_manager,
+            self.i18n,
+            realtime_recorder=realtime_recorder,
+        )
+        content_area.addWidget(workspace_widget)
+        self.pages["workspace"] = workspace_widget
+
+    with patch.object(MainWindow, "_create_pages", _create_workspace_only):
+        window = MainWindow(managers, _build_i18n())
+
+    window.show()
+    app.processEvents()
+    return window
 
 
 def test_update_shell_status_sets_runtime_labels():
@@ -108,9 +150,20 @@ def test_setup_keyboard_shortcuts_registers_expected_sequences(monkeypatch):
         "Ctrl+2",
         "Ctrl+3",
         "Ctrl+4",
-        "Ctrl+5",
         "Ctrl+,",
         "Ctrl+K",
         "Ctrl+Q",
     ]
-    assert len(fake_window._shortcuts) == 8
+    assert len(fake_window._shortcuts) == 7
+
+
+def test_main_window_exposes_persistent_recording_dock_and_workspace_shell(tmp_path):
+    main_window = build_main_window_with_workspace(tmp_path)
+
+    try:
+        assert main_window.recording_dock is not None
+        assert main_window.recording_dock.isVisible()
+        assert main_window.pages["workspace"].library_panel is not None
+        assert main_window.pages["workspace"].inspector_panel is not None
+    finally:
+        main_window.close()

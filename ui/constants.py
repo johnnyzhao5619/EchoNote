@@ -52,6 +52,9 @@ APP_SHELL_RESOURCE_BAR_WIDTH = 86
 APP_SHELL_RESOURCE_BAR_HEIGHT = 16
 APP_SEARCH_MIN_WIDTH = 180
 APP_SEARCH_MAX_WIDTH = 260
+APP_RECORDING_DOCK_MIN_HEIGHT = 68
+APP_RECORDING_DOCK_MARGINS = (12, 8, 12, 8)
+APP_SHELL_AUXILIARY_MARGINS = (8, 0, 8, 0)
 APP_TOP_BAR_CONTROL_HEIGHT = 26
 APP_TOP_BAR_HINT_WIDTH = 50
 SHELL_STATUS_REFRESH_INTERVAL_MS = 2000
@@ -267,6 +270,7 @@ ROLE_SHELL_RESOURCE_BAR = "shell-resource-bar"
 
 # Realtime Record Roles
 ROLE_REALTIME_DURATION = "realtime-duration"
+ROLE_REALTIME_RECORDING_DOCK = "realtime-recording-dock"
 ROLE_REALTIME_MARKER_ACTION = "realtime-marker-action"
 ROLE_REALTIME_RECORD_ACTION = "realtime-record-action"
 ROLE_REALTIME_FIELD_CONTROL = "realtime-field-control"
@@ -291,8 +295,10 @@ ROLE_WARNING_LARGE = "warning-large"
 
 # Workspace Roles
 ROLE_WORKSPACE_SURFACE = "workspace-surface"
+ROLE_WORKSPACE_LIBRARY_PANEL = "workspace-library-panel"
 ROLE_WORKSPACE_ITEM_LIST = "workspace-item-list"
 ROLE_WORKSPACE_EDITOR_PANEL = "workspace-editor-panel"
+ROLE_WORKSPACE_INSPECTOR_PANEL = "workspace-inspector-panel"
 ROLE_WORKSPACE_RECORDING_PANEL = "workspace-recording-panel"
 ROLE_WORKSPACE_ASSET_SELECTOR = "workspace-asset-selector"
 ROLE_WORKSPACE_AI_ACTION = "workspace-ai-action"
