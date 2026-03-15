@@ -245,3 +245,43 @@ def test_workspace_widget_embeds_realtime_recording_controls(
 
     assert widget.recording_control_panel.record_button.isVisible()
     assert widget.recording_control_panel.stop_button.isVisible()
+
+
+def test_workspace_item_list_shows_collection_filter_and_metadata(
+    qapp, mock_i18n, workspace_manager, transcription_manager
+):
+    orphaned_item = WorkspaceItem(
+        title="Detached Notes",
+        item_type="document",
+        source_kind="workspace_note",
+        status="orphaned",
+    )
+    orphaned_item.save(workspace_manager.db)
+    orphaned_asset = WorkspaceAsset(
+        item_id=orphaned_item.id,
+        asset_role="document_text",
+        text_content="Detached content",
+        content_type="text/plain",
+    )
+    orphaned_asset.save(workspace_manager.db)
+
+    widget = WorkspaceWidget(
+        workspace_manager,
+        mock_i18n,
+        transcription_manager=transcription_manager,
+    )
+
+    row_texts = [
+        widget.item_list.list_widget.item(index).text()
+        for index in range(widget.item_list.list_widget.count())
+    ]
+
+    assert widget.item_list.collection_combo.count() == 5
+    assert any("realtime_recording" in text for text in row_texts)
+    assert any("audio" in text for text in row_texts)
+    assert any("text" in text for text in row_texts)
+
+    widget.item_list.collection_combo.setCurrentIndex(3)
+    qapp.processEvents()
+
+    assert widget.item_list.current_item_id() == orphaned_item.id

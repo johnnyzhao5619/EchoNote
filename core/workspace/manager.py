@@ -85,9 +85,51 @@ class WorkspaceManager:
         """Fetch a workspace item by ID."""
         return WorkspaceItem.get_by_id(self.db, item_id)
 
-    def list_items(self, item_type: Optional[str] = None) -> List[WorkspaceItem]:
-        """List workspace items."""
-        return WorkspaceItem.get_all(self.db, item_type=item_type)
+    def list_items(
+        self,
+        *,
+        collection: Optional[str] = None,
+        item_type: Optional[str] = None,
+    ) -> List[WorkspaceItem]:
+        """List workspace items for the requested collection."""
+        resolved_collection = (collection or "all").strip().lower()
+        resolved_item_type = item_type
+        status = None
+        limit = None
+
+        if resolved_collection == "recordings":
+            resolved_item_type = "recording"
+        elif resolved_collection == "documents":
+            resolved_item_type = "document"
+        elif resolved_collection == "orphaned":
+            status = "orphaned"
+        elif resolved_collection == "recent":
+            limit = 10
+
+        return WorkspaceItem.get_all(
+            self.db,
+            item_type=resolved_item_type,
+            status=status,
+            limit=limit,
+        )
+
+    def get_item_list_metadata(self, items: List[WorkspaceItem]) -> dict[str, dict]:
+        """Build lightweight list metadata for workspace items."""
+        assets_by_item = self._get_assets_for_item_ids([item.id for item in items])
+        metadata_by_item: dict[str, dict] = {}
+        for item in items:
+            assets = assets_by_item.get(item.id, [])
+            metadata_by_item[item.id] = {
+                "source": item.source_kind or item.item_type,
+                "updated_at": item.updated_at,
+                "has_audio": any(asset.asset_role == "audio" for asset in assets),
+                "has_text": any(
+                    asset.asset_role in TEXT_ASSET_ROLE_PRIORITY or bool(asset.text_content)
+                    for asset in assets
+                ),
+                "is_orphaned": item.status == "orphaned",
+            }
+        return metadata_by_item
 
     def get_assets(self, item_id: str, asset_role: Optional[str] = None) -> List[WorkspaceAsset]:
         """List assets for a workspace item."""
@@ -421,6 +463,7 @@ class WorkspaceManager:
             if item.source_event_id != event_id:
                 continue
             item.source_event_id = None
+            item.status = "orphaned"
             item.save(self.db)
             detached_count += 1
         return detached_count

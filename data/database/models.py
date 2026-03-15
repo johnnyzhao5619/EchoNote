@@ -754,17 +754,32 @@ class WorkspaceItem:
         return None
 
     @staticmethod
-    def get_all(db_connection, item_type: Optional[str] = None) -> List["WorkspaceItem"]:
+    def get_all(
+        db_connection,
+        item_type: Optional[str] = None,
+        *,
+        status: Optional[str] = None,
+        limit: Optional[int] = None,
+    ) -> List["WorkspaceItem"]:
         """List workspace items, optionally filtered by type."""
+        clauses = []
+        params = []
         if item_type:
-            rows = db_connection.execute(
-                "SELECT * FROM workspace_items WHERE item_type = ? ORDER BY updated_at DESC",
-                (item_type,),
-            )
-        else:
-            rows = db_connection.execute(
-                "SELECT * FROM workspace_items ORDER BY updated_at DESC"
-            )
+            clauses.append("item_type = ?")
+            params.append(item_type)
+        if status:
+            clauses.append("status = ?")
+            params.append(status)
+
+        query = "SELECT * FROM workspace_items"
+        if clauses:
+            query += " WHERE " + " AND ".join(clauses)
+        query += " ORDER BY updated_at DESC"
+        if limit is not None:
+            query += " LIMIT ?"
+            params.append(limit)
+
+        rows = db_connection.execute(query, tuple(params))
         return [WorkspaceItem.from_db_row(row) for row in rows]
 
     def delete(self, db_connection):

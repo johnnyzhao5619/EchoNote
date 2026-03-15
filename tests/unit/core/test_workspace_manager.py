@@ -4,8 +4,77 @@
 from pathlib import Path
 
 from data.database.connection import DatabaseConnection
-from data.database.models import CalendarEvent
+from data.database.models import CalendarEvent, WorkspaceAsset, WorkspaceItem
 from data.storage.file_manager import FileManager
+
+
+def build_workspace_manager(tmp_path):
+    from core.workspace.manager import WorkspaceManager
+
+    db = DatabaseConnection(str(tmp_path / "workspace.db"))
+    db.initialize_schema()
+    file_manager = FileManager(str(tmp_path / "files"))
+    return WorkspaceManager(db, file_manager)
+
+
+def create_workspace_recording(manager, *, title: str, status: str = "completed") -> str:
+    item = WorkspaceItem(
+        title=title,
+        item_type="recording",
+        source_kind="realtime_recording",
+        status=status,
+    )
+    item.save(manager.db)
+    audio_path = Path(manager.file_manager.get_workspace_path(item.id, "audio", f"{title}.wav"))
+    audio_path.parent.mkdir(parents=True, exist_ok=True)
+    audio_path.write_bytes(b"RIFF")
+    transcript_path = Path(manager.file_manager.get_workspace_path(item.id, "text", f"{title}.md"))
+    transcript_path.parent.mkdir(parents=True, exist_ok=True)
+    transcript_path.write_text(f"{title} transcript", encoding="utf-8")
+
+    audio_asset = WorkspaceAsset(
+        item_id=item.id,
+        asset_role="audio",
+        file_path=str(audio_path),
+        content_type="audio/wav",
+    )
+    audio_asset.save(manager.db)
+    transcript_asset = WorkspaceAsset(
+        item_id=item.id,
+        asset_role="transcript",
+        file_path=str(transcript_path),
+        text_content=transcript_path.read_text(encoding="utf-8"),
+        content_type="text/markdown",
+    )
+    transcript_asset.save(manager.db)
+    item.primary_audio_asset_id = audio_asset.id
+    item.primary_text_asset_id = transcript_asset.id
+    item.save(manager.db)
+    return item.id
+
+
+def create_workspace_document(manager, *, title: str, status: str = "active") -> str:
+    item = WorkspaceItem(
+        title=title,
+        item_type="document",
+        source_kind="workspace_note",
+        status=status,
+    )
+    item.save(manager.db)
+    document_path = Path(manager.file_manager.get_workspace_path(item.id, "notes", f"{title}.md"))
+    document_path.parent.mkdir(parents=True, exist_ok=True)
+    document_path.write_text(f"{title} body", encoding="utf-8")
+    asset = WorkspaceAsset(
+        item_id=item.id,
+        asset_role="document_text",
+        file_path=str(document_path),
+        text_content=document_path.read_text(encoding="utf-8"),
+        content_type="text/markdown",
+    )
+    asset.save(manager.db)
+    item.primary_text_asset_id = asset.id
+    item.save(manager.db)
+    return item.id
 
 
 def test_import_document_creates_workspace_item(tmp_path):
@@ -142,6 +211,7 @@ def test_detach_and_delete_event_items_manage_workspace_lifecycle(tmp_path):
     assert detached == 1
     assert kept_item is not None
     assert kept_item.source_event_id is None
+    assert kept_item.status == "orphaned"
 
     event_delete = CalendarEvent(
         title="Delete Event",
@@ -158,3 +228,66 @@ def test_detach_and_delete_event_items_manage_workspace_lifecycle(tmp_path):
     assert deleted == 1
     assert workspace_manager.get_item(item_id) is None
     assert all(not Path(asset.file_path).exists() for asset in assets if asset.file_path)
+
+
+def test_get_event_cleanup_summary_reports_workspace_linkage(tmp_path):
+    """Delete confirmation should be able to describe linked workspace assets."""
+    from core.workspace.manager import WorkspaceManager
+
+    db = DatabaseConnection(str(tmp_path / "workspace_cleanup_summary.db"))
+    db.initialize_schema()
+    file_manager = FileManager(str(tmp_path / "files"))
+    workspace_manager = WorkspaceManager(db, file_manager)
+
+    doc = tmp_path / "summary_source.txt"
+    doc.write_text("workspace linked content", encoding="utf-8")
+    event = CalendarEvent(
+        title="Linked Event",
+        start_time="2026-03-15T11:00:00+00:00",
+        end_time="2026-03-15T12:00:00+00:00",
+    )
+    event.save(db)
+    item_id = workspace_manager.import_document(str(doc))
+    item = workspace_manager.get_item(item_id)
+    assert item is not None
+    item.source_event_id = event.id
+    item.save(db)
+
+    summary = workspace_manager.get_event_cleanup_summary(event.id)
+
+    assert summary["linked_item_count"] == 1
+    assert summary["linked_asset_count"] == 2
+    assert summary["has_workspace_assets"] is True
+    assert summary["asset_roles"] == ["document_text", "source_document"]
+
+
+def test_workspace_manager_lists_filtered_collections(tmp_path):
+    manager = build_workspace_manager(tmp_path)
+    create_workspace_recording(manager, title="Call")
+    create_workspace_document(manager, title="Agenda")
+
+    recordings = manager.list_items(collection="recordings")
+    documents = manager.list_items(collection="documents")
+
+    assert [item.title for item in recordings] == ["Call"]
+    assert [item.title for item in documents] == ["Agenda"]
+
+
+def test_workspace_manager_lists_orphaned_collection(tmp_path):
+    manager = build_workspace_manager(tmp_path)
+    orphaned_id = create_workspace_document(manager, title="Detached", status="orphaned")
+    create_workspace_document(manager, title="Fresh")
+
+    orphaned_items = manager.list_items(collection="orphaned")
+
+    assert [item.id for item in orphaned_items] == [orphaned_id]
+
+
+def test_workspace_manager_lists_recent_collection_in_updated_order(tmp_path):
+    manager = build_workspace_manager(tmp_path)
+    old_id = create_workspace_document(manager, title="Old")
+    recent_id = create_workspace_recording(manager, title="Recent")
+
+    recent_items = manager.list_items(collection="recent")
+
+    assert [item.id for item in recent_items[:2]] == [recent_id, old_id]

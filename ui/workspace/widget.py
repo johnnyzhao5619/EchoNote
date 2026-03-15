@@ -77,6 +77,7 @@ class WorkspaceWidget(BaseWidget):
         content_splitter.setStretchFactor(2, 2)
 
         self.item_list.item_selected.connect(self._on_item_selected)
+        self.item_list.collection_changed.connect(self.refresh_items)
         self.toolbar.item_open_requested.connect(self.open_item)
         self.toolbar.recording_requested.connect(self._focus_recording_panel)
         self.recording_control_panel.workspace_item_requested.connect(self.open_item)
@@ -86,9 +87,10 @@ class WorkspaceWidget(BaseWidget):
 
     def refresh_items(self) -> None:
         current_item_id = self.item_list.current_item_id()
-        items = self.workspace_manager.list_items()
+        items = self.workspace_manager.list_items(collection=self.item_list.current_collection())
+        metadata_by_item = self.workspace_manager.get_item_list_metadata(items)
         self._items_by_id = {item.id: item for item in items}
-        self.item_list.set_items(items)
+        self.item_list.set_items(items, metadata_by_item=metadata_by_item)
         if items and current_item_id in self._items_by_id:
             self.item_list.select_item(current_item_id)
             self._on_item_selected(current_item_id)
