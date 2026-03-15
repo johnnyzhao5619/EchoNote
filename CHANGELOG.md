@@ -5,6 +5,13 @@ All notable changes to EchoNote will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Added `docs/plans/2026-03-15-unified-workspace-and-local-ai.md` as the formal hard-switch implementation plan for the upcoming unified recording/document workspace and local AI meeting workflow.
+- Expanded documentation indexing so `docs/README.md` and `AGENTS.md` both expose the new `docs/plans/` directory and the active workspace plan entry.
+
 ## [2.0.2] - 2026-02-27
 
 ### Changed

@@ -48,6 +48,7 @@
   - `tests/integration/`：集成测试。
 - `scripts/`：构建、发布、版本同步与工具脚本。
 - `docs/`：设计说明、开发规范与专题方案文档。
+  - `docs/plans/`：多阶段功能实施计划与执行拆解文档。
 - `echonote-landing/`：官网/落地页前端（独立包版本）。
 
 ## 常用定位建议
@@ -56,6 +57,7 @@
 - 查“时间线音频播放”：优先看 `ui/common/audio_player.py` + `ui/common/audio_player_launcher.py` + `ui/timeline/widget.py`。
 - 查“主题覆盖缺失”：先对照 `ui/constants.py` 的 role，再查双主题与 `theme_outline.json`。
 - 查“版本发布遗漏”：先看 `config/__version__.py`，再按发布清单同步其他文件。
+- 查“新功能实施计划”：优先看 `docs/plans/`，再回到对应模块代码与测试。
 
 ## 功能关键词到文件路径（快速索引）
 
@@ -67,6 +69,7 @@
 - 时间线音频播放器：`ui/common/audio_player.py`、`ui/common/audio_player_launcher.py`、`ui/timeline/transcript_viewer.py`、`tests/ui/test_timeline_audio_player.py`
 - 翻译引擎接入：`utils/app_initializer.py`、`engines/translation/`、`core/realtime/recorder.py`
 - 版本号与发布：`config/__version__.py`、`CHANGELOG.md`、`scripts/build_config.py`、`pyproject.toml`
+- 统一工作台规划：`docs/plans/2026-03-15-unified-workspace-and-local-ai.md`、`ui/main_window.py`、`ui/navigation.py`、`core/transcription/manager.py`
 
 ## 结构变更同步更新要求（强制）
 

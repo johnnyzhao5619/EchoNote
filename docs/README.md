@@ -34,8 +34,15 @@ For contributors and developers:
 - **[Code Standards](CODE_STANDARDS.md)** - Coding conventions and best practices
 - **[Contributing Guide](CONTRIBUTING.md)** - How to contribute to the project
 - **[CI/CD Guide](CI_CD_GUIDE.md)** - Continuous integration and deployment
+- **[Implementation Plans](plans/)** - Active architecture and rollout plans for multi-step feature work
 - Settings architecture note: translation defaults are managed in `ui/settings/translation_page.py`, while realtime recording controls remain in `ui/settings/realtime_page.py`.
 - Shared playback architecture note: reusable audio playback lives in `ui/common/audio_player.py` and is opened via `ui/common/audio_player_launcher.py`.
+
+---
+
+## 🧭 Active Plans
+
+- **[Unified Workspace & Local AI Plan](plans/2026-03-15-unified-workspace-and-local-ai.md)** - Hard-switch plan for the new recording/document workspace, local summaries, meeting briefs, and model-management expansion
 
 ---
 
@@ -124,5 +131,5 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ---
 
-**Last Updated**: February 26, 2026
+**Last Updated**: March 15, 2026
 **Version**: v2.0.2

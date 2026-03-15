@@ -1401,21 +1401,36 @@ class RealtimeRecorder:
 
     def _apply_input_device_native_sample_rate(self, input_source: Optional[int]) -> None:
         """Align capture sample rate with selected device defaults when possible."""
-        if self.audio_capture is None or input_source is None:
+        if self.audio_capture is None:
             return
-        lister = getattr(self.audio_capture, "get_input_devices", None)
-        if not callable(lister):
-            return
-        try:
-            devices = lister() or []
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Failed to inspect audio input devices: %s", exc)
-            return
+        if input_source is None:
+            default_getter = getattr(self.audio_capture, "get_default_input_device", None)
+            if not callable(default_getter):
+                return
+            try:
+                selected = default_getter()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Failed to inspect default input device: %s", exc)
+                return
+            if not isinstance(selected, dict):
+                return
+        else:
+            lister = getattr(self.audio_capture, "get_input_devices", None)
+            if not callable(lister):
+                return
+            try:
+                devices = lister() or []
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Failed to inspect audio input devices: %s", exc)
+                return
 
-        selected = next((device for device in devices if device.get("index") == input_source), None)
-        if not selected:
-            return
-        device_rate = selected.get("default_sample_rate")
+            selected = next(
+                (device for device in devices if device.get("index") == input_source), None
+            )
+            if not selected:
+                return
+
+        device_rate = selected.get("default_sample_rate") or selected.get("defaultSampleRate")
         if not isinstance(device_rate, (int, float)) or device_rate <= 0:
             return
         native_rate = int(device_rate)

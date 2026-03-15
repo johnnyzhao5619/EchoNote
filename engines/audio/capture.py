@@ -67,6 +67,8 @@ class AudioCapture:
         self.capture_thread = None
         self.audio_queue = queue.Queue()
         self.error_callback: Optional[Callable[[str], None]] = None
+        self._stream_channels: Optional[int] = None
+        self._warned_partial_frame = False
 
         self._pyaudio_module = None
         self._pyaudio_error: Optional[Exception] = None
@@ -197,32 +199,56 @@ class AudioCapture:
         pyaudio_instance = self._ensure_pyaudio_instance()
         pyaudio_module = self._ensure_module_available()
         self.error_callback = error_callback
+        device_info = self._get_device_info(pyaudio_instance, device_index)
+        stream_candidates = self._build_stream_candidates(device_info)
 
-        try:
-            # Open the input stream in blocking mode.
-            self.stream = pyaudio_instance.open(
-                format=pyaudio_module.paInt16,
-                channels=self.channels,
-                rate=self.sample_rate,
-                input=True,
-                input_device_index=device_index,
-                frames_per_buffer=self.chunk_size,
-                stream_callback=None,  # Use blocking mode.
+        last_error = None
+        for rate, channels in stream_candidates:
+            try:
+                # Open the input stream in blocking mode.
+                self.stream = pyaudio_instance.open(
+                    format=pyaudio_module.paInt16,
+                    channels=channels,
+                    rate=rate,
+                    input=True,
+                    input_device_index=device_index,
+                    frames_per_buffer=self.chunk_size,
+                    stream_callback=None,  # Use blocking mode.
+                )
+                self.sample_rate = rate
+                self.channels = channels
+                self._stream_channels = channels
+                last_error = None
+                break
+            except Exception as exc:  # noqa: BLE001
+                last_error = exc
+                self.stream = None
+                continue
+
+        if last_error is not None or self.stream is None:
+            attempted = ", ".join(f"{rate}Hz/{channels}ch" for rate, channels in stream_candidates)
+            logger.error(
+                "Failed to start audio capture (device_index=%s). Attempted: %s. Last error: %s",
+                device_index,
+                attempted,
+                last_error,
             )
+            raise last_error
 
-            self.is_capturing = True
+        self.is_capturing = True
 
-            # Launch the capture loop in a dedicated thread.
-            self.capture_thread = threading.Thread(
-                target=self._capture_loop, args=(callback,), daemon=True
-            )
-            self.capture_thread.start()
+        # Launch the capture loop in a dedicated thread.
+        self.capture_thread = threading.Thread(
+            target=self._capture_loop, args=(callback,), daemon=True
+        )
+        self.capture_thread.start()
 
-            logger.info(f"Audio capture started (device_index={device_index})")
-
-        except Exception as e:
-            logger.error(f"Failed to start audio capture: {e}")
-            raise
+        logger.info(
+            "Audio capture started (device_index=%s, rate=%s, channels=%s)",
+            device_index,
+            self.sample_rate,
+            self.channels,
+        )
 
     def _capture_loop(self, callback: Optional[Callable[[np.ndarray], None]]):
         """Capture loop executed on the background thread."""
@@ -235,6 +261,9 @@ class AudioCapture:
 
                 # Convert to a numpy array.
                 audio_array = np.frombuffer(audio_data, dtype=np.int16)
+                stream_channels = self._stream_channels or self.channels or 1
+                if stream_channels > 1:
+                    audio_array = self._downmix_to_mono(audio_array, stream_channels)
 
                 from config.constants import AUDIO_NORMALIZATION_DIVISOR
 
@@ -288,6 +317,7 @@ class AudioCapture:
             except Exception as exc:  # noqa: BLE001
                 logger.debug("Ignoring stream close error during shutdown: %s", exc)
             self.stream = None
+            self._stream_channels = None
 
         # Wait for the capture thread to terminate.
         if self.capture_thread:
@@ -359,6 +389,83 @@ class AudioCapture:
             self.pyaudio = None
 
         logger.info("Audio capture closed")
+
+    def _get_device_info(self, pyaudio_instance, device_index: Optional[int]) -> Optional[Dict]:
+        """Return PyAudio device info for the selected input device."""
+        try:
+            if device_index is None:
+                return pyaudio_instance.get_default_input_device_info()
+            return pyaudio_instance.get_device_info_by_index(device_index)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to resolve input device info: %s", exc)
+            return None
+
+    def _build_stream_candidates(
+        self, device_info: Optional[Dict]
+    ) -> List[tuple[int, int]]:
+        """Build a prioritized list of stream configs to try."""
+        desired_rate = int(self.sample_rate) if self.sample_rate and self.sample_rate > 0 else None
+        desired_channels = (
+            int(self.channels) if self.channels and self.channels > 0 else None
+        )
+        if desired_rate is None:
+            from config.constants import DEFAULT_SAMPLE_RATE_HZ
+
+            desired_rate = DEFAULT_SAMPLE_RATE_HZ
+        if desired_channels is None:
+            desired_channels = 1
+
+        candidates = [(desired_rate, desired_channels)]
+
+        if device_info:
+            max_channels = int(
+                device_info.get("maxInputChannels")
+                or device_info.get("max_input_channels")
+                or 0
+            )
+            if max_channels > 0 and max_channels != desired_channels:
+                candidates.append((desired_rate, max_channels))
+
+        seen = set()
+        unique_candidates = []
+        for rate, channels in candidates:
+            if rate <= 0 or channels <= 0:
+                continue
+            key = (rate, channels)
+            if key in seen:
+                continue
+            seen.add(key)
+            unique_candidates.append(key)
+
+        return unique_candidates
+
+    def _downmix_to_mono(self, audio_array: np.ndarray, channels: int) -> np.ndarray:
+        """Downmix interleaved multichannel int16 data to mono."""
+        if channels <= 1:
+            return audio_array
+
+        total_samples = audio_array.size
+        if total_samples == 0:
+            return audio_array
+
+        frame_count = total_samples // channels
+        if frame_count <= 0:
+            return audio_array
+
+        expected_samples = frame_count * channels
+        if expected_samples != total_samples and not self._warned_partial_frame:
+            logger.warning(
+                "Audio capture received a partial frame (samples=%s, channels=%s). "
+                "Trimming to %s samples for downmix.",
+                total_samples,
+                channels,
+                expected_samples,
+            )
+            self._warned_partial_frame = True
+
+        trimmed = audio_array[:expected_samples]
+        reshaped = trimmed.reshape(frame_count, channels)
+        return reshaped.mean(axis=1)
 
     def __enter__(self):
         """Context manager entry hook."""
