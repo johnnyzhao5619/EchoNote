@@ -44,9 +44,9 @@ class WorkspaceItemList(BaseWidget):
             list_item = QListWidgetItem(self._format_item_label(item, metadata))
             list_item.setData(0x0100, item.id)
             self.list_widget.addItem(list_item)
-        self.list_widget.blockSignals(False)
         if self.items:
             self.list_widget.setCurrentRow(0)
+        self.list_widget.blockSignals(False)
 
     def select_item(self, item_id: str) -> None:
         for row in range(self.list_widget.count()):

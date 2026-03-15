@@ -299,3 +299,22 @@ def test_workspace_library_panel_supports_structure_and_event_views(
 
     assert widget.library_panel.current_view_mode() == "event"
     assert widget.item_list.list_widget.count() >= 1
+
+
+def test_workspace_supports_document_tabs_and_detached_window(
+    qapp, mock_i18n, workspace_manager
+):
+    first_existing_id = workspace_manager.list_items()[0].id
+    second_id = workspace_manager.create_note(title="Plan")
+    widget = WorkspaceWidget(workspace_manager, mock_i18n)
+
+    widget.open_item(first_existing_id)
+    widget.open_item(second_id)
+
+    assert widget.document_tabs.count() == 2
+    assert widget.open_current_item_in_window_action is not None
+
+    widget.open_current_item_in_window_action.trigger()
+    qapp.processEvents()
+
+    assert second_id in widget._detached_windows
