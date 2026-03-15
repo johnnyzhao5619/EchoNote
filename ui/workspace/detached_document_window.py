@@ -25,6 +25,13 @@ class DetachedDocumentWindow(QWidget):
         layout.addWidget(self.editor_panel)
         self.resize(860, 720)
 
+    def update_translations(self) -> None:
+        self.editor_panel.update_translations()
+        item = self.workspace_manager.get_item(self.item_id)
+        self.setWindowTitle(
+            item.title if item is not None else self.i18n.t("workspace.library_title")
+        )
+
     def load_item(self, item_id: str) -> None:
         """Reload the target document and refresh the window title."""
         self.item_id = item_id

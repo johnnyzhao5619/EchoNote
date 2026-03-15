@@ -6,6 +6,7 @@ from unittest.mock import Mock, PropertyMock, patch
 
 import pytest
 
+import ui.workspace as workspace_module
 from core.qt_imports import QWidget
 from core.workspace.manager import WorkspaceManager
 from data.database.connection import DatabaseConnection
@@ -442,6 +443,43 @@ def test_workspace_supports_document_tabs_and_detached_window(
     qapp.processEvents()
 
     assert second_id in widget._detached_windows
+
+
+def test_workspace_module_does_not_export_legacy_recording_control_panel():
+    assert "WorkspaceRecordingControlPanel" not in workspace_module.__all__
+    assert not hasattr(workspace_module, "WorkspaceRecordingControlPanel")
+
+
+def test_workspace_update_translations_refreshes_detached_window_editor(
+    qapp, mock_i18n, workspace_manager
+):
+    note_id = workspace_manager.create_note(title="Plan")
+    widget = WorkspaceWidget(workspace_manager, mock_i18n)
+
+    widget.open_item(note_id)
+    widget.open_current_item_in_window_action.trigger()
+    qapp.processEvents()
+
+    detached_window = widget._detached_windows[note_id]
+    assert detached_window.editor_panel.search_button.text() == "transcript.search"
+
+    translations = {
+        "common.edit": "编辑",
+        "viewer.copy_all": "复制全部",
+        "viewer.export": "导出",
+        "viewer.export_txt": "导出 TXT",
+        "viewer.export_md": "导出 MD",
+        "transcript.search": "搜索",
+        "workspace.open_in_new_window": "在新窗口打开",
+        "workspace.library_title": "工作台条目",
+    }
+    mock_i18n.t.side_effect = lambda key, **kwargs: translations.get(key, key)
+
+    widget.update_translations()
+    qapp.processEvents()
+
+    assert widget.open_current_item_in_window_action.text() == "在新窗口打开"
+    assert detached_window.editor_panel.search_button.text() == "搜索"
 
 
 def test_recording_dock_quick_start_uses_defaults_and_more_settings_routes_to_realtime_page(

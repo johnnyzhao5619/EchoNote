@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Cleaned remaining workspace lifecycle gaps: primary text/audio references are now maintained centrally, calendar delete/provider-removal flows now detach or remove workspace assets correctly, and calendar export/auto-transcribe now read workspace artifacts instead of legacy attachment rows.
+- Removed the leftover `WorkspaceRecordingControlPanel` export/file after the shell recording dock hard switch, and propagated workspace translation refresh into already-open detached document windows so editor actions no longer keep stale language text.
 - Hardened local Text AI execution and governance: ONNX summaries now support a real greedy seq2seq path with extractive fallback, `text-ai` download/usage records persist across sessions, and workspace summary/meeting flows now record actual model usage.
 - Stabilized workspace editor asset presentation with explicit role labels and deterministic ordering instead of ad-hoc `title()` humanization.
 - Restored batch transcription/translation queue visibility inside `ui/workspace/` by embedding a dedicated task panel with file/folder import, pasted-text translation, task progress, retry/cancel/delete, and result viewing/export.

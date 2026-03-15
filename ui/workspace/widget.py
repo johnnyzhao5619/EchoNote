@@ -97,6 +97,8 @@ class WorkspaceWidget(BaseWidget):
             editor_panel = self.document_tabs.widget(index)
             if hasattr(editor_panel, "update_translations"):
                 editor_panel.update_translations()
+        for detached_window in self._detached_windows.values():
+            detached_window.update_translations()
 
     def refresh_items(self) -> None:
         current_item_id = self.library_panel.current_item_id()
