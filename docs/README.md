@@ -48,6 +48,7 @@ For contributors and developers:
 ## 🧭 Active Plans
 
 - **[Unified Workspace & Local AI Plan](plans/2026-03-15-unified-workspace-and-local-ai.md)** - Hard-switch plan for the new recording/document workspace, local summaries, meeting briefs, and model-management expansion
+- **[Workspace Experience Rearchitecture Plan](plans/2026-03-15-workspace-experience-rearchitecture.md)** - Current plan for adding a persistent recording dock, structure/event dual library views, and card-based multi-document editing with detached windows
 
 ## 🗃️ Archived Plans
 
