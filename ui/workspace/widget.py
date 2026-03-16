@@ -26,8 +26,6 @@ from ui.workspace.detached_document_window import DetachedDocumentWindow
 from ui.workspace.editor_panel import WorkspaceEditorPanel
 from ui.workspace.inspector_panel import WorkspaceInspectorPanel
 from ui.workspace.library_panel import WorkspaceLibraryPanel
-from ui.workspace.tool_rail import WorkspaceToolRail
-from ui.workspace.toolbar import WorkspaceToolbar
 
 
 class WorkspaceWidget(BaseWidget):
@@ -48,16 +46,15 @@ class WorkspaceWidget(BaseWidget):
         self.realtime_recorder = realtime_recorder
         self._items_by_id = {}
         self._detached_windows: dict[str, DetachedDocumentWindow] = {}
+        self._suspend_tree_selection_sync = False
         self._init_ui()
         self.refresh_items()
 
     def _init_ui(self) -> None:
         self.setProperty("role", ROLE_WORKSPACE_SURFACE)
         layout = QVBoxLayout(self)
-        self.toolbar = WorkspaceToolbar(self.workspace_manager, self.i18n, self)
-        self.tool_rail = WorkspaceToolRail(self.i18n, self)
         self.library_panel = WorkspaceLibraryPanel(self.workspace_manager, self.i18n, self)
-        self.item_list = self.library_panel.item_list
+        self.item_list = self.library_panel
         self.document_tabs = QTabWidget(self)
         self.document_tabs.setTabsClosable(True)
         self.document_tabs.tabCloseRequested.connect(self._close_document_tab)
@@ -82,13 +79,10 @@ class WorkspaceWidget(BaseWidget):
         self.task_panel = None
         self.inspector_panel.set_editor_panel(None)
 
-        left_splitter = QSplitter(Qt.Orientation.Vertical, self)
-        left_splitter.setMinimumWidth(WORKSPACE_LIBRARY_PANEL_MIN_WIDTH)
-        left_splitter.addWidget(self.library_panel)
-        left_splitter.setStretchFactor(0, 1)
+        self.library_panel.setMinimumWidth(WORKSPACE_LIBRARY_PANEL_MIN_WIDTH)
 
         content_splitter = QSplitter(Qt.Orientation.Horizontal, self)
-        content_splitter.addWidget(left_splitter)
+        content_splitter.addWidget(self.library_panel)
         content_splitter.addWidget(editor_stage)
         content_splitter.addWidget(self.inspector_panel)
         content_splitter.setStretchFactor(0, 1)
@@ -99,26 +93,18 @@ class WorkspaceWidget(BaseWidget):
 
         self.library_panel.item_selected.connect(self._on_item_selected)
         self.library_panel.view_mode_changed.connect(self.refresh_items)
-        self.library_panel.view_mode_changed.connect(self.tool_rail.set_active_view_mode)
         self.library_panel.library_changed.connect(self.refresh_items)
-        self.toolbar.import_document_requested.connect(self._import_document)
-        self.toolbar.new_note_requested.connect(self._create_note)
-        self.tool_rail.view_mode_requested.connect(self._set_library_view_mode)
-        self.tool_rail.toggle_inspector_requested.connect(self._toggle_inspector_panel)
-
-        layout.addWidget(self.toolbar)
+        self.library_panel.import_document_requested.connect(self._import_document)
+        self.library_panel.new_note_requested.connect(self._create_note)
         body = QWidget(self)
         body_layout = QHBoxLayout(body)
         body_layout.setContentsMargins(0, 0, 0, 0)
-        body_layout.addWidget(self.tool_rail)
         body_layout.addWidget(content_splitter, 1)
         layout.addWidget(body, 1)
         self.update_translations()
 
     def update_translations(self) -> None:
-        self.toolbar.update_translations()
         self.library_panel.update_translations()
-        self.tool_rail.update_translations()
         self.inspector_panel.update_translations()
         self.open_current_item_in_window_action.setText(
             self.i18n.t("workspace.open_in_new_window")
@@ -134,31 +120,37 @@ class WorkspaceWidget(BaseWidget):
             detached_window.update_translations()
 
     def refresh_items(self) -> None:
-        current_item_id = self.library_panel.current_item_id()
+        current_open_item_id = self.editor_panel.current_item_id() if self.editor_panel is not None else ""
         items = self.workspace_manager.list_items(
             view_mode=self.library_panel.current_view_mode(),
-            folder_id=self.library_panel.current_folder_id(),
         )
         metadata_by_item = self.workspace_manager.get_item_list_metadata(items)
         self._items_by_id = {item.id: item for item in items}
         self.library_panel.set_items(items, metadata_by_item=metadata_by_item)
+        tree_selection_kind = self.library_panel.current_selection_kind()
+        tree_selection_value = self.library_panel.current_selection_value()
         self._refresh_document_tabs()
-        if items and current_item_id in self._items_by_id:
-            self.library_panel.select_item(current_item_id)
-            self.open_item(current_item_id)
-        elif items and self.current_item_id():
-            self.open_item(self.current_item_id())
+        if items and tree_selection_kind == "item" and tree_selection_value in self._items_by_id:
+            self.open_item(tree_selection_value)
+        elif items and tree_selection_kind in {"folder", "event"}:
+            if current_open_item_id in self._items_by_id:
+                self.open_item(current_open_item_id, sync_tree_selection=False)
+            else:
+                self.open_item(items[0].id, sync_tree_selection=False)
+        elif items and current_open_item_id in self._items_by_id:
+            self.open_item(current_open_item_id)
         elif items:
             self.open_item(items[0].id)
         else:
             self._clear_document_stage()
-        self.tool_rail.set_active_view_mode(self.library_panel.current_view_mode())
 
     def open_item(
         self,
         item_id: str,
         asset_role: str | None = None,
         view_mode: str | None = None,
+        *,
+        sync_tree_selection: bool = True,
     ) -> bool:
         """Refresh and focus a specific workspace item."""
         if view_mode and self.library_panel.current_view_mode() != view_mode:
@@ -179,8 +171,14 @@ class WorkspaceWidget(BaseWidget):
             return False
 
         editor_panel = self._ensure_document_tab(item_id)
-        self.document_tabs.setCurrentWidget(editor_panel)
-        self.library_panel.select_item(item_id)
+        previous_suspend_state = self._suspend_tree_selection_sync
+        self._suspend_tree_selection_sync = not sync_tree_selection
+        try:
+            self.document_tabs.setCurrentWidget(editor_panel)
+        finally:
+            self._suspend_tree_selection_sync = previous_suspend_state
+        if sync_tree_selection:
+            self.library_panel.select_item(item_id)
         self.inspector_panel.set_item(item)
         self.inspector_panel.set_editor_panel(editor_panel)
         if asset_role == "audio":
@@ -220,19 +218,23 @@ class WorkspaceWidget(BaseWidget):
 
         item = self._items_by_id.get(item_id) or self.workspace_manager.get_item(item_id)
         editor_panel = WorkspaceEditorPanel(self.workspace_manager, self.i18n, parent=self.document_tabs)
+        editor_panel.item_renamed.connect(self._on_editor_item_renamed)
         editor_panel.set_item(item)
         self.document_tabs.addTab(editor_panel, item.title if item is not None else item_id)
         return editor_panel
 
     def _refresh_document_tabs(self) -> None:
-        for index in range(self.document_tabs.count()):
+        for index in range(self.document_tabs.count() - 1, -1, -1):
             editor_panel = self.document_tabs.widget(index)
             if not isinstance(editor_panel, WorkspaceEditorPanel):
                 continue
             item_id = editor_panel.current_item_id()
             item = self.workspace_manager.get_item(item_id) if item_id else None
+            if item is None:
+                self._close_document_tab(index)
+                continue
             editor_panel.set_item(item)
-            self.document_tabs.setTabText(index, item.title if item is not None else item_id)
+            self.document_tabs.setTabText(index, item.title)
 
     def _close_document_tab(self, index: int) -> None:
         widget = self.document_tabs.widget(index)
@@ -253,7 +255,7 @@ class WorkspaceWidget(BaseWidget):
         item = self.workspace_manager.get_item(item_id) if item_id else None
         self.inspector_panel.set_item(item)
         self.inspector_panel.set_editor_panel(editor_panel)
-        if item_id:
+        if item_id and not self._suspend_tree_selection_sync:
             self.library_panel.select_item(item_id)
 
     def _open_current_item_in_detached_window(self) -> None:
@@ -275,6 +277,10 @@ class WorkspaceWidget(BaseWidget):
         self.inspector_panel.set_item(None)
         self.inspector_panel.set_editor_panel(None)
 
+    def _on_editor_item_renamed(self, item_id: str) -> None:
+        self.refresh_items()
+        self.open_item(item_id)
+
     def _import_document(self) -> None:
         file_path, _ = QFileDialog.getOpenFileName(self, self.i18n.t("workspace.import_document"))
         if not file_path:
@@ -290,10 +296,3 @@ class WorkspaceWidget(BaseWidget):
         if item_id:
             self.refresh_items()
             self.open_item(item_id)
-
-    def _set_library_view_mode(self, view_mode: str) -> None:
-        if view_mode and self.library_panel.current_view_mode() != view_mode:
-            self.library_panel.set_view_mode(view_mode)
-
-    def _toggle_inspector_panel(self) -> None:
-        self.inspector_panel.setVisible(not self.inspector_panel.isVisible())

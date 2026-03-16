@@ -27,6 +27,21 @@ TEXT_ASSET_ROLE_PRIORITY = {
 
 LIBRARY_VIEW_STRUCTURE = "structure"
 LIBRARY_VIEW_EVENT = "event"
+WORKSPACE_FOLDER_KIND_USER = "user"
+WORKSPACE_FOLDER_KIND_INBOX = "inbox"
+WORKSPACE_FOLDER_KIND_SYSTEM_ROOT = "system_root"
+WORKSPACE_FOLDER_KIND_EVENT = "event"
+WORKSPACE_FOLDER_KIND_BATCH_TASK = "batch_task"
+WORKSPACE_SYSTEM_FOLDER_EVENTS = "事件"
+WORKSPACE_SYSTEM_FOLDER_BATCH_TASKS = "批量任务"
+
+
+class WorkspaceValidationError(ValueError):
+    """Workspace domain validation error with stable codes for UI handling."""
+
+    def __init__(self, code: str):
+        super().__init__(code)
+        self.code = code
 
 
 class WorkspaceManager:
@@ -64,14 +79,32 @@ class WorkspaceManager:
     def import_document(self, file_path: str) -> str:
         """Import a document into the unified workspace store."""
         item = self.import_service.import_document(file_path)
+        if item.folder_id is None:
+            default_folder_id = self.ensure_inbox_folder().id
+            item.folder_id = default_folder_id
+        item.title = self._build_unique_entry_name(
+            item.title or Path(file_path).stem or Path(file_path).name,
+            container_id=item.folder_id,
+            exclude_item_id=item.id,
+        )
+        item.save(self.db)
         return item.id
 
-    def create_note(self, *, title: str, text_content: str = "") -> str:
+    def create_note(
+        self,
+        *,
+        title: str,
+        text_content: str = "",
+        event_id: Optional[str] = None,
+    ) -> str:
         """Create a workspace-native note item backed by a document text asset."""
+        folder_id = self.resolve_default_folder_id(event_id=event_id)
         item = WorkspaceItem(
-            title=title,
+            title=self._build_unique_entry_name(title, container_id=folder_id),
             item_type="document",
             source_kind="workspace_note",
+            folder_id=folder_id,
+            source_event_id=event_id,
             status="active",
         )
         item.save(self.db)
@@ -84,9 +117,25 @@ class WorkspaceManager:
         )
         return item.id
 
-    def create_folder(self, name: str, *, parent_id: Optional[str] = None) -> str:
+    def create_folder(
+        self,
+        name: str,
+        *,
+        parent_id: Optional[str] = None,
+        folder_kind: str = WORKSPACE_FOLDER_KIND_USER,
+        source_event_id: Optional[str] = None,
+    ) -> str:
         """Create a user-managed workspace folder."""
-        folder = WorkspaceFolder(name=name.strip(), parent_id=parent_id)
+        normalized_name = self._normalize_entry_name(name)
+        if not normalized_name:
+            raise WorkspaceValidationError("empty_name")
+        self._ensure_entry_name_available(normalized_name, container_id=parent_id)
+        folder = WorkspaceFolder(
+            name=normalized_name,
+            parent_id=parent_id,
+            folder_kind=folder_kind,
+            source_event_id=source_event_id,
+        )
         folder.save(self.db)
         return folder.id
 
@@ -96,16 +145,108 @@ class WorkspaceManager:
 
     def list_folders(self) -> List[WorkspaceFolder]:
         """List all workspace folders for structure rendering."""
-        return WorkspaceFolder.get_all(self.db)
+        self.normalize_structure_assignments()
+        self.ensure_structure_root_folders()
+        return self._list_folders_raw()
+
+    def ensure_structure_root_folders(self) -> list[WorkspaceFolder]:
+        """Ensure stable top-level folders for structure view navigation."""
+        return [
+            self.ensure_inbox_folder(),
+            self.ensure_event_root_folder(),
+            self.ensure_batch_task_root_folder(),
+        ]
+
+    def ensure_inbox_folder(self) -> WorkspaceFolder:
+        """Return the singleton top-level folder for manually created/imported docs."""
+        return self._ensure_special_folder(
+            name="工作台条目",
+            folder_kind=WORKSPACE_FOLDER_KIND_INBOX,
+        )
+
+    def ensure_event_root_folder(self) -> WorkspaceFolder:
+        """Return the singleton system root folder for event-backed content."""
+        return self._ensure_system_root_folder(
+            name=WORKSPACE_SYSTEM_FOLDER_EVENTS,
+        )
+
+    def ensure_batch_task_root_folder(self) -> WorkspaceFolder:
+        """Return the singleton system root folder for batch-task content."""
+        return self._ensure_special_folder(
+            name=WORKSPACE_SYSTEM_FOLDER_BATCH_TASKS,
+            folder_kind=WORKSPACE_FOLDER_KIND_BATCH_TASK,
+        )
+
+    def ensure_event_folder(self, event_id: str) -> WorkspaceFolder:
+        """Return the canonical event folder for a calendar event."""
+        if not event_id:
+            raise ValueError("event_id is required")
+        for folder in self._list_folders_raw():
+            if (
+                folder.folder_kind == WORKSPACE_FOLDER_KIND_EVENT
+                and folder.source_event_id == event_id
+            ):
+                return folder
+
+        root_folder = self.ensure_event_root_folder()
+        folder_name = self._resolve_event_folder_name(event_id)
+        folder = WorkspaceFolder(
+            name=folder_name,
+            parent_id=root_folder.id,
+            folder_kind=WORKSPACE_FOLDER_KIND_EVENT,
+            source_event_id=event_id,
+        )
+        folder.save(self.db)
+        return folder
+
+    def resolve_default_folder_id(
+        self,
+        *,
+        event_id: Optional[str] = None,
+        task_id: Optional[str] = None,
+    ) -> Optional[str]:
+        """Resolve the default structure folder for new workspace items."""
+        if task_id:
+            return self.ensure_batch_task_root_folder().id
+        if event_id:
+            return self.ensure_event_folder(event_id).id
+        return self.ensure_inbox_folder().id
 
     def rename_folder(self, folder_id: str, name: str) -> WorkspaceFolder:
         """Rename a workspace folder."""
         folder = self.get_folder(folder_id)
         if folder is None:
             raise ValueError(f"Unknown workspace folder: {folder_id}")
-        folder.name = name.strip()
+        if getattr(folder, "folder_kind", "") != WORKSPACE_FOLDER_KIND_USER:
+            raise WorkspaceValidationError("folder_not_renamable")
+        normalized_name = self._normalize_entry_name(name)
+        if not normalized_name:
+            raise WorkspaceValidationError("empty_name")
+        self._ensure_entry_name_available(
+            normalized_name,
+            container_id=folder.parent_id,
+            exclude_folder_id=folder.id,
+        )
+        folder.name = normalized_name
         folder.save(self.db)
         return folder
+
+    def rename_item(self, item_id: str, title: str) -> WorkspaceItem:
+        """Rename a workspace item while enforcing same-container uniqueness."""
+        item = self.get_item(item_id)
+        if item is None:
+            raise ValueError(f"Unknown workspace item: {item_id}")
+        normalized_title = self._normalize_entry_name(title)
+        if not normalized_title:
+            raise WorkspaceValidationError("empty_name")
+        self._ensure_entry_name_available(
+            normalized_title,
+            container_id=item.folder_id,
+            exclude_item_id=item.id,
+        )
+        item.title = normalized_title
+        item.save(self.db)
+        return item
 
     def move_folder(self, folder_id: str, parent_id: Optional[str]) -> WorkspaceFolder:
         """Move a folder under a new parent folder."""
@@ -133,16 +274,30 @@ class WorkspaceManager:
         folder = self.get_folder(folder_id)
         if folder is None:
             return False
+        if getattr(folder, "folder_kind", "") != WORKSPACE_FOLDER_KIND_USER:
+            raise WorkspaceValidationError("folder_not_deletable")
         child_folders = [item for item in self.list_folders() if item.parent_id == folder_id]
         if child_folders:
-            return False
+            raise WorkspaceValidationError("folder_not_empty")
         linked_items = self.db.execute(
             "SELECT id FROM workspace_items WHERE folder_id = ? LIMIT 1",
             (folder_id,),
         )
         if linked_items:
-            return False
+            raise WorkspaceValidationError("folder_not_empty")
         folder.delete(self.db)
+        return True
+
+    def delete_item(self, item_id: str, *, delete_files: bool = True) -> bool:
+        """Delete a workspace item together with its owned assets."""
+        item = self.get_item(item_id)
+        if item is None:
+            return False
+        for asset in WorkspaceAsset.get_by_item_id(self.db, item.id):
+            if delete_files:
+                self._delete_asset_file(asset)
+            asset.delete(self.db)
+        item.delete(self.db)
         return True
 
     def move_item_to_folder(self, item_id: str, folder_id: Optional[str]) -> WorkspaceItem:
@@ -167,8 +322,10 @@ class WorkspaceManager:
         item_type: Optional[str] = None,
         view_mode: str = LIBRARY_VIEW_STRUCTURE,
         folder_id: Optional[str] = None,
+        event_id: Optional[str] = None,
     ) -> List[WorkspaceItem]:
         """List workspace items for the requested collection."""
+        self.normalize_structure_assignments()
         resolved_collection = (collection or "all").strip().lower()
         resolved_item_type = item_type
         status = None
@@ -188,21 +345,90 @@ class WorkspaceManager:
             item_type=resolved_item_type,
             status=status,
             folder_id=folder_id if view_mode == LIBRARY_VIEW_STRUCTURE else None,
+            source_event_id=event_id if view_mode == LIBRARY_VIEW_EVENT else None,
             view_mode=view_mode,
             limit=limit,
         )
+
+    def normalize_structure_assignments(self) -> None:
+        """Hard-switch legacy items into stable structure folders."""
+        self.ensure_structure_root_folders()
+        folders_by_id = {
+            folder.id: folder for folder in self._list_folders_raw()
+        }
+        items = WorkspaceItem.get_all(self.db)
+        for item in items:
+            if item.folder_id and item.folder_id in folders_by_id:
+                continue
+            target_folder_id = self.resolve_default_folder_id(
+                event_id=item.source_event_id,
+                task_id=item.source_task_id,
+            )
+            if item.folder_id == target_folder_id:
+                continue
+            self.db.execute(
+                "UPDATE workspace_items SET folder_id = ? WHERE id = ?",
+                (target_folder_id, item.id),
+                commit=True,
+            )
+
+    def get_event_navigation_entries(self) -> list[dict]:
+        """Build event-focused navigator entries for workspace event view."""
+        rows = self.db.execute(
+            """
+            SELECT
+                wi.source_event_id AS event_id,
+                COALESCE(NULLIF(TRIM(ce.title), ''), '') AS event_title,
+                COUNT(wi.id) AS item_count,
+                MAX(wi.updated_at) AS updated_at
+            FROM workspace_items AS wi
+            LEFT JOIN calendar_events AS ce ON ce.id = wi.source_event_id
+            GROUP BY wi.source_event_id, ce.title
+            ORDER BY
+                CASE WHEN wi.source_event_id IS NULL THEN 1 ELSE 0 END,
+                MAX(wi.updated_at) DESC,
+                COALESCE(NULLIF(TRIM(ce.title), ''), wi.source_event_id, '') ASC
+            """
+        )
+        entries: list[dict] = []
+        for row in rows:
+            event_id = row["event_id"]
+            event_title = (row["event_title"] or "").strip()
+            entries.append(
+                {
+                    "event_id": event_id,
+                    "event_title": event_title,
+                    "item_count": int(row["item_count"] or 0),
+                    "updated_at": row["updated_at"] or "",
+                }
+            )
+        return entries
 
     def get_item_list_metadata(self, items: List[WorkspaceItem]) -> dict[str, dict]:
         """Build lightweight list metadata for workspace items."""
         assets_by_item = self._get_assets_for_item_ids([item.id for item in items])
         folder_names = {folder.id: folder.name for folder in self.list_folders()}
+        event_titles = self._get_event_titles(
+            [item.source_event_id for item in items if item.source_event_id]
+        )
+        task_sources = self._get_task_source_map(
+            [item.source_task_id for item in items if item.source_task_id]
+        )
         metadata_by_item: dict[str, dict] = {}
         for item in items:
             assets = assets_by_item.get(item.id, [])
+            task_source = task_sources.get(item.source_task_id or "")
             metadata_by_item[item.id] = {
                 "source": item.source_kind or item.item_type,
                 "folder_name": folder_names.get(item.folder_id),
                 "event_id": item.source_event_id,
+                "event_title": event_titles.get(item.source_event_id or ""),
+                "task_id": item.source_task_id,
+                "original_file_name": self._resolve_original_file_name(
+                    item,
+                    assets,
+                    task_source=task_source,
+                ),
                 "updated_at": item.updated_at,
                 "has_audio": any(asset.asset_role == "audio" for asset in assets),
                 "has_text": any(
@@ -212,6 +438,15 @@ class WorkspaceManager:
                 "is_orphaned": item.status == "orphaned",
             }
         return metadata_by_item
+
+    def get_item_context_metadata(self, item_id: str) -> dict:
+        """Return normalized metadata used by workspace inspector and editor chrome."""
+        item = self.get_item(item_id)
+        if item is None:
+            return {}
+        metadata = self.get_item_list_metadata([item]).get(item.id, {})
+        metadata["item_title"] = item.title or item.id
+        return metadata
 
     def get_assets(self, item_id: str, asset_role: Optional[str] = None) -> List[WorkspaceAsset]:
         """List assets for a workspace item."""
@@ -349,12 +584,19 @@ class WorkspaceManager:
         replace_existing: bool = False,
     ) -> str:
         """Publish a completed transcription task into the unified workspace."""
+        existing_item = self._get_item_by_source_task_id(getattr(task, "id", None)) if getattr(task, "id", None) else None
         item = self._resolve_transcription_item(task, event_id=event_id, replace_existing=replace_existing)
         item.item_type = "recording"
+        item.folder_id = item.folder_id or self.resolve_default_folder_id(
+            event_id=event_id,
+            task_id=getattr(task, "id", None),
+        )
         item.source_kind = "batch_transcription"
         item.source_task_id = getattr(task, "id", None)
         item.source_event_id = event_id or item.source_event_id
         item.status = getattr(task, "status", "completed") or "completed"
+        if existing_item is None:
+            item.title = self._build_unique_entry_name(item.title, container_id=item.folder_id)
         item.save(self.db)
 
         audio_asset = self._upsert_file_asset(item, "audio", getattr(task, "file_path", None))
@@ -375,11 +617,15 @@ class WorkspaceManager:
     def publish_recording_session(self, recording_result: dict) -> str:
         """Publish a realtime recording session and its artifacts to workspace."""
         event_id = recording_result.get("event_id")
+        existing_item = self._get_latest_item_for_event(event_id) if event_id else None
         item = self._resolve_recording_item(recording_result, event_id=event_id)
         item.item_type = "recording"
+        item.folder_id = item.folder_id or self.resolve_default_folder_id(event_id=event_id)
         item.source_kind = "realtime_recording"
         item.source_event_id = event_id or item.source_event_id
         item.status = "completed"
+        if existing_item is None:
+            item.title = self._build_unique_entry_name(item.title, container_id=item.folder_id)
         item.save(self.db)
 
         audio_asset = self._upsert_file_asset(item, "audio", recording_result.get("recording_path"))
@@ -510,13 +756,16 @@ class WorkspaceManager:
             return None
         item = self._get_latest_item_for_event(event_id)
         if item is None:
+            folder_id = self.resolve_default_folder_id(event_id=event_id)
             item = WorkspaceItem(
                 title=title or Path(file_path).stem or asset_role,
                 item_type="recording",
+                folder_id=folder_id,
                 source_kind="ai_generated",
                 source_event_id=event_id,
                 status="completed",
             )
+            item.title = self._build_unique_entry_name(item.title, container_id=folder_id)
         item.save(self.db)
         asset = self._upsert_text_asset(item, asset_role, file_path)
         if asset is None:
@@ -616,6 +865,129 @@ class WorkspaceManager:
             title = f"recording_{recording_result['start_time']}"
         return WorkspaceItem(title=title or "recording", item_type="recording")
 
+    def _ensure_system_root_folder(self, *, name: str) -> WorkspaceFolder:
+        """Return or create a singleton top-level system root folder."""
+        return self._ensure_special_folder(
+            name=name,
+            folder_kind=WORKSPACE_FOLDER_KIND_SYSTEM_ROOT,
+        )
+
+    def _ensure_special_folder(self, *, name: str, folder_kind: str) -> WorkspaceFolder:
+        """Return or create a singleton top-level folder for system-owned content."""
+        for folder in self._list_folders_raw():
+            if (
+                folder.folder_kind == folder_kind
+                and folder.name == name
+                and folder.parent_id is None
+                and folder.source_event_id is None
+            ):
+                return folder
+
+        folder = WorkspaceFolder(
+            name=name,
+            parent_id=None,
+            folder_kind=folder_kind,
+        )
+        folder.save(self.db)
+        return folder
+
+    def _list_folders_raw(self) -> List[WorkspaceFolder]:
+        """List folders without triggering structure normalization."""
+        return WorkspaceFolder.get_all(self.db)
+
+    def _resolve_event_folder_name(self, event_id: str) -> str:
+        """Build a stable folder label for an event-backed workspace group."""
+        event_rows = self.db.execute(
+            "SELECT title FROM calendar_events WHERE id = ? LIMIT 1",
+            (event_id,),
+        )
+        if event_rows:
+            title = (event_rows[0]["title"] or "").strip()
+            if title:
+                return self._build_unique_entry_name(
+                    title,
+                    container_id=self.ensure_event_root_folder().id,
+                )
+        return self._build_unique_entry_name(
+            f"事件 {event_id}",
+            container_id=self.ensure_event_root_folder().id,
+        )
+
+    @staticmethod
+    def _normalize_entry_name(name: str) -> str:
+        return str(name or "").strip()
+
+    def _build_unique_entry_name(
+        self,
+        preferred_name: str,
+        *,
+        container_id: Optional[str],
+        exclude_item_id: Optional[str] = None,
+        exclude_folder_id: Optional[str] = None,
+    ) -> str:
+        base_name = self._normalize_entry_name(preferred_name) or "Untitled"
+        existing_names = self._list_entry_names(
+            container_id,
+            exclude_item_id=exclude_item_id,
+            exclude_folder_id=exclude_folder_id,
+        )
+        lower_names = {name.lower() for name in existing_names}
+        if base_name.lower() not in lower_names:
+            return base_name
+        suffix = 2
+        while True:
+            candidate = f"{base_name} {suffix}"
+            if candidate.lower() not in lower_names:
+                return candidate
+            suffix += 1
+
+    def _ensure_entry_name_available(
+        self,
+        name: str,
+        *,
+        container_id: Optional[str],
+        exclude_item_id: Optional[str] = None,
+        exclude_folder_id: Optional[str] = None,
+    ) -> None:
+        normalized_name = self._normalize_entry_name(name)
+        if not normalized_name:
+            raise WorkspaceValidationError("empty_name")
+        existing_names = self._list_entry_names(
+            container_id,
+            exclude_item_id=exclude_item_id,
+            exclude_folder_id=exclude_folder_id,
+        )
+        if normalized_name.lower() in {existing_name.lower() for existing_name in existing_names}:
+            raise WorkspaceValidationError("duplicate_name")
+
+    def _list_entry_names(
+        self,
+        container_id: Optional[str],
+        *,
+        exclude_item_id: Optional[str] = None,
+        exclude_folder_id: Optional[str] = None,
+    ) -> list[str]:
+        item_rows = self.db.execute(
+            """
+            SELECT title AS name
+            FROM workspace_items
+            WHERE ((folder_id = ?) OR (folder_id IS NULL AND ? IS NULL))
+              AND (? IS NULL OR id != ?)
+            """,
+            (container_id, container_id, exclude_item_id, exclude_item_id),
+        )
+        folder_rows = self.db.execute(
+            """
+            SELECT name
+            FROM workspace_folders
+            WHERE ((parent_id = ?) OR (parent_id IS NULL AND ? IS NULL))
+              AND (? IS NULL OR id != ?)
+            """,
+            (container_id, container_id, exclude_folder_id, exclude_folder_id),
+        )
+        names = [str(row["name"] or "").strip() for row in item_rows + folder_rows]
+        return [name for name in names if name]
+
     def _get_item_by_source_task_id(self, task_id: str) -> Optional[WorkspaceItem]:
         rows = self.db.execute(
             "SELECT * FROM workspace_items WHERE source_task_id = ? ORDER BY updated_at DESC",
@@ -654,6 +1026,56 @@ class WorkspaceManager:
             asset = WorkspaceAsset.from_db_row(row)
             assets_by_item.setdefault(asset.item_id, []).append(asset)
         return assets_by_item
+
+    def _get_event_titles(self, event_ids: List[str]) -> dict[str, str]:
+        unique_event_ids = [event_id for event_id in dict.fromkeys(event_ids) if event_id]
+        if not unique_event_ids:
+            return {}
+        placeholders = ", ".join(["?"] * len(unique_event_ids))
+        rows = self.db.execute(
+            "SELECT id, title FROM calendar_events WHERE id IN (" + placeholders + ")",
+            tuple(unique_event_ids),
+        )
+        return {row["id"]: (row["title"] or "").strip() for row in rows}
+
+    def _get_task_source_map(self, task_ids: List[str]) -> dict[str, dict]:
+        unique_task_ids = [task_id for task_id in dict.fromkeys(task_ids) if task_id]
+        if not unique_task_ids:
+            return {}
+        placeholders = ", ".join(["?"] * len(unique_task_ids))
+        rows = self.db.execute(
+            "SELECT id, file_name, file_path FROM transcription_tasks WHERE id IN ("
+            + placeholders
+            + ")",
+            tuple(unique_task_ids),
+        )
+        return {
+            row["id"]: {
+                "file_name": row["file_name"],
+                "file_path": row["file_path"],
+            }
+            for row in rows
+        }
+
+    def _resolve_original_file_name(
+        self,
+        item: WorkspaceItem,
+        assets: List[WorkspaceAsset],
+        *,
+        task_source: Optional[dict] = None,
+    ) -> str:
+        if task_source:
+            file_name = str(task_source.get("file_name") or "").strip()
+            if file_name:
+                return file_name
+            file_path = str(task_source.get("file_path") or "").strip()
+            if file_path:
+                return Path(file_path).name
+        for preferred_role in ("audio", "document_text", "transcript", "translation"):
+            asset = next((candidate for candidate in assets if candidate.asset_role == preferred_role), None)
+            if asset is not None and asset.file_path:
+                return Path(asset.file_path).name
+        return ""
 
     def _upsert_file_asset(
         self, item: WorkspaceItem, asset_role: str, file_path: Optional[str]

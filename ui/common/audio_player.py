@@ -90,6 +90,7 @@ from ui.constants import (
     ROLE_AUDIO_PLAYER_VOLUME,
 )
 from ui.common.theme import ThemeManager
+from ui.common.style_utils import set_widget_dynamic_property
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.common.audio_player")
@@ -131,6 +132,7 @@ class AudioPlayer(BaseWidget):
         auto_load: bool = True,
         transcript_path: Optional[str] = None,
         translation_path: Optional[str] = None,
+        presentation: str = "default",
     ):
         """
         Initialize audio player.
@@ -147,6 +149,7 @@ class AudioPlayer(BaseWidget):
 
         self.file_path = file_path
         self.i18n = i18n
+        self.presentation = presentation if presentation in {"default", "inspector"} else "default"
         self._full_file_name = Path(file_path).name
         self._initial_time_text = self.i18n.t("timeline.audio_player.initial_time")
         self._playback_state = QMediaPlayer.PlaybackState.StoppedState
@@ -204,6 +207,7 @@ class AudioPlayer(BaseWidget):
     def setup_ui(self):
         """Set up the player UI with a clear media-first layout."""
         self.setObjectName("audio_player")
+        set_widget_dynamic_property(self, "state", self.presentation)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
@@ -278,6 +282,7 @@ class AudioPlayer(BaseWidget):
         )
         surface_layout.addWidget(self.transcript_area, stretch=1)
         self._apply_layout_mode(show_transcript=False)
+        self._apply_presentation()
 
         layout.addWidget(self.surface)
 
@@ -351,6 +356,7 @@ class AudioPlayer(BaseWidget):
         """创建控制栏 - 简洁的三列布局."""
         container = QWidget()
         container.setObjectName("player_control_bar")
+        set_widget_dynamic_property(container, "state", self.presentation)
         main_layout = QVBoxLayout(container)
         main_layout.setContentsMargins(
             AUDIO_PLAYER_CONTENT_MARGIN,
@@ -388,18 +394,22 @@ class AudioPlayer(BaseWidget):
         progress_layout.addLayout(time_layout)
         main_layout.addLayout(progress_layout)
 
-        # 控制按钮行 - 简单的三列布局，垂直居中对齐
+        # 控制按钮行 - 结构化为 transport / volume / utility 三个簇，避免 inspector 内部继续堆叠
         controls_layout = create_hbox()
         controls_layout.setSpacing(AUDIO_PLAYER_CONTROLS_SPACING)
         controls_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
-        # 左侧：音量控制
+        self.volume_cluster = QWidget(container)
+        volume_layout = create_hbox(spacing=AUDIO_PLAYER_CONTENT_SPACING)
+        volume_layout.setContentsMargins(0, 0, 0, 0)
+        self.volume_cluster.setLayout(volume_layout)
+
         self.volume_button = self._create_icon_button(
             self._toggle_mute,
             role_name=ROLE_AUDIO_PLAYER_CONTROL,
             is_primary=False,
         )
-        controls_layout.addWidget(self.volume_button, alignment=Qt.AlignmentFlag.AlignVCenter)
+        volume_layout.addWidget(self.volume_button, alignment=Qt.AlignmentFlag.AlignVCenter)
 
         self.volume_slider = QSlider(Qt.Orientation.Horizontal)
         self.volume_slider.setProperty("role", ROLE_AUDIO_PLAYER_VOLUME)
@@ -407,12 +417,13 @@ class AudioPlayer(BaseWidget):
         self.volume_slider.setValue(self.DEFAULT_VOLUME)
         self.volume_slider.setFixedWidth(AUDIO_PLAYER_VOLUME_SLIDER_WIDTH)
         self.volume_slider.valueChanged.connect(self._on_volume_changed)
-        controls_layout.addWidget(self.volume_slider, alignment=Qt.AlignmentFlag.AlignVCenter)
+        volume_layout.addWidget(self.volume_slider, alignment=Qt.AlignmentFlag.AlignVCenter)
 
-        # 弹性空间
-        controls_layout.addStretch()
+        self.transport_cluster = QWidget(container)
+        transport_layout = create_hbox(spacing=AUDIO_PLAYER_CONTROLS_SPACING)
+        transport_layout.setContentsMargins(0, 0, 0, 0)
+        self.transport_cluster.setLayout(transport_layout)
 
-        # 中间：播放按钮
         self.play_button = self._create_icon_button(
             self.toggle_playback,
             role_name=ROLE_AUDIO_PLAYER_PRIMARY,
@@ -423,34 +434,45 @@ class AudioPlayer(BaseWidget):
             role_name=ROLE_AUDIO_PLAYER_CONTROL,
             is_primary=False,
         )
-        controls_layout.addWidget(self.rewind_button, alignment=Qt.AlignmentFlag.AlignVCenter)
-        controls_layout.addWidget(self.play_button, alignment=Qt.AlignmentFlag.AlignVCenter)
+        transport_layout.addWidget(self.rewind_button, alignment=Qt.AlignmentFlag.AlignVCenter)
+        transport_layout.addWidget(self.play_button, alignment=Qt.AlignmentFlag.AlignVCenter)
         self.stop_button = self._create_icon_button(
             self.stop_playback,
             role_name=ROLE_AUDIO_PLAYER_CONTROL,
             is_primary=False,
         )
-        controls_layout.addWidget(self.stop_button, alignment=Qt.AlignmentFlag.AlignVCenter)
+        transport_layout.addWidget(self.stop_button, alignment=Qt.AlignmentFlag.AlignVCenter)
         self.forward_button = self._create_icon_button(
             self._skip_forward,
             role_name=ROLE_AUDIO_PLAYER_CONTROL,
             is_primary=False,
         )
-        controls_layout.addWidget(self.forward_button, alignment=Qt.AlignmentFlag.AlignVCenter)
+        transport_layout.addWidget(self.forward_button, alignment=Qt.AlignmentFlag.AlignVCenter)
 
-        # 弹性空间
-        controls_layout.addStretch()
+        self.utility_cluster = QWidget(container)
+        utility_layout = create_hbox(spacing=AUDIO_PLAYER_CONTENT_SPACING)
+        utility_layout.setContentsMargins(0, 0, 0, 0)
+        self.utility_cluster.setLayout(utility_layout)
 
-        # 右侧：转录按钮
         self.show_transcript_button = self._create_icon_button(
             self._toggle_transcript_visibility,
             role_name=ROLE_AUDIO_PLAYER_CONTROL,
             is_primary=False,
             checkable=True,
         )
-        controls_layout.addWidget(
-            self.show_transcript_button, alignment=Qt.AlignmentFlag.AlignVCenter
-        )
+        utility_layout.addWidget(self.show_transcript_button, alignment=Qt.AlignmentFlag.AlignVCenter)
+
+        if self.presentation == "inspector":
+            controls_layout.addStretch()
+            controls_layout.addWidget(self.transport_cluster, alignment=Qt.AlignmentFlag.AlignVCenter)
+            controls_layout.addStretch()
+            controls_layout.addWidget(self.volume_cluster, alignment=Qt.AlignmentFlag.AlignVCenter)
+        else:
+            controls_layout.addWidget(self.volume_cluster, alignment=Qt.AlignmentFlag.AlignVCenter)
+            controls_layout.addStretch()
+            controls_layout.addWidget(self.transport_cluster, alignment=Qt.AlignmentFlag.AlignVCenter)
+            controls_layout.addStretch()
+            controls_layout.addWidget(self.utility_cluster, alignment=Qt.AlignmentFlag.AlignVCenter)
 
         main_layout.addLayout(controls_layout)
 
@@ -498,6 +520,8 @@ class AudioPlayer(BaseWidget):
 
     def _toggle_transcript_visibility(self):
         """切换转录区域的显示/隐藏."""
+        if self.presentation == "inspector":
+            return
         is_visible = self.transcript_area.isVisible()
         new_visible = not is_visible
 
@@ -511,14 +535,50 @@ class AudioPlayer(BaseWidget):
 
     def _apply_layout_mode(self, *, show_transcript: bool) -> None:
         """Apply centered or transcript-priority layout mode."""
+        if self.presentation == "inspector":
+            self.top_fill.setVisible(False)
+            self.bottom_fill.setVisible(False)
+            self.transcript_divider.setVisible(False)
+            self.transcript_area.setVisible(False)
+            self.show_transcript_button.setChecked(False)
+            return
         self.top_fill.setVisible(not show_transcript)
         self.bottom_fill.setVisible(not show_transcript)
         self.transcript_divider.setVisible(show_transcript)
         self.transcript_area.setVisible(show_transcript)
         self.show_transcript_button.setChecked(show_transcript)
 
+    def _apply_presentation(self) -> None:
+        """Tune layout details for the embedding surface."""
+        state_targets = (
+            self.surface,
+            self.file_label,
+            self.current_time_label,
+            self.total_time_label,
+            self.play_button,
+            self.rewind_button,
+            self.stop_button,
+            self.forward_button,
+            self.volume_button,
+            self.progress_slider,
+            self.volume_slider,
+        )
+        for widget in state_targets:
+            set_widget_dynamic_property(widget, "state", self.presentation)
+
+        if self.presentation != "inspector":
+            return
+        self.now_playing_label.hide()
+        self.file_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        self.show_transcript_button.hide()
+        self.utility_cluster.hide()
+        self.transcript_area.hide()
+        self.transcript_divider.hide()
+
     def _sync_transcript_toggle_tooltip(self) -> None:
         """Update transcript toggle tooltip based on current panel visibility."""
+        if self.presentation == "inspector":
+            return
         is_panel_open = not self.transcript_area.isHidden()
         tooltip_key = (
             "timeline.audio_player.hide_text_panel"
@@ -529,6 +589,8 @@ class AudioPlayer(BaseWidget):
 
     def _resize_dialog_for_layout_mode(self, *, show_transcript: bool) -> None:
         """Resize dialog to match collapsed/expanded transcript layout modes."""
+        if self.presentation == "inspector":
+            return
         window = self.window()
         if not isinstance(window, QDialog):
             return

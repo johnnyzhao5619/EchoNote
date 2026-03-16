@@ -94,13 +94,18 @@ CREATE TABLE IF NOT EXISTS workspace_folders (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     parent_id TEXT,
+    folder_kind TEXT NOT NULL DEFAULT 'user',
+    source_event_id TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (parent_id) REFERENCES workspace_folders (id) ON DELETE RESTRICT
+    FOREIGN KEY (parent_id) REFERENCES workspace_folders (id) ON DELETE RESTRICT,
+    FOREIGN KEY (source_event_id) REFERENCES calendar_events (id) ON DELETE SET NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_workspace_folders_parent ON workspace_folders (parent_id);
 CREATE INDEX IF NOT EXISTS idx_workspace_folders_name ON workspace_folders (name);
+CREATE INDEX IF NOT EXISTS idx_workspace_folders_kind ON workspace_folders (folder_kind);
+CREATE INDEX IF NOT EXISTS idx_workspace_folders_source_event ON workspace_folders (source_event_id);
 
 -- ============================================================================
 -- Workspace Items Table

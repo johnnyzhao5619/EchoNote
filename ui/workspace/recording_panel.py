@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from core.qt_imports import QLabel, QVBoxLayout
+from core.qt_imports import QLabel, QVBoxLayout, Qt
 from ui.base_widgets import BaseWidget
 from ui.common.audio_player import AudioPlayer
 from ui.constants import (
@@ -25,10 +25,19 @@ class WorkspaceRecordingPanel(BaseWidget):
     def _init_ui(self) -> None:
         self.setProperty("role", ROLE_WORKSPACE_RECORDING_PANEL)
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
         self.placeholder_label = QLabel(self.i18n.t("workspace.no_audio_asset"))
         self.placeholder_label.setProperty("role", ROLE_WORKSPACE_PLACEHOLDER)
+        self.placeholder_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.placeholder_label)
-        self.audio_player = AudioPlayer("", self.i18n, self, auto_load=False)
+        self.audio_player = AudioPlayer(
+            "",
+            self.i18n,
+            self,
+            auto_load=False,
+            presentation="inspector",
+        )
         self.audio_player.hide()
         layout.addWidget(self.audio_player, 1)
 

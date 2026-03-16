@@ -7,14 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- No unreleased changes.
-
-## [2.1.0] - 2026-03-15
+## [2.1.0] - 2026-03-16
 
 ### Changed
 
+- Reissued `v2.1.0` on `main` after the post-cut workspace closure, including the final tree-navigation hard switch, drag/drop stabilization, and workspace item lifecycle fixes.
+- Replaced the workspace left rail's split "navigation + document results" stack with a single Obsidian-style tree in `ui/workspace/library_panel.py`, moved folder actions into direct icon actions plus contextual drag/drop, and lowered panel minimum widths so narrow shells no longer hit the old stacked-explorer failure mode as early.
+- Finalized workspace tree semantics and default system structure: structure view now guarantees stable top-level roots for workspace content, events, and batch tasks, supports direct folder creation, keeps event/batch artifacts associated with their source records after moves, and routes item moves only through valid folder targets.
+- Hardened workspace naming, rename, and delete workflows: same-folder duplicate names are now rejected centrally, note/import/system-published assets now generate deterministic unique titles, rename/delete actions now apply to the currently selected item or folder, and editor title changes now save back to the same workspace item instead of diverging from the tree/tab state.
+- Fixed the workspace selection/refresh pipeline after drag/drop so moved items no longer appear to disappear, stale `QTreeWidgetItem` references no longer survive tree rebuilds, and delete/rename flows no longer leave orphaned tabs or invalid selection state behind.
+- Refined the workspace shell presentation around the single-tree explorer, segmented structure/event switcher, direct icon actions, delegate-backed item rendering, and inspector-mode audio preview so the left explorer, editor header, and recording panel now share one consistent interaction model.
 - Reissued `v2.1.0` on the latest `main` commit so the published tag/release now includes the full post-cut unified-workspace follow-up and workspace visual-polish closure.
 - Cleaned remaining workspace lifecycle gaps: primary text/audio references are now maintained centrally, calendar delete/provider-removal flows now detach or remove workspace assets correctly, and calendar export/auto-transcribe now read workspace artifacts instead of legacy attachment rows.
 - Removed the leftover `WorkspaceRecordingControlPanel` export/file after the shell recording dock hard switch, and propagated workspace translation refresh into already-open detached document windows so editor actions no longer keep stale language text.

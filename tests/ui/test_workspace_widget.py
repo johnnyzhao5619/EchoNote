@@ -8,7 +8,7 @@ import wave
 import pytest
 
 import ui.workspace as workspace_module
-from core.qt_imports import QWidget
+from core.qt_imports import QWidget, Qt
 from core.workspace.manager import WorkspaceManager
 from data.database.connection import DatabaseConnection
 from data.database.models import CalendarEvent, TranscriptionTask, WorkspaceAsset, WorkspaceItem
@@ -224,7 +224,7 @@ def test_workspace_widget_exposes_workspace_shell(
 
     assert widget.library_panel is not None
     assert widget.inspector_panel is not None
-    assert widget.library_panel.item_list is widget.item_list
+    assert widget.item_list is widget.library_panel
     assert widget.inspector_panel.recording_panel is widget.recording_panel
 
 
@@ -258,6 +258,9 @@ def test_workspace_recording_panel_reuses_shared_audio_player(qapp, mock_i18n, w
     widget = WorkspaceWidget(workspace_manager, mock_i18n)
 
     assert isinstance(widget.recording_panel.audio_player, AudioPlayer)
+    assert widget.recording_panel.audio_player.presentation == "inspector"
+    assert widget.recording_panel.audio_player.show_transcript_button.isHidden()
+    assert widget.recording_panel.audio_player.surface.property("state") == "inspector"
 
 
 def test_workspace_editor_panel_uses_stable_asset_tab_labels(qapp, mock_i18n, workspace_manager):
@@ -473,27 +476,36 @@ def test_workspace_task_window_groups_creation_actions_publish_unpublished_resul
         main_window.close()
 
 
-def test_workspace_widget_exposes_unified_create_toolbar(
+def test_workspace_widget_exposes_navigator_header_actions(
     qapp, mock_i18n, workspace_manager, transcription_manager
 ):
     widget = WorkspaceWidget(workspace_manager, mock_i18n, transcription_manager=transcription_manager)
     widget.show()
     qapp.processEvents()
 
-    assert widget.toolbar is not None
-    assert widget.toolbar.import_document_button.isVisible()
-    assert widget.toolbar.new_note_button.isVisible()
-    assert not hasattr(widget.toolbar, "start_recording_button")
+    assert widget.library_panel.header_action_bar is not None
+    assert widget.library_panel.import_document_button.isVisible()
+    assert widget.library_panel.new_note_button.isVisible()
+    assert widget.library_panel.new_folder_button.isVisible()
+    assert widget.library_panel.rename_folder_button.isVisible()
+    assert widget.library_panel.delete_folder_button.isVisible()
+    assert widget.library_panel.import_document_button.toolTip()
+    assert widget.library_panel.new_note_button.toolTip()
+    assert widget.library_panel.new_folder_button.toolTip()
+    assert widget.library_panel.rename_folder_button.toolTip()
+    assert widget.library_panel.delete_folder_button.toolTip()
+    assert widget.library_panel.import_document_button.text() == ""
+    assert not widget.library_panel.import_document_button.icon().isNull()
 
 
-def test_workspace_shell_exposes_tool_rail_explorer_and_document_stage(
+def test_workspace_shell_exposes_navigator_explorer_and_document_stage(
     qapp, mock_i18n, workspace_manager
 ):
     widget = WorkspaceWidget(workspace_manager, mock_i18n)
 
-    assert widget.tool_rail is not None
+    assert not hasattr(widget, "tool_rail")
     assert widget.library_panel.explorer_header is not None
-    assert widget.library_panel.item_list is not None
+    assert not hasattr(widget.library_panel, "navigator_toolbar")
     assert widget.document_tabs is not None
 
 
@@ -507,10 +519,10 @@ def test_workspace_shell_uses_single_view_mode_entry_and_document_first_splitter
 
     assert not hasattr(widget.library_panel, "view_mode_combo")
     assert widget.content_splitter.sizes()[1] > widget.content_splitter.sizes()[2]
-    assert not hasattr(widget.toolbar, "start_recording_button")
+    assert not hasattr(widget, "toolbar")
 
 
-def test_workspace_tool_rail_and_explorer_header_expose_compact_mode_shell(
+def test_workspace_navigator_header_exposes_compact_mode_shell(
     qapp, mock_i18n, workspace_manager
 ):
     widget = WorkspaceWidget(workspace_manager, mock_i18n)
@@ -518,8 +530,12 @@ def test_workspace_tool_rail_and_explorer_header_expose_compact_mode_shell(
     widget.show()
     qapp.processEvents()
 
-    assert widget.tool_rail.mode_button_group is not None
+    assert widget.library_panel.view_mode_button_group is not None
+    assert widget.library_panel.view_mode_switch is not None
     assert widget.library_panel.context_label is not None
+    assert widget.library_panel.structure_view_button.toolTip()
+    assert widget.library_panel.event_view_button.toolTip()
+    assert widget.library_panel.folder_tree.property("role") == "workspace-nav-tree"
     assert widget.content_splitter.sizes()[1] > widget.content_splitter.sizes()[2]
 
 
@@ -531,30 +547,67 @@ def test_workspace_item_list_renders_structured_row_widgets(
     widget.show()
     qapp.processEvents()
 
-    row_item = None
-    for row in range(widget.item_list.list_widget.count()):
-        candidate = widget.item_list.list_widget.item(row)
-        if candidate.data(0x0100) == note_id:
-            row_item = candidate
-            break
+    item_node = widget.library_panel.find_item_node(note_id)
 
-    assert row_item is not None
-    row_widget = widget.item_list.list_widget.itemWidget(row_item)
-
-    assert row_widget.title_label.text() == "Plan"
-    assert row_widget.meta_label.text()
-    assert row_widget.status_badges_layout.count() >= 1
+    assert item_node is not None
+    assert item_node.text(0) == "Plan"
+    assert widget.library_panel.item_tooltip(note_id)
 
 
 def test_workspace_item_row_uses_dense_title_meta_and_badge_roles(
     qapp, mock_i18n, workspace_manager
 ):
     widget = WorkspaceWidget(workspace_manager, mock_i18n)
-    row = widget.item_list.list_widget.itemWidget(widget.item_list.list_widget.item(0))
 
-    assert row.title_label.property("role") == "workspace-item-title"
-    assert row.meta_label.property("role") == "workspace-item-meta"
-    assert row.badges_widget.property("role") == "workspace-item-badges"
+    assert widget.library_panel.folder_tree.property("role") == "workspace-nav-tree"
+    assert widget.library_panel.folder_tree.textElideMode() == Qt.TextElideMode.ElideRight
+    assert widget.library_panel.folder_tree.uniformRowHeights()
+
+
+def test_workspace_item_row_surfaces_event_task_and_original_file_context(
+    qapp, mock_i18n, workspace_manager
+):
+    translations = {
+        "workspace.item_meta_event": "事件 {value}",
+        "workspace.item_meta_task": "任务 {value}",
+        "workspace.item_meta_original_file": "原文件 {value}",
+        "workspace.item_meta_updated": "更新于 {value}",
+        "workspace.item_badge_event_linked": "关联事件",
+        "workspace.item_badge_task_linked": "批量任务",
+    }
+    mock_i18n.t.side_effect = lambda key, **kwargs: translations.get(key, key).format(**kwargs)
+
+    event = CalendarEvent(
+        title="Planning Session",
+        start_time="2026-03-15T15:00:00+00:00",
+        end_time="2026-03-15T16:00:00+00:00",
+    )
+    event.save(workspace_manager.db)
+
+    task = TranscriptionTask(
+        id="task-ui-context-1",
+        file_path="/tmp/planning.wav",
+        file_name="planning.wav",
+        status="completed",
+    )
+    task.save(workspace_manager.db)
+
+    item = workspace_manager.get_item(workspace_manager.list_items()[0].id)
+    assert item is not None
+    item.source_event_id = event.id
+    item.source_task_id = task.id
+    item.save(workspace_manager.db)
+
+    widget = WorkspaceWidget(workspace_manager, mock_i18n)
+    widget.show()
+    qapp.processEvents()
+
+    tooltip = widget.library_panel.item_tooltip(item.id)
+
+    assert "任务 task-ui-context-1" in tooltip
+    assert "planning.wav" in tooltip
+    assert "关联事件" in tooltip
+    assert "批量任务" in tooltip
 
 
 def test_workspace_inspector_exposes_section_titles_and_user_facing_metadata(
@@ -567,7 +620,47 @@ def test_workspace_inspector_exposes_section_titles_and_user_facing_metadata(
     assert widget.inspector_panel.ai_section_title.text()
     assert widget.inspector_panel.media_section_title.text()
     assert widget.inspector_panel.metadata_section_title.text()
+    assert widget.inspector_panel.source_value_label.property("role") == "workspace-meta-value"
     assert "T" not in widget.inspector_panel.updated_value_label.text()
+
+
+def test_workspace_inspector_surfaces_event_task_and_original_file_context(
+    qapp, mock_i18n, workspace_manager
+):
+    translations = {
+        "workspace.inspector_event": "关联事件：{value}",
+        "workspace.inspector_task": "来源任务：{value}",
+        "workspace.inspector_original_file": "原文件：{value}",
+        "workspace.inspector_source": "来源：{value}",
+        "workspace.inspector_updated": "更新时间：{value}",
+    }
+    mock_i18n.t.side_effect = lambda key, **kwargs: translations.get(key, key).format(**kwargs)
+
+    event = CalendarEvent(
+        title="Design Review",
+        start_time="2026-03-15T09:00:00+00:00",
+        end_time="2026-03-15T10:00:00+00:00",
+    )
+    event.save(workspace_manager.db)
+    task = TranscriptionTask(
+        id="task-inspector-1",
+        file_path="/tmp/design-review.wav",
+        file_name="design-review.wav",
+        status="completed",
+    )
+    task.save(workspace_manager.db)
+
+    item = workspace_manager.list_items()[0]
+    item.source_event_id = event.id
+    item.source_task_id = task.id
+    item.save(workspace_manager.db)
+
+    widget = WorkspaceWidget(workspace_manager, mock_i18n)
+    widget.open_item(item.id)
+
+    assert "Design Review" in widget.inspector_panel.event_value_label.text()
+    assert "task-inspector-1" in widget.inspector_panel.task_value_label.text()
+    assert "design-review.wav" in widget.inspector_panel.original_file_value_label.text()
 
 
 def test_workspace_editor_keeps_blank_note_asset_tab_editable(
@@ -579,8 +672,213 @@ def test_workspace_editor_keeps_blank_note_asset_tab_editable(
     widget.open_item(note_id)
 
     assert widget.editor_panel.asset_tabs.count() == 1
+    assert not widget.editor_panel.asset_tabs.isVisible()
     assert widget.editor_panel.edit_button.isEnabled()
     assert widget.editor_panel.text_edit.toPlainText() == ""
+
+
+def test_workspace_structure_view_surfaces_system_folders_and_inbox_items(
+    qapp, mock_i18n, workspace_manager
+):
+    note_id = workspace_manager.create_note(title="Plan")
+    widget = WorkspaceWidget(workspace_manager, mock_i18n)
+    widget.show()
+    qapp.processEvents()
+
+    top_level_labels = [
+        widget.library_panel.folder_tree.topLevelItem(index).text(0)
+        for index in range(widget.library_panel.folder_tree.topLevelItemCount())
+    ]
+    note_node = widget.library_panel.find_item_node(note_id)
+
+    assert top_level_labels[0] == "工作台条目"
+    assert top_level_labels[-2:] == ["事件", "批量任务"]
+    assert note_node is not None
+    assert note_node.parent() is not None
+    assert note_node.parent().text(0) == "工作台条目"
+
+
+def test_workspace_structure_drag_moves_items_without_menu_action(
+    qapp, mock_i18n, workspace_manager
+):
+    folder_id = workspace_manager.create_folder("Archive")
+    note_id = workspace_manager.create_note(title="Plan")
+    widget = WorkspaceWidget(workspace_manager, mock_i18n)
+    widget.show()
+    qapp.processEvents()
+
+    widget.library_panel._on_tree_drop_requested("item", note_id, "folder", folder_id)
+    moved = workspace_manager.get_item(note_id)
+
+    assert moved is not None
+    assert moved.folder_id == folder_id
+
+
+def test_workspace_structure_drag_keeps_moved_item_visible_and_selected(
+    qapp, mock_i18n, workspace_manager
+):
+    folder_id = workspace_manager.create_folder("Archive")
+    note_id = workspace_manager.create_note(title="Plan")
+    widget = WorkspaceWidget(workspace_manager, mock_i18n)
+    widget.show()
+    qapp.processEvents()
+    widget.open_item(note_id)
+    qapp.processEvents()
+
+    widget.library_panel._on_tree_drop_requested("item", note_id, "folder", folder_id)
+    qapp.processEvents()
+
+    moved_item = workspace_manager.get_item(note_id)
+    moved_node = widget.library_panel.find_item_node(note_id)
+
+    assert moved_item is not None
+    assert moved_item.folder_id == folder_id
+    assert widget.current_item_id() == note_id
+    assert moved_node is not None
+    assert moved_node.parent() is not None
+    assert moved_node.parent().data(0, Qt.ItemDataRole.UserRole) == "folder"
+    assert moved_node.parent().data(0, Qt.ItemDataRole.UserRole + 1) == folder_id
+
+
+def test_workspace_structure_drag_rejects_item_drop_onto_item_target(
+    qapp, mock_i18n, workspace_manager
+):
+    folder_id = workspace_manager.create_folder("Archive")
+    first_note_id = workspace_manager.create_note(title="Plan")
+    second_note_id = workspace_manager.create_note(title="Spec")
+    workspace_manager.move_item_to_folder(second_note_id, folder_id)
+    widget = WorkspaceWidget(workspace_manager, mock_i18n)
+    widget.show()
+    qapp.processEvents()
+
+    source_item = workspace_manager.get_item(first_note_id)
+    widget.library_panel._on_tree_drop_requested("item", first_note_id, "item", second_note_id)
+    qapp.processEvents()
+    moved_item = workspace_manager.get_item(first_note_id)
+
+    assert source_item is not None
+    assert moved_item is not None
+    assert moved_item.folder_id == source_item.folder_id
+
+
+def test_workspace_structure_drag_moves_user_folder_under_user_folder(
+    qapp, mock_i18n, workspace_manager
+):
+    parent_folder_id = workspace_manager.create_folder("Projects")
+    child_folder_id = workspace_manager.create_folder("Drafts")
+    widget = WorkspaceWidget(workspace_manager, mock_i18n)
+    widget.show()
+    qapp.processEvents()
+
+    widget.library_panel._on_tree_drop_requested("folder", child_folder_id, "folder", parent_folder_id)
+    moved_folder = workspace_manager.get_folder(child_folder_id)
+
+    assert moved_folder is not None
+    assert moved_folder.parent_id == parent_folder_id
+    current_folder = widget.library_panel.current_folder_id()
+    selected_folder = widget.library_panel.folder_tree.currentItem()
+
+    assert current_folder == child_folder_id
+    assert selected_folder is not None
+    assert selected_folder.data(0, Qt.ItemDataRole.UserRole) == "folder"
+    assert selected_folder.data(0, Qt.ItemDataRole.UserRole + 1) == child_folder_id
+
+
+def test_workspace_rename_button_renames_selected_item(
+    qapp, mock_i18n, workspace_manager
+):
+    note_id = workspace_manager.create_note(title="Plan")
+    widget = WorkspaceWidget(workspace_manager, mock_i18n)
+    widget.show()
+    qapp.processEvents()
+    widget.library_panel.select_item(note_id)
+    qapp.processEvents()
+
+    with patch("ui.workspace.library_panel.QInputDialog.getText", return_value=("Renamed Plan", True)):
+        widget.library_panel.rename_folder_button.click()
+        qapp.processEvents()
+
+    renamed_item = workspace_manager.get_item(note_id)
+    renamed_node = widget.library_panel.find_item_node(note_id)
+
+    assert renamed_item is not None
+    assert renamed_item.title == "Renamed Plan"
+    assert renamed_node is not None
+    assert renamed_node.text(0) == "Renamed Plan"
+
+
+def test_workspace_editor_edit_mode_saves_title_and_content_together(
+    qapp, mock_i18n, workspace_manager
+):
+    note_id = workspace_manager.create_note(title="Plan", text_content="Old content")
+    widget = WorkspaceWidget(workspace_manager, mock_i18n)
+    widget.show()
+    qapp.processEvents()
+    widget.open_item(note_id)
+    qapp.processEvents()
+
+    widget.editor_panel.show_info = Mock()
+    widget.editor_panel.toggle_edit_mode()
+    widget.editor_panel.document_title_edit.setText("Renamed Plan")
+    widget.editor_panel.text_edit.setPlainText("Updated content")
+    widget.editor_panel.save_changes()
+    qapp.processEvents()
+
+    renamed_item = workspace_manager.get_item(note_id)
+    renamed_node = widget.library_panel.find_item_node(note_id)
+
+    assert renamed_item is not None
+    assert renamed_item.title == "Renamed Plan"
+    assert widget.editor_panel.document_title_label.text() == "Renamed Plan"
+    assert renamed_node is not None
+    assert renamed_node.text(0) == "Renamed Plan"
+    assert workspace_manager.get_item_text_content(note_id) == "Updated content"
+
+
+def test_workspace_delete_button_confirms_once_and_deletes_selected_item(
+    qapp, mock_i18n, workspace_manager
+):
+    note_id = workspace_manager.create_note(title="Delete Me")
+    widget = WorkspaceWidget(workspace_manager, mock_i18n)
+    widget.show()
+    qapp.processEvents()
+    widget.library_panel.select_item(note_id)
+    qapp.processEvents()
+
+    with patch.object(widget.library_panel, "show_question", return_value=True) as confirm_dialog:
+        widget.library_panel.delete_folder_button.click()
+        qapp.processEvents()
+
+    assert confirm_dialog.call_count == 1
+    assert workspace_manager.get_item(note_id) is None
+
+
+def test_workspace_select_item_recovers_from_stale_tree_node_cache(
+    qapp, mock_i18n, workspace_manager
+):
+    folder_id = workspace_manager.create_folder("Archive")
+    note_id = workspace_manager.create_note(title="Plan")
+    widget = WorkspaceWidget(workspace_manager, mock_i18n)
+    widget.show()
+    qapp.processEvents()
+
+    stale_node = widget.library_panel.find_item_node(note_id)
+    assert stale_node is not None
+
+    workspace_manager.move_item_to_folder(note_id, folder_id)
+    widget.refresh_items()
+    qapp.processEvents()
+
+    widget.library_panel._item_nodes[note_id] = stale_node
+    widget.library_panel.select_item(note_id)
+    qapp.processEvents()
+
+    selected_node = widget.library_panel.find_item_node(note_id)
+
+    assert selected_node is not None
+    assert widget.library_panel.current_item_id() == note_id
+    assert selected_node.parent() is not None
+    assert selected_node.parent().data(0, Qt.ItemDataRole.UserRole + 1) == folder_id
 
 
 def test_detached_document_window_matches_workspace_context_stack(
@@ -596,13 +894,13 @@ def test_detached_document_window_matches_workspace_context_stack(
     assert hasattr(window.editor_panel, "generate_summary")
 
 
-def test_workspace_toolbar_new_note_creates_workspace_item(
+def test_workspace_header_new_note_creates_workspace_item(
     qapp, mock_i18n, workspace_manager, transcription_manager
 ):
     widget = WorkspaceWidget(workspace_manager, mock_i18n, transcription_manager=transcription_manager)
     before_ids = {item.id for item in workspace_manager.list_items()}
 
-    widget.toolbar.new_note_button.click()
+    widget.library_panel.new_note_button.click()
 
     after_items = workspace_manager.list_items()
     created_items = [item for item in after_items if item.id not in before_ids]
@@ -610,7 +908,7 @@ def test_workspace_toolbar_new_note_creates_workspace_item(
     assert len(created_items) == 1
     assert created_items[0].source_kind == "workspace_note"
     assert workspace_manager.get_primary_text_asset(created_items[0].id) is not None
-    assert widget.item_list.current_item_id() == created_items[0].id
+    assert widget.library_panel.current_item_id() == created_items[0].id
 
 
 def test_workspace_widget_moves_recording_controls_out_of_workspace_shell(
@@ -659,13 +957,31 @@ def test_workspace_library_panel_supports_structure_and_event_views(
     qapp.processEvents()
 
     assert widget.library_panel.current_view_mode() == "structure"
-    assert widget.item_list.current_item_id() == note_id
+    assert widget.library_panel.current_folder_id() == folder_id
+    structure_item_node = widget.library_panel.find_item_node(note_id)
+    assert structure_item_node is not None
+    assert structure_item_node.parent() is not None
+    assert structure_item_node.parent().data(0, Qt.ItemDataRole.UserRole) == "folder"
+    assert structure_item_node.parent().data(0, Qt.ItemDataRole.UserRole + 1) == folder_id
 
     widget.library_panel.set_view_mode("event")
     qapp.processEvents()
 
     assert widget.library_panel.current_view_mode() == "event"
-    assert widget.item_list.list_widget.count() >= 1
+    widget.library_panel.select_event(event.id)
+    qapp.processEvents()
+
+    assert widget.library_panel.current_event_id() == event.id
+    event_item_node = widget.library_panel.find_item_node(note_id)
+    assert event_item_node is not None
+    assert event_item_node.parent() is not None
+    assert event_item_node.parent().data(0, Qt.ItemDataRole.UserRole) == "event"
+    assert event_item_node.parent().data(0, Qt.ItemDataRole.UserRole + 1) == event.id
+
+    widget.library_panel.select_item(note_id)
+    qapp.processEvents()
+
+    assert widget.library_panel.current_item_id() == note_id
 
 
 def test_workspace_supports_document_tabs_and_detached_window(

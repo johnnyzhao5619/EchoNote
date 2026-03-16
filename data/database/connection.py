@@ -28,7 +28,7 @@ from typing import Optional
 
 logger = logging.getLogger("echonote.database")
 
-CURRENT_SCHEMA_VERSION = 5
+CURRENT_SCHEMA_VERSION = 6
 REQUIRED_SCHEMA_TABLES = (
     "workspace_folders",
     "workspace_items",
@@ -37,6 +37,7 @@ REQUIRED_SCHEMA_TABLES = (
 )
 REQUIRED_SCHEMA_COLUMNS = {
     "workspace_items": ("folder_id",),
+    "workspace_folders": ("folder_kind", "source_event_id"),
 }
 
 
@@ -425,6 +426,21 @@ class DatabaseConnection:
         if "folder_id" in workspace_item_missing:
             self.execute("ALTER TABLE workspace_items ADD COLUMN folder_id TEXT", commit=True)
             logger.info("Added missing workspace_items.folder_id column before schema replay")
+        workspace_folder_missing = missing_columns.get("workspace_folders", [])
+        if "folder_kind" in workspace_folder_missing:
+            self.execute(
+                "ALTER TABLE workspace_folders ADD COLUMN folder_kind TEXT NOT NULL DEFAULT 'user'",
+                commit=True,
+            )
+            logger.info("Added missing workspace_folders.folder_kind column before schema replay")
+        if "source_event_id" in workspace_folder_missing:
+            self.execute(
+                "ALTER TABLE workspace_folders ADD COLUMN source_event_id TEXT",
+                commit=True,
+            )
+            logger.info(
+                "Added missing workspace_folders.source_event_id column before schema replay"
+            )
 
     def close(self):
         """Close the database connection for the current thread."""

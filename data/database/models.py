@@ -683,6 +683,8 @@ class WorkspaceFolder:
     id: str = field(default_factory=generate_uuid)
     name: str = ""
     parent_id: Optional[str] = None
+    folder_kind: str = "user"
+    source_event_id: Optional[str] = None
     created_at: str = field(default_factory=current_iso_timestamp)
     updated_at: str = field(default_factory=current_iso_timestamp)
 
@@ -693,6 +695,8 @@ class WorkspaceFolder:
             id=row["id"],
             name=row["name"],
             parent_id=row["parent_id"],
+            folder_kind=row["folder_kind"] if "folder_kind" in row.keys() else "user",
+            source_event_id=row["source_event_id"] if "source_event_id" in row.keys() else None,
             created_at=row["created_at"],
             updated_at=row["updated_at"],
         )
@@ -702,11 +706,13 @@ class WorkspaceFolder:
         self.updated_at = current_iso_timestamp()
         query = """
             INSERT INTO workspace_folders (
-                id, name, parent_id, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?)
+                id, name, parent_id, folder_kind, source_event_id, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 name = excluded.name,
                 parent_id = excluded.parent_id,
+                folder_kind = excluded.folder_kind,
+                source_event_id = excluded.source_event_id,
                 created_at = excluded.created_at,
                 updated_at = excluded.updated_at
         """
@@ -714,6 +720,8 @@ class WorkspaceFolder:
             self.id,
             self.name,
             self.parent_id,
+            self.folder_kind,
+            self.source_event_id,
             to_utc_iso(self.created_at),
             to_utc_iso(self.updated_at),
         )
@@ -830,6 +838,7 @@ class WorkspaceItem:
         *,
         status: Optional[str] = None,
         folder_id: Optional[str] = None,
+        source_event_id: Optional[str] = None,
         view_mode: str = "structure",
         limit: Optional[int] = None,
     ) -> List["WorkspaceItem"]:
@@ -845,6 +854,12 @@ class WorkspaceItem:
         if folder_id:
             clauses.append("folder_id = ?")
             params.append(folder_id)
+        if source_event_id is not None:
+            if source_event_id:
+                clauses.append("source_event_id = ?")
+                params.append(source_event_id)
+            else:
+                clauses.append("source_event_id IS NULL")
 
         query = "SELECT * FROM workspace_items"
         if clauses:

@@ -119,6 +119,8 @@ def test_i18n_outline_covers_workspace_item_meta_copy():
     workspace_keys = set(outline.get("required_nested_keys", {}).get("workspace", []))
 
     assert "item_meta_event" in workspace_keys
+    assert "item_meta_task" in workspace_keys
+    assert "item_meta_original_file" in workspace_keys
     assert "item_meta_updated" in workspace_keys
     assert "item_source_workspace_note" in workspace_keys
     assert "item_source_batch_transcription" in workspace_keys
@@ -134,6 +136,9 @@ def test_i18n_outline_covers_workspace_inspector_section_titles():
     assert "inspector_section_ai" in workspace_keys
     assert "inspector_section_media" in workspace_keys
     assert "inspector_section_metadata" in workspace_keys
+    assert "inspector_event" in workspace_keys
+    assert "inspector_task" in workspace_keys
+    assert "inspector_original_file" in workspace_keys
 
 
 def test_i18n_outline_covers_workspace_recording_dock_compact_copy():
@@ -151,7 +156,7 @@ def test_visual_polish_contracts_are_documented_in_project_guides():
     ).read_text(encoding="utf-8")
     changelog_text = (PROJECT_ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
 
-    assert "2026-03-15-workspace-visual-density-and-layout-polish-plan.md" in agents_text
-    assert "2026-03-15-workspace-visual-density-and-layout-polish-plan.md" in docs_readme_text
+    assert "2026-03-15-workspace-redbox-closure-plan.md" in agents_text
+    assert "2026-03-15-workspace-redbox-closure-plan.md" in docs_readme_text
     assert "pytest tests/unit/test_main_window_shell.py -v" in release_skill_text
     assert "theme/i18n/tests/docs" in changelog_text

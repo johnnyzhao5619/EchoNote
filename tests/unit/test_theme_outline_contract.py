@@ -185,14 +185,12 @@ def test_theme_outline_covers_workspace_roles():
         "workspace-surface",
         "workspace-asset-tabs",
         "workspace-task-summary",
-        "workspace-tool-rail",
+        "workspace-header-action",
         "workspace-explorer-header",
-        "workspace-item-list",
-        "workspace-item-title",
-        "workspace-item-meta",
-        "workspace-item-badges",
+        "workspace-nav-tree",
         "workspace-editor-panel",
         "workspace-inspector-section",
+        "workspace-meta-value",
         "workspace-recording-panel",
         "workspace-ai-action",
         "workspace-placeholder",
@@ -201,10 +199,9 @@ def test_theme_outline_covers_workspace_roles():
     assert not missing_roles, f"Theme outline is missing workspace roles: {missing_roles}"
 
 
-def test_tool_rail_explorer_and_document_stage_theme_outline_covers_workspace_shell_roles():
+def test_navigator_explorer_and_document_stage_theme_outline_covers_workspace_shell_roles():
     outline_roles = _load_outline_roles()
     expected_roles = {
-        "workspace-tool-rail",
         "workspace-mode-button-group",
         "workspace-explorer-header",
         "workspace-context-label",
@@ -221,7 +218,11 @@ def test_theme_outline_covers_workspace_compact_shell_selectors():
         for selector in section.get("selectors", [])
     }
     expected_selectors = {
+        'QToolButton[role="workspace-header-action"]',
+        'QToolButton[role="workspace-header-action"]:hover',
         'QWidget[role="workspace-mode-button-group"]',
+        'QWidget[role="workspace-mode-button-group"] QPushButton',
+        'QWidget[role="workspace-mode-button-group"] QPushButton:checked',
         'QLabel[role="workspace-context-label"]',
     }
     missing = sorted(expected_selectors - selectors)
@@ -236,9 +237,9 @@ def test_theme_outline_covers_workspace_item_row_selectors():
         for selector in section.get("selectors", [])
     }
     expected_selectors = {
-        'QLabel[role="workspace-item-title"]',
-        'QLabel[role="workspace-item-meta"]',
-        'QWidget[role="workspace-item-badges"]',
+        'QTreeWidget[role="workspace-nav-tree"]',
+        'QTreeWidget[role="workspace-nav-tree"]::branch:closed:has-children',
+        'QTreeWidget[role="workspace-nav-tree"]::branch:open:has-children',
     }
     missing = sorted(expected_selectors - selectors)
     assert not missing, f"Theme outline is missing workspace item row selectors: {missing}"
@@ -382,13 +383,18 @@ def test_visual_polish_contracts_cover_workspace_roles():
     }
     expected_selectors = {
         'QWidget[role="app-topbar-tools"]',
+        'QToolButton[role="workspace-header-action"]',
         'QWidget[role="workspace-mode-button-group"]',
         'QLabel[role="workspace-context-label"]',
-        'QLabel[role="workspace-item-title"]',
-        'QLabel[role="workspace-item-meta"]',
-        'QWidget[role="workspace-item-badges"]',
         'QLabel[role="workspace-inspector-section-title"]',
+        'QLabel[role="workspace-meta-value"]',
+        'QTreeWidget[role="workspace-nav-tree"]',
         'QWidget[role="realtime-summary-group"]',
+        'QWidget[role="audio-player-surface"][state="inspector"]',
+        'QPushButton[role="audio-player-primary"][state="inspector"]',
+        'QPushButton[role="audio-player-control"][state="inspector"]',
+        'QSlider[role="audio-player-progress"][state="inspector"]::groove:horizontal',
+        'QSlider[role="audio-player-volume"][state="inspector"]::groove:horizontal',
     }
     missing = sorted(expected_selectors - selectors)
     assert not missing, f"Theme outline is missing workspace visual polish selectors: {missing}"

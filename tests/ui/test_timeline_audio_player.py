@@ -140,6 +140,27 @@ def test_audio_player_default_layout_centers_chrome_when_transcript_hidden(qapp,
     player.cleanup()
 
 
+def test_audio_player_inspector_presentation_hides_transcript_toggle_and_center_fill(
+    qapp, mock_i18n
+):
+    player = AudioPlayer(
+        "/tmp/nonexistent.mp3",
+        mock_i18n,
+        auto_load=False,
+        presentation="inspector",
+    )
+
+    assert player.presentation == "inspector"
+    assert player.show_transcript_button.isHidden()
+    assert player.transcript_area.isHidden()
+    assert player.top_fill.isHidden()
+    assert player.bottom_fill.isHidden()
+    assert player.surface.property("state") == "inspector"
+    assert player.play_button.property("state") == "inspector"
+    assert player.volume_slider.property("state") == "inspector"
+    player.cleanup()
+
+
 def test_audio_player_layout_mode_resizes_parent_dialog(qapp, mock_i18n):
     dialog = QDialog()
     dialog.resize(640, AUDIO_PLAYER_DIALOG_DEFAULT_HEIGHT)

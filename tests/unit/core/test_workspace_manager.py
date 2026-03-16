@@ -2,9 +2,12 @@
 """Unit tests for workspace manager."""
 
 from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
 
 from data.database.connection import DatabaseConnection
-from data.database.models import CalendarEvent, WorkspaceAsset, WorkspaceItem
+from data.database.models import CalendarEvent, TranscriptionTask, WorkspaceAsset, WorkspaceItem
 from data.storage.file_manager import FileManager
 
 
@@ -313,9 +316,138 @@ def test_workspace_manager_supports_folders_and_dual_library_views(tmp_path):
 
     structure_items = manager.list_items(view_mode="structure", folder_id=folder_id)
     event_items = manager.list_items(view_mode="event")
+    filtered_event_items = manager.list_items(view_mode="event", event_id=event.id)
 
     assert [item.id for item in structure_items] == [note_id]
     assert note_id in [item.id for item in event_items]
+    assert [item.id for item in filtered_event_items] == [note_id]
+
+    event_navigation = manager.get_event_navigation_entries()
+    assert event_navigation[0]["event_id"] == event.id
+    assert event_navigation[0]["event_title"] == "Planning Session"
+    assert event_navigation[0]["item_count"] == 1
+
+
+def test_workspace_manager_builds_context_metadata_for_event_and_batch_links(tmp_path):
+    manager = build_workspace_manager(tmp_path)
+    event = CalendarEvent(
+        title="Planning Session",
+        start_time="2026-03-15T13:00:00+00:00",
+        end_time="2026-03-15T14:00:00+00:00",
+    )
+    event.save(manager.db)
+
+    recording_path = tmp_path / "meeting.wav"
+    recording_path.write_bytes(b"RIFF")
+    transcript_path = tmp_path / "meeting.md"
+    transcript_path.write_text("hello", encoding="utf-8")
+
+    task = TranscriptionTask(
+        id="task-context-1",
+        file_path=str(recording_path),
+        file_name=recording_path.name,
+        status="completed",
+    )
+    task.save(manager.db)
+
+    item_id = manager.publish_transcription_task(
+        task,
+        transcript_path=str(transcript_path),
+        event_id=event.id,
+    )
+
+    metadata = manager.get_item_context_metadata(item_id)
+
+    assert metadata["event_title"] == "Planning Session"
+    assert metadata["task_id"] == "task-context-1"
+    assert metadata["original_file_name"] == "meeting.wav"
+
+
+def test_event_linked_items_default_into_event_folder_but_keep_link_after_move(tmp_path):
+    manager = build_workspace_manager(tmp_path)
+    event = CalendarEvent(
+        title="Design Review",
+        start_time="2026-03-15T09:00:00+00:00",
+        end_time="2026-03-15T10:00:00+00:00",
+    )
+    event.save(manager.db)
+
+    item_id = manager.create_note(title="Review Notes", event_id=event.id)
+    item = manager.get_item(item_id)
+
+    assert item is not None
+    event_folder = manager.get_folder(item.folder_id)
+    assert event_folder is not None
+    assert getattr(event_folder, "folder_kind", None) == "event"
+    assert getattr(event_folder, "source_event_id", None) == event.id
+    assert item.source_event_id == event.id
+
+    archive_folder_id = manager.create_folder("Archive")
+    manager.move_item_to_folder(item_id, archive_folder_id)
+    moved = manager.get_item(item_id)
+
+    assert moved is not None
+    assert moved.folder_id == archive_folder_id
+    assert moved.source_event_id == event.id
+
+
+def test_batch_task_items_default_into_batch_folder_but_keep_task_link_after_move(tmp_path):
+    manager = build_workspace_manager(tmp_path)
+    recording_path = tmp_path / "meeting.wav"
+    recording_path.write_bytes(b"RIFF")
+    transcript_path = tmp_path / "meeting.md"
+    transcript_path.write_text("hello", encoding="utf-8")
+
+    persisted_task = TranscriptionTask(
+        id="task-1",
+        file_path=str(recording_path),
+        file_name=recording_path.name,
+        status="completed",
+    )
+    persisted_task.save(manager.db)
+    task = SimpleNamespace(
+        id=persisted_task.id,
+        file_path=persisted_task.file_path,
+        file_name=persisted_task.file_name,
+        status=persisted_task.status,
+    )
+
+    item_id = manager.publish_transcription_task(task, transcript_path=str(transcript_path))
+    item = manager.get_item(item_id)
+
+    assert item is not None
+    batch_folder = manager.get_folder(item.folder_id)
+    assert batch_folder is not None
+    assert getattr(batch_folder, "folder_kind", None) == "batch_task"
+    assert item.source_task_id == "task-1"
+
+    archive_folder_id = manager.create_folder("Archive")
+    manager.move_item_to_folder(item_id, archive_folder_id)
+    moved = manager.get_item(item_id)
+
+    assert moved is not None
+    assert moved.folder_id == archive_folder_id
+    assert moved.source_task_id == "task-1"
+
+
+def test_workspace_manager_ensures_system_folders_and_normalizes_unassigned_items(tmp_path):
+    manager = build_workspace_manager(tmp_path)
+    loose_document_id = create_workspace_document(manager, title="Loose Doc")
+
+    inbox_folder = manager.ensure_inbox_folder()
+    event_root_folder = manager.ensure_event_root_folder()
+    batch_root_folder = manager.ensure_batch_task_root_folder()
+
+    folders = manager.list_folders()
+    folder_names = {folder.name for folder in folders}
+    normalized_item = manager.get_item(loose_document_id)
+
+    assert normalized_item is not None
+    assert normalized_item.folder_id == inbox_folder.id
+    assert {"工作台条目", "事件", "批量任务"} <= folder_names
+    assert inbox_folder.folder_kind == "inbox"
+    assert event_root_folder.folder_kind == "system_root"
+    assert batch_root_folder.folder_kind == "batch_task"
 
 
 def test_workspace_manager_renames_moves_and_deletes_folders(tmp_path):
@@ -337,3 +469,51 @@ def test_workspace_manager_renames_moves_and_deletes_folders(tmp_path):
     assert moved_folder is not None
     assert moved_folder.parent_id == target_folder_id
     assert manager.delete_folder(source_folder_id) is True
+
+
+def test_workspace_manager_creates_unique_note_titles_within_same_folder(tmp_path):
+    manager = build_workspace_manager(tmp_path)
+
+    first_id = manager.create_note(title="未命名笔记")
+    second_id = manager.create_note(title="未命名笔记")
+
+    first_item = manager.get_item(first_id)
+    second_item = manager.get_item(second_id)
+
+    assert first_item is not None
+    assert second_item is not None
+    assert first_item.title == "未命名笔记"
+    assert second_item.title == "未命名笔记 2"
+
+
+def test_workspace_manager_rejects_duplicate_names_for_renaming_and_folder_creation(tmp_path):
+    from core.workspace.manager import WorkspaceValidationError
+
+    manager = build_workspace_manager(tmp_path)
+    note_id = manager.create_note(title="Plan")
+    inbox_folder = manager.ensure_inbox_folder()
+
+    with pytest.raises(WorkspaceValidationError, match="duplicate_name"):
+        manager.create_folder("Plan", parent_id=inbox_folder.id)
+
+    folder_id = manager.create_folder("Projects")
+    manager.move_item_to_folder(note_id, folder_id)
+    another_note_id = manager.create_note(title="Spec")
+    manager.move_item_to_folder(another_note_id, folder_id)
+
+    with pytest.raises(WorkspaceValidationError, match="duplicate_name"):
+        manager.rename_item(another_note_id, "Plan")
+
+
+def test_workspace_manager_delete_item_removes_assets_and_files(tmp_path):
+    manager = build_workspace_manager(tmp_path)
+    item_id = manager.create_note(title="Plan", text_content="Hello")
+    asset = manager.get_primary_text_asset(item_id)
+    assert asset is not None
+    asset_path = Path(asset.file_path)
+    assert asset_path.exists()
+
+    assert manager.delete_item(item_id) is True
+    assert manager.get_item(item_id) is None
+    assert manager.get_primary_text_asset(item_id) is None
+    assert not asset_path.exists()

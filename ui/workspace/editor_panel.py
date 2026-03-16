@@ -15,6 +15,7 @@ from core.qt_imports import (
     QFrame,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QMenu,
     QMessageBox,
     QPushButton,
@@ -25,6 +26,7 @@ from core.qt_imports import (
     QWidget,
     Signal,
 )
+from core.workspace.manager import WorkspaceValidationError
 
 from ui.base_widgets import BaseWidget, connect_button_with_callback
 from ui.batch_transcribe.search_widget import SearchWidget
@@ -384,11 +386,14 @@ class TextEditorPanel(BaseWidget):
 class WorkspaceEditorPanel(TextEditorPanel):
     """Workspace-specific editor with asset switching and AI actions."""
 
+    item_renamed = Signal(str)
+
     def __init__(self, workspace_manager, i18n: I18nQtManager, *, parent: Optional[QWidget] = None):
         self.workspace_manager = workspace_manager
         self.current_item = None
         self.current_asset = None
         self._text_assets = []
+        self._title_modified = False
         super().__init__(
             i18n,
             settings_manager=getattr(workspace_manager, "settings_manager", None),
@@ -406,16 +411,21 @@ class WorkspaceEditorPanel(TextEditorPanel):
         self.setProperty("role", ROLE_WORKSPACE_EDITOR_PANEL)
         self.document_title_label = QLabel()
         self.layout().insertWidget(0, self.document_title_label)
+        self.document_title_edit = QLineEdit()
+        self.document_title_edit.setVisible(False)
+        self.document_title_edit.textChanged.connect(self._on_title_text_changed)
+        self.layout().insertWidget(1, self.document_title_edit)
 
         self.document_context_label = QLabel()
-        self.layout().insertWidget(1, self.document_context_label)
+        self.document_context_label.setVisible(False)
+        self.layout().insertWidget(2, self.document_context_label)
 
         self.asset_tabs = QTabWidget()
         self.asset_tabs.setProperty("role", ROLE_WORKSPACE_ASSET_TABS)
         self.asset_tabs.setDocumentMode(True)
         self.asset_tabs.setMaximumHeight(36)
         self.asset_tabs.currentChanged.connect(self._on_asset_tab_changed)
-        self.layout().insertWidget(2, self.asset_tabs)
+        self.layout().insertWidget(3, self.asset_tabs)
 
     def set_item(self, item) -> None:
         """Load editable assets for the selected workspace item."""
@@ -423,6 +433,10 @@ class WorkspaceEditorPanel(TextEditorPanel):
         self.current_asset = None
         self._text_assets = []
         self.document_title_label.setText(item.title if item is not None else "")
+        self.document_title_edit.blockSignals(True)
+        self.document_title_edit.setText(item.title if item is not None else "")
+        self.document_title_edit.blockSignals(False)
+        self._title_modified = False
         self.asset_tabs.blockSignals(True)
         while self.asset_tabs.count() > 0:
             self.asset_tabs.removeTab(0)
@@ -442,6 +456,7 @@ class WorkspaceEditorPanel(TextEditorPanel):
                 self.asset_tabs.addTab(QWidget(self.asset_tabs), self._label_for_asset(asset))
                 if preferred_id and asset.id == preferred_id:
                     selected_index = index
+            self.asset_tabs.setVisible(len(self._text_assets) > 1)
             if self._text_assets:
                 self.asset_tabs.setCurrentIndex(selected_index)
                 self.current_asset = self._text_assets[selected_index]
@@ -449,13 +464,18 @@ class WorkspaceEditorPanel(TextEditorPanel):
             else:
                 self.set_document_context(display_name=item.title or item.id, file_path=None)
                 self.set_text_content("")
+                self.document_context_label.clear()
+                self.document_context_label.setVisible(False)
         else:
             self.set_document_context(display_name="workspace", file_path=None)
             self.set_text_content("")
             self.document_context_label.setText("")
+            self.document_context_label.setVisible(False)
+            self.asset_tabs.setVisible(False)
 
         self.asset_tabs.blockSignals(False)
         self._update_action_states()
+        self._sync_title_editor_visibility()
 
     def update_translations(self) -> None:
         super().update_translations()
@@ -477,13 +497,69 @@ class WorkspaceEditorPanel(TextEditorPanel):
             save_handler=self._save_current_asset,
             export_formats=("txt", "md"),
         )
-        self.document_context_label.setText(self._label_for_asset(self.current_asset))
+        self.document_context_label.clear()
+        self.document_context_label.setVisible(False)
         self.set_text_content(self.workspace_manager.read_asset_text(self.current_asset))
 
     def _save_current_asset(self, text_content: str) -> None:
         if self.current_asset is None:
             raise ValueError("No workspace asset selected")
         self.current_asset = self.workspace_manager.update_text_asset(self.current_asset.id, text_content)
+
+    def toggle_edit_mode(self) -> None:
+        super().toggle_edit_mode()
+        self._sync_title_editor_visibility()
+
+    def save_changes(self) -> None:
+        title_changed = self._has_pending_title_change()
+        text_changed = self.is_modified
+        if not title_changed and not text_changed:
+            self._leave_edit_mode()
+            self._sync_title_editor_visibility()
+            return
+
+        try:
+            if title_changed and self.current_item is not None:
+                self.current_item = self.workspace_manager.rename_item(
+                    self.current_item.id,
+                    self.document_title_edit.text(),
+                )
+                self.document_title_label.setText(self.current_item.title)
+                self.document_title_edit.blockSignals(True)
+                self.document_title_edit.setText(self.current_item.title)
+                self.document_title_edit.blockSignals(False)
+                self._title_modified = False
+            if text_changed:
+                content = self.text_edit.toPlainText()
+                if callable(self.save_handler):
+                    self.save_handler(content)
+                elif self.current_file_path:
+                    target_path = Path(self.current_file_path).expanduser()
+                    target_path.parent.mkdir(parents=True, exist_ok=True)
+                    target_path.write_text(content, encoding="utf-8")
+                else:
+                    raise ValueError("Text editor is missing a save target")
+                self.is_modified = False
+
+            self._leave_edit_mode()
+            self._sync_title_editor_visibility()
+            self.show_info(self.i18n.t("common.success"), self.i18n.t(self.save_success_key))
+            if self.current_item is not None and title_changed:
+                self.item_renamed.emit(self.current_item.id)
+            self.content_saved.emit()
+        except WorkspaceValidationError as exc:
+            self.show_warning(
+                self.i18n.t("common.warning"),
+                self.i18n.t("workspace.duplicate_name")
+                if exc.code == "duplicate_name"
+                else self.i18n.t("workspace.invalid_name"),
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Failed to save editor content: %s", exc, exc_info=True)
+            self._show_save_error_with_retry(
+                self.i18n.t("viewer.save_error_details", error=str(exc)),
+                str(exc),
+            )
 
     def _generate_summary(self) -> None:
         if self.current_item is None:
@@ -554,3 +630,20 @@ class WorkspaceEditorPanel(TextEditorPanel):
     def current_item_id(self) -> str:
         """Expose the currently loaded workspace item identifier."""
         return self.current_item.id if self.current_item is not None else ""
+
+    def _on_title_text_changed(self, _text: str) -> None:
+        if self.is_edit_mode:
+            self._title_modified = True
+
+    def _has_pending_title_change(self) -> bool:
+        if self.current_item is None:
+            return False
+        return (
+            self._title_modified
+            and self.document_title_edit.text().strip() != (self.current_item.title or "").strip()
+        )
+
+    def _sync_title_editor_visibility(self) -> None:
+        title_edit_visible = self.is_edit_mode and self.current_item is not None
+        self.document_title_label.setVisible(not title_edit_visible)
+        self.document_title_edit.setVisible(title_edit_visible)
