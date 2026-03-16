@@ -43,9 +43,9 @@ python main.py
 
 ### 🎯 Key Features
 
-- **🗂️ Unified Workspace**: Manage imported documents, batch transcriptions, realtime recordings, summaries, and meeting briefs in one editable asset workspace
+- **🗂️ Comprehensive Note Management**: A unified workspace to seamlessly manage imported documents, batch transcriptions, realtime recordings, summaries, and meeting briefs within an intuitive folder structure
 - **🎙️ Local Speech Pipelines**: Process audio/video files or capture live recordings, then persist transcript and translation assets back into the workspace
-- **🧠 Local Meeting AI**: Generate extractive summaries, ONNX small-model summaries, and GGUF-backed meeting briefs with editable outputs
+- **🧠 AI Note Summarization & Organization**: Generate intelligent, extractive summaries, ONNX small-model summaries, and GGUF-backed meeting briefs to perfectly organize your notes
 - **📅 Calendar Integration**: Sync with Google Calendar and Outlook, manage local events
 - **⏰ Timeline Intelligence**: Correlate events with recordings, automated task scheduling
 - **🔒 Privacy-First**: Encrypted local storage, no cloud dependency required
@@ -92,7 +92,7 @@ EchoNote/
 Workspace architecture highlights:
 - `core/workspace/`: unified asset layer for `workspace_items` and `workspace_assets`
 - `engines/text_ai/`: extractive, ONNX, and GGUF local text AI runtimes
-- `ui/workspace/`: single workbench for text editing, playback, and AI actions
+- `ui/workspace/`: single workbench featuring a Navigator shell, Document Editor, Results List, and Inspector with an integrated media transport player
 
 ### 📚 Documentation
 

@@ -11,15 +11,21 @@ const DOCS_URL = `${GITHUB_URL}/tree/main/docs`
 export const projectConfig: ProjectConfig = {
   name: PROJECT_NAME,
   description:
-    'A local-first desktop application for voice transcription, real-time recording, and calendar-aware timeline management.',
+    'A local-first desktop application for comprehensive note management, voice transcription, and AI-powered note summarization.',
   githubUrl: GITHUB_URL,
 
   features: [
     {
-      id: 'batch-transcription',
-      icon: '🎙️',
-      title: 'features.items.batchTranscription.title',
-      description: 'features.items.batchTranscription.description',
+      id: 'note-management',
+      icon: '🗂️',
+      title: 'features.items.noteManagement.title',
+      description: 'features.items.noteManagement.description',
+    },
+    {
+      id: 'ai-summarization',
+      icon: '🧠',
+      title: 'features.items.aiSummarization.title',
+      description: 'features.items.aiSummarization.description',
     },
     {
       id: 'realtime-recording',
@@ -28,16 +34,10 @@ export const projectConfig: ProjectConfig = {
       description: 'features.items.realtimeRecording.description',
     },
     {
-      id: 'calendar-sync',
-      icon: '📅',
-      title: 'features.items.calendarIntegration.title',
-      description: 'features.items.calendarIntegration.description',
-    },
-    {
-      id: 'timeline',
-      icon: '🧭',
-      title: 'features.items.timelineIntelligence.title',
-      description: 'features.items.timelineIntelligence.description',
+      id: 'batch-transcription',
+      icon: '🎙️',
+      title: 'features.items.batchTranscription.title',
+      description: 'features.items.batchTranscription.description',
     },
     {
       id: 'privacy-first',
@@ -86,7 +86,7 @@ export const projectConfig: ProjectConfig = {
 
   seo: {
     title: `${PROJECT_NAME} - Local-First Voice Transcription & Calendar Workflow`,
-    description: `${PROJECT_NAME} is an open-source desktop app for batch transcription, real-time recording, and calendar-aware timeline management.`,
+    description: `${PROJECT_NAME} is an open-source desktop app for comprehensive note management, voice transcription, and AI note summarization.`,
     keywords: [
       'voice transcription',
       'speech to text',

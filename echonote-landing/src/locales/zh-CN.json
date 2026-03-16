@@ -2,7 +2,7 @@
   "hero": {
     "title": "EchoNote",
     "headline": "从语音到行动，全程本地",
-    "description": "本地优先的桌面应用，聚焦语音转写、实时录音与日历联动时间线。",
+    "description": "本地优先的桌面应用，聚焦全面笔记管理、语音转写与AI笔记整理。",
     "releaseBadge": "新版本 {version} 已发布",
     "viewOnGitHub": "查看 GitHub",
     "subtitle": "开源 • 免费 • 跨平台",
@@ -37,21 +37,21 @@
     "callToAction": "想了解更多技术细节？",
     "exploreMore": "查看项目统计",
     "items": {
-      "batchTranscription": {
-        "title": "批量转写",
-        "description": "使用本地模型转写音频/视频文件，并导出为多种格式。"
+      "noteManagement": {
+        "title": "全面笔记管理",
+        "description": "通过全新的工作台结构，以文件夹与标签页形式高效组织、检索、编辑你的所有录音与文档。"
+      },
+      "aiSummarization": {
+        "title": "AI 整理笔记总结",
+        "description": "通过本地 AI 能力智能提取长录音或会议要点，一键生成结构化的知识总结。"
       },
       "realtimeRecording": {
         "title": "实时录音",
         "description": "采集麦克风音频，标注关键片段，并生成实时转写文本。"
       },
-      "calendarIntegration": {
-        "title": "日历集成",
-        "description": "连接 Google 或 Outlook 日历，让事件与录音保持同步。"
-      },
-      "timelineIntelligence": {
-        "title": "时间线智能",
-        "description": "在统一可搜索时间线中关联事件、录音与转写。"
+      "batchTranscription": {
+        "title": "批量转写",
+        "description": "使用本地模型转写音频/视频文件，并导出为多种格式。"
       },
       "privacyFirst": {
         "title": "隐私优先",
@@ -104,7 +104,7 @@
     "copyright": "版权所有",
     "openSource": "开源资源",
     "links": "相关链接",
-    "summary": "EchoNote 提供本地优先的语音转写、实时录音与日历时间线管理能力，帮助你把会议内容快速转化为可执行信息。",
+    "summary": "EchoNote 提供本地优先的全面笔记管理、语音转写与AI总结能力，帮助你把内容快速转化为可执行信息。",
     "sourceCode": "源代码",
     "documentation": "文档",
     "releases": "发布版本",

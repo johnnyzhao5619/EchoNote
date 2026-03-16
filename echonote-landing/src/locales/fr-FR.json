@@ -2,7 +2,7 @@
   "hero": {
     "title": "EchoNote",
     "headline": "De la voix à l'action, en local",
-    "description": "Une application desktop local-first pour la transcription vocale, l'enregistrement en temps réel et les workflows de timeline liés au calendrier.",
+    "description": "Une application desktop local-first pour la gestion complète de notes, la transcription vocale et l'organisation de notes par l'IA.",
     "releaseBadge": "Nouvelle version {version}",
     "viewOnGitHub": "Voir sur GitHub",
     "subtitle": "Open Source • Gratuit • Multi-plateforme",
@@ -37,21 +37,21 @@
     "callToAction": "Vous voulez en savoir plus sur les détails techniques ?",
     "exploreMore": "Voir les statistiques du projet",
     "items": {
-      "batchTranscription": {
-        "title": "Transcription par lot",
-        "description": "Transcrivez des fichiers audio et vidéo avec des modèles locaux et exportez dans plusieurs formats."
+      "noteManagement": {
+        "title": "Gestion Complète des Notes",
+        "description": "Organisez, recherchez et éditez efficacement tous vos enregistrements et documents grâce au nouvel espace de travail structuré avec dossiers et onglets."
+      },
+      "aiSummarization": {
+        "title": "Résumé et Organisation IA des Notes",
+        "description": "Exploitez l'IA locale pour extraire les points clés de longs enregistrements et structurer intelligemment les informations complexes."
       },
       "realtimeRecording": {
         "title": "Enregistrement en temps réel",
         "description": "Capturez l'audio microphone, annotez les moments clés et générez des transcriptions en direct."
       },
-      "calendarIntegration": {
-        "title": "Intégration calendrier",
-        "description": "Connectez Google ou Outlook et synchronisez les événements avec les enregistrements."
-      },
-      "timelineIntelligence": {
-        "title": "Intelligence de timeline",
-        "description": "Corrélez événements, enregistrements et transcriptions dans une timeline unique et searchable."
+      "batchTranscription": {
+        "title": "Transcription par lot",
+        "description": "Transcrivez des fichiers audio et vidéo avec des modèles locaux et exportez dans plusieurs formats."
       },
       "privacyFirst": {
         "title": "Confidentialité d'abord",
@@ -104,7 +104,7 @@
     "copyright": "Droits d'auteur",
     "openSource": "Ressources Open Source",
     "links": "Liens",
-    "summary": "EchoNote propose un workflow desktop local-first pour la transcription vocale, l'enregistrement en direct et la timeline liee au calendrier.",
+    "summary": "EchoNote propose un workflow desktop local-first pour la gestion complète de notes, la transcription vocale et le résumé par IA.",
     "sourceCode": "Code source",
     "documentation": "Documentation",
     "releases": "Versions",

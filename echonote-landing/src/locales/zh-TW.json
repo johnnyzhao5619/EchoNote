@@ -2,7 +2,7 @@
   "hero": {
     "title": "EchoNote",
     "headline": "從語音到行動，全程本地",
-    "description": "本地優先的桌面應用，專注於語音轉寫、即時錄音與日曆整合時間線。",
+    "description": "本地優先的桌面應用程式，聚焦全面筆記管理、語音轉寫與AI筆記整理。",
     "releaseBadge": "新版本 {version} 已發布",
     "viewOnGitHub": "查看 GitHub",
     "subtitle": "開源 • 免費 • 跨平台",
@@ -37,21 +37,21 @@
     "callToAction": "想了解更多技術細節？",
     "exploreMore": "查看專案統計",
     "items": {
-      "batchTranscription": {
-        "title": "批次轉寫",
-        "description": "使用本地模型轉寫音訊/影片檔案，並匯出多種格式。"
+      "noteManagement": {
+        "title": "全面筆記管理",
+        "description": "透過全新結構的工作台，以資料夾與多分頁形式高效組織、檢索、編輯您的所有錄音與文件。"
+      },
+      "aiSummarization": {
+        "title": "AI 整理筆記總結",
+        "description": "利用強大的本地 AI 能力智能提取長錄音或會議重點，一鍵生成高度結構化的知識總結。"
       },
       "realtimeRecording": {
         "title": "即時錄音",
         "description": "擷取麥克風音訊，標記關鍵片段，並生成即時逐字稿。"
       },
-      "calendarIntegration": {
-        "title": "日曆整合",
-        "description": "連接 Google 或 Outlook 日曆，讓事件與錄音保持同步。"
-      },
-      "timelineIntelligence": {
-        "title": "時間線智慧",
-        "description": "在單一可搜尋時間線中關聯事件、錄音與轉寫。"
+      "batchTranscription": {
+        "title": "批次轉寫",
+        "description": "使用本地模型轉寫音訊/影片檔案，並匯出多種格式。"
       },
       "privacyFirst": {
         "title": "隱私優先",
@@ -104,7 +104,7 @@
     "copyright": "版權所有",
     "openSource": "開源資源",
     "links": "相關連結",
-    "summary": "EchoNote 提供本地優先的語音轉寫、即時錄音與日曆時間線管理，幫助你把會議內容快速轉化為可執行資訊。",
+    "summary": "EchoNote 提供本地優先的全面筆記管理、語音轉寫與AI總結能力，幫助你把內容快速轉化為可執行資訊。",
     "sourceCode": "原始碼",
     "documentation": "文件",
     "releases": "發布版本",
