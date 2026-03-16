@@ -853,6 +853,56 @@ def test_workspace_delete_button_confirms_once_and_deletes_selected_item(
     assert workspace_manager.get_item(note_id) is None
 
 
+def test_workspace_delete_button_deletes_selected_event_folder_group(
+    qapp, mock_i18n, workspace_manager
+):
+    event = CalendarEvent(
+        title="Recording Session",
+        start_time="2026-03-16T19:30:00+00:00",
+        end_time="2026-03-16T20:00:00+00:00",
+    )
+    event.save(workspace_manager.db)
+    note_id = workspace_manager.create_note(title="Session Note", event_id=event.id)
+    folder_id = workspace_manager.resolve_default_folder_id(event_id=event.id)
+    widget = WorkspaceWidget(workspace_manager, mock_i18n)
+    widget.show()
+    qapp.processEvents()
+    widget.library_panel.select_folder(folder_id)
+    qapp.processEvents()
+
+    with patch.object(widget.library_panel, "show_question", return_value=True) as confirm_dialog:
+        widget.library_panel.delete_folder_button.click()
+        qapp.processEvents()
+
+    assert confirm_dialog.call_count == 1
+    assert workspace_manager.get_item(note_id) is None
+    assert workspace_manager.get_folder(folder_id) is None
+
+
+def test_workspace_drag_duplicate_item_name_shows_validation_warning(
+    qapp, mock_i18n, workspace_manager
+):
+    folder_id = workspace_manager.create_folder("Archive")
+    drafts_folder_id = workspace_manager.create_folder("Drafts")
+    first_note_id = workspace_manager.create_note(title="Plan")
+    second_note_id = workspace_manager.create_note(title="Plan")
+    workspace_manager.move_item_to_folder(first_note_id, folder_id)
+    workspace_manager.move_item_to_folder(second_note_id, drafts_folder_id)
+    workspace_manager.rename_item(second_note_id, "Plan")
+    widget = WorkspaceWidget(workspace_manager, mock_i18n)
+    widget.show()
+    qapp.processEvents()
+
+    with patch.object(widget.library_panel, "show_warning") as warning_dialog:
+        widget.library_panel._on_tree_drop_requested("item", second_note_id, "folder", folder_id)
+        qapp.processEvents()
+
+    moved_item = workspace_manager.get_item(second_note_id)
+    assert moved_item is not None
+    assert moved_item.folder_id != folder_id
+    warning_dialog.assert_called_once()
+
+
 def test_workspace_select_item_recovers_from_stale_tree_node_cache(
     qapp, mock_i18n, workspace_manager
 ):
@@ -1051,9 +1101,9 @@ def test_recording_dock_quick_start_uses_defaults_and_more_settings_routes_to_re
 
     try:
         main_window.recording_dock.compact_panel.start_button.click()
-        main_window.recording_dock.expand_button.click()
+        main_window.recording_dock.compact_panel.settings_button.click()
         qapp.processEvents()
-        main_window.recording_dock.full_panel.more_settings_button.click()
+        main_window.recording_dock.settings_panel.more_settings_button.click()
         qapp.processEvents()
 
         realtime_recorder.start_recording.assert_called_once()
@@ -1066,7 +1116,7 @@ def test_recording_dock_quick_start_uses_defaults_and_more_settings_routes_to_re
         main_window.close()
 
 
-def test_recording_dock_full_panel_grouped_console_sections_in_main_window(
+def test_recording_dock_exposes_compact_transport_and_popup_settings_in_main_window(
     qapp, mock_i18n, workspace_manager
 ):
     main_window, _ = build_main_window_with_workspace(
@@ -1076,14 +1126,14 @@ def test_recording_dock_full_panel_grouped_console_sections_in_main_window(
     )
 
     try:
-        main_window.recording_dock.set_expanded(True)
+        main_window.recording_dock.compact_panel.settings_button.click()
         qapp.processEvents()
 
-        assert main_window.recording_dock.full_panel.session_summary_section is not None
-        assert main_window.recording_dock.full_panel.capture_section is not None
-        assert main_window.recording_dock.full_panel.processing_section is not None
-        assert main_window.recording_dock.full_panel.output_section is not None
-        assert main_window.recording_dock.full_panel.live_results_section is not None
+        assert main_window.recording_dock.compact_panel.start_button.isVisible()
+        assert main_window.recording_dock.compact_panel.overlay_button.isVisible()
+        assert main_window.recording_dock.settings_popup.isVisible()
+        assert main_window.recording_dock.settings_panel.input_source_combo is not None
+        assert not hasattr(main_window.recording_dock.settings_panel, "session_tabs")
     finally:
         main_window.close()
 

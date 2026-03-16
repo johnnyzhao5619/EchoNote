@@ -517,3 +517,69 @@ def test_workspace_manager_delete_item_removes_assets_and_files(tmp_path):
     assert manager.get_item(item_id) is None
     assert manager.get_primary_text_asset(item_id) is None
     assert not asset_path.exists()
+
+
+def test_workspace_manager_move_item_rejects_duplicate_names_and_system_root_targets(tmp_path):
+    from core.workspace.manager import WorkspaceValidationError
+
+    manager = build_workspace_manager(tmp_path)
+    archive_folder_id = manager.create_folder("Archive")
+    drafts_folder_id = manager.create_folder("Drafts")
+    first_note_id = manager.create_note(title="Plan")
+    second_note_id = manager.create_note(title="Plan")
+    event_root_folder = manager.ensure_event_root_folder()
+
+    manager.move_item_to_folder(first_note_id, archive_folder_id)
+    manager.move_item_to_folder(second_note_id, drafts_folder_id)
+    manager.rename_item(second_note_id, "Plan")
+
+    with pytest.raises(WorkspaceValidationError, match="duplicate_name"):
+        manager.move_item_to_folder(second_note_id, archive_folder_id)
+
+    with pytest.raises(WorkspaceValidationError, match="invalid_move_target"):
+        manager.move_item_to_folder(second_note_id, event_root_folder.id)
+
+
+def test_workspace_manager_move_and_delete_cleanup_empty_event_folder(tmp_path):
+    manager = build_workspace_manager(tmp_path)
+    event = CalendarEvent(
+        title="Recording Session",
+        start_time="2026-03-16T19:30:00+00:00",
+        end_time="2026-03-16T20:00:00+00:00",
+    )
+    event.save(manager.db)
+    note_id = manager.create_note(title="Session Note", event_id=event.id)
+    event_folder_id = manager.resolve_default_folder_id(event_id=event.id)
+    archive_folder_id = manager.create_folder("Archive")
+
+    assert manager.get_folder(event_folder_id) is not None
+
+    manager.move_item_to_folder(note_id, archive_folder_id)
+
+    assert manager.get_folder(event_folder_id) is None
+
+    another_note_id = manager.create_note(title="Session Note", event_id=event.id)
+    new_event_folder_id = manager.resolve_default_folder_id(event_id=event.id)
+    assert manager.get_folder(new_event_folder_id) is not None
+
+    assert manager.delete_item(another_note_id) is True
+    assert manager.get_folder(new_event_folder_id) is None
+
+
+def test_workspace_manager_delete_generated_event_folder_removes_contents(tmp_path):
+    manager = build_workspace_manager(tmp_path)
+    event = CalendarEvent(
+        title="Realtime Session",
+        start_time="2026-03-16T21:00:00+00:00",
+        end_time="2026-03-16T22:00:00+00:00",
+    )
+    event.save(manager.db)
+    note_id = manager.create_note(title="Realtime Note", event_id=event.id)
+    folder_id = manager.resolve_default_folder_id(event_id=event.id)
+
+    summary = manager.get_folder_cleanup_summary(folder_id)
+
+    assert summary["linked_item_count"] == 1
+    assert manager.delete_generated_folder(folder_id) == 1
+    assert manager.get_item(note_id) is None
+    assert manager.get_folder(folder_id) is None

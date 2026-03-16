@@ -36,7 +36,7 @@
   - `engines/translation/`：翻译引擎。
   - `engines/text_ai/`：本地文本 AI 能力（extractive、ONNX 摘要、GGUF 会议整理 runtime）。
 - `ui/`：桌面端界面层（PySide6）。
-- `ui/workspace/`：统一 workspace 工作台（顶部创建入口、Obsidian 风格单树导航、结构/事件双模式目录、文件夹管理、壳层级批量任务工具窗口、卡片/标签式文本编辑、独立窗口、录音回放与 AI 操作）。
+- `ui/workspace/`：统一 workspace 工作台（顶部创建入口、Obsidian 风格单树导航、结构/事件双模式目录、文件夹管理、壳层级批量任务工具窗口、卡片/标签式文本编辑、独立窗口、录音回放与 AI 操作；录音会话完成后的文档、翻译与回放都统一回到 workspace，`recording_session_panel.py` 只承载轻量录音选项弹出层）。
   - `ui/realtime_record/`：实时录音浮动窗与音频可视化组件（主录音入口已硬切到应用壳层底座与 `ui/common/realtime_recording_dock.py`）。
   - `ui/timeline/`：时间线页面与事件卡片（`widget.py`、`event_card.py`、`transcript_viewer.py`）。
   - `ui/settings/`：设置页面（含 `translation_page.py` 与 `workspace_ai_page.py` 独立默认设置页）。
@@ -59,8 +59,8 @@
 
 - 查“统一工作台/文档资产”：优先看 `core/workspace/` + `ui/workspace/` + `data/database/models.py`。
 - 查“工作台批量转写/转译任务”：优先看 `ui/workspace/task_window.py` + `ui/workspace/task_panel.py` + `ui/main_window.py` + `core/transcription/manager.py` + `ui/batch_transcribe/task_item.py` + `ui/workspace/editor_panel.py`。
-- 查“工作台创建入口/录音主控”：优先看 `ui/workspace/library_panel.py` + `ui/common/realtime_recording_dock.py` + `ui/workspace/recording_session_panel.py` + `core/realtime/recorder.py` + `core/workspace/manager.py`。
-- 查“实时录音/浮动窗”：优先看 `ui/common/realtime_recording_dock.py` + `ui/realtime_record/` + `core/realtime/` + `resources/themes/*qss`；录音落盘与资产发布再看 `core/workspace/manager.py`。
+- 查“工作台创建入口/录音主控”：优先看 `ui/workspace/library_panel.py` + `ui/common/realtime_recording_dock.py` + `ui/workspace/recording_session_panel.py` + `core/realtime/recorder.py` + `core/workspace/manager.py`；当前录音工作流已收口为“紧凑横向 dock + 录音选项弹出层 + 悬浮窗实时结果 + workspace 完成结果”。
+- 查“实时录音/浮动窗”：优先看 `ui/common/realtime_recording_dock.py` + `ui/realtime_record/floating_overlay.py` + `core/realtime/` + `resources/themes/*qss`；悬浮窗现在是实时转录/转译主展示面，与壳层录音 dock 共用同一 recorder 状态，录音落盘与资产发布再看 `core/workspace/manager.py`。
 - 查“工作台单树导航/文件夹管理”：优先看 `ui/workspace/library_panel.py` + `ui/workspace/item_list.py` + `core/workspace/manager.py` + `data/database/models.py`。
 - 查“文档标签页/独立窗口”：优先看 `ui/workspace/widget.py` + `ui/workspace/editor_panel.py` + `ui/workspace/detached_document_window.py`。
 - 查“时间线音频播放”：优先看 `ui/common/audio_player.py` + `ui/common/audio_player_launcher.py` + `ui/timeline/widget.py`。
@@ -84,7 +84,7 @@
 - 本地摘要与会议整理：`core/workspace/summary_service.py`、`core/workspace/meeting_brief_service.py`、`engines/text_ai/`
 - Text AI 模型管理：`core/models/manager.py`、`core/models/text_ai_registry.py`、`ui/settings/model_management_page.py`、`ui/settings/workspace_ai_page.py`
 - 录音设备刷新：`ui/settings/realtime_page.py`、`engines/audio/capture.py`、`core/realtime/recorder.py`
-- 壳层录音底座与浮动窗布局：`ui/common/realtime_recording_dock.py`、`ui/workspace/recording_session_panel.py`、`ui/realtime_record/floating_overlay.py`、`ui/constants.py`、`resources/themes/light.qss`、`resources/themes/dark.qss`
+- 壳层录音底座与浮动窗布局：`ui/common/realtime_recording_dock.py`、`ui/workspace/recording_session_panel.py`、`ui/realtime_record/floating_overlay.py`、`ui/constants.py`、`resources/themes/light.qss`、`resources/themes/dark.qss`；dock 只负责 transport/status 与少量图标动作，实时结果走悬浮窗，播放跟随文本依赖 `core/realtime/archiver.py` 写出的同名 `.txt + .json` 资产对
 - 主题契约与角色覆盖：`resources/themes/theme_outline.json`、`tests/unit/test_theme_outline_contract.py`、`ui/constants.py`
 - 实时录音偏好设置：`core/settings/manager.py`、`ui/settings/realtime_page.py`、`config/default_config.json`
 - 翻译默认设置：`ui/settings/translation_page.py`、`core/settings/manager.py`、`config/default_config.json`

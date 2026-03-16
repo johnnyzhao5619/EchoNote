@@ -176,6 +176,12 @@ class SettingsManager(QObject):
             "floating_window_always_on_top": bool(
                 realtime_defaults.get("floating_window_always_on_top", True)
             ),
+            "auto_secondary_processing": bool(
+                realtime_defaults.get("auto_secondary_processing", False)
+            ),
+            "transcription_model_name": str(
+                realtime_defaults.get("transcription_model_name", "")
+            ),
         }
 
         # Override with current settings
@@ -191,6 +197,10 @@ class SettingsManager(QObject):
         translation_preferences = self.get_translation_preferences()
         realtime_preferences.setdefault("enable_transcription", True)
         realtime_preferences.setdefault("enable_translation", False)
+        realtime_preferences.setdefault(
+            "transcription_model_name",
+            self.get_setting("transcription.faster_whisper.model_size") or "",
+        )
         realtime_preferences["translation_source_lang"] = translation_preferences.get(
             "translation_source_lang",
             "auto",

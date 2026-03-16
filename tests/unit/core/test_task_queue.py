@@ -125,6 +125,29 @@ class TestTaskQueueBasics:
         await queue.stop()
 
     @pytest.mark.asyncio
+    async def test_non_retryable_task_failure_stops_immediately(self):
+        """Non-retryable errors should fail once without retrying."""
+        queue = TaskQueue(max_concurrent=1, max_retries=3, retry_delay=0.05)
+        await queue.start()
+
+        attempt_count = 0
+
+        class _NonRetryableError(RuntimeError):
+            retryable = False
+
+        async def failing_task(cancel_event):
+            nonlocal attempt_count
+            attempt_count += 1
+            raise _NonRetryableError("permanent failure")
+
+        await queue.add_task("task1", failing_task)
+        await queue.wait_for_completion()
+
+        assert attempt_count == 1
+
+        await queue.stop()
+
+    @pytest.mark.asyncio
     async def test_pause_and_resume(self):
         """Test pausing and resuming the queue."""
         queue = TaskQueue(max_concurrent=2)

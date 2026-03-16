@@ -216,6 +216,8 @@ class MainWindow(QMainWindow):
             self.managers.get("realtime_recorder"),
             self.i18n,
             settings_manager=self.managers.get("settings_manager"),
+            transcription_manager=self.managers.get("transcription_manager"),
+            model_manager=self.managers.get("model_manager"),
             parent=self,
         )
         dock.workspace_item_requested.connect(

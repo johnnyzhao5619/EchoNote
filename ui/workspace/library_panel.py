@@ -705,6 +705,27 @@ class WorkspaceLibraryPanel(BaseWidget):
                 return
             self.library_changed.emit()
             return
+        if selected_kind == "folder" and self._can_delete_generated_folder(selected_value):
+            folder = self.workspace_manager.get_folder(selected_value)
+            if folder is None:
+                return
+            summary = self.workspace_manager.get_folder_cleanup_summary(selected_value)
+            if not self.show_question(
+                self.i18n.t("common.warning"),
+                self.i18n.t(
+                    "workspace.delete_generated_folder_confirm",
+                    name=folder.name,
+                    count=summary.get("linked_item_count", 0),
+                ),
+            ):
+                return
+            try:
+                self.workspace_manager.delete_generated_folder(selected_value)
+            except WorkspaceValidationError as exc:
+                self._show_workspace_validation_error(exc)
+                return
+            self.library_changed.emit()
+            return
         if selected_kind == "item":
             item = self.workspace_manager.get_item(selected_value)
             if item is None:
@@ -745,9 +766,14 @@ class WorkspaceLibraryPanel(BaseWidget):
     def _update_header_action_states(self) -> None:
         selected_kind, selected_value = self._current_selection_identity()
         can_manage_folder = selected_kind == "folder" and self._can_manage_folder(selected_value)
+        can_delete_generated_folder = selected_kind == "folder" and self._can_delete_generated_folder(
+            selected_value
+        )
         can_manage_item = selected_kind == "item" and self.workspace_manager.get_item(selected_value) is not None
         self.rename_folder_button.setEnabled(can_manage_folder or can_manage_item)
-        self.delete_folder_button.setEnabled(can_manage_folder or can_manage_item)
+        self.delete_folder_button.setEnabled(
+            can_manage_folder or can_delete_generated_folder or can_manage_item
+        )
 
     def _current_selection_identity(self) -> tuple[str, str]:
         return self.current_selection_kind(), self.current_selection_value()
@@ -755,6 +781,8 @@ class WorkspaceLibraryPanel(BaseWidget):
     def _show_workspace_validation_error(self, error: WorkspaceValidationError) -> None:
         if error.code == "duplicate_name":
             message = self.i18n.t("workspace.duplicate_name")
+        elif error.code == "invalid_move_target":
+            message = self.i18n.t("workspace.invalid_move_target")
         elif error.code == "folder_not_empty":
             message = self.i18n.t("workspace.delete_folder_failed")
         elif error.code == "folder_not_renamable":
@@ -779,7 +807,11 @@ class WorkspaceLibraryPanel(BaseWidget):
             item = self.workspace_manager.get_item(source_value)
             if item is None or target_folder_id is None or item.folder_id == target_folder_id:
                 return
-            self.workspace_manager.move_item_to_folder(source_value, target_folder_id)
+            try:
+                self.workspace_manager.move_item_to_folder(source_value, target_folder_id)
+            except WorkspaceValidationError as exc:
+                self._show_workspace_validation_error(exc)
+                return
             self._pending_selection = ("item", source_value)
             self.library_changed.emit()
             return
@@ -803,6 +835,12 @@ class WorkspaceLibraryPanel(BaseWidget):
             return None
         target_folder = self.workspace_manager.get_folder(target_value)
         return target_folder.id if target_folder is not None else None
+
+    def _can_delete_generated_folder(self, folder_id: str | None) -> bool:
+        if not folder_id:
+            return False
+        folder = self.workspace_manager.get_folder(folder_id)
+        return bool(folder is not None and getattr(folder, "folder_kind", "") == "event")
 
     def _resolve_folder_drop_target_parent_id(self, target_kind: str, target_value: str) -> str | None:
         if target_kind != "folder":

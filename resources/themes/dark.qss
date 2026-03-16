@@ -2580,10 +2580,6 @@ QPushButton[role="calendar-primary-action"] {
     padding: 3px 10px;
 }
 
-QPushButton[role="realtime-marker-action"] {
-    min-width: 84px;
-}
-
 QPushButton[role="realtime-record-action"] {
     min-width: 96px;
     background-color: #2f9e55;
@@ -2716,25 +2712,27 @@ QDoubleSpinBox[role="realtime-field-control"] {
     padding: 3px 8px;
 }
 
-QPushButton[role="realtime-floating-toggle"] {
-    min-width: 84px;
-    min-height: 28px;
-    padding: 3px 8px;
+QToolButton[role="realtime-icon-action"],
+QToolButton[role="realtime-floating-toggle"] {
+    min-width: 30px;
+    max-width: 30px;
+    min-height: 30px;
+    max-height: 30px;
+    padding: 0;
     border-radius: 9px;
     border: 1px solid #4f6382;
     background-color: #2e3a50;
     color: #d2e1ff;
-    font-size: 12px;
-    font-weight: 600;
 }
 
-QPushButton[role="realtime-floating-toggle"]:hover {
+QToolButton[role="realtime-icon-action"]:hover,
+QToolButton[role="realtime-floating-toggle"]:hover {
     background-color: #364762;
     border-color: #6780a5;
 }
 
-QPushButton[role="realtime-floating-toggle"][state="active"] {
-    color: #ffffff;
+QToolButton[role="realtime-icon-action"]:checked,
+QToolButton[role="realtime-floating-toggle"]:checked {
     background-color: #3f78cb;
     border-color: #3f78cb;
 }

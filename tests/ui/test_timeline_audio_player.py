@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """UI tests for timeline audio player transcript sync behavior."""
 
+import json
 from unittest.mock import Mock
 
 import pytest
@@ -194,4 +195,36 @@ def test_audio_player_clear_media_resets_labels_and_controls(qapp, mock_i18n):
 
     assert player.file_label.text() == ""
     assert player.play_button.isEnabled() is False
+    player.cleanup()
+
+
+def test_audio_player_prefers_adjacent_segment_json_for_synced_transcript(
+    qapp, mock_i18n, tmp_path
+):
+    audio_path = tmp_path / "session.wav"
+    audio_path.write_bytes(b"RIFF")
+    transcript_txt = tmp_path / "transcript_session.txt"
+    transcript_txt.write_text("plain transcript", encoding="utf-8")
+    transcript_json = tmp_path / "transcript_session.json"
+    transcript_json.write_text(
+        json.dumps(
+            {
+                "text": "plain transcript",
+                "segments": [{"start": 0.0, "end": 1.0, "text": "plain transcript"}],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    player = AudioPlayer(
+        str(audio_path),
+        mock_i18n,
+        auto_load=False,
+    )
+
+    player.load_file(str(audio_path), transcript_path=str(transcript_txt))
+
+    assert player._transcript_format == "segments"
+    assert player._segment_timeline == [(0, 1000)]
     player.cleanup()

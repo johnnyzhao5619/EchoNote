@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 """Tests for main window shell status and shortcuts."""
 
+import asyncio
+import time
 from unittest.mock import Mock, PropertyMock, patch
 
 import ui.main_window as main_window_module
@@ -23,11 +25,39 @@ def _build_i18n():
             "app_shell.recording_on": "Recording: active",
             "app_shell.recording_off": "Recording: idle",
             "workspace.recording_console.default_input_source": "System Input",
-            "workspace.recording_console.apply_and_record": "Apply Settings and Record",
+            "workspace.recording_console.session_options_title": "Session Options",
+            "workspace.recording_console.input_section": "Input",
+            "workspace.recording_console.realtime_processing_section": "Live Processing",
+            "workspace.recording_console.recording_output_section": "Recording Output",
+            "workspace.recording_console.secondary_processing_section": "Secondary Processing",
+            "workspace.recording_console.translation_target_language_label": "Translation Target",
+            "workspace.recording_console.realtime_transcription_model_label": "Live Transcription Model",
+            "workspace.recording_console.secondary_default_model_label": "Default Secondary Model",
+            "workspace.recording_console.enable_transcription": "Enable Live Transcription",
+            "workspace.recording_console.enable_translation": "Enable Live Translation",
+            "workspace.recording_console.settings_tooltip": "Recording Settings",
+            "workspace.recording_console.enable_transcription_tooltip": "Enable Live Transcription",
+            "workspace.recording_console.disable_transcription_tooltip": "Disable Live Transcription",
+            "workspace.recording_console.enable_translation_tooltip": "Enable Live Translation",
+            "workspace.recording_console.disable_translation_tooltip": "Disable Live Translation",
+            "workspace.recording_console.show_overlay_tooltip": "Show Floating Overlay",
+            "workspace.recording_console.hide_overlay_tooltip": "Hide Floating Overlay",
+            "workspace.recording_console.open_latest_document_tooltip": "Open Latest Document",
+            "workspace.recording_console.secondary_process_tooltip": "Run Secondary Processing",
+            "workspace.recording_console.auto_secondary_processing": "Auto Secondary Processing",
+            "workspace.recording_console.enable_auto_secondary_tooltip": "Enable Auto Secondary",
+            "workspace.recording_console.disable_auto_secondary_tooltip": "Disable Auto Secondary",
+            "workspace.recording_console.mode_record_only": "Audio Only",
+            "workspace.recording_console.mode_transcription_only": "Live Transcription",
+            "workspace.recording_console.mode_translation_target": "Translate to {language}",
             "workspace.recording_console.target_language_auto": "Automatic",
             "workspace.recording_console.target_language_en": "English",
             "workspace.recording_console.target_language_zh": "Chinese",
             "workspace.recording_console.target_language_fr": "French",
+            "workspace.record_button": "Record",
+            "workspace.record_button_active": "Recording",
+            "workspace.record_button_busy": "Processing",
+            "workspace.stop_button": "Stop",
             "logging.main_window.keyboard_shortcuts_configured": "shortcuts configured",
         }
         template = mapping.get(key, key)
@@ -49,6 +79,17 @@ def _build_transcription_manager():
     manager.get_active_task_count.return_value = 0
     manager._running = False
     return manager
+
+
+def _wait_until(app, predicate, timeout=2.0):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        app.processEvents()
+        if predicate():
+            return True
+        time.sleep(0.01)
+    app.processEvents()
+    return predicate()
 
 
 def build_main_window_with_workspace(tmp_path, *, transcription_manager=None, settings_file=None):
@@ -287,10 +328,11 @@ def test_main_window_top_bar_groups_search_hint_and_task_entry(tmp_path):
         main_window.close()
 
 
-def test_recording_dock_supports_compact_and_full_modes():
+def test_recording_dock_supports_compact_transport_and_popup_settings():
     app = QApplication.instance() or QApplication([])
     realtime_recorder = Mock()
     type(realtime_recorder).is_recording = PropertyMock(return_value=False)
+    realtime_recorder.set_callbacks = Mock()
     realtime_recorder.list_input_sources.return_value = []
     realtime_recorder.get_recording_status.return_value = {"duration": 0.0}
     realtime_recorder.get_accumulated_transcription.return_value = ""
@@ -301,16 +343,24 @@ def test_recording_dock_supports_compact_and_full_modes():
 
     assert dock.compact_panel.start_button.isVisible()
     assert dock.compact_panel.stop_button.isVisible()
-    assert dock.expand_button.isVisible()
+    assert dock.compact_panel.settings_button.isVisible()
+    assert dock.compact_panel.overlay_button.isVisible()
+    assert dock.compact_panel.open_document_button.isVisible()
+    assert dock.compact_panel.secondary_button.isVisible()
+    assert dock.compact_panel.auto_secondary_button.isVisible()
+    assert dock.compact_panel.transcription_button.isVisible()
+    assert dock.compact_panel.translation_button.isVisible()
+    realtime_recorder.set_callbacks.assert_called()
 
-    dock.expand_button.click()
+    dock.compact_panel.settings_button.click()
     app.processEvents()
 
-    assert dock.full_panel.input_source_combo is not None
-    assert dock.full_panel.marker_button.isVisible()
+    assert dock.settings_popup.isVisible()
+    assert dock.settings_panel.input_source_combo is not None
+    assert dock.settings_panel.more_settings_button.isVisible()
 
 
-def test_recording_dock_full_panel_exposes_grouped_console_sections():
+def test_recording_dock_settings_popup_exposes_compact_controls():
     app = QApplication.instance() or QApplication([])
     realtime_recorder = Mock()
     type(realtime_recorder).is_recording = PropertyMock(return_value=False)
@@ -323,17 +373,24 @@ def test_recording_dock_full_panel_exposes_grouped_console_sections():
     dock.show()
     app.processEvents()
 
-    dock.set_expanded(True)
+    dock.compact_panel.settings_button.click()
     app.processEvents()
 
-    assert dock.full_panel.session_summary_section is not None
-    assert dock.full_panel.capture_section is not None
-    assert dock.full_panel.processing_section is not None
-    assert dock.full_panel.output_section is not None
-    assert dock.full_panel.live_results_section is not None
+    assert dock.settings_panel.input_source_combo is not None
+    assert dock.settings_panel.gain_spin is not None
+    assert dock.settings_panel.translation_language_combo is not None
+    assert dock.settings_panel.model_combo is not None
+    assert dock.settings_panel.secondary_model_combo is not None
+    assert dock.settings_panel.input_section_label.text() == "Input"
+    assert dock.settings_panel.realtime_section_label.text() == "Live Processing"
+    assert dock.settings_panel.recording_output_section_label.text() == "Recording Output"
+    assert dock.settings_panel.secondary_section_label.text() == "Secondary Processing"
+    assert dock.settings_panel.transcribe_check.isVisible()
+    assert dock.settings_panel.translate_check.isVisible()
+    assert dock.settings_panel.more_settings_button.isVisible()
 
 
-def test_recording_dock_uses_single_transport_summary_and_dense_full_panel():
+def test_recording_dock_uses_single_transport_summary_and_popup_settings_panel():
     app = QApplication.instance() or QApplication([])
     realtime_recorder = Mock()
     type(realtime_recorder).is_recording = PropertyMock(return_value=False)
@@ -347,19 +404,17 @@ def test_recording_dock_uses_single_transport_summary_and_dense_full_panel():
     realtime_recorder.get_markers.return_value = []
     dock = RealtimeRecordingDock(realtime_recorder, _build_i18n())
     dock.show()
-    app.processEvents()
-
-    dock.set_expanded(True)
     app.processEvents()
 
     assert dock.compact_panel.summary_group is not None
-    assert dock.full_panel.session_summary_section is not None
-    assert dock.full_panel.start_button.text() == "Apply Settings and Record"
-    assert not hasattr(dock.full_panel, "stop_button")
-    assert dock.full_panel.capture_form_layout.columnCount() == 2
+    assert dock.settings_popup is not None
+    assert dock.settings_panel.title_label.text() == "Session Options"
+    assert not hasattr(dock, "expand_button")
+    assert not hasattr(dock.settings_panel, "session_tabs")
+    assert dock.compact_panel.open_document_button.isEnabled() is False
 
 
-def test_recording_dock_full_panel_uses_scroll_container_and_localized_summary_labels():
+def test_recording_dock_localizes_summary_labels_and_overlay_toggle():
     app = QApplication.instance() or QApplication([])
     realtime_recorder = Mock()
     type(realtime_recorder).is_recording = PropertyMock(return_value=False)
@@ -375,10 +430,312 @@ def test_recording_dock_full_panel_uses_scroll_container_and_localized_summary_l
     dock.show()
     app.processEvents()
 
-    dock.set_expanded(True)
+    assert dock.settings_panel.gain_spin.property("role") == "realtime-field-control"
+    assert "default" not in dock.compact_panel.input_label.text().lower()
+    assert dock.compact_panel.target_label.text() == "Live Transcription"
+    assert dock.compact_panel.overlay_button.toolTip() == "Show Floating Overlay"
+
+
+def test_recording_dock_transcription_and_translation_toggles_stay_in_sync():
+    app = QApplication.instance() or QApplication([])
+    realtime_recorder = Mock()
+    type(realtime_recorder).is_recording = PropertyMock(return_value=False)
+    realtime_recorder.list_input_sources.return_value = []
+    realtime_recorder.get_recording_status.return_value = {
+        "duration": 0.0,
+        "input_device_name": "default",
+    }
+    dock = RealtimeRecordingDock(realtime_recorder, _build_i18n())
+    dock.show()
     app.processEvents()
 
-    assert dock.full_panel_scroll_area is not None
-    assert dock.full_panel.gain_spin.property("role") == "realtime-field-control"
-    assert "default" not in dock.full_panel.summary_input_label.text().lower()
-    assert dock.full_panel.summary_target_label.text() == "English"
+    dock.compact_panel.translation_button.setChecked(True)
+    app.processEvents()
+    assert dock.settings_panel.transcription_enabled() is True
+    assert dock.settings_panel.translation_enabled() is True
+    assert dock.compact_panel.target_label.text() == "Translate to English"
+
+    dock.compact_panel.transcription_button.setChecked(False)
+    app.processEvents()
+    assert dock.settings_panel.transcription_enabled() is False
+    assert dock.settings_panel.translation_enabled() is False
+    assert dock.compact_panel.translation_button.isChecked() is False
+    assert dock.compact_panel.target_label.text() == "Audio Only"
+
+
+def test_recording_dock_floating_overlay_tracks_live_preview():
+    app = QApplication.instance() or QApplication([])
+    realtime_recorder = Mock()
+    realtime_recorder.current_options = {"floating_window_enabled": True}
+    type(realtime_recorder).is_recording = PropertyMock(return_value=True)
+    realtime_recorder.list_input_sources.return_value = []
+    realtime_recorder.get_recording_status.return_value = {
+        "duration": 65.0,
+        "input_device_name": "Built-in Mic",
+    }
+    realtime_recorder.get_accumulated_transcription.return_value = "hello world"
+    realtime_recorder.get_accumulated_translation.return_value = "bonjour le monde"
+    settings_manager = Mock()
+    settings_manager.get_realtime_session_defaults.return_value = {"floating_window_enabled": True}
+    settings_manager.get_setting.side_effect = lambda key: {
+        "realtime.hide_main_window_when_floating": False,
+        "realtime.floating_window_always_on_top": True,
+    }.get(key, False)
+    dock = RealtimeRecordingDock(realtime_recorder, _build_i18n(), settings_manager=settings_manager)
+    dock.show()
+    app.processEvents()
+
+    dock._handle_start_completed({})
+    dock.refresh_status()
+    app.processEvents()
+
+    assert dock.floating_overlay.isVisible()
+    assert dock.floating_overlay.transcript_preview_label.text() == "hello world"
+    assert dock.floating_overlay.translation_preview_label.text() == "bonjour le monde"
+
+    type(realtime_recorder).is_recording = PropertyMock(return_value=False)
+    dock._handle_stop_completed({"recording_path": "/tmp/session.wav"})
+    app.processEvents()
+    assert not dock.floating_overlay.isVisible()
+
+
+def test_recording_dock_recorder_callbacks_push_live_preview_immediately():
+    app = QApplication.instance() or QApplication([])
+    realtime_recorder = Mock()
+    type(realtime_recorder).is_recording = PropertyMock(return_value=True)
+    realtime_recorder.list_input_sources.return_value = []
+    realtime_recorder.get_recording_status.return_value = {"duration": 2.0, "input_device_name": "Mic"}
+    realtime_recorder.get_accumulated_transcription.return_value = ""
+    realtime_recorder.get_accumulated_translation.return_value = ""
+    realtime_recorder.set_callbacks = Mock()
+
+    dock = RealtimeRecordingDock(realtime_recorder, _build_i18n())
+    dock.show()
+    app.processEvents()
+
+    callback_kwargs = realtime_recorder.set_callbacks.call_args.kwargs
+    callback_kwargs["on_transcription"]("live transcript")
+    callback_kwargs["on_translation"]("live translation")
+    app.processEvents()
+
+    assert dock.floating_overlay.transcript_preview_label.text() == "live transcript"
+    assert dock.floating_overlay.translation_preview_label.text() == "live translation"
+
+
+def test_recording_dock_secondary_transcription_reuses_task_pipeline():
+    realtime_recorder = Mock()
+    type(realtime_recorder).is_recording = PropertyMock(return_value=False)
+    realtime_recorder.list_input_sources.return_value = []
+    transcription_manager = Mock()
+    dock = RealtimeRecordingDock(
+        realtime_recorder,
+        _build_i18n(),
+        transcription_manager=transcription_manager,
+        model_manager=Mock(),
+    )
+    dock._latest_session_result = {
+        "recording_path": "/tmp/session.wav",
+        "event_id": "evt-1",
+        "session_options": {
+            "enable_translation": True,
+            "target_language": "fr",
+        },
+    }
+
+    with patch(
+        "ui.common.realtime_recording_dock.select_secondary_transcribe_model",
+        return_value={"model_name": "base", "model_path": "/models/base"},
+    ) as select_model:
+        dock._on_secondary_transcription_requested()
+
+    assert select_model.call_args.kwargs["preferred_model_name"] == ""
+    transcription_manager.add_task.assert_called_once_with(
+        "/tmp/session.wav",
+        options={
+            "replace_realtime": True,
+            "model_name": "base",
+            "model_path": "/models/base",
+            "event_id": "evt-1",
+            "enable_translation": True,
+            "translation_target_lang": "fr",
+        },
+    )
+
+
+def test_recording_dock_secondary_button_uses_recorder_last_session_result_fallback():
+    app = QApplication.instance() or QApplication([])
+    realtime_recorder = Mock()
+    type(realtime_recorder).is_recording = PropertyMock(return_value=False)
+    realtime_recorder.list_input_sources.return_value = []
+    realtime_recorder.get_recording_status.return_value = {"duration": 0.0}
+    realtime_recorder.last_session_result = {"recording_path": "/tmp/fallback.wav"}
+    dock = RealtimeRecordingDock(realtime_recorder, _build_i18n())
+    dock.show()
+    app.processEvents()
+
+    dock.refresh_status()
+
+    assert dock.compact_panel.secondary_button.isEnabled()
+
+
+def test_recording_dock_start_button_switches_to_recording_copy_and_reuses_single_loop():
+    app = QApplication.instance() or QApplication([])
+
+    class _AsyncRecorder:
+        def __init__(self):
+            self.is_recording = False
+            self.current_options = {}
+            self.last_session_result = None
+            self.last_workspace_item_id = None
+            self.start_event_loop = None
+            self.stop_event_loop = None
+
+        def list_input_sources(self):
+            return []
+
+        def get_recording_status(self):
+            return {"duration": 0.0, "input_device_name": "default"}
+
+        def get_accumulated_transcription(self):
+            return ""
+
+        def get_accumulated_translation(self):
+            return ""
+
+        async def start_recording(self, input_source=None, options=None, event_loop=None):
+            self.start_event_loop = event_loop
+            self.current_options = dict(options or {})
+            self.is_recording = True
+            return {}
+
+        async def stop_recording(self):
+            self.stop_event_loop = asyncio.get_running_loop()
+            self.is_recording = False
+            self.last_session_result = {
+                "recording_path": "/tmp/session.wav",
+                "workspace_item_id": "item-1",
+                "session_options": dict(self.current_options),
+            }
+            self.last_workspace_item_id = "item-1"
+            return dict(self.last_session_result)
+
+    recorder = _AsyncRecorder()
+    dock = RealtimeRecordingDock(recorder, _build_i18n())
+    dock.show()
+    app.processEvents()
+
+    dock.compact_panel.start_button.click()
+    assert _wait_until(app, lambda: recorder.is_recording)
+    assert recorder.start_event_loop is not None
+    assert dock.compact_panel.start_button.text() == "Recording"
+
+    dock.compact_panel.stop_button.click()
+    assert _wait_until(app, lambda: recorder.stop_event_loop is not None)
+    assert recorder.stop_event_loop is recorder.start_event_loop
+
+    dock.close()
+
+
+def test_recording_dock_auto_secondary_toggle_queues_latest_recording_with_default_model():
+    realtime_recorder = Mock()
+    type(realtime_recorder).is_recording = PropertyMock(return_value=False)
+    realtime_recorder.list_input_sources.return_value = []
+    transcription_manager = Mock()
+    model_manager = Mock()
+    base_model = Mock()
+    base_model.name = "base"
+    base_model.local_path = "/models/base"
+    small_model = Mock()
+    small_model.name = "small"
+    small_model.local_path = "/models/small"
+    model_manager.get_downloaded_models.return_value = [base_model, small_model]
+    settings_manager = Mock()
+    settings_manager.get_realtime_session_defaults.return_value = {
+        "auto_secondary_processing": False,
+        "transcription_model_name": "small",
+    }
+    settings_manager.get_setting.side_effect = lambda key: {
+        "transcription.secondary_model_size": "base",
+        "transcription.faster_whisper.model_size": "base",
+        "realtime.transcription_model_name": "small",
+    }.get(key)
+
+    dock = RealtimeRecordingDock(
+        realtime_recorder,
+        _build_i18n(),
+        transcription_manager=transcription_manager,
+        model_manager=model_manager,
+        settings_manager=settings_manager,
+    )
+    dock.settings_panel.auto_secondary_check.setChecked(True)
+    with patch(
+        "ui.common.realtime_recording_dock.select_secondary_transcribe_model",
+        return_value={"model_name": "base", "model_path": "/models/base"},
+    ) as select_model:
+        dock._handle_stop_completed(
+            {
+                "recording_path": "/tmp/session.wav",
+                "event_id": "evt-9",
+                "workspace_item_id": "item-9",
+                "session_options": {
+                    "model_name": "small",
+                    "model_path": "/models/small",
+                    "secondary_model_name": "base",
+                    "secondary_model_path": "/models/base",
+                    "enable_translation": True,
+                    "translation_target_lang": "fr",
+                },
+            }
+        )
+
+    assert select_model.call_args.kwargs["preferred_model_name"] == "base"
+
+    transcription_manager.add_task.assert_called_once_with(
+        "/tmp/session.wav",
+        options={
+            "replace_realtime": True,
+            "model_name": "base",
+            "model_path": "/models/base",
+            "event_id": "evt-9",
+            "enable_translation": True,
+            "translation_target_lang": "fr",
+        },
+    )
+
+
+def test_recording_dock_session_options_include_selected_downloaded_model():
+    app = QApplication.instance() or QApplication([])
+    realtime_recorder = Mock()
+    type(realtime_recorder).is_recording = PropertyMock(return_value=False)
+    realtime_recorder.list_input_sources.return_value = []
+    model_manager = Mock()
+    base_model = Mock()
+    base_model.name = "base"
+    base_model.local_path = "/models/base"
+    small_model = Mock()
+    small_model.name = "small"
+    small_model.local_path = "/models/small"
+    model_manager.get_downloaded_models.return_value = [base_model, small_model]
+    settings_manager = Mock()
+    settings_manager.get_realtime_session_defaults.return_value = {
+        "transcription_model_name": "small",
+    }
+    settings_manager.get_setting.side_effect = lambda key: {
+        "transcription.secondary_model_size": "base",
+        "transcription.faster_whisper.model_size": "base",
+    }.get(key)
+    dock = RealtimeRecordingDock(
+        realtime_recorder,
+        _build_i18n(),
+        settings_manager=settings_manager,
+        model_manager=model_manager,
+    )
+    dock.show()
+    app.processEvents()
+
+    options = dock.build_realtime_session_options()
+
+    assert options["model_name"] == "small"
+    assert options["model_path"] == "/models/small"
+    assert options["secondary_model_name"] == "base"
+    assert options["secondary_model_path"] == "/models/base"

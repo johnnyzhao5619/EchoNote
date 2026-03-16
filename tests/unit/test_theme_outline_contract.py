@@ -31,7 +31,6 @@ from ui.common.theme import ThemeManager
 from ui.constants import (
     APP_TOP_BAR_CONTROL_HEIGHT,
     CONTROL_BUTTON_MIN_HEIGHT,
-    REALTIME_BUTTON_MIN_WIDTH,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -337,7 +336,7 @@ def test_theme_outline_covers_recording_dock_and_document_tab_roles():
     assert not missing, f"Theme outline is missing recording dock/document tab selectors: {missing}"
 
 
-def test_recording_dock_full_panel_theme_outline_covers_recording_console_section_roles():
+def test_recording_dock_theme_outline_covers_recording_console_section_roles():
     outline = _load_theme_outline()
     selectors = {
         selector
@@ -362,6 +361,24 @@ def test_recording_dock_full_panel_theme_outline_covers_spin_box_field_control()
     assert (
         'QDoubleSpinBox[role="realtime-field-control"]' in selectors
     ), "Theme outline must cover realtime field-control spin boxes."
+
+
+def test_recording_dock_theme_outline_covers_icon_actions_and_overlay_toggle():
+    outline = _load_theme_outline()
+    selectors = {
+        selector
+        for section in outline.get("sections", [])
+        for selector in section.get("selectors", [])
+    }
+    expected = {
+        'QToolButton[role="realtime-icon-action"]',
+        'QToolButton[role="realtime-icon-action"]:hover',
+        'QToolButton[role="realtime-icon-action"]:checked',
+        'QToolButton[role="realtime-floating-toggle"]',
+        'QToolButton[role="realtime-floating-toggle"]:checked',
+    }
+    missing = sorted(expected - selectors)
+    assert not missing, f"Theme outline is missing realtime icon-action selectors: {missing}"
 
 
 def test_recording_dock_theme_outline_covers_compact_summary_group():
@@ -457,8 +474,13 @@ def test_density_contract_for_core_controls():
         push_button_block = _extract_selector_block(text, "QPushButton")
         assert _get_css_property(push_button_block, "min-height") == "28px"
 
-        marker_block = _extract_selector_block(text, 'QPushButton[role="realtime-marker-action"]')
-        assert _get_css_property(marker_block, "min-width") == f"{REALTIME_BUTTON_MIN_WIDTH}px"
+        icon_action_match = re.search(
+            r'QToolButton\[role="realtime-icon-action"\],\s*\nQToolButton\[role="realtime-floating-toggle"\]\s*\{(.*?)^\}',
+            text,
+            re.S | re.M,
+        )
+        assert icon_action_match, "Theme must define a shared block for realtime icon actions."
+        assert _get_css_property(icon_action_match.group(1), "min-width") == "30px"
 
         duration_block = _extract_selector_block(text, 'QLabel[role="realtime-duration"]')
         assert _get_css_property(duration_block, "min-height") == f"{CONTROL_BUTTON_MIN_HEIGHT}px"

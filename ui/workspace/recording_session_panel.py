@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Expanded recording session controls for the shell dock."""
+"""Compact recording settings panel used by the shell-level dock popup."""
 
 from __future__ import annotations
 
@@ -10,22 +10,21 @@ from core.qt_imports import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
-    QPlainTextEdit,
     QPushButton,
     QVBoxLayout,
     QWidget,
 )
 from ui.base_widgets import BaseWidget
+from ui.common.secondary_transcribe_dialog import (
+    list_downloaded_transcription_models,
+    resolve_preferred_downloaded_transcription_model,
+)
 from ui.constants import (
     REALTIME_CONSOLE_SECTION_MARGINS,
     REALTIME_CONSOLE_SECTION_SPACING,
     ROLE_REALTIME_CONSOLE_SECTION,
     ROLE_REALTIME_CONSOLE_SECTION_TITLE,
-    ROLE_REALTIME_DURATION,
     ROLE_REALTIME_FIELD_CONTROL,
-    ROLE_REALTIME_FLOATING_TOGGLE,
-    ROLE_REALTIME_MARKER_ACTION,
-    ROLE_REALTIME_RECORD_ACTION,
 )
 
 _DEFAULT_LANGUAGE_ITEMS = ("auto", "en", "zh", "fr")
@@ -57,189 +56,178 @@ def format_recording_target_language(i18n, language_code) -> str:
 
 
 class WorkspaceRecordingSessionPanel(BaseWidget):
-    """Full recording session panel sharing the main recorder instance."""
+    """Lightweight settings form for the compact recording dock."""
 
-    def __init__(self, realtime_recorder, i18n, *, settings_manager=None, parent=None):
+    def __init__(
+        self,
+        realtime_recorder,
+        i18n,
+        *,
+        settings_manager=None,
+        model_manager=None,
+        parent=None,
+    ):
         super().__init__(i18n, parent)
         self.realtime_recorder = realtime_recorder
         self.settings_manager = settings_manager
+        self.model_manager = model_manager
+        self._floating_window_enabled = False
         self._init_ui()
         self.load_defaults()
-        self.sync_from_recorder()
 
     def _init_ui(self) -> None:
+        self.setProperty("role", ROLE_REALTIME_CONSOLE_SECTION)
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(*REALTIME_CONSOLE_SECTION_MARGINS)
         layout.setSpacing(REALTIME_CONSOLE_SECTION_SPACING)
 
-        (
-            self.session_summary_section,
-            self.session_summary_title_label,
-            session_summary_layout,
-        ) = self._build_section()
-        self.summary_status_label = QLabel(self.session_summary_section)
-        session_summary_layout.addWidget(self.summary_status_label)
+        self.title_label = QLabel(self)
+        self.title_label.setProperty("role", ROLE_REALTIME_CONSOLE_SECTION_TITLE)
+        layout.addWidget(self.title_label)
 
-        summary_meta_layout = QHBoxLayout()
-        self.summary_duration_label = QLabel(self.session_summary_section)
-        self.summary_duration_label.setProperty("role", ROLE_REALTIME_DURATION)
-        summary_meta_layout.addWidget(self.summary_duration_label)
+        self.input_section_label = QLabel(self)
+        layout.addWidget(self.input_section_label)
 
-        self.summary_input_label = QLabel(self.session_summary_section)
-        summary_meta_layout.addWidget(self.summary_input_label)
+        input_form = QGridLayout()
+        input_form.setHorizontalSpacing(REALTIME_CONSOLE_SECTION_SPACING)
+        input_form.setVerticalSpacing(REALTIME_CONSOLE_SECTION_SPACING)
 
-        self.summary_target_label = QLabel(self.session_summary_section)
-        summary_meta_layout.addWidget(self.summary_target_label)
-        summary_meta_layout.addStretch()
-        session_summary_layout.addLayout(summary_meta_layout)
-
-        self.start_button = QPushButton(self.session_summary_section)
-        self.start_button.setProperty("role", ROLE_REALTIME_RECORD_ACTION)
-        summary_action_layout = QHBoxLayout()
-        summary_action_layout.addWidget(self.start_button)
-        summary_action_layout.addStretch()
-        session_summary_layout.addLayout(summary_action_layout)
-        layout.addWidget(self.session_summary_section)
-
-        self.capture_section, self.capture_title_label, capture_layout = self._build_section()
-        self.capture_form_layout = QGridLayout()
-        self.capture_form_layout.setHorizontalSpacing(REALTIME_CONSOLE_SECTION_SPACING)
-        self.capture_form_layout.setVerticalSpacing(REALTIME_CONSOLE_SECTION_SPACING)
-        self.input_source_label = QLabel(self.capture_section)
-        self.capture_form_layout.addWidget(self.input_source_label, 0, 0)
-
-        self.input_source_combo = QComboBox(self.capture_section)
+        self.input_source_label = QLabel(self)
+        input_form.addWidget(self.input_source_label, 0, 0)
+        self.input_source_combo = QComboBox(self)
         self.input_source_combo.setProperty("role", ROLE_REALTIME_FIELD_CONTROL)
-        self.capture_form_layout.addWidget(self.input_source_combo, 0, 1)
+        input_form.addWidget(self.input_source_combo, 0, 1)
 
-        self.gain_label = QLabel(self.capture_section)
-        self.capture_form_layout.addWidget(self.gain_label, 1, 0)
-
-        self.gain_spin = QDoubleSpinBox(self.capture_section)
+        self.gain_label = QLabel(self)
+        input_form.addWidget(self.gain_label, 0, 2)
+        self.gain_spin = QDoubleSpinBox(self)
         self.gain_spin.setRange(0.1, 4.0)
         self.gain_spin.setSingleStep(0.1)
         self.gain_spin.setProperty("role", ROLE_REALTIME_FIELD_CONTROL)
-        self.capture_form_layout.addWidget(self.gain_spin, 1, 1)
+        input_form.addWidget(self.gain_spin, 0, 3)
+        layout.addLayout(input_form)
 
-        self.floating_button = QPushButton(self.capture_section)
-        self.floating_button.setCheckable(True)
-        self.floating_button.setProperty("role", ROLE_REALTIME_FLOATING_TOGGLE)
-        self.capture_form_layout.addWidget(self.floating_button, 2, 0, 1, 2)
-        capture_layout.addLayout(self.capture_form_layout)
-        layout.addWidget(self.capture_section)
+        self.realtime_section_label = QLabel(self)
+        layout.addWidget(self.realtime_section_label)
 
-        self.processing_section, self.processing_title_label, processing_layout = self._build_section()
-        self.processing_form_layout = QGridLayout()
-        self.processing_form_layout.setHorizontalSpacing(REALTIME_CONSOLE_SECTION_SPACING)
-        self.processing_form_layout.setVerticalSpacing(REALTIME_CONSOLE_SECTION_SPACING)
-        self.transcribe_check = QCheckBox(self.processing_section)
-        self.processing_form_layout.addWidget(self.transcribe_check, 0, 0, 1, 2)
+        processing_form = QGridLayout()
+        processing_form.setHorizontalSpacing(REALTIME_CONSOLE_SECTION_SPACING)
+        processing_form.setVerticalSpacing(REALTIME_CONSOLE_SECTION_SPACING)
 
-        self.translate_check = QCheckBox(self.processing_section)
-        self.processing_form_layout.addWidget(self.translate_check, 1, 0, 1, 2)
-
-        self.translation_language_label = QLabel(self.processing_section)
-        self.processing_form_layout.addWidget(self.translation_language_label, 2, 0)
-
-        self.translation_language_combo = QComboBox(self.processing_section)
+        self.translation_language_label = QLabel(self)
+        processing_form.addWidget(self.translation_language_label, 0, 0)
+        self.translation_language_combo = QComboBox(self)
         self.translation_language_combo.setProperty("role", ROLE_REALTIME_FIELD_CONTROL)
         for language in _DEFAULT_LANGUAGE_ITEMS:
             self.translation_language_combo.addItem(language, language)
-        self.processing_form_layout.addWidget(self.translation_language_combo, 2, 1)
-        processing_layout.addLayout(self.processing_form_layout)
-        layout.addWidget(self.processing_section)
+        processing_form.addWidget(self.translation_language_combo, 0, 1)
 
-        self.output_section, self.output_title_label, output_layout = self._build_section()
-        self.output_form_layout = QGridLayout()
-        self.output_form_layout.setHorizontalSpacing(REALTIME_CONSOLE_SECTION_SPACING)
-        self.output_form_layout.setVerticalSpacing(REALTIME_CONSOLE_SECTION_SPACING)
-        self.save_recording_check = QCheckBox(self.output_section)
-        self.output_form_layout.addWidget(self.save_recording_check, 0, 0, 1, 2)
+        self.realtime_model_label = QLabel(self)
+        processing_form.addWidget(self.realtime_model_label, 1, 0)
+        self.model_combo = QComboBox(self)
+        self.model_combo.setProperty("role", ROLE_REALTIME_FIELD_CONTROL)
+        processing_form.addWidget(self.model_combo, 1, 1)
 
-        self.save_transcript_check = QCheckBox(self.output_section)
-        self.output_form_layout.addWidget(self.save_transcript_check, 1, 0, 1, 2)
+        live_toggle_row = QHBoxLayout()
+        live_toggle_row.setContentsMargins(0, 0, 0, 0)
+        live_toggle_row.setSpacing(REALTIME_CONSOLE_SECTION_SPACING)
 
-        self.create_calendar_event_check = QCheckBox(self.output_section)
-        self.output_form_layout.addWidget(self.create_calendar_event_check, 2, 0, 1, 2)
+        self.transcribe_check = QCheckBox(self)
+        live_toggle_row.addWidget(self.transcribe_check)
 
-        self.more_settings_button = QPushButton(self.output_section)
-        self.output_form_layout.addWidget(self.more_settings_button, 3, 0, 1, 2)
-        output_layout.addLayout(self.output_form_layout)
-        layout.addWidget(self.output_section)
+        self.translate_check = QCheckBox(self)
+        live_toggle_row.addWidget(self.translate_check)
 
-        self.live_results_section, self.live_results_title_label, live_results_layout = self._build_section()
-        marker_layout = QHBoxLayout()
-        self.marker_button = QPushButton(self.live_results_section)
-        self.marker_button.setProperty("role", ROLE_REALTIME_MARKER_ACTION)
-        self.marker_button.clicked.connect(self._on_add_marker)
-        marker_layout.addWidget(self.marker_button)
+        live_toggle_row.addStretch()
+        processing_form.addLayout(live_toggle_row, 2, 0, 1, 2)
+        layout.addLayout(processing_form)
 
-        self.marker_list_label = QLabel(self.live_results_section)
-        marker_layout.addWidget(self.marker_list_label)
-        marker_layout.addStretch()
-        live_results_layout.addLayout(marker_layout)
+        self.recording_output_section_label = QLabel(self)
+        layout.addWidget(self.recording_output_section_label)
 
-        self.transcript_preview = QPlainTextEdit(self.live_results_section)
-        self.transcript_preview.setReadOnly(True)
-        live_results_layout.addWidget(self.transcript_preview)
+        output_form = QGridLayout()
+        output_form.setHorizontalSpacing(REALTIME_CONSOLE_SECTION_SPACING)
+        output_form.setVerticalSpacing(REALTIME_CONSOLE_SECTION_SPACING)
 
-        self.translation_preview = QPlainTextEdit(self.live_results_section)
-        self.translation_preview.setReadOnly(True)
-        live_results_layout.addWidget(self.translation_preview)
-        layout.addWidget(self.live_results_section)
+        self.save_recording_check = QCheckBox(self)
+        output_form.addWidget(self.save_recording_check, 0, 0)
 
+        self.save_transcript_check = QCheckBox(self)
+        output_form.addWidget(self.save_transcript_check, 0, 1)
+
+        self.create_calendar_event_check = QCheckBox(self)
+        output_form.addWidget(self.create_calendar_event_check, 0, 2)
+
+        self.more_settings_button = QPushButton(self)
+        output_form.addWidget(self.more_settings_button, 0, 3)
+
+        layout.addLayout(output_form)
+
+        self.secondary_section_label = QLabel(self)
+        layout.addWidget(self.secondary_section_label)
+
+        secondary_form = QGridLayout()
+        secondary_form.setHorizontalSpacing(REALTIME_CONSOLE_SECTION_SPACING)
+        secondary_form.setVerticalSpacing(REALTIME_CONSOLE_SECTION_SPACING)
+
+        self.auto_secondary_check = QCheckBox(self)
+        secondary_form.addWidget(self.auto_secondary_check, 0, 0, 1, 2)
+
+        self.secondary_model_label = QLabel(self)
+        secondary_form.addWidget(self.secondary_model_label, 1, 0)
+        self.secondary_model_combo = QComboBox(self)
+        self.secondary_model_combo.setProperty("role", ROLE_REALTIME_FIELD_CONTROL)
+        secondary_form.addWidget(self.secondary_model_combo, 1, 1)
+
+        layout.addLayout(secondary_form)
         self.refresh_input_sources()
+        self.refresh_transcription_models()
         self.update_translations()
 
-    def _build_section(self) -> tuple[QWidget, QLabel, QVBoxLayout]:
-        """Create a reusable section shell for the recording console."""
-        section = QWidget(self)
-        section.setProperty("role", ROLE_REALTIME_CONSOLE_SECTION)
-        section_layout = QVBoxLayout(section)
-        section_layout.setContentsMargins(*REALTIME_CONSOLE_SECTION_MARGINS)
-        section_layout.setSpacing(REALTIME_CONSOLE_SECTION_SPACING)
-
-        title_label = QLabel(section)
-        title_label.setProperty("role", ROLE_REALTIME_CONSOLE_SECTION_TITLE)
-        section_layout.addWidget(title_label)
-        return section, title_label, section_layout
-
     def update_translations(self) -> None:
-        self.session_summary_title_label.setText(
-            self.i18n.t("workspace.recording_console.section_summary")
+        self.title_label.setText(self.i18n.t("workspace.recording_console.session_options_title"))
+        self.input_section_label.setText(self.i18n.t("workspace.recording_console.input_section"))
+        self.realtime_section_label.setText(
+            self.i18n.t("workspace.recording_console.realtime_processing_section")
         )
-        self.capture_title_label.setText(
-            self.i18n.t("workspace.recording_console.section_capture")
+        self.recording_output_section_label.setText(
+            self.i18n.t("workspace.recording_console.recording_output_section")
         )
-        self.processing_title_label.setText(
-            self.i18n.t("workspace.recording_console.section_processing")
+        self.secondary_section_label.setText(
+            self.i18n.t("workspace.recording_console.secondary_processing_section")
         )
-        self.output_title_label.setText(
-            self.i18n.t("workspace.recording_console.section_output")
-        )
-        self.live_results_title_label.setText(
-            self.i18n.t("workspace.recording_console.section_live_results")
-        )
-
         self.input_source_label.setText(self.i18n.t("settings.realtime.audio_input"))
         self.gain_label.setText(self.i18n.t("settings.realtime.gain_level"))
-        self.transcribe_check.setText(self.i18n.t("workspace.record_button"))
-        self.translate_check.setText(self.i18n.t("settings.translation.title"))
-        self.translation_language_label.setText(self.i18n.t("settings.translation.target_language"))
+        self.translation_language_label.setText(
+            self.i18n.t("workspace.recording_console.translation_target_language_label")
+        )
+        self.realtime_model_label.setText(
+            self.i18n.t("workspace.recording_console.realtime_transcription_model_label")
+        )
+        self.secondary_model_label.setText(
+            self.i18n.t("workspace.recording_console.secondary_default_model_label")
+        )
+        self.transcribe_check.setText(self.i18n.t("workspace.recording_console.enable_transcription"))
+        self.translate_check.setText(self.i18n.t("workspace.recording_console.enable_translation"))
         self.save_recording_check.setText(self.i18n.t("settings.realtime.auto_save"))
         self.save_transcript_check.setText(self.i18n.t("settings.realtime.save_transcript"))
         self.create_calendar_event_check.setText(
             self.i18n.t("settings.realtime.create_calendar_event")
         )
-        self.start_button.setText(self.i18n.t("workspace.recording_console.apply_and_record"))
-        self.marker_button.setText(self.i18n.t("workspace.add_marker"))
-        self.floating_button.setText(self.i18n.t("settings.realtime.floating_window"))
+        self.auto_secondary_check.setText(
+            self.i18n.t("workspace.recording_console.auto_secondary_processing")
+        )
         self.more_settings_button.setText(self.i18n.t("settings.title"))
-        self.summary_status_label.setText(format_recording_status(self.i18n, is_recording=False))
         if self.input_source_combo.count() > 0:
             self.input_source_combo.setItemText(
+                0, self.i18n.t("workspace.recording_console.default_input_source")
+            )
+        if self.model_combo.count() > 0 and not self.model_combo.isEnabled():
+            self.model_combo.setItemText(0, self.i18n.t("realtime_record.no_models_available"))
+        if self.secondary_model_combo.count() > 0 and not self.secondary_model_combo.isEnabled():
+            self.secondary_model_combo.setItemText(
                 0,
-                self.i18n.t("workspace.recording_console.default_input_source"),
+                self.i18n.t("realtime_record.no_models_available"),
             )
 
     def load_defaults(self) -> None:
@@ -258,7 +246,8 @@ class WorkspaceRecordingSessionPanel(BaseWidget):
         self.create_calendar_event_check.setChecked(
             bool(preferences.get("create_calendar_event", True))
         )
-        self.floating_button.setChecked(bool(preferences.get("floating_window_enabled", False)))
+        self._floating_window_enabled = bool(preferences.get("floating_window_enabled", False))
+        self.auto_secondary_check.setChecked(bool(preferences.get("auto_secondary_processing", False)))
 
         default_input_source = preferences.get("default_input_source")
         if default_input_source in (None, "", "default"):
@@ -268,10 +257,30 @@ class WorkspaceRecordingSessionPanel(BaseWidget):
         if selected_index >= 0:
             self.input_source_combo.setCurrentIndex(selected_index)
 
-        target_language = preferences.get("translation_target_lang", "en")
+        target_language = (
+            preferences.get("target_language")
+            or preferences.get("translation_target_lang")
+            or "en"
+        )
         target_index = self.translation_language_combo.findData(target_language)
         if target_index >= 0:
             self.translation_language_combo.setCurrentIndex(target_index)
+
+        configured_model_name = str(preferences.get("transcription_model_name") or "").strip()
+        if not configured_model_name and callable(getattr(self.settings_manager, "get_setting", None)):
+            configured_model_name = str(
+                self.settings_manager.get_setting("transcription.faster_whisper.model_size") or ""
+            ).strip()
+        self._select_transcription_model(configured_model_name)
+
+        configured_secondary_model_name = ""
+        if callable(getattr(self.settings_manager, "get_setting", None)):
+            configured_secondary_model_name = str(
+                self.settings_manager.get_setting("transcription.secondary_model_size") or ""
+            ).strip()
+        if not configured_secondary_model_name:
+            configured_secondary_model_name = configured_model_name
+        self._select_secondary_transcription_model(configured_secondary_model_name)
 
     def refresh_input_sources(self) -> None:
         """Reload input devices from the shared recorder."""
@@ -297,6 +306,56 @@ class WorkspaceRecordingSessionPanel(BaseWidget):
         if selected_index >= 0:
             self.input_source_combo.setCurrentIndex(selected_index)
 
+    def refresh_transcription_models(self) -> None:
+        """Reload downloaded transcription models for quick session switching."""
+        selected_model = self.selected_transcription_model_name()
+        selected_secondary_model = self.selected_secondary_model_name()
+        self.model_combo.clear()
+        self.secondary_model_combo.clear()
+
+        downloaded_models = list_downloaded_transcription_models(self.model_manager)
+        if not downloaded_models:
+            self.model_combo.addItem(self.i18n.t("realtime_record.no_models_available"), None)
+            self.model_combo.setEnabled(False)
+            self.secondary_model_combo.addItem(
+                self.i18n.t("realtime_record.no_models_available"),
+                None,
+            )
+            self.secondary_model_combo.setEnabled(False)
+            return
+
+        self.model_combo.setEnabled(True)
+        self.secondary_model_combo.setEnabled(True)
+        for model in downloaded_models:
+            self.model_combo.addItem(model.name, model)
+            self.secondary_model_combo.addItem(model.name, model)
+        self._select_transcription_model(selected_model)
+        self._select_secondary_transcription_model(selected_secondary_model)
+
+    def _select_transcription_model(self, preferred_name: str) -> None:
+        self._select_model_combo(self.model_combo, preferred_name)
+
+    def _select_secondary_transcription_model(self, preferred_name: str) -> None:
+        self._select_model_combo(self.secondary_model_combo, preferred_name)
+
+    def _select_model_combo(self, combo: QComboBox, preferred_name: str) -> None:
+        if not combo.isEnabled():
+            return
+        if preferred_name:
+            preferred_index = combo.findText(preferred_name)
+            if preferred_index >= 0:
+                combo.setCurrentIndex(preferred_index)
+                return
+        fallback = resolve_preferred_downloaded_transcription_model(
+            self.model_manager,
+            preferred_names=(preferred_name,),
+        )
+        if fallback is None:
+            return
+        fallback_index = combo.findText(fallback["model_name"])
+        if fallback_index >= 0:
+            combo.setCurrentIndex(fallback_index)
+
     def selected_input_source(self):
         """Return the selected device index or ``None`` for the default source."""
         return self.input_source_combo.currentData()
@@ -305,61 +364,59 @@ class WorkspaceRecordingSessionPanel(BaseWidget):
         """Return the selected target language code for summary rendering."""
         return self.translation_language_combo.currentData() or "en"
 
+    def selected_transcription_model_name(self) -> str:
+        return self._selected_model_name(self.model_combo)
+
+    def selected_transcription_model_path(self) -> str:
+        return self._selected_model_path(self.model_combo)
+
+    def selected_secondary_model_name(self) -> str:
+        return self._selected_model_name(self.secondary_model_combo)
+
+    def selected_secondary_model_path(self) -> str:
+        return self._selected_model_path(self.secondary_model_combo)
+
+    @staticmethod
+    def _selected_model_name(combo: QComboBox) -> str:
+        model_info = combo.currentData()
+        return str(getattr(model_info, "name", "") or "").strip()
+
+    @staticmethod
+    def _selected_model_path(combo: QComboBox) -> str:
+        model_info = combo.currentData()
+        return str(getattr(model_info, "local_path", "") or "").strip()
+
+    def transcription_enabled(self) -> bool:
+        return self.transcribe_check.isChecked()
+
+    def translation_enabled(self) -> bool:
+        return self.translate_check.isChecked()
+
+    def floating_window_enabled(self) -> bool:
+        return bool(self._floating_window_enabled)
+
+    def set_floating_window_enabled(self, enabled: bool) -> None:
+        self._floating_window_enabled = bool(enabled)
+
+    def auto_secondary_processing_enabled(self) -> bool:
+        return self.auto_secondary_check.isChecked()
+
     def collect_session_options(self) -> dict:
-        """Build runtime session options from the current full-panel state."""
+        """Build runtime session options from the current panel state."""
+        target_language = self.selected_target_language()
         return {
             "default_gain": float(self.gain_spin.value()),
             "enable_transcription": self.transcribe_check.isChecked(),
             "enable_translation": self.translate_check.isChecked(),
-            "translation_target_lang": self.translation_language_combo.currentData() or "en",
+            "model_name": self.selected_transcription_model_name(),
+            "model_path": self.selected_transcription_model_path(),
+            "secondary_model_name": self.selected_secondary_model_name(),
+            "secondary_model_path": self.selected_secondary_model_path(),
+            "target_language": target_language,
+            "translation_target_lang": target_language,
             "save_recording": self.save_recording_check.isChecked(),
             "save_transcript": self.save_transcript_check.isChecked(),
             "create_calendar_event": self.create_calendar_event_check.isChecked(),
-            "floating_window_enabled": self.floating_button.isChecked(),
+            "floating_window_enabled": self.floating_window_enabled(),
+            "auto_secondary_processing": self.auto_secondary_processing_enabled(),
         }
-
-    def sync_from_recorder(self, *, busy: bool = False) -> None:
-        """Refresh preview text and marker count from the recorder."""
-        status = {}
-        status_getter = getattr(self.realtime_recorder, "get_recording_status", None)
-        if callable(status_getter):
-            loaded_status = status_getter()
-            if isinstance(loaded_status, dict):
-                status = loaded_status
-
-        duration = float(status.get("duration", 0.0) or 0.0)
-        minutes = int(duration // 60)
-        seconds = int(duration % 60)
-        self.summary_duration_label.setText(f"{minutes:02d}:{seconds:02d}")
-        self.summary_input_label.setText(format_recording_input_source(self.i18n, status.get("input_device_name")))
-        self.summary_target_label.setText(
-            format_recording_target_language(self.i18n, self.selected_target_language())
-        )
-        is_recording = bool(getattr(self.realtime_recorder, "is_recording", False))
-        self.summary_status_label.setText(
-            format_recording_status(self.i18n, is_recording=is_recording, busy=busy)
-        )
-
-        transcription_getter = getattr(self.realtime_recorder, "get_accumulated_transcription", None)
-        if callable(transcription_getter):
-            loaded_text = transcription_getter()
-            self.transcript_preview.setPlainText(loaded_text if isinstance(loaded_text, str) else "")
-
-        translation_getter = getattr(self.realtime_recorder, "get_accumulated_translation", None)
-        if callable(translation_getter):
-            loaded_text = translation_getter()
-            self.translation_preview.setPlainText(loaded_text if isinstance(loaded_text, str) else "")
-
-        markers_getter = getattr(self.realtime_recorder, "get_markers", None)
-        if callable(markers_getter):
-            loaded_markers = markers_getter()
-            marker_count = len(loaded_markers) if isinstance(loaded_markers, (list, tuple)) else 0
-            self.marker_list_label.setText(str(marker_count))
-        else:
-            self.marker_list_label.setText("0")
-
-    def _on_add_marker(self) -> None:
-        add_marker = getattr(self.realtime_recorder, "add_marker", None)
-        if callable(add_marker):
-            add_marker()
-            self.sync_from_recorder()

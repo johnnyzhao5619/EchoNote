@@ -110,7 +110,7 @@ def test_i18n_outline_covers_workspace_task_window_and_recording_console_copy():
     assert "task_summary_total" in workspace_keys
     assert "task_summary_active" in workspace_keys
     assert "task_summary_failed" in workspace_keys
-    assert "recording_console.section_capture" in workspace_keys
+    assert "recording_console.session_options_title" in workspace_keys
     assert "recording_console.default_input_source" in workspace_keys
 
 
@@ -145,7 +145,11 @@ def test_i18n_outline_covers_workspace_recording_dock_compact_copy():
     outline = _load_outline()
     workspace_keys = set(outline.get("required_nested_keys", {}).get("workspace", []))
 
-    assert "recording_console.apply_and_record" in workspace_keys
+    assert "recording_console.settings_tooltip" in workspace_keys
+    assert "recording_console.enable_transcription_tooltip" in workspace_keys
+    assert "recording_console.enable_translation_tooltip" in workspace_keys
+    assert "recording_console.show_overlay_tooltip" in workspace_keys
+    assert "recording_console.open_latest_document_tooltip" in workspace_keys
 
 
 def test_visual_polish_contracts_are_documented_in_project_guides():

@@ -21,7 +21,7 @@ from config.constants import (
     TASK_STATUS_PENDING,
     TASK_STATUS_PROCESSING,
 )
-from core.transcription.manager import TaskNotFoundError, TranscriptionManager
+from core.transcription.manager import TaskNotFoundError, TaskProcessingError, TranscriptionManager
 from core.transcription.task_queue import TaskStatus
 from data.database.models import TranscriptionTask
 
@@ -389,13 +389,28 @@ class TestTranscriptionManager:
             patch.object(manager, "_send_notification"),
             patch.object(manager, "export_result") as mock_export,
         ):
-            await manager._process_task_async(task_id, cancel_event=asyncio.Event())
+            with pytest.raises(TaskProcessingError, match="Transcription output is invalid"):
+                await manager._process_task_async(task_id, cancel_event=asyncio.Event())
 
         assert manager.db.tasks[task_id]["status"] == TASK_STATUS_FAILED
         assert "quality regression" in (manager.db.tasks[task_id]["error_message"] or "")
         assert transcript_path.read_text(encoding="utf-8") == original_content
         manager.workspace_manager.publish_transcription_task.assert_not_called()
         mock_export.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_process_task_raises_non_retryable_error_for_empty_transcript_output(
+        self, manager, temp_audio_file
+    ):
+        """Empty transcript output should fail explicitly and be marked non-retryable."""
+        task_id = manager.add_task(str(temp_audio_file))
+        manager.speech_engine.transcribe_file = AsyncMock(return_value={"segments": [], "duration": 1.0})
+
+        with pytest.raises(TaskProcessingError, match="empty transcript text") as exc_info:
+            await manager._process_task_async(task_id, cancel_event=asyncio.Event())
+
+        assert exc_info.value.retryable is False
+        assert manager.db.tasks[task_id]["status"] == TASK_STATUS_FAILED
 
     @pytest.mark.asyncio
     async def test_replace_realtime_clears_stale_translation_attachment_when_refresh_fails(

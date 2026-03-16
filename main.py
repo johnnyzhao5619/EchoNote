@@ -35,7 +35,9 @@ def main():
 
     try:
         speech_engine_loader = None
+        realtime_speech_engine_loader = None
         translation_engine_loader = None
+        realtime_translation_engine_loader = None
 
         # Initialize logging system
         logger = setup_logging()
@@ -256,8 +258,16 @@ def main():
             managers.get("secrets_manager"),
             db,
         )
+        realtime_speech_engine_loader = initialize_speech_engine(
+            config,
+            model_manager,
+            managers.get("secrets_manager"),
+            db,
+        )
         managers["speech_engine_loader"] = speech_engine_loader
         managers["speech_engine"] = EngineProxy(speech_engine_loader)
+        managers["realtime_speech_engine_loader"] = realtime_speech_engine_loader
+        managers["realtime_speech_engine"] = EngineProxy(realtime_speech_engine_loader)
 
         # Initialize transcription manager
         splash.show_progress(
@@ -323,8 +333,17 @@ def main():
             managers.get("secrets_manager"),
             model_manager=managers.get("model_manager"),
         )
+        realtime_translation_engine_loader = initialize_translation_engine(
+            config,
+            managers.get("secrets_manager"),
+            model_manager=managers.get("model_manager"),
+        )
         managers["translation_engine_loader"] = translation_engine_loader
         managers["translation_engine"] = TranslationEngineProxy(translation_engine_loader)
+        managers["realtime_translation_engine_loader"] = realtime_translation_engine_loader
+        managers["realtime_translation_engine"] = TranslationEngineProxy(
+            realtime_translation_engine_loader
+        )
         if managers.get("transcription_manager") is not None:
             managers["transcription_manager"].translation_engine = managers["translation_engine"]
 
@@ -347,8 +366,8 @@ def main():
 
         realtime_recorder = RealtimeRecorder(
             audio_capture=audio_capture,
-            speech_engine=managers["speech_engine"],
-            translation_engine=managers["translation_engine"],
+            speech_engine=managers["realtime_speech_engine"],
+            translation_engine=managers["realtime_translation_engine"],
             db_connection=db,
             file_manager=file_manager,
             i18n=i18n,
@@ -554,7 +573,13 @@ def main():
         logger.info("Performing cleanup...")
 
         close_lazy_loaded_engine("speech engine", speech_engine_loader, logger)
+        close_lazy_loaded_engine("realtime speech engine", realtime_speech_engine_loader, logger)
         close_lazy_loaded_engine("translation engine", translation_engine_loader, logger)
+        close_lazy_loaded_engine(
+            "realtime translation engine",
+            realtime_translation_engine_loader,
+            logger,
+        )
 
         db.close_all()
         logger.info("Cleanup complete")

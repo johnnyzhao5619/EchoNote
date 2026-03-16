@@ -63,7 +63,11 @@ class MockSpeechEngine:
             {"audio_size": len(audio_data), "language": language, "sample_rate": sample_rate}
         )
         # Simulate transcription result
-        return {"text": "Test transcription", "language": "en"}
+        return {
+            "text": "Test transcription",
+            "language": "en",
+            "segments": [{"text": "Test transcription", "start": 0.0, "end": 1.2}],
+        }
 
     async def transcribe_file(self, file_path, language=None, progress_callback=None):
         """Mock file transcription."""
@@ -254,6 +258,31 @@ class TestRealtimeRecorderLifecycle:
         recorder.session_archiver.save_text.assert_called()
         recorder.calendar_integration.create_event.assert_called()
 
+    def test_audio_callback_skips_closed_event_loop_without_warning(self, recorder):
+        closed_loop = asyncio.new_event_loop()
+        closed_loop.close()
+        recorder.is_recording = True
+        recorder._transcription_enabled = True
+        recorder._event_loop = closed_loop
+        recorder.transcription_queue = asyncio.Queue()
+
+        with patch("core.realtime.recorder.logger.warning") as warning_logger:
+            recorder._audio_callback(np.ones(32, dtype=np.float32))
+
+        warning_logger.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_stop_recording_tolerates_cancelled_processing_task(self, recorder, event_loop):
+        await recorder.start_recording(event_loop=event_loop)
+
+        with patch(
+            "core.realtime.recorder.asyncio.wait_for",
+            side_effect=asyncio.CancelledError(),
+        ):
+            result = await recorder.stop_recording()
+
+        assert result["duration"] >= 0.0
+
     @pytest.mark.asyncio
     async def test_stop_recording_saves_files(self, recorder, event_loop):
         options = {"save_recording": True, "save_transcript": True, "create_calendar_event": True}
@@ -261,14 +290,26 @@ class TestRealtimeRecorderLifecycle:
 
         recorder.recording_audio_buffer.append(np.zeros(10))
         recorder.accumulated_transcription.append("Test")
+        recorder.accumulated_transcription_segments.append(
+            {"text": "Test", "start": 0.0, "end": 1.0}
+        )
 
         result = await recorder.stop_recording()
 
         assert result["recording_path"] == "/path/to/recording.wav"
         assert result["transcript_path"] == "/path/to/transcript.txt"
         assert result["event_id"] == "event_123"
+        assert result["session_options"]["save_recording"] is True
+        assert result["transcription_segments"] == [{"text": "Test", "start": 0.0, "end": 1.0}]
         assert recorder.last_workspace_item_id == recorder.workspace_manager.publish_recording_session.return_value
         recorder.workspace_manager.publish_recording_session.assert_called_once()
+        recorder.session_archiver.save_text.assert_called_with(
+            ["Test"],
+            recorder.recording_start_time,
+            prefix="transcript",
+            subdirectory="Transcripts",
+            segments=[{"text": "Test", "start": 0.0, "end": 1.0}],
+        )
 
     @pytest.mark.asyncio
     async def test_stop_recording_respects_processing_timeout_config(self, recorder, event_loop):
@@ -496,6 +537,20 @@ class TestRealtimeRecorderTranslation:
 
         await recorder.stop_recording()
 
+    def test_build_translation_segments_reuses_transcript_timeline(self, recorder):
+        segments = recorder._build_translation_segments(
+            "Bonjour\nle monde",
+            [
+                {"text": "Hello", "start": 1.0, "end": 2.0},
+                {"text": "world", "start": 2.0, "end": 3.0},
+            ],
+        )
+
+        assert segments == [
+            {"text": "Bonjour", "start": 1.0, "end": 2.0},
+            {"text": "le monde", "start": 2.0, "end": 3.0},
+        ]
+
 
 class TestRealtimeRecorderMarkers:
     @pytest.mark.asyncio
@@ -538,6 +593,16 @@ class TestRealtimeRecorderUtilities:
     def test_is_duplicate_transcription_empty_last(self, recorder):
         """Test duplicate detection with empty last text."""
         assert not recorder._is_duplicate_transcription("Hello", "")
+
+    def test_normalize_stream_segments_falls_back_to_chunk_window(self, recorder):
+        segments = recorder._normalize_stream_segments(
+            None,
+            "Hello world",
+            base_offset_ms=5000,
+            fallback_duration_ms=1800,
+        )
+
+        assert segments == [{"text": "Hello world", "start": 5.0, "end": 6.8}]
 
     def test_drain_queue(self, recorder):
         """Test queue draining."""

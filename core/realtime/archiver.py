@@ -434,22 +434,40 @@ class SessionArchiver:
         start_time: datetime,
         prefix: str,
         subdirectory: str,
+        *,
+        segments: Optional[List[Dict[str, Any]]] = None,
     ) -> str:
         """
         Persist text data (transcript or translation).
         """
-        if not lines:
+        if not lines and not segments:
             return ""
 
-        content = "\n".join(lines)
+        content = "\n".join(lines).strip()
+        if not content and segments:
+            content = "\n".join(
+                str(segment.get("text", "")).strip()
+                for segment in segments
+                if str(segment.get("text", "")).strip()
+            ).strip()
         timestamp = start_time.strftime("%Y%m%d_%H%M%S")
         base_filename = f"{prefix}_{timestamp}"
 
         return await self._run_in_executor(
-            self._save_text_sync, content, base_filename, subdirectory
+            self._save_text_sync,
+            content,
+            base_filename,
+            subdirectory,
+            segments or [],
         )
 
-    def _save_text_sync(self, content: str, base_filename: str, subdirectory: str) -> str:
+    def _save_text_sync(
+        self,
+        content: str,
+        base_filename: str,
+        subdirectory: str,
+        segments: List[Dict[str, Any]],
+    ) -> str:
         try:
             filename = self.file_manager.create_unique_filename(
                 base_filename, "txt", subdirectory=subdirectory
@@ -457,6 +475,18 @@ class SessionArchiver:
             final_path = self.file_manager.save_text_file(
                 content, filename, subdirectory=subdirectory
             )
+            if segments:
+                json_filename = Path(final_path).with_suffix(".json").name
+                payload = {
+                    "text": content,
+                    "segments": segments,
+                }
+                self.file_manager.save_text_file(
+                    json.dumps(payload, ensure_ascii=False, indent=2),
+                    json_filename,
+                    subdirectory=subdirectory,
+                    overwrite=True,
+                )
             logger.info(f"Text saved to {subdirectory}: {final_path}")
             return final_path
         except Exception as e:

@@ -313,15 +313,16 @@ class TaskQueue:
                 except Exception as e:
                     task_info["retry_count"] += 1
                     final_error = str(e)
+                    retryable = bool(getattr(e, "retryable", True))
 
-                    if task_info["retry_count"] <= self.max_retries:
+                    if retryable and task_info["retry_count"] <= self.max_retries:
                         # Calculate exponential backoff delay
                         delay = self.retry_delay * (2 ** (task_info["retry_count"] - 1))
 
                         logger.warning(
                             f"Task {task_id} failed (attempt "
                             f"{task_info['retry_count']}/{self.max_retries}): {e}. "
-                            f"Retrying in {delay:.1f}s..."
+                                f"Retrying in {delay:.1f}s..."
                         )
 
                         # Wait before retry
@@ -329,6 +330,14 @@ class TaskQueue:
                     else:
                         # Max retries exceeded
                         final_status = TaskStatus.FAILED
+                        if not retryable:
+                            logger.error(
+                                "Task %s failed with non-retryable error: %s",
+                                task_id,
+                                e,
+                                exc_info=True,
+                            )
+                            break
                         logger.error(
                             f"Task {task_id} failed after {self.max_retries} " f"retries: {e}",
                             exc_info=True,

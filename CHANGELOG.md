@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Corrected the shell realtime-recording architecture after the first refactor overshot into a second bottom workspace: the dock is now a compact horizontal transport/status bar with icon actions, live transcript/translation is shown through the floating overlay instead of a dock results pane, completed recording output is published only into workspace documents, and the shared `.txt + .json` timeline asset path plus secondary retranscription reuse remain intact.
+
 ## [2.1.0] - 2026-03-16
 
 ### Changed

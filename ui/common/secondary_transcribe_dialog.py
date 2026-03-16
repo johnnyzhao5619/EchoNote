@@ -18,7 +18,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 from core.qt_imports import (
     QComboBox,
@@ -34,6 +34,53 @@ from ui.base_widgets import connect_button_with_callback, create_button, create_
 logger = logging.getLogger("echonote.ui.common.secondary_transcribe_dialog")
 
 
+def list_downloaded_transcription_models(model_manager=None) -> List[Any]:
+    """Return downloaded transcription model objects from the shared model manager."""
+    if model_manager is None or not hasattr(model_manager, "get_downloaded_models"):
+        return []
+    try:
+        models = model_manager.get_downloaded_models()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Failed to load downloaded transcription models: %s", exc)
+        return []
+    if not isinstance(models, (list, tuple)):
+        return []
+    return [model for model in models if getattr(model, "name", None)]
+
+
+def build_transcription_model_payload(model_info: Any) -> Optional[Dict[str, str]]:
+    """Normalize a model-manager record into lightweight runtime options."""
+    if model_info is None:
+        return None
+    model_name = str(getattr(model_info, "name", "") or "").strip()
+    if not model_name:
+        return None
+    return {
+        "model_name": model_name,
+        "model_path": str(getattr(model_info, "local_path", "") or ""),
+    }
+
+
+def resolve_preferred_downloaded_transcription_model(
+    model_manager=None,
+    *,
+    preferred_names: Optional[Iterable[str]] = None,
+) -> Optional[Dict[str, str]]:
+    """Pick the first downloaded model matching preferred names, otherwise the first download."""
+    downloaded_models = list_downloaded_transcription_models(model_manager)
+    if not downloaded_models:
+        return None
+
+    downloaded_by_name = {
+        str(getattr(model, "name", "") or "").strip(): model for model in downloaded_models
+    }
+    for preferred_name in preferred_names or ():
+        normalized = str(preferred_name or "").strip()
+        if normalized and normalized in downloaded_by_name:
+            return build_transcription_model_payload(downloaded_by_name[normalized])
+    return build_transcription_model_payload(downloaded_models[0])
+
+
 class SecondaryTranscribeDialog(QDialog):
     """Prompt user to choose a model for secondary transcription."""
 
@@ -43,12 +90,14 @@ class SecondaryTranscribeDialog(QDialog):
         i18n,
         model_manager=None,
         settings_manager=None,
+        preferred_model_name: str = "",
         parent: Optional[QWidget] = None,
     ):
         super().__init__(parent)
         self.i18n = i18n
         self.model_manager = model_manager
         self.settings_manager = settings_manager
+        self.preferred_model_name = str(preferred_model_name or "").strip()
         self.model_combo: Optional[QComboBox] = None
         self._confirm_button: Optional[QPushButton] = None
         self._setup_ui()
@@ -89,13 +138,7 @@ class SecondaryTranscribeDialog(QDialog):
             return
 
         self.model_combo.clear()
-        downloaded_models = []
-        if self.model_manager is not None and hasattr(self.model_manager, "get_downloaded_models"):
-            try:
-                downloaded_models = self.model_manager.get_downloaded_models()
-            except Exception as exc:  # noqa: BLE001
-                logger.warning("Failed to load downloaded models for secondary dialog: %s", exc)
-                downloaded_models = []
+        downloaded_models = list_downloaded_transcription_models(self.model_manager)
 
         if not downloaded_models:
             self.model_combo.addItem(self.i18n.t("realtime_record.no_models_available"), None)
@@ -105,7 +148,9 @@ class SecondaryTranscribeDialog(QDialog):
             return
 
         preferred_model = None
-        if self.settings_manager is not None and hasattr(self.settings_manager, "get_setting"):
+        if self.preferred_model_name:
+            preferred_model = self.preferred_model_name
+        elif self.settings_manager is not None and hasattr(self.settings_manager, "get_setting"):
             preferred_model = self.settings_manager.get_setting("transcription.secondary_model_size")
             if not preferred_model:
                 preferred_model = self.settings_manager.get_setting(
@@ -125,13 +170,7 @@ class SecondaryTranscribeDialog(QDialog):
             return None
 
         model_info = self.model_combo.currentData()
-        if model_info is None:
-            return None
-
-        return {
-            "model_name": str(getattr(model_info, "name", "")),
-            "model_path": str(getattr(model_info, "local_path", "")),
-        }
+        return build_transcription_model_payload(model_info)
 
 
 def select_secondary_transcribe_model(
@@ -140,12 +179,14 @@ def select_secondary_transcribe_model(
     i18n,
     model_manager=None,
     settings_manager=None,
+    preferred_model_name: str = "",
 ) -> Optional[Dict[str, str]]:
     """Show model-selection dialog and return selected model options."""
     dialog = SecondaryTranscribeDialog(
         i18n=i18n,
         model_manager=model_manager,
         settings_manager=settings_manager,
+        preferred_model_name=preferred_model_name,
         parent=parent,
     )
     if dialog.exec() != QDialog.DialogCode.Accepted:

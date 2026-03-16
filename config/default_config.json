@@ -29,6 +29,8 @@
     "floating_window_enabled": false,
     "hide_main_window_when_floating": false,
     "floating_window_always_on_top": true,
+    "auto_secondary_processing": false,
+    "transcription_model_name": "",
     "recording_save_path": "~/Documents/EchoNote/Recordings",
     "vad_threshold": 0.5,
     "silence_duration_ms": 2000,

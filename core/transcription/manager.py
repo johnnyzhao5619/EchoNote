@@ -56,6 +56,14 @@ class TaskNotFoundError(Exception):
     pass
 
 
+class TaskProcessingError(RuntimeError):
+    """Structured task-processing error with retryability metadata."""
+
+    def __init__(self, message: str, *, retryable: bool = True):
+        super().__init__(message)
+        self.retryable = retryable
+
+
 class TranscriptionManager:
     """
     Manages transcription tasks and coordinates speech engine processing.
@@ -1004,7 +1012,10 @@ class TranscriptionManager:
             )
             if not transcript_valid:
                 self._set_task_quality_note(task_id, transcript_issue)
-                raise ValueError(f"Transcription output is invalid ({transcript_issue})")
+                raise TaskProcessingError(
+                    f"Transcription output is invalid ({transcript_issue})",
+                    retryable=False,
+                )
 
             ensure_not_cancelled("after completing transcription")
             logger.info(f"Transcription completed for task {task_id}, processing results")
@@ -1126,6 +1137,7 @@ class TranscriptionManager:
                     self._build_task_payload(task, runtime_options=runtime_options),
                 )
                 self._notify_listeners("task_failed", {"id": task_id, "error": str(e)})
+            raise
 
     def _save_internal_result(self, task_id: str, result: Dict[str, Any]) -> None:
         """

@@ -40,7 +40,8 @@ For contributors and developers:
 - Workspace red-box closure note: the latest implementation track consolidates the screenshot red-box issues into one execution plan covering navigator-shell hard switch, event-folder and batch-task-folder semantics, stable results-list rendering, and inspector transport-player redesign; use `plans/2026-03-15-workspace-redbox-closure-plan.md` as the primary handoff before touching workspace layout code.
 - Workspace copy note: shell task-window title and recording-console section labels are now governed by `workspace.task_window_title` and `workspace.recording_console.*` in `resources/translations/*.json`, with `resources/translations/i18n_outline.json` as the outline SSOT.
 - Workspace visual polish note: top-bar tool grouping, explorer compact shell, item meta/badges, inspector section titles, and recording-dock summary semantics are all contract-driven by `ui/constants.py`, `resources/themes/theme_outline.json`, and `resources/translations/i18n_outline.json`; theme/i18n/tests/docs are expected to land in the same change.
-- Shell recording note: the primary realtime recording entry is now the persistent dock in `ui/common/realtime_recording_dock.py`, with `ui/workspace/recording_session_panel.py` providing the shared full panel and `ui/realtime_record/` reduced to floating overlay and visualization helpers.
+- Shell recording note: the primary realtime recording entry is now the persistent compact dock in `ui/common/realtime_recording_dock.py`; `ui/workspace/recording_session_panel.py` has been reduced to a lightweight popup settings form, while `ui/realtime_record/` owns the floating live-result surface and visualization helpers.
+- Realtime workflow note: live transcript/translation now belong to the floating overlay, while completed recording output is published only into the workspace document tree; the dock no longer hosts a second bottom results workspace.
 - Model governance note: `core/models/manager.py` now governs `speech` / `translation` / `text-ai` catalogs together, with workspace defaults exposed in `ui/settings/workspace_ai_page.py`.
 - Settings ownership note: translation defaults are managed in `ui/settings/translation_page.py`, realtime recording controls remain in `ui/settings/realtime_page.py`, and workspace summary/meeting preferences live in `ui/settings/workspace_ai_page.py`.
 - Shared playback architecture note: reusable audio playback lives in `ui/common/audio_player.py` and is opened via `ui/common/audio_player_launcher.py`.
@@ -52,6 +53,7 @@ For contributors and developers:
 ## 🧭 Active Plans
 
 - **[Workspace Red-Box Closure Plan](plans/2026-03-15-workspace-redbox-closure-plan.md)** - Primary execution plan for the four screenshot issues: left navigator hard switch, Obsidian-aligned structure/event navigation, event-folder and batch-task-folder default placement with persistent source linkage, and inspector transport-player redesign
+- **[Realtime Recording Workflow Correction Plan](plans/2026-03-16-realtime-recording-workflow-refactor.md)** - Primary correction plan for the recording shell: remove the bottom results workspace, keep the dock compact and horizontal, route live transcript/translation to the floating overlay, and publish completed recording output only into workspace documents
 
 ## ✅ Stable Regression Batches
 
@@ -68,6 +70,7 @@ For contributors and developers:
 - **[Workspace Polish & Obsidian Alignment Plan](plans/archive/2026-03-15-workspace-polish-and-obsidian-alignment.md)** - Historical follow-up plan for task utility window / recording console / Obsidian-style workspace alignment; superseded by the red-box closure plan
 - **[Workspace Visual Density & Layout Polish Plan](plans/archive/2026-03-15-workspace-visual-density-and-layout-polish-plan.md)** - Historical visual polish plan; superseded by the red-box closure plan
 - **[Workspace Risk Closure And Polish Plan](plans/archive/2026-03-15-workspace-risk-closure-plan.md)** - Historical risk-closure plan after the first workspace hard switch; superseded by the red-box closure plan
+- **[Superseded Realtime Recording Workflow Plan](plans/archive/2026-03-16-realtime-recording-workflow-refactor-superseded.md)** - Historical recording-shell plan that incorrectly put `setup / live / results` workflow inside the bottom dock; kept only as context for the current correction plan
 
 ---
 
@@ -156,5 +159,5 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ---
 
-**Last Updated**: March 15, 2026
+**Last Updated**: March 16, 2026
 **Version**: v2.1.0

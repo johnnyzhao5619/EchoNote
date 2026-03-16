@@ -148,6 +148,9 @@ class RealtimeRecorder:
         # Accumulated transcription and translation text.
         self.accumulated_transcription = []
         self.accumulated_translation = []
+        self.accumulated_transcription_segments: List[Dict[str, Any]] = []
+        self.accumulated_translation_segments: List[Dict[str, Any]] = []
+        self.last_session_result: Optional[Dict[str, Any]] = None
 
         # Marker metadata recorded during the session.
         self.markers: List[Dict[str, Any]] = []
@@ -307,6 +310,8 @@ class RealtimeRecorder:
         self.audio_buffer = AudioBuffer(sample_rate=self.sample_rate)
         self.accumulated_transcription = []
         self.accumulated_translation = []
+        self.accumulated_transcription_segments = []
+        self.accumulated_translation_segments = []
         self._transcription_succeeded = False
         self._model_usage_recorded = False
         self._capture_error_message = None
@@ -336,6 +341,7 @@ class RealtimeRecorder:
             self._selected_input_device_scoped_app or "none",
         )
         self._stream_recording_active = False
+        self.last_session_result = None
         with self._marker_lock:
             self.markers = []
 
@@ -435,20 +441,24 @@ class RealtimeRecorder:
 
         # Push audio into the transcription queue in a thread-safe manner.
         try:
-            # ``call_soon_threadsafe`` safely schedules the queue operation.
+            loop = self._event_loop
             if (
                 self._transcription_enabled
-                and hasattr(self, "_event_loop")
-                and self._event_loop is not None
+                and loop is not None
+                and not loop.is_closed()
                 and self.transcription_queue is not None
+                and self.is_recording
             ):
-                self._event_loop.call_soon_threadsafe(
-                    self.transcription_queue.put_nowait, chunk_array.copy()
-                )
+                loop.call_soon_threadsafe(self.transcription_queue.put_nowait, chunk_array.copy())
             elif self._transcription_enabled:
                 logger.debug("Event loop or transcription queue not ready, audio chunk skipped")
-        except Exception as e:
-            logger.warning(f"Failed to queue audio chunk: {e}")
+        except RuntimeError as exc:
+            if "closed" in str(exc).lower():
+                logger.debug("Skipped audio chunk because recorder event loop is closing")
+            else:
+                logger.warning("Failed to queue audio chunk: %s", exc)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to queue audio chunk: %s", exc)
 
         # Notify observers that fresh audio data is available.
         if self.on_audio_data:
@@ -508,9 +518,11 @@ class RealtimeRecorder:
         transcription_attempts = 0
         last_transcription = ""  # Track the previous transcription to avoid duplicates.
         translation_queue = self.translation_queue
+        processed_samples = 0
+        buffered_samples = 0
 
         async def _process_buffered_audio(force: bool = False) -> None:
-            nonlocal last_transcription, transcription_attempts
+            nonlocal last_transcription, transcription_attempts, processed_samples, buffered_samples
 
             pending_duration = audio_buffer.get_duration()
             if pending_duration <= 0:
@@ -550,6 +562,8 @@ class RealtimeRecorder:
             try:
                 transcription_attempts += 1
                 logger.debug(f"Transcription attempt #{transcription_attempts}")
+                window_start_ms = int((processed_samples / sample_rate) * 1000)
+                window_duration_ms = max(int((buffered_samples / sample_rate) * 1000), 800)
 
                 language = self.current_options.get("language")
                 result = await self.speech_engine.transcribe_stream(
@@ -567,7 +581,14 @@ class RealtimeRecorder:
                     if self._is_duplicate_transcription(text, last_transcription):
                         logger.debug(f"Duplicate transcription detected, skipping: {text[:50]}...")
                     else:
+                        transcript_segments = self._normalize_stream_segments(
+                            result.get("segments") if isinstance(result, dict) else None,
+                            text,
+                            base_offset_ms=window_start_ms,
+                            fallback_duration_ms=window_duration_ms,
+                        )
                         self.accumulated_transcription.append(text)
+                        self.accumulated_transcription_segments.extend(transcript_segments)
                         self._transcription_succeeded = True
                         await stream_queue.put(text)
 
@@ -579,7 +600,13 @@ class RealtimeRecorder:
 
                         enable_trans = self.current_options.get("enable_translation", False)
                         if enable_trans and translation_queue is not None:
-                            await translation_queue.put({"text": text, "language": detected_lang})
+                            await translation_queue.put(
+                                {
+                                    "text": text,
+                                    "language": detected_lang,
+                                    "segments": transcript_segments,
+                                }
+                            )
 
                         logger.info(f"Transcribed successfully: {text[:50]}...")
                         last_transcription = text
@@ -588,6 +615,8 @@ class RealtimeRecorder:
                 if self.on_error:
                     self.on_error(f"Transcription error: {e}")
             finally:
+                processed_samples += buffered_samples
+                buffered_samples = 0
                 audio_buffer.clear()
 
         cancelled = False
@@ -602,6 +631,7 @@ class RealtimeRecorder:
 
                 audio_chunks_received += 1
                 audio_buffer.append(audio_chunk)
+                buffered_samples += int(len(audio_chunk))
 
                 try:
                     await _process_buffered_audio(force=False)
@@ -696,9 +726,11 @@ class RealtimeRecorder:
                     if isinstance(data, dict):
                         text = data.get("text", "")
                         detected_lang = data.get("language")
+                        source_segments = data.get("segments")
                     else:
                         text = str(data)
                         detected_lang = None
+                        source_segments = None
 
                     if not text.strip():
                         continue
@@ -720,6 +752,12 @@ class RealtimeRecorder:
                     if translated_text.strip():
                         # Store translated text for persistence.
                         self.accumulated_translation.append(translated_text)
+                        self.accumulated_translation_segments.extend(
+                            self._build_translation_segments(
+                                translated_text,
+                                source_segments if isinstance(source_segments, list) else None,
+                            )
+                        )
 
                         # Push the translation into the streaming queue.
                         await stream_queue.put(translated_text)
@@ -773,6 +811,8 @@ class RealtimeRecorder:
                 self.processing_task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
                     await self.processing_task
+            except asyncio.CancelledError:
+                logger.info("Processing task was cancelled during recorder shutdown")
             finally:
                 self.processing_task = None
 
@@ -871,6 +911,7 @@ class RealtimeRecorder:
                 self.recording_start_time,
                 prefix="transcript",
                 subdirectory="Transcripts",
+                segments=self.accumulated_transcription_segments,
             )
             result["transcript_path"] = transcript_path
 
@@ -882,6 +923,7 @@ class RealtimeRecorder:
                 self.recording_start_time,
                 prefix=f"translation_{target_lang}",
                 subdirectory="Translations",
+                segments=self.accumulated_translation_segments,
             )
             result["translation_path"] = translation_path
 
@@ -912,6 +954,14 @@ class RealtimeRecorder:
                 logger.warning("Failed to publish recording session to workspace: %s", exc)
 
         self._record_model_usage_if_needed()
+        result["session_options"] = dict(self.current_options)
+        result["transcription_segments"] = [
+            segment.copy() for segment in self.accumulated_transcription_segments
+        ]
+        result["translation_segments"] = [
+            segment.copy() for segment in self.accumulated_translation_segments
+        ]
+        self.last_session_result = dict(result)
 
         logger.info(f"Recording stopped: duration={duration:.2f}s")
 
@@ -1062,6 +1112,8 @@ class RealtimeRecorder:
         except asyncio.TimeoutError:
             logger.warning("Translation task timeout; requesting graceful shutdown")
             await self._request_translation_shutdown(task)
+        except asyncio.CancelledError:
+            logger.info("Translation task was cancelled during recorder shutdown")
         finally:
             self.translation_task = None
 
@@ -1240,6 +1292,14 @@ class RealtimeRecorder:
         """Return all accumulated translation text as a single string."""
         return "\n".join(self.accumulated_translation)
 
+    def get_accumulated_transcription_segments(self) -> List[Dict[str, Any]]:
+        """Return timestamped transcript segments captured for the active session."""
+        return [segment.copy() for segment in self.accumulated_transcription_segments]
+
+    def get_accumulated_translation_segments(self) -> List[Dict[str, Any]]:
+        """Return timestamped translation segments captured for the active session."""
+        return [segment.copy() for segment in self.accumulated_translation_segments]
+
     async def _rollback_failed_start(self) -> None:
         """Reset internal state after a failed recording startup."""
         if self.audio_capture is not None and hasattr(self.audio_capture, "stop_capture"):
@@ -1273,8 +1333,11 @@ class RealtimeRecorder:
 
         self.accumulated_transcription = []
         self.accumulated_translation = []
+        self.accumulated_transcription_segments = []
+        self.accumulated_translation_segments = []
         self._stream_recording_active = False
         self._capture_error_message = None
+        self.last_session_result = None
         self._selected_input_source = None
         self._selected_input_device_name = ""
         self._selected_input_device_is_loopback = False
@@ -1319,6 +1382,95 @@ class RealtimeRecorder:
                 return True
 
         return False
+
+    def _normalize_stream_segments(
+        self,
+        segments: Optional[List[Dict[str, Any]]],
+        text: str,
+        *,
+        base_offset_ms: int,
+        fallback_duration_ms: int,
+    ) -> List[Dict[str, Any]]:
+        """Normalize chunk-relative segment payloads to absolute session offsets."""
+        normalized: List[Dict[str, Any]] = []
+        next_start_ms = max(0, int(base_offset_ms))
+
+        for segment in segments or []:
+            if not isinstance(segment, dict):
+                continue
+            segment_text = str(segment.get("text", "")).strip()
+            if not segment_text:
+                continue
+            relative_start_ms = int(float(segment.get("start", 0.0)) * 1000)
+            relative_end_ms = int(
+                float(segment.get("end", segment.get("start", 0.0))) * 1000
+            )
+            start_ms = max(next_start_ms, base_offset_ms + relative_start_ms)
+            end_ms = max(start_ms + 200, base_offset_ms + relative_end_ms)
+            normalized.append(
+                {
+                    "start": round(start_ms / 1000.0, 3),
+                    "end": round(end_ms / 1000.0, 3),
+                    "text": segment_text,
+                }
+            )
+            next_start_ms = end_ms
+
+        if normalized:
+            return normalized
+
+        cleaned_text = str(text or "").strip()
+        if not cleaned_text:
+            return []
+
+        end_ms = max(base_offset_ms + int(fallback_duration_ms), base_offset_ms + 800)
+        return [
+            {
+                "start": round(max(0, base_offset_ms) / 1000.0, 3),
+                "end": round(end_ms / 1000.0, 3),
+                "text": cleaned_text,
+            }
+        ]
+
+    def _build_translation_segments(
+        self,
+        translated_text: str,
+        source_segments: Optional[List[Dict[str, Any]]],
+    ) -> List[Dict[str, Any]]:
+        """Project translated chunks onto the transcript timeline for synced playback."""
+        cleaned_text = str(translated_text or "").strip()
+        if not cleaned_text:
+            return []
+
+        if source_segments:
+            translated_lines = [line.strip() for line in cleaned_text.splitlines() if line.strip()]
+            if len(translated_lines) == len(source_segments):
+                aligned: List[Dict[str, Any]] = []
+                for line, source_segment in zip(translated_lines, source_segments):
+                    aligned.append(
+                        {
+                            "start": float(source_segment.get("start", 0.0)),
+                            "end": float(
+                                source_segment.get(
+                                    "end", source_segment.get("start", 0.0)
+                                )
+                            ),
+                            "text": line,
+                        }
+                    )
+                return aligned
+
+            first_segment = source_segments[0]
+            last_segment = source_segments[-1]
+            return [
+                {
+                    "start": float(first_segment.get("start", 0.0)),
+                    "end": float(last_segment.get("end", last_segment.get("start", 0.0))),
+                    "text": cleaned_text,
+                }
+            ]
+
+        return [{"start": 0.0, "end": 1.0, "text": cleaned_text}]
 
     def _start_audio_capture(self, input_source: Optional[int]) -> None:
         """Start audio capture with backward-compatible callback wiring."""

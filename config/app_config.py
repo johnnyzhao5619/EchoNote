@@ -404,8 +404,11 @@ class ConfigManager:
             "floating_window_enabled",
             "hide_main_window_when_floating",
             "floating_window_always_on_top",
+            "auto_secondary_processing",
         ):
             return isinstance(value, bool)
+        elif setting == "transcription_model_name":
+            return isinstance(value, str)
         elif setting == "recording_save_path":
             return isinstance(value, str)
         return True

@@ -72,6 +72,7 @@ class FasterWhisperEngine(SpeechEngine):
         self._vad_model = None
         self._model_available = False  # 标记模型是否可用
         self._model_state_lock = threading.RLock()
+        self._model_execution_lock = threading.RLock()
 
         # Validate and adjust device configuration
         from utils.gpu_detector import GPUDetector
@@ -496,70 +497,73 @@ class FasterWhisperEngine(SpeechEngine):
             # 定义一个同步函数来执行完整的转录过程
             def do_transcription():
                 """在线程池中执行的同步转录函数"""
-                # 执行转录（返回迭代器）
-                segments_iterator, transcribe_info = active_model.transcribe(
-                    audio_path,
-                    language=normalized_language,
-                    beam_size=beam_size,
-                    vad_filter=vad_filter,
-                    vad_parameters=(
-                        dict(min_silence_duration_ms=vad_min_silence_duration_ms)
-                        if vad_filter
-                        else None
-                    ),
-                )
-
-                # 转换为标准格式，同时更新进度
-                result_segments = []
-                last_progress = 0.0
-                segment_count = 0
-
-                logger.info("Starting to iterate through segments")
-                for segment in segments_iterator:
-                    segment_count += 1
-                    result_segments.append(
-                        {"start": segment.start, "end": segment.end, "text": segment.text.strip()}
+                with self._model_execution_lock:
+                    # 执行转录（返回迭代器）
+                    segments_iterator, transcribe_info = active_model.transcribe(
+                        audio_path,
+                        language=normalized_language,
+                        beam_size=beam_size,
+                        vad_filter=vad_filter,
+                        vad_parameters=(
+                            dict(min_silence_duration_ms=vad_min_silence_duration_ms)
+                            if vad_filter
+                            else None
+                        ),
                     )
 
-                    # Log every 10 segments
-                    if segment_count % 10 == 0:
-                        logger.debug(f"Processed {segment_count} segments")
+                    # 转换为标准格式，同时更新进度
+                    result_segments = []
+                    last_progress = 0.0
+                    segment_count = 0
 
-                    # 更新进度（基于已处理的音频时长或段落数）
-                    if progress_callback:
-                        if audio_duration and audio_duration > 0:
-                            # 计算进度：已处理时长 / 总时长 * 80 + 10
-                            # 10-90% 用于转录，前10%用于加载，后10%用于保存
-                            current_progress = min(
-                                90.0, (segment.end / audio_duration) * 80.0 + 10.0
-                            )
-                        else:
-                            # 如果没有时长信息，基于段落数估算进度
-                            # 假设平均每分钟30个段落，最多估算到85%
-                            estimated_progress = min(85.0, 10.0 + (segment_count / 30.0) * 2.5)
-                            current_progress = estimated_progress
+                    logger.info("Starting to iterate through segments")
+                    for segment in segments_iterator:
+                        segment_count += 1
+                        result_segments.append(
+                            {"start": segment.start, "end": segment.end, "text": segment.text.strip()}
+                        )
 
-                        # 只在进度变化超过1%时更新，避免过于频繁
-                        if current_progress - last_progress >= 1.0:
-                            try:
-                                progress_callback(current_progress)
-                                last_progress = current_progress
-                                logger.debug(
-                                    f"Progress: {current_progress:.1f}% (segment {segment_count})"
+                        # Log every 10 segments
+                        if segment_count % 10 == 0:
+                            logger.debug(f"Processed {segment_count} segments")
+
+                        # 更新进度（基于已处理的音频时长或段落数）
+                        if progress_callback:
+                            if audio_duration and audio_duration > 0:
+                                # 计算进度：已处理时长 / 总时长 * 80 + 10
+                                # 10-90% 用于转录，前10%用于加载，后10%用于保存
+                                current_progress = min(
+                                    90.0, (segment.end / audio_duration) * 80.0 + 10.0
                                 )
-                            except Exception as e:
-                                logger.error(f"Error in progress callback: {e}")
+                            else:
+                                # 如果没有时长信息，基于段落数估算进度
+                                # 假设平均每分钟30个段落，最多估算到85%
+                                estimated_progress = min(
+                                    85.0, 10.0 + (segment_count / 30.0) * 2.5
+                                )
+                                current_progress = estimated_progress
 
-                logger.info(f"Finished iterating, processed {segment_count} segments")
+                            # 只在进度变化超过1%时更新，避免过于频繁
+                            if current_progress - last_progress >= 1.0:
+                                try:
+                                    progress_callback(current_progress)
+                                    last_progress = current_progress
+                                    logger.debug(
+                                        f"Progress: {current_progress:.1f}% (segment {segment_count})"
+                                    )
+                                except Exception as e:
+                                    logger.error(f"Error in progress callback: {e}")
 
-                # 如果有进度回调，设置为90%（转录完成，准备保存）
-                if progress_callback:
-                    try:
-                        progress_callback(90.0)
-                    except Exception as e:
-                        logger.error(f"Error in final progress callback: {e}")
+                    logger.info(f"Finished iterating, processed {segment_count} segments")
 
-                return result_segments, transcribe_info
+                    # 如果有进度回调，设置为90%（转录完成，准备保存）
+                    if progress_callback:
+                        try:
+                            progress_callback(90.0)
+                        except Exception as e:
+                            logger.error(f"Error in final progress callback: {e}")
+
+                    return result_segments, transcribe_info
 
             # 在线程池中执行转录（避免阻塞事件循环）
             import asyncio
@@ -659,8 +663,7 @@ class FasterWhisperEngine(SpeechEngine):
             logger.error(f"Stream transcription failed: {e}", exc_info=True)
             return ""
 
-    @staticmethod
-    def _transcribe_stream_sync(active_model, audio_data, normalized_language, effective_rate):
+    def _transcribe_stream_sync(self, active_model, audio_data, normalized_language, effective_rate):
         """同步执行流式转写，供 ``asyncio.to_thread`` 调用。"""
         # 注意：faster-whisper 需要音频文件路径，所以需要临时保存
         import tempfile
@@ -675,24 +678,24 @@ class FasterWhisperEngine(SpeechEngine):
             sf.write(tmp_path, audio_data, effective_rate)
             logger.debug(f"Wrote audio to temp file: {tmp_path}")
 
-            # 转录
-            segments, info = active_model.transcribe(
-                tmp_path,
-                language=normalized_language,
-                beam_size=1,  # 实时转录使用较小的 beam size
-                vad_filter=False,  # 已经做过 VAD
-                word_timestamps=False,  # 不需要词级时间戳
-            )
+            with self._model_execution_lock:
+                segments, info = active_model.transcribe(
+                    tmp_path,
+                    language=normalized_language,
+                    beam_size=1,  # 实时转录使用较小的 beam size
+                    vad_filter=False,  # 已经做过 VAD
+                    word_timestamps=False,  # 不需要词级时间戳
+                )
 
-            # 合并所有段落的文本
-            text_parts = []
-            for seg in segments:
-                text_parts.append(seg.text.strip())
+                # 合并所有段落的文本
+                text_parts = []
+                for seg in segments:
+                    text_parts.append(seg.text.strip())
 
-            text = " ".join(text_parts)
-            lang = info.language if hasattr(info, "language") else "unknown"
-            logger.debug(f"Transcription result: '{text}' (language: {lang})")
-            return {"text": text, "language": lang}
+                text = " ".join(text_parts)
+                lang = info.language if hasattr(info, "language") else "unknown"
+                logger.debug(f"Transcription result: '{text}' (language: {lang})")
+                return {"text": text, "language": lang}
         finally:
             # 清理临时文件
             try:

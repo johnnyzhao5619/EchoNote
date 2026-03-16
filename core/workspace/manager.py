@@ -293,11 +293,13 @@ class WorkspaceManager:
         item = self.get_item(item_id)
         if item is None:
             return False
+        folder_id = item.folder_id
         for asset in WorkspaceAsset.get_by_item_id(self.db, item.id):
             if delete_files:
                 self._delete_asset_file(asset)
             asset.delete(self.db)
         item.delete(self.db)
+        self._cleanup_empty_folder(folder_id)
         return True
 
     def move_item_to_folder(self, item_id: str, folder_id: Optional[str]) -> WorkspaceItem:
@@ -305,11 +307,66 @@ class WorkspaceManager:
         item = self.get_item(item_id)
         if item is None:
             raise ValueError(f"Unknown workspace item: {item_id}")
-        if folder_id is not None and self.get_folder(folder_id) is None:
+        if folder_id is None:
+            folder_id = self.ensure_inbox_folder().id
+        target_folder = self.get_folder(folder_id)
+        if target_folder is None:
             raise ValueError(f"Unknown workspace folder: {folder_id}")
+        if not self._folder_accepts_direct_items(target_folder):
+            raise WorkspaceValidationError("invalid_move_target")
+        self._ensure_entry_name_available(
+            item.title or item.id,
+            container_id=folder_id,
+            exclude_item_id=item.id,
+        )
+        previous_folder_id = item.folder_id
         item.folder_id = folder_id
         item.save(self.db)
+        self._cleanup_empty_folder(previous_folder_id)
         return item
+
+    def get_folder_cleanup_summary(self, folder_id: str) -> dict:
+        """Summarize folder-linked items/assets for destructive confirmations."""
+        folder = self.get_folder(folder_id)
+        if folder is None:
+            return {
+                "folder_id": folder_id,
+                "folder_name": "",
+                "folder_kind": "",
+                "linked_item_count": 0,
+                "linked_asset_count": 0,
+            }
+        items = WorkspaceItem.get_all(self.db, folder_id=folder_id, view_mode=LIBRARY_VIEW_STRUCTURE)
+        linked_asset_count = 0
+        for item in items:
+            linked_asset_count += len(WorkspaceAsset.get_by_item_id(self.db, item.id))
+        return {
+            "folder_id": folder_id,
+            "folder_name": folder.name,
+            "folder_kind": getattr(folder, "folder_kind", "") or "",
+            "linked_item_count": len(items),
+            "linked_asset_count": linked_asset_count,
+        }
+
+    def delete_generated_folder(self, folder_id: str, *, delete_files: bool = True) -> int:
+        """Delete an auto-generated workspace folder and all items it currently owns."""
+        folder = self.get_folder(folder_id)
+        if folder is None:
+            return 0
+        if getattr(folder, "folder_kind", "") != WORKSPACE_FOLDER_KIND_EVENT:
+            raise WorkspaceValidationError("folder_not_deletable")
+        child_folders = [candidate for candidate in self.list_folders() if candidate.parent_id == folder_id]
+        if child_folders:
+            raise WorkspaceValidationError("folder_not_empty")
+        items = WorkspaceItem.get_all(self.db, folder_id=folder_id, view_mode=LIBRARY_VIEW_STRUCTURE)
+        removed_count = 0
+        for item in items:
+            if self.delete_item(item.id, delete_files=delete_files):
+                removed_count += 1
+        folder = self.get_folder(folder_id)
+        if folder is not None:
+            folder.delete(self.db)
+        return removed_count
 
     def get_item(self, item_id: str) -> Optional[WorkspaceItem]:
         """Fetch a workspace item by ID."""
@@ -959,6 +1016,35 @@ class WorkspaceManager:
         )
         if normalized_name.lower() in {existing_name.lower() for existing_name in existing_names}:
             raise WorkspaceValidationError("duplicate_name")
+
+    @staticmethod
+    def _folder_accepts_direct_items(folder: WorkspaceFolder) -> bool:
+        folder_kind = getattr(folder, "folder_kind", "") or ""
+        return folder_kind in {
+            WORKSPACE_FOLDER_KIND_USER,
+            WORKSPACE_FOLDER_KIND_INBOX,
+            WORKSPACE_FOLDER_KIND_EVENT,
+            WORKSPACE_FOLDER_KIND_BATCH_TASK,
+        }
+
+    def _cleanup_empty_folder(self, folder_id: Optional[str]) -> None:
+        if not folder_id:
+            return
+        folder = self.get_folder(folder_id)
+        if folder is None:
+            return
+        if getattr(folder, "folder_kind", "") != WORKSPACE_FOLDER_KIND_EVENT:
+            return
+        has_child_folders = any(candidate.parent_id == folder.id for candidate in self._list_folders_raw())
+        has_items = bool(
+            self.db.execute(
+                "SELECT id FROM workspace_items WHERE folder_id = ? LIMIT 1",
+                (folder.id,),
+            )
+        )
+        if has_child_folders or has_items:
+            return
+        folder.delete(self.db)
 
     def _list_entry_names(
         self,
