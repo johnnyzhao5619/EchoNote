@@ -153,19 +153,12 @@ class WorkspaceWidget(BaseWidget):
         sync_tree_selection: bool = True,
     ) -> bool:
         """Refresh and focus a specific workspace item."""
-        if view_mode and self.library_panel.current_view_mode() != view_mode:
-            self.library_panel.set_view_mode(view_mode)
-            self.refresh_items()
         if item_id not in self._items_by_id:
             item = self.workspace_manager.get_item(item_id)
             if item is None:
                 return False
-            if view_mode == "event":
-                self.refresh_items()
-            else:
-                self.library_panel.set_view_mode("structure")
-                self.library_panel.select_folder(getattr(item, "folder_id", None))
-                self.refresh_items()
+            self.library_panel.select_folder(getattr(item, "folder_id", None))
+            self.refresh_items()
         item = self._items_by_id.get(item_id)
         if item is None:
             return False

@@ -35,7 +35,6 @@ from ui.constants import (
     ROLE_WORKSPACE_EXPLORER_HEADER,
     ROLE_WORKSPACE_HEADER_ACTION,
     ROLE_WORKSPACE_LIBRARY_PANEL,
-    ROLE_WORKSPACE_MODE_BUTTON_GROUP,
     ROLE_WORKSPACE_NAV_TREE,
 )
 from ui.workspace.item_list import build_workspace_item_tooltip
@@ -46,46 +45,7 @@ _TREE_LABEL_ROLE = Qt.ItemDataRole.UserRole + 2
 _TREE_CONTEXT_ROLE = Qt.ItemDataRole.UserRole + 3
 _HEADER_ACTION_ICON_SIZE = 16
 
-_HEADER_ACTION_SVGS = {
-    "import": """
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path d="M5 2.75H9.25L12 5.5V12.25C12 12.6642 11.6642 13 11.25 13H5C4.58579 13 4.25 12.6642 4.25 12.25V3.5C4.25 3.08579 4.58579 2.75 5 2.75Z" stroke="{color}" stroke-width="1.3" stroke-linejoin="round"/>
-          <path d="M9 2.75V5.5H11.75" stroke="{color}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M8 7V10.5" stroke="{color}" stroke-width="1.3" stroke-linecap="round"/>
-          <path d="M6.5 9L8 10.5L9.5 9" stroke="{color}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-    """,
-    "new_note": """
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path d="M3.75 12.25L4.3 10.2L10.35 4.15C10.6429 3.85711 11.1178 3.85711 11.4107 4.15L11.85 4.58934C12.1429 4.88223 12.1429 5.35711 11.85 5.65L5.8 11.7L3.75 12.25Z" stroke="{color}" stroke-width="1.3" stroke-linejoin="round"/>
-          <path d="M9.75 4.75L11.25 6.25" stroke="{color}" stroke-width="1.3" stroke-linecap="round"/>
-          <path d="M8 2.75V5.25" stroke="{color}" stroke-width="1.3" stroke-linecap="round"/>
-          <path d="M6.75 4H9.25" stroke="{color}" stroke-width="1.3" stroke-linecap="round"/>
-        </svg>
-    """,
-    "new_folder": """
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path d="M2.75 4.75C2.75 4.33579 3.08579 4 3.5 4H6.1L7.2 5.1H12.5C12.9142 5.1 13.25 5.43579 13.25 5.85V11.75C13.25 12.1642 12.9142 12.5 12.5 12.5H3.5C3.08579 12.5 2.75 12.1642 2.75 11.75V4.75Z" stroke="{color}" stroke-width="1.3" stroke-linejoin="round"/>
-          <path d="M8 7.25V10.25" stroke="{color}" stroke-width="1.3" stroke-linecap="round"/>
-          <path d="M6.5 8.75H9.5" stroke="{color}" stroke-width="1.3" stroke-linecap="round"/>
-        </svg>
-    """,
-    "rename": """
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path d="M3.75 12.25L4.3 10.2L10.35 4.15C10.6429 3.85711 11.1178 3.85711 11.4107 4.15L11.85 4.58934C12.1429 4.88223 12.1429 5.35711 11.85 5.65L5.8 11.7L3.75 12.25Z" stroke="{color}" stroke-width="1.3" stroke-linejoin="round"/>
-          <path d="M9.75 4.75L11.25 6.25" stroke="{color}" stroke-width="1.3" stroke-linecap="round"/>
-        </svg>
-    """,
-    "delete": """
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path d="M4.5 5.25V11.25C4.5 11.6642 4.83579 12 5.25 12H10.75C11.1642 12 11.5 11.6642 11.5 11.25V5.25" stroke="{color}" stroke-width="1.3" stroke-linecap="round"/>
-          <path d="M3.5 4H12.5" stroke="{color}" stroke-width="1.3" stroke-linecap="round"/>
-          <path d="M6.25 4V3.25C6.25 2.83579 6.58579 2.5 7 2.5H9C9.41421 2.5 9.75 2.83579 9.75 3.25V4" stroke="{color}" stroke-width="1.3" stroke-linecap="round"/>
-          <path d="M6.75 6.5V10.25" stroke="{color}" stroke-width="1.3" stroke-linecap="round"/>
-          <path d="M9.25 6.5V10.25" stroke="{color}" stroke-width="1.3" stroke-linecap="round"/>
-        </svg>
-    """,
-}
+from ui.common.svg_icons import build_svg_icon
 
 
 class WorkspaceNavigationTree(QTreeWidget):
@@ -113,14 +73,11 @@ class WorkspaceNavigationTree(QTreeWidget):
         source_value = str(source_item.data(0, _TREE_VALUE_ROLE) or "")
         target_kind = str(target_item.data(0, _TREE_KIND_ROLE) or "") if target_item else ""
         target_value = str(target_item.data(0, _TREE_VALUE_ROLE) or "") if target_item else ""
-        if source_kind == "item" and target_kind != "folder":
-            event.ignore()
-            return
         if source_kind == "folder" and target_kind != "folder":
             event.ignore()
             return
         self.drop_requested.emit(source_kind, source_value, target_kind, target_value)
-        event.acceptProposedAction()
+        event.ignore()
 
 
 class WorkspaceLibraryPanel(BaseWidget):
@@ -135,12 +92,10 @@ class WorkspaceLibraryPanel(BaseWidget):
     def __init__(self, workspace_manager, i18n, parent=None):
         super().__init__(i18n, parent)
         self.workspace_manager = workspace_manager
-        self._view_mode = "structure"
         self._workspace_items = []
         self._metadata_by_item: dict[str, dict] = {}
         self._pending_selection: tuple[str, str] | None = None
         self._folder_nodes: dict[str, QTreeWidgetItem] = {}
-        self._event_nodes: dict[str, QTreeWidgetItem] = {}
         self._item_nodes: dict[str, QTreeWidgetItem] = {}
         self._init_ui()
 
@@ -212,42 +167,6 @@ class WorkspaceLibraryPanel(BaseWidget):
         header_action_bar_layout.addStretch()
         explorer_header_layout.addWidget(self.header_action_bar)
 
-        self.view_mode_switch = QWidget(self.explorer_header)
-        self.view_mode_switch.setProperty("role", ROLE_WORKSPACE_MODE_BUTTON_GROUP)
-        view_mode_switch_layout = QHBoxLayout(self.view_mode_switch)
-        view_mode_switch_layout.setContentsMargins(0, 0, 0, 0)
-        view_mode_switch_layout.setSpacing(0)
-
-        self.view_mode_button_group = QButtonGroup(self)
-        self.view_mode_button_group.setExclusive(True)
-
-        self.structure_view_button = QPushButton(self.view_mode_switch)
-        self.structure_view_button.setCheckable(True)
-        self.structure_view_button.setProperty("variant", "secondary")
-        self.structure_view_button.setMinimumHeight(CONTROL_BUTTON_MIN_HEIGHT)
-        self.structure_view_button.setSizePolicy(
-            QSizePolicy.Policy.Expanding,
-            QSizePolicy.Policy.Fixed,
-        )
-        self.structure_view_button.clicked.connect(
-            lambda checked=False: self.set_view_mode("structure")
-        )
-        self.view_mode_button_group.addButton(self.structure_view_button)
-        view_mode_switch_layout.addWidget(self.structure_view_button)
-
-        self.event_view_button = QPushButton(self.view_mode_switch)
-        self.event_view_button.setCheckable(True)
-        self.event_view_button.setProperty("variant", "secondary")
-        self.event_view_button.setMinimumHeight(CONTROL_BUTTON_MIN_HEIGHT)
-        self.event_view_button.setSizePolicy(
-            QSizePolicy.Policy.Expanding,
-            QSizePolicy.Policy.Fixed,
-        )
-        self.event_view_button.clicked.connect(lambda checked=False: self.set_view_mode("event"))
-        self.view_mode_button_group.addButton(self.event_view_button)
-        view_mode_switch_layout.addWidget(self.event_view_button)
-        explorer_header_layout.addWidget(self.view_mode_switch)
-
         layout.addWidget(self.explorer_header)
 
         self.folder_tree = WorkspaceNavigationTree(self)
@@ -262,7 +181,12 @@ class WorkspaceLibraryPanel(BaseWidget):
         self.folder_tree.drop_requested.connect(self._on_tree_drop_requested)
         layout.addWidget(self.folder_tree, 1)
 
-        self._sync_structure_controls()
+        self.folder_tree.setDragEnabled(True)
+        self.folder_tree.viewport().setAcceptDrops(True)
+        self.folder_tree.setAcceptDrops(True)
+        self.folder_tree.setDropIndicatorShown(True)
+        self._update_header_action_states()
+
         self.update_translations()
 
     def update_translations(self) -> None:
@@ -292,10 +216,6 @@ class WorkspaceLibraryPanel(BaseWidget):
             tooltip=self.i18n.t("common.delete"),
             icon_name="delete",
         )
-        self.structure_view_button.setText(self.i18n.t("workspace.structure_view_short"))
-        self.structure_view_button.setToolTip(self.i18n.t("workspace.structure_view"))
-        self.event_view_button.setText(self.i18n.t("workspace.event_view_short"))
-        self.event_view_button.setToolTip(self.i18n.t("workspace.event_view"))
         self.refresh_navigation()
         self._update_context_label()
 
@@ -324,11 +244,7 @@ class WorkspaceLibraryPanel(BaseWidget):
 
     def _build_header_action_icon(self, icon_name: str) -> QIcon:
         color = self.palette().color(QPalette.ColorRole.ButtonText).name()
-        svg_markup = _HEADER_ACTION_SVGS[icon_name].format(color=color)
-        pixmap = QPixmap()
-        if not pixmap.loadFromData(svg_markup.encode("utf-8"), "SVG"):
-            return QIcon()
-        return QIcon(pixmap)
+        return build_svg_icon(icon_name, color)
 
     def set_items(self, items, *, metadata_by_item=None) -> None:
         self._workspace_items = list(items)
@@ -340,27 +256,20 @@ class WorkspaceLibraryPanel(BaseWidget):
         self._pending_selection = None
         selected_item_id = self.current_item_id()
         selected_folder_id = self.current_folder_id()
-        selected_event_id = self.current_event_id()
 
         self._folder_nodes.clear()
-        self._event_nodes.clear()
         self._item_nodes.clear()
 
         self.folder_tree.blockSignals(True)
         self.folder_tree.clear()
 
-        if self.current_view_mode() == "event":
-            self._build_event_tree()
-        else:
-            self._build_structure_tree()
+        self._build_structure_tree()
 
         if pending_selection is not None:
             self._select_tree_identity(*pending_selection)
         elif selected_item_id:
             self.select_item(selected_item_id)
-        elif self.current_view_mode() == "event" and selected_event_id is not None:
-            self.select_event(selected_event_id)
-        elif self.current_view_mode() == "structure":
+        elif selected_folder_id:
             self.select_folder(selected_folder_id)
 
         self.folder_tree.blockSignals(False)
@@ -406,52 +315,7 @@ class WorkspaceLibraryPanel(BaseWidget):
         for node in self._folder_nodes.values():
             node.setExpanded(True)
 
-    def _build_event_tree(self) -> None:
-        grouped_items: dict[str, list] = {}
-        group_labels: dict[str, str] = {}
-        for item in self._workspace_items:
-            metadata = self._metadata_by_item.get(item.id, {})
-            event_key = item.source_event_id or ""
-            grouped_items.setdefault(event_key, []).append(item)
-            group_labels[event_key] = (
-                str(metadata.get("event_title") or "").strip()
-                or self.i18n.t("workspace.event_group_unlinked")
-            )
 
-        sorted_group_keys = sorted(
-            grouped_items,
-            key=lambda event_key: (
-                event_key == "",
-                -max(self._item_sort_timestamp(item) for item in grouped_items[event_key]),
-                group_labels[event_key].lower(),
-            ),
-        )
-        for event_key in sorted_group_keys:
-            title = group_labels[event_key]
-            label = self.i18n.t(
-                "workspace.navigator_group_with_count",
-                name=title,
-                count=len(grouped_items[event_key]),
-            )
-            node = QTreeWidgetItem([label])
-            node.setData(0, _TREE_KIND_ROLE, "event")
-            node.setData(0, _TREE_VALUE_ROLE, event_key)
-            node.setData(0, _TREE_LABEL_ROLE, title)
-            node.setData(0, _TREE_CONTEXT_ROLE, event_key)
-            node.setIcon(0, self._build_tree_icon("event_group"))
-            event_font = QFont(self.font())
-            event_font.setBold(True)
-            node.setFont(0, event_font)
-            self.folder_tree.addTopLevelItem(node)
-            self._event_nodes[event_key] = node
-
-            for item in sorted(
-                grouped_items[event_key],
-                key=lambda candidate: (-self._item_sort_timestamp(candidate), candidate.title.lower()),
-            ):
-                child_node = self._create_item_node(item, context_value=event_key)
-                node.addChild(child_node)
-            node.setExpanded(True)
 
     def _create_item_node(self, item, *, context_value: str | None) -> QTreeWidgetItem:
         title = item.title or item.id
@@ -480,17 +344,7 @@ class WorkspaceLibraryPanel(BaseWidget):
             return 0
 
     def current_view_mode(self) -> str:
-        return self._view_mode
-
-    def set_view_mode(self, view_mode: str) -> None:
-        normalized_view_mode = view_mode if view_mode in {"structure", "event"} else "structure"
-        if normalized_view_mode == self._view_mode:
-            return
-        self._view_mode = normalized_view_mode
-        self.refresh_navigation()
-        self._sync_structure_controls()
-        self._update_context_label()
-        self.view_mode_changed.emit(self.current_view_mode())
+        return "structure"
 
     def current_item_id(self) -> str:
         current_item = self._current_tree_item()
@@ -744,19 +598,6 @@ class WorkspaceLibraryPanel(BaseWidget):
             self.library_changed.emit()
             return
 
-    def _sync_structure_controls(self) -> None:
-        structure_visible = self.current_view_mode() == "structure"
-        self.structure_view_button.setChecked(structure_visible)
-        self.event_view_button.setChecked(not structure_visible)
-        self.new_folder_button.setVisible(structure_visible)
-        self.rename_folder_button.setVisible(structure_visible)
-        self.delete_folder_button.setVisible(structure_visible)
-        self.folder_tree.setDragEnabled(structure_visible)
-        self.folder_tree.viewport().setAcceptDrops(structure_visible)
-        self.folder_tree.setAcceptDrops(structure_visible)
-        self.folder_tree.setDropIndicatorShown(structure_visible)
-        self._update_header_action_states()
-
     def _can_manage_folder(self, folder_id: str | None) -> bool:
         if not folder_id:
             return False
@@ -807,6 +648,36 @@ class WorkspaceLibraryPanel(BaseWidget):
             item = self.workspace_manager.get_item(source_value)
             if item is None or target_folder_id is None or item.folder_id == target_folder_id:
                 return
+
+            source_folder = self.workspace_manager.get_folder(item.folder_id)
+            target_folder = self.workspace_manager.get_folder(target_folder_id)
+            if source_folder and target_folder:
+                s_kind = getattr(source_folder, "folder_kind", "")
+                t_kind = getattr(target_folder, "folder_kind", "")
+                if s_kind in {"event", "batch_task"} and t_kind in {"user", "inbox"}:
+                    from PySide6.QtWidgets import QMessageBox
+                    msg_box = QMessageBox(self)
+                    msg_box.setIcon(QMessageBox.Icon.Question)
+                    msg_box.setWindowTitle(self.i18n.t("common.confirm"))
+                    msg_box.setText(self.i18n.t("workspace.drag_from_system_prompt", default="您正在将系统自动生成的条目移出，请选择复制副本还是剪切？"))
+                    copy_btn = msg_box.addButton(self.i18n.t("workspace.action_copy", default="复制副本"), QMessageBox.ButtonRole.AcceptRole)
+                    move_btn = msg_box.addButton(self.i18n.t("workspace.action_move", default="移动剪切"), QMessageBox.ButtonRole.DestructiveRole)
+                    cancel_btn = msg_box.addButton(self.i18n.t("common.cancel", default="取消"), QMessageBox.ButtonRole.RejectRole)
+                    msg_box.exec()
+                    clicked_btn = msg_box.clickedButton()
+                    if clicked_btn == cancel_btn:
+                        return
+                    elif clicked_btn == copy_btn:
+                        try:
+                            suffix = self.i18n.t("workspace.copy_suffix", default=" [副本]")
+                            new_item = self.workspace_manager.copy_item_to_folder(source_value, target_folder_id, copy_suffix=suffix)
+                            self._pending_selection = ("item", new_item.id)
+                            self.library_changed.emit()
+                            return
+                        except Exception as exc:
+                            self.show_warning(self.i18n.t("common.warning"), str(exc))
+                            return
+
             try:
                 self.workspace_manager.move_item_to_folder(source_value, target_folder_id)
             except WorkspaceValidationError as exc:
@@ -831,10 +702,13 @@ class WorkspaceLibraryPanel(BaseWidget):
             self.library_changed.emit()
 
     def _resolve_item_drop_target_folder_id(self, target_kind: str, target_value: str) -> str | None:
-        if target_kind != "folder":
-            return None
-        target_folder = self.workspace_manager.get_folder(target_value)
-        return target_folder.id if target_folder is not None else None
+        if target_kind == "folder":
+            target_folder = self.workspace_manager.get_folder(target_value)
+            return target_folder.id if target_folder is not None else None
+        elif target_kind == "item":
+            target_item = self.workspace_manager.get_item(target_value)
+            return target_item.folder_id if target_item is not None else None
+        return None
 
     def _can_delete_generated_folder(self, folder_id: str | None) -> bool:
         if not folder_id:

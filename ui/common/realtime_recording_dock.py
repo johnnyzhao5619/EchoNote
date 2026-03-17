@@ -54,63 +54,7 @@ _DOCK_ICON_SIZE = 16
 _DOCK_ICON_BUTTON_SIZE = 30
 _POPUP_OFFSET_Y = 8
 _RECORDER_LOOP_JOIN_TIMEOUT_SECONDS = 2.0
-_DOCK_ACTION_SVGS = {
-    "settings": """
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M6.4 1.5h3.2l.52 1.67c.28.09.55.2.82.34l1.62-.72 2.26 2.26-.72 1.62c.14.27.25.54.34.82l1.67.52v3.2l-1.67.52c-.09.28-.2.55-.34.82l.72 1.62-2.26 2.26-1.62-.72a5.2 5.2 0 0 1-.82.34L9.6 14.5H6.4l-.52-1.67a5.2 5.2 0 0 1-.82-.34l-1.62.72-2.26-2.26.72-1.62a5.2 5.2 0 0 1-.34-.82L.5 9.9V6.7l1.67-.52c.09-.28.2-.55.34-.82l-.72-1.62 2.26-2.26 1.62.72c.27-.14.54-.25.82-.34L6.4 1.5Z" stroke="{color}" stroke-width="1.2" stroke-linejoin="round"/>
-            <circle cx="8" cy="8.3" r="2.1" stroke="{color}" stroke-width="1.2"/>
-        </svg>
-    """,
-    "overlay": """
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <rect x="2" y="3" width="12" height="8.5" rx="2" stroke="{color}" stroke-width="1.2"/>
-            <path d="M5 13h6" stroke="{color}" stroke-width="1.2" stroke-linecap="round"/>
-            <circle cx="11.5" cy="7.25" r="1.2" fill="{color}"/>
-        </svg>
-    """,
-    "document": """
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M4 1.8h5.2L12.5 5v8.7c0 .83-.67 1.5-1.5 1.5H4c-.83 0-1.5-.67-1.5-1.5V3.3c0-.83.67-1.5 1.5-1.5Z" stroke="{color}" stroke-width="1.2" stroke-linejoin="round"/>
-            <path d="M9.2 1.8V5h3.3" stroke="{color}" stroke-width="1.2" stroke-linejoin="round"/>
-            <path d="M5.4 8h5.2M5.4 10.6h5.2" stroke="{color}" stroke-width="1.2" stroke-linecap="round"/>
-        </svg>
-    """,
-    "spark": """
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M8 1.5l1.37 3.43L12.8 6.3l-3.43 1.37L8 11.1 6.63 7.67 3.2 6.3l3.43-1.37L8 1.5Z" stroke="{color}" stroke-width="1.2" stroke-linejoin="round"/>
-            <path d="M12.2 10.2l.63 1.58 1.57.63-1.57.62-.63 1.58-.62-1.58-1.58-.62 1.58-.63.62-1.58Z" fill="{color}"/>
-        </svg>
-    """,
-    "transcript": """
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M3 3.5h10v6.8a1 1 0 0 1-1 1H7.4l-2.9 2V11.3H4a1 1 0 0 1-1-1V3.5Z" stroke="{color}" stroke-width="1.2" stroke-linejoin="round"/>
-            <path d="M5.2 6h5.6M5.2 8.2h4.1" stroke="{color}" stroke-width="1.2" stroke-linecap="round"/>
-        </svg>
-    """,
-    "translation": """
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M2.5 4.5h7" stroke="{color}" stroke-width="1.2" stroke-linecap="round"/>
-            <path d="M7.5 2.5L9.5 4.5L7.5 6.5" stroke="{color}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M13.5 11.5h-7" stroke="{color}" stroke-width="1.2" stroke-linecap="round"/>
-            <path d="M8.5 9.5L6.5 11.5L8.5 13.5" stroke="{color}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-    """,
-    "auto-secondary": """
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M8 2.2a5.8 5.8 0 1 1-4.1 1.7" stroke="{color}" stroke-width="1.2" stroke-linecap="round"/>
-            <path d="M2.3 2.6h3v3" stroke="{color}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M8 5.1l.88 2.22 2.22.88-2.22.89L8 11.32l-.88-2.22-2.22-.89 2.22-.88L8 5.1Z" fill="{color}"/>
-        </svg>
-    """,
-}
-
-
-def _build_svg_icon(icon_name: str, color: str) -> QIcon:
-    svg_markup = _DOCK_ACTION_SVGS[icon_name].format(color=color)
-    pixmap = QPixmap(_DOCK_ICON_SIZE, _DOCK_ICON_SIZE)
-    if not pixmap.loadFromData(svg_markup.encode("utf-8"), "SVG"):
-        return QIcon()
-    return QIcon(pixmap)
+from ui.common.svg_icons import build_svg_icon
 
 
 class _CompactRecordingPanel(QWidget):
@@ -421,7 +365,7 @@ class RealtimeRecordingDock(BaseWidget):
         color: str | None = None,
     ) -> None:
         resolved_color = color or button.palette().buttonText().color().name()
-        button.setIcon(_build_svg_icon(icon_name, resolved_color))
+        button.setIcon(build_svg_icon(icon_name, resolved_color))
         button.setToolTip(tooltip)
         button.setAccessibleName(tooltip)
 

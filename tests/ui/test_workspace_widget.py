@@ -530,11 +530,7 @@ def test_workspace_navigator_header_exposes_compact_mode_shell(
     widget.show()
     qapp.processEvents()
 
-    assert widget.library_panel.view_mode_button_group is not None
-    assert widget.library_panel.view_mode_switch is not None
     assert widget.library_panel.context_label is not None
-    assert widget.library_panel.structure_view_button.toolTip()
-    assert widget.library_panel.event_view_button.toolTip()
     assert widget.library_panel.folder_tree.property("role") == "workspace-nav-tree"
     assert widget.content_splitter.sizes()[1] > widget.content_splitter.sizes()[2]
 
@@ -740,7 +736,7 @@ def test_workspace_structure_drag_keeps_moved_item_visible_and_selected(
     assert moved_node.parent().data(0, Qt.ItemDataRole.UserRole + 1) == folder_id
 
 
-def test_workspace_structure_drag_rejects_item_drop_onto_item_target(
+def test_workspace_structure_drag_reparents_item_drop_onto_item_target(
     qapp, mock_i18n, workspace_manager
 ):
     folder_id = workspace_manager.create_folder("Archive")
@@ -755,10 +751,11 @@ def test_workspace_structure_drag_rejects_item_drop_onto_item_target(
     widget.library_panel._on_tree_drop_requested("item", first_note_id, "item", second_note_id)
     qapp.processEvents()
     moved_item = workspace_manager.get_item(first_note_id)
+    target_item = workspace_manager.get_item(second_note_id)
 
     assert source_item is not None
     assert moved_item is not None
-    assert moved_item.folder_id == source_item.folder_id
+    assert moved_item.folder_id == target_item.folder_id
 
 
 def test_workspace_structure_drag_moves_user_folder_under_user_folder(
@@ -976,62 +973,6 @@ def test_workspace_widget_moves_recording_controls_out_of_workspace_shell(
     assert widget.inspector_panel.recording_panel.isVisible()
     assert not hasattr(widget, "recording_control_panel")
 
-
-def test_workspace_library_panel_supports_structure_and_event_views(
-    qapp, mock_i18n, workspace_manager, transcription_manager
-):
-    folder_id = workspace_manager.create_folder("Projects")
-    note_id = workspace_manager.create_note(title="Plan")
-    event = CalendarEvent(
-        title="Planning Session",
-        start_time="2026-03-15T15:00:00+00:00",
-        end_time="2026-03-15T16:00:00+00:00",
-    )
-    event.save(workspace_manager.db)
-
-    note = workspace_manager.get_item(note_id)
-    assert note is not None
-    note.source_event_id = event.id
-    note.save(workspace_manager.db)
-    workspace_manager.move_item_to_folder(note_id, folder_id)
-
-    widget = WorkspaceWidget(
-        workspace_manager,
-        mock_i18n,
-        transcription_manager=transcription_manager,
-    )
-    widget.show()
-    qapp.processEvents()
-
-    widget.library_panel.select_folder(folder_id)
-    qapp.processEvents()
-
-    assert widget.library_panel.current_view_mode() == "structure"
-    assert widget.library_panel.current_folder_id() == folder_id
-    structure_item_node = widget.library_panel.find_item_node(note_id)
-    assert structure_item_node is not None
-    assert structure_item_node.parent() is not None
-    assert structure_item_node.parent().data(0, Qt.ItemDataRole.UserRole) == "folder"
-    assert structure_item_node.parent().data(0, Qt.ItemDataRole.UserRole + 1) == folder_id
-
-    widget.library_panel.set_view_mode("event")
-    qapp.processEvents()
-
-    assert widget.library_panel.current_view_mode() == "event"
-    widget.library_panel.select_event(event.id)
-    qapp.processEvents()
-
-    assert widget.library_panel.current_event_id() == event.id
-    event_item_node = widget.library_panel.find_item_node(note_id)
-    assert event_item_node is not None
-    assert event_item_node.parent() is not None
-    assert event_item_node.parent().data(0, Qt.ItemDataRole.UserRole) == "event"
-    assert event_item_node.parent().data(0, Qt.ItemDataRole.UserRole + 1) == event.id
-
-    widget.library_panel.select_item(note_id)
-    qapp.processEvents()
-
-    assert widget.library_panel.current_item_id() == note_id
 
 
 def test_workspace_supports_document_tabs_and_detached_window(

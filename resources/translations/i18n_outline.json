@@ -37,10 +37,12 @@
   ],
   "required_nested_keys": {
     "workspace": [
+      "drag_from_system_prompt",
+      "action_copy",
+      "action_move",
+      "copy_suffix",
       "structure_view",
-      "structure_view_short",
       "event_view",
-      "event_view_short",
       "new_folder",
       "navigator_section_title_structure",
       "navigator_section_title_event",

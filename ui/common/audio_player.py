@@ -89,6 +89,7 @@ from ui.constants import (
     ROLE_AUDIO_PLAYER_TRANSCRIPT_TOGGLE,
     ROLE_AUDIO_PLAYER_VOLUME,
 )
+from ui.common.svg_icons import build_svg_icon
 from ui.common.theme import ThemeManager
 from ui.common.style_utils import set_widget_dynamic_property
 from utils.i18n import I18nQtManager
@@ -395,9 +396,7 @@ class AudioPlayer(BaseWidget):
         main_layout.addLayout(progress_layout)
 
         # 控制按钮行 - 结构化为 transport / volume / utility 三个簇，避免 inspector 内部继续堆叠
-        controls_layout = create_hbox()
-        controls_layout.setSpacing(AUDIO_PLAYER_CONTROLS_SPACING)
-        controls_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+        controls_layout = create_vbox(spacing=AUDIO_PLAYER_CONTROL_BAR_SPACING)
 
         self.volume_cluster = QWidget(container)
         volume_layout = create_hbox(spacing=AUDIO_PLAYER_CONTENT_SPACING)
@@ -436,6 +435,8 @@ class AudioPlayer(BaseWidget):
         )
         transport_layout.addWidget(self.rewind_button, alignment=Qt.AlignmentFlag.AlignVCenter)
         transport_layout.addWidget(self.play_button, alignment=Qt.AlignmentFlag.AlignVCenter)
+        
+        # Stop button is redundant for audio players, we can hide it in extreme inspector spaces
         self.stop_button = self._create_icon_button(
             self.stop_playback,
             role_name=ROLE_AUDIO_PLAYER_CONTROL,
@@ -463,16 +464,29 @@ class AudioPlayer(BaseWidget):
         utility_layout.addWidget(self.show_transcript_button, alignment=Qt.AlignmentFlag.AlignVCenter)
 
         if self.presentation == "inspector":
-            controls_layout.addStretch()
-            controls_layout.addWidget(self.transport_cluster, alignment=Qt.AlignmentFlag.AlignVCenter)
-            controls_layout.addStretch()
-            controls_layout.addWidget(self.volume_cluster, alignment=Qt.AlignmentFlag.AlignVCenter)
+            # Flow layout: Transport on row 1, Volume below it
+            row2_layout = create_hbox()
+            row2_layout.addStretch()
+            row2_layout.addWidget(self.transport_cluster, alignment=Qt.AlignmentFlag.AlignVCenter)
+            row2_layout.addStretch()
+            controls_layout.addLayout(row2_layout)
+            
+            row3_layout = create_hbox()
+            row3_layout.addStretch()
+            row3_layout.addWidget(self.volume_cluster, alignment=Qt.AlignmentFlag.AlignVCenter)
+            row3_layout.addStretch()
+            controls_layout.addLayout(row3_layout)
+            
+            # Hide stop button in inspector to save more space for rewind/play/forward
+            self.stop_button.hide()
         else:
-            controls_layout.addWidget(self.volume_cluster, alignment=Qt.AlignmentFlag.AlignVCenter)
-            controls_layout.addStretch()
-            controls_layout.addWidget(self.transport_cluster, alignment=Qt.AlignmentFlag.AlignVCenter)
-            controls_layout.addStretch()
-            controls_layout.addWidget(self.utility_cluster, alignment=Qt.AlignmentFlag.AlignVCenter)
+            flat_layout = create_hbox()
+            flat_layout.addWidget(self.volume_cluster, alignment=Qt.AlignmentFlag.AlignVCenter)
+            flat_layout.addStretch()
+            flat_layout.addWidget(self.transport_cluster, alignment=Qt.AlignmentFlag.AlignVCenter)
+            flat_layout.addStretch()
+            flat_layout.addWidget(self.utility_cluster, alignment=Qt.AlignmentFlag.AlignVCenter)
+            controls_layout.addLayout(flat_layout)
 
         main_layout.addLayout(controls_layout)
 
@@ -498,13 +512,14 @@ class AudioPlayer(BaseWidget):
     def _set_button_icon(
         self,
         button: QPushButton,
-        pixmap: QStyle.StandardPixmap,
+        icon_name: str,
         *,
         is_primary: bool,
     ) -> None:
-        """Assign a standard Qt media icon with consistent sizing."""
+        """Assign an SVG icon mapped to the central library with consistent sizing."""
         icon_size = AUDIO_PLAYER_PLAY_ICON_SIZE if is_primary else AUDIO_PLAYER_CONTROL_ICON_SIZE
-        button.setIcon(button.style().standardIcon(pixmap))
+        color = button.palette().buttonText().color().name()
+        button.setIcon(build_svg_icon(icon_name, color))
         button.setIconSize(QSize(icon_size, icon_size))
 
     def _setup_shortcuts(self) -> None:
@@ -1311,7 +1326,7 @@ class AudioPlayer(BaseWidget):
         if self._playback_state == QMediaPlayer.PlaybackState.PlayingState:
             self._set_button_icon(
                 self.play_button,
-                QStyle.StandardPixmap.SP_MediaPause,
+                "pause",
                 is_primary=True,
             )
             self.play_button.setAccessibleName(
@@ -1321,7 +1336,7 @@ class AudioPlayer(BaseWidget):
         else:
             self._set_button_icon(
                 self.play_button,
-                QStyle.StandardPixmap.SP_MediaPlay,
+                "play",
                 is_primary=True,
             )
             self.play_button.setAccessibleName(
@@ -1331,17 +1346,17 @@ class AudioPlayer(BaseWidget):
 
         self._set_button_icon(
             self.stop_button,
-            QStyle.StandardPixmap.SP_MediaStop,
+            "stop",
             is_primary=False,
         )
         self._set_button_icon(
             self.rewind_button,
-            QStyle.StandardPixmap.SP_MediaSeekBackward,
+            "rewind",
             is_primary=False,
         )
         self._set_button_icon(
             self.forward_button,
-            QStyle.StandardPixmap.SP_MediaSeekForward,
+            "fast_forward",
             is_primary=False,
         )
         self.rewind_button.setAccessibleName(
@@ -1356,7 +1371,7 @@ class AudioPlayer(BaseWidget):
         self.stop_button.setToolTip(self.i18n.t("timeline.audio_player.stop_tooltip"))
         self._set_button_icon(
             self.show_transcript_button,
-            QStyle.StandardPixmap.SP_FileDialogDetailedView,
+            "subtitles",
             is_primary=False,
         )
         self.show_transcript_button.setAccessibleName(
@@ -1373,10 +1388,10 @@ class AudioPlayer(BaseWidget):
         """Update volume icon and accessible text according to current state."""
         volume_value = self.volume_slider.value()
         if self._is_muted or volume_value == 0:
-            icon = QStyle.StandardPixmap.SP_MediaVolumeMuted
+            icon = "volume_mute"
             accessible_name = self.i18n.t("timeline.audio_player.mute_icon")
         else:
-            icon = QStyle.StandardPixmap.SP_MediaVolume
+            icon = "volume_up"
             if volume_value < 50:
                 accessible_name = self.i18n.t("timeline.audio_player.low_volume_icon")
             else:

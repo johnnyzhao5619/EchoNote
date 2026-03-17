@@ -865,34 +865,6 @@ QToolButton[role="workspace-header-action"]:pressed {
     border-color: #8badde;
 }
 
-QWidget[role="workspace-mode-button-group"] {
-    background-color: #f6f8fc;
-    border: 1px solid #d6deed;
-    border-radius: 10px;
-    padding: 2px;
-}
-
-QWidget[role="workspace-mode-button-group"] QPushButton {
-    background-color: transparent;
-    color: #5b6f91;
-    border: none;
-    border-radius: 8px;
-    padding: 6px 10px;
-    min-height: 24px;
-    font-size: 12px;
-    font-weight: 700;
-}
-
-QWidget[role="workspace-mode-button-group"] QPushButton:hover {
-    background-color: #eaf1fd;
-    color: #28466d;
-}
-
-QWidget[role="workspace-mode-button-group"] QPushButton:checked {
-    background-color: #dceaff;
-    color: #17335d;
-    border: 1px solid #90b4ea;
-}
 
 QWidget[role="workspace-explorer-header"] {
     background-color: transparent;
@@ -3084,14 +3056,14 @@ QLabel[role="realtime-duration"] {
 
 QLabel[role="audio-player-time"] {
     color: #5c6f8f;
-    font-size: 12px;
-    font-family: "Monaco", "Consolas", "Courier New", monospace;
+    font-size: 11px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     font-weight: 500;
 }
 
 QLabel[role="audio-player-time"][state="inspector"] {
     color: #526684;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 600;
 }
 
@@ -3174,128 +3146,84 @@ QPushButton[role="audio-player-control"]:disabled {
 }
 
 QSlider[role="audio-player-progress"] {
-    min-height: 18px;
+    background: transparent;
+    padding: 0;
+    min-height: 20px;
     max-height: 20px;
 }
 
-QSlider[role="audio-player-progress"]::groove:horizontal {
-    background: #e1dfdd;
-    height: 5px;
-    border-radius: 2px;
-    border: none;
-}
-
-QSlider[role="audio-player-progress"][state="inspector"]::groove:horizontal {
-    background: #dbe5f4;
-    height: 6px;
-    border-radius: 3px;
-}
-
-QSlider[role="audio-player-progress"]::handle:horizontal {
-    background: #2196F3;
-    width: 12px;
-    height: 12px;
-    margin: -4px 0;
-    border-radius: 6px;
-}
-
-QSlider[role="audio-player-progress"]::handle:horizontal:hover {
-    background: #42a5f5;
-    width: 14px;
-    height: 14px;
-    margin: -5px 0;
-}
-
-QSlider[role="audio-player-progress"]::handle:horizontal:pressed {
-    background: #1d63e9;
-    width: 14px;
-    height: 14px;
-    margin: -5px 0;
-    border: none;
-}
-
-QSlider[role="audio-player-progress"]::sub-page:horizontal {
-    background: #2196F3;
-    border-radius: 2px;
-}
-
-QSlider[role="audio-player-progress"]::add-page:horizontal {
-    background: #e1dfdd;
-    border-radius: 2px;
-}
-
-QSlider[role="audio-player-progress"]:disabled::groove:horizontal {
-    background: #e9ecef;
-}
-
-QSlider[role="audio-player-progress"]:disabled::handle:horizontal {
-    background: #adb5bd;
-}
-
 QSlider[role="audio-player-volume"] {
+    background: transparent;
+    padding: 0;
     min-height: 20px;
-    max-height: 30px;
+    max-height: 20px;
     min-width: 100px;
     max-width: 100px;
 }
 
+QSlider[role="audio-player-progress"]::groove:horizontal,
 QSlider[role="audio-player-volume"]::groove:horizontal {
-    background: #e1dfdd;
-    height: 3px;
-    border-radius: 1px;
     border: none;
-}
-
-QSlider[role="audio-player-volume"][state="inspector"]::groove:horizontal {
-    background: #dbe5f4;
+    background: transparent;
     height: 4px;
     border-radius: 2px;
 }
 
+QSlider[role="audio-player-progress"]::sub-page:horizontal,
+QSlider[role="audio-player-volume"]::sub-page:horizontal {
+    background: #2196F3;
+    border-radius: 2px;
+}
+
+QSlider[role="audio-player-progress"]::add-page:horizontal,
+QSlider[role="audio-player-volume"]::add-page:horizontal {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 2px;
+}
+
+QSlider[role="audio-player-progress"]::handle:horizontal,
 QSlider[role="audio-player-volume"]::handle:horizontal {
     background: #2196F3;
     width: 12px;
     height: 12px;
     margin: -4px 0;
     border-radius: 6px;
+    border: none;
 }
 
+QSlider[role="audio-player-progress"]::handle:horizontal:hover,
 QSlider[role="audio-player-volume"]::handle:horizontal:hover {
     background: #42a5f5;
     width: 14px;
     height: 14px;
     margin: -5px 0;
+    border-radius: 7px;
 }
 
+QSlider[role="audio-player-progress"]::handle:horizontal:pressed,
 QSlider[role="audio-player-volume"]::handle:horizontal:pressed {
     background: #1d63e9;
     width: 14px;
     height: 14px;
     margin: -5px 0;
-    border: none;
 }
 
-QSlider[role="audio-player-volume"]::sub-page:horizontal {
-    background: #2196F3;
-    border-radius: 1px;
+QSlider[role="audio-player-progress"]:disabled::sub-page:horizontal,
+QSlider[role="audio-player-volume"]:disabled::sub-page:horizontal {
+    background: #adb5bd;
 }
 
-QSlider[role="audio-player-volume"]::add-page:horizontal {
-    background: #e1dfdd;
-    border-radius: 1px;
+QSlider[role="audio-player-progress"]:disabled::add-page:horizontal,
+QSlider[role="audio-player-volume"]:disabled::add-page:horizontal {
+    background: rgba(0, 0, 0, 0.05);
 }
 
-QSlider[role="audio-player-volume"]:disabled::groove:horizontal {
-    background: #e9ecef;
-}
-
+QSlider[role="audio-player-progress"]:disabled::handle:horizontal,
 QSlider[role="audio-player-volume"]:disabled::handle:horizontal {
     background: #adb5bd;
 }
 
-QSlider[role="audio-player-volume"]:disabled::sub-page:horizontal {
-    background: #c7d3e5;
-}
+
 
 QProgressBar {
     background-color: #edf2fb;

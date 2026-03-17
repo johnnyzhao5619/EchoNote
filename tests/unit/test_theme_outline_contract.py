@@ -201,7 +201,6 @@ def test_theme_outline_covers_workspace_roles():
 def test_navigator_explorer_and_document_stage_theme_outline_covers_workspace_shell_roles():
     outline_roles = _load_outline_roles()
     expected_roles = {
-        "workspace-mode-button-group",
         "workspace-explorer-header",
         "workspace-context-label",
     }
@@ -219,9 +218,6 @@ def test_theme_outline_covers_workspace_compact_shell_selectors():
     expected_selectors = {
         'QToolButton[role="workspace-header-action"]',
         'QToolButton[role="workspace-header-action"]:hover',
-        'QWidget[role="workspace-mode-button-group"]',
-        'QWidget[role="workspace-mode-button-group"] QPushButton',
-        'QWidget[role="workspace-mode-button-group"] QPushButton:checked',
         'QLabel[role="workspace-context-label"]',
     }
     missing = sorted(expected_selectors - selectors)
@@ -401,7 +397,6 @@ def test_visual_polish_contracts_cover_workspace_roles():
     expected_selectors = {
         'QWidget[role="app-topbar-tools"]',
         'QToolButton[role="workspace-header-action"]',
-        'QWidget[role="workspace-mode-button-group"]',
         'QLabel[role="workspace-context-label"]',
         'QLabel[role="workspace-inspector-section-title"]',
         'QLabel[role="workspace-meta-value"]',
@@ -410,8 +405,6 @@ def test_visual_polish_contracts_cover_workspace_roles():
         'QWidget[role="audio-player-surface"][state="inspector"]',
         'QPushButton[role="audio-player-primary"][state="inspector"]',
         'QPushButton[role="audio-player-control"][state="inspector"]',
-        'QSlider[role="audio-player-progress"][state="inspector"]::groove:horizontal',
-        'QSlider[role="audio-player-volume"][state="inspector"]::groove:horizontal',
     }
     missing = sorted(expected_selectors - selectors)
     assert not missing, f"Theme outline is missing workspace visual polish selectors: {missing}"

@@ -325,6 +325,76 @@ class WorkspaceManager:
         self._cleanup_empty_folder(previous_folder_id)
         return item
 
+    def copy_item_to_folder(self, item_id: str, target_folder_id: Optional[str] = None, copy_suffix: str = " [Copy]") -> WorkspaceItem:
+        """Create a full copy of a workspace item, including its assets, into a target folder."""
+        item = self.get_item(item_id)
+        if item is None:
+            raise ValueError(f"Unknown workspace item: {item_id}")
+        if target_folder_id is None:
+            target_folder_id = self.ensure_inbox_folder().id
+        target_folder = self.get_folder(target_folder_id)
+        if target_folder is None:
+            raise ValueError(f"Unknown workspace folder: {target_folder_id}")
+        if not self._folder_accepts_direct_items(target_folder):
+            raise WorkspaceValidationError("invalid_move_target")
+        
+        base_title = item.title or item.id
+        new_title = self._build_unique_entry_name(
+            f"{base_title}{copy_suffix}",
+            container_id=target_folder_id,
+        )
+        
+        new_item = WorkspaceItem(
+            title=new_title,
+            item_type=item.item_type,
+            folder_id=target_folder_id,
+            source_kind=item.source_kind,
+            source_event_id=None,
+            source_task_id=None,
+            status=item.status,
+        )
+        new_item.save(self.db)
+        
+        assets = self.get_assets(item_id)
+        mapped_primary_audio_asset_id = None
+        mapped_primary_text_asset_id = None
+        
+        for asset in assets:
+            new_asset = WorkspaceAsset(
+                item_id=new_item.id,
+                asset_role=asset.asset_role,
+                text_content=asset.text_content,
+                content_type=asset.content_type,
+                metadata_json=asset.metadata_json,
+            )
+            
+            if asset.file_path:
+                source_path = Path(asset.file_path).expanduser()
+                if source_path.exists():
+                    try:
+                        target_path_str = self.file_manager.get_workspace_path(
+                            new_item.id, "assets", source_path.name
+                        )
+                        self.file_manager.copy_file(str(source_path), target_path_str, overwrite=True)
+                        new_asset.file_path = target_path_str
+                    except Exception as e:
+                        import logging
+                        logging.getLogger("echonote.workspace").error(f"Failed to copy asset file {source_path}: {e}")
+            
+            new_asset.save(self.db)
+            
+            if asset.id == item.primary_audio_asset_id:
+                mapped_primary_audio_asset_id = new_asset.id
+            if asset.id == item.primary_text_asset_id:
+                mapped_primary_text_asset_id = new_asset.id
+                
+        if mapped_primary_audio_asset_id or mapped_primary_text_asset_id:
+            new_item.primary_audio_asset_id = mapped_primary_audio_asset_id
+            new_item.primary_text_asset_id = mapped_primary_text_asset_id
+            new_item.save(self.db)
+            
+        return new_item
+
     def get_folder_cleanup_summary(self, folder_id: str) -> dict:
         """Summarize folder-linked items/assets for destructive confirmations."""
         folder = self.get_folder(folder_id)
