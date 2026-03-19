@@ -1,6 +1,6 @@
 # Realtime Recording Workflow Refactor Implementation Plan (Superseded)
 
-> Superseded on 2026-03-16 by `/Users/weijiazhao/Dev/EchoNote/docs/plans/2026-03-16-realtime-recording-workflow-refactor.md`.
+> Superseded on 2026-03-16 by `/Users/weijiazhao/Dev/EchoNote/docs/plans/archive/2026-03-16-realtime-recording-workflow-refactor-superseded.md`.
 
 ## Superseded Reason
 
@@ -41,4 +41,4 @@
 
 ## Archival Note
 
-该归档仅用于保留本次方向纠偏的历史上下文，不应再作为实施依据。后续开发应以当前主计划 `/Users/weijiazhao/Dev/EchoNote/docs/plans/2026-03-16-realtime-recording-workflow-refactor.md` 为准。
+该归档仅用于保留本次方向纠偏的历史上下文，不应再作为实施依据。后续开发应以当前归档记录 `/Users/weijiazhao/Dev/EchoNote/docs/plans/archive/2026-03-16-realtime-recording-workflow-refactor-superseded.md` 为准。

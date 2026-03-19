@@ -67,7 +67,7 @@
 - 查“时间线音频播放”：优先看 `ui/common/audio_player.py` + `ui/common/audio_player_launcher.py` + `ui/timeline/widget.py`。
 - 查“本地摘要/会议整理/Text AI”：优先看 `engines/text_ai/` + `core/workspace/summary_service.py` + `core/workspace/meeting_brief_service.py` + `core/models/manager.py`。
 - 查“工作台任务窗口/录音控制台文案”：优先看 `resources/translations/i18n_outline.json` + `resources/translations/zh_CN.json` + `resources/translations/en_US.json` + `resources/translations/fr_FR.json` + `ui/workspace/task_window.py` + `ui/workspace/recording_session_panel.py`。
-- 查“工作台红框问题总计划/布局精修”：优先看 `docs/plans/2026-03-15-workspace-redbox-closure-plan.md` + `ui/constants.py` + `resources/themes/theme_outline.json` + `tests/unit/test_main_window_shell.py` + `tests/ui/test_workspace_widget.py` + `tests/unit/test_i18n_outline_contract.py` + `tests/unit/test_theme_outline_contract.py`。
+- 查“工作台红框问题总计划/布局精修”：优先看 `docs/plans/archive/2026-03-15-workspace-redbox-closure-plan-superseded.md` + `ui/constants.py` + `resources/themes/theme_outline.json` + `tests/unit/test_main_window_shell.py` + `tests/ui/test_workspace_widget.py` + `tests/unit/test_i18n_outline_contract.py` + `tests/unit/test_theme_outline_contract.py`。
 - 查“主题覆盖缺失”：先对照 `ui/constants.py` 的 role，再查双主题与 `theme_outline.json`。
 - 查“版本发布遗漏”：先看 `config/__version__.py`，再按发布清单同步其他文件。
 - 查“新功能实施计划”：优先看 `docs/plans/`，再回到对应模块代码与测试。
@@ -99,8 +99,8 @@
 - 翻译引擎接入：`utils/app_initializer.py`、`engines/translation/`、`core/realtime/recorder.py`
 - Text AI 引擎接入：`utils/app_initializer.py`、`engines/text_ai/`、`core/workspace/summary_service.py`
 - 版本号与发布：`config/__version__.py`、`CHANGELOG.md`、`scripts/build_config.py`、`pyproject.toml`
-- 统一工作台规划：`docs/plans/2026-03-15-workspace-redbox-closure-plan.md`、`docs/plans/archive/2026-03-15-workspace-polish-and-obsidian-alignment.md`、`docs/plans/archive/2026-03-15-workspace-experience-rearchitecture.md`、`docs/plans/archive/2026-03-15-unified-workspace-and-local-ai.md`、`ui/main_window.py`、`ui/navigation.py`、`core/transcription/manager.py`
-- 工作台视觉精修计划：`docs/plans/2026-03-15-workspace-redbox-closure-plan.md`、`ui/main_window.py`、`ui/common/realtime_recording_dock.py`、`ui/workspace/library_panel.py`、`ui/workspace/item_list.py`、`ui/workspace/inspector_panel.py`、`ui/workspace/recording_session_panel.py`、`resources/themes/theme_outline.json`、`resources/translations/i18n_outline.json`
+- 统一工作台规划：`docs/plans/archive/2026-03-15-workspace-redbox-closure-plan-superseded.md`、`docs/plans/archive/2026-03-15-workspace-polish-and-obsidian-alignment.md`、`docs/plans/archive/2026-03-15-workspace-experience-rearchitecture.md`、`docs/plans/archive/2026-03-15-unified-workspace-and-local-ai.md`、`ui/main_window.py`、`ui/navigation.py`、`core/transcription/manager.py`
+- 工作台视觉精修计划：`docs/plans/archive/2026-03-15-workspace-redbox-closure-plan-superseded.md`、`ui/main_window.py`、`ui/common/realtime_recording_dock.py`、`ui/workspace/library_panel.py`、`ui/workspace/item_list.py`、`ui/workspace/inspector_panel.py`、`ui/workspace/recording_session_panel.py`、`resources/themes/theme_outline.json`、`resources/translations/i18n_outline.json`
 
 ## 结构变更同步更新要求（强制）
 

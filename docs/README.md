@@ -40,8 +40,8 @@ For contributors and developers:
 - Workspace drag protocol note: `ui/workspace_drag_payload.py` is now the shared mime/payload contract for dragging text-backed event cards and batch-task cards into the workspace tree, while `ui/workspace/library_panel.py` remains the only drop-policy entry that decides copy-vs-move and target validity.
 - Workspace vault note: `core/workspace/vault_layout.py` is now the single path-planning layer for tree-aligned Markdown files and copied attachments, while `ui/settings/workspace_page.py` owns the configurable Vault root.
 - Workspace tree follow-up note: the latest tree interaction handoff is archived in `plans/archive/2026-03-18-workspace-tree-context-dnd-markdown-vault-superseded.md`, which covers the missing right-click menu, constrained copy/move drag semantics, and the Markdown Vault hard switch that aligns the tree with the local folder structure.
-- Workspace red-box closure note: the latest implementation track consolidates the screenshot red-box issues into one execution plan covering navigator-shell hard switch, event-folder and batch-task-folder semantics, stable results-list rendering, and inspector transport-player redesign; use `plans/2026-03-15-workspace-redbox-closure-plan.md` as the primary handoff before touching workspace layout code.
-- Workspace screenshot shell note: the current screenshot-specific gap has shifted to shell chrome refinement rather than data-model rebuild; use `plans/2026-03-18-workspace-obsidian-screenshot-shell-refactor.md` before changing workspace tab chrome, structure/event mode exposure, or workspace SVG icon semantics.
+- Workspace red-box closure note: the screenshot red-box implementation track is archived in `plans/archive/2026-03-15-workspace-redbox-closure-plan-superseded.md`; use the archived plan only as historical context for the navigator-shell hard switch, event-folder and batch-task-folder semantics, results-list rendering, and inspector transport-player redesign.
+- Workspace screenshot shell note: the screenshot-specific shell chrome track is archived in `plans/archive/2026-03-18-workspace-obsidian-screenshot-shell-refactor-superseded.md`; use the archived plan only as historical context before changing workspace tab chrome, structure/event mode exposure, or workspace SVG icon semantics.
 - Workspace copy note: shell task-window title and recording-console section labels are now governed by `workspace.task_window_title` and `workspace.recording_console.*` in `resources/translations/*.json`, with `resources/translations/i18n_outline.json` as the outline SSOT.
 - Workspace visual polish note: top-bar tool grouping, explorer compact shell, item meta/badges, inspector section titles, and recording-dock summary semantics are all contract-driven by `ui/constants.py`, `resources/themes/theme_outline.json`, and `resources/translations/i18n_outline.json`; theme/i18n/tests/docs are expected to land in the same change.
 - Shell recording note: the primary realtime recording entry is now the persistent compact dock in `ui/common/realtime_recording_dock.py`; `ui/workspace/recording_session_panel.py` has been reduced to a lightweight popup settings form, while `ui/realtime_record/` owns the floating live-result surface and visualization helpers.
@@ -54,12 +54,9 @@ For contributors and developers:
 
 ---
 
-## 🧭 Active Plans
+## 🧭 Plan Index
 
-- **[Workspace Obsidian Screenshot Shell Refactor Plan](plans/2026-03-18-workspace-obsidian-screenshot-shell-refactor.md)** - Primary plan for the screenshot-scoped shell rebuild: real structure/event mode exposure, stacked-tabs menu, unified SVG icon pipeline, and tighter workspace tab/editor chrome semantics
-- **[Workspace Tree Context Menu / Drag-Drop / Markdown Vault Plan](plans/archive/2026-03-18-workspace-tree-context-dnd-markdown-vault-superseded.md)** - Archived execution plan for tree right-click actions, constrained copy-vs-move behavior when content leaves event/batch system domains, and the hard switch to Obsidian-style Markdown Vault storage aligned with the folder tree
-- **[Workspace Red-Box Closure Plan](plans/2026-03-15-workspace-redbox-closure-plan.md)** - Primary execution plan for the four screenshot issues: left navigator hard switch, Obsidian-aligned structure/event navigation, event-folder and batch-task-folder default placement with persistent source linkage, and inspector transport-player redesign
-- **[Realtime Recording Workflow Correction Plan](plans/2026-03-16-realtime-recording-workflow-refactor.md)** - Primary correction plan for the recording shell: remove the bottom results workspace, keep the dock compact and horizontal, route live transcript/translation to the floating overlay, and publish completed recording output only into workspace documents
+All workspace implementation plans listed here are historical references only. New work should start from the codebase and the archived records below.
 
 ## ✅ Stable Regression Batches
 
@@ -70,6 +67,9 @@ For contributors and developers:
 
 ## 🗃️ Archived Plans
 
+- **[Workspace Red-Box Closure Plan](plans/archive/2026-03-15-workspace-redbox-closure-plan-superseded.md)** - Archived execution plan for the four screenshot issues: left navigator hard switch, Obsidian-aligned structure/event navigation, event-folder and batch-task-folder default placement with persistent source linkage, and inspector transport-player redesign
+- **[Realtime Recording Workflow Correction Plan](plans/archive/2026-03-16-realtime-recording-workflow-refactor-superseded.md)** - Archived correction plan for the recording shell: remove the bottom results workspace, keep the dock compact and horizontal, route live transcript/translation to the floating overlay, and publish completed recording output only into workspace documents
+- **[Workspace Obsidian Screenshot Shell Refactor Plan](plans/archive/2026-03-18-workspace-obsidian-screenshot-shell-refactor-superseded.md)** - Archived screenshot-scoped shell plan for real structure/event mode exposure, stacked-tabs menu, unified SVG icon pipeline, and tighter workspace tab/editor chrome semantics
 - **[Unified Workspace & Local AI Plan](plans/archive/2026-03-15-unified-workspace-and-local-ai.md)** - Historical hard-switch plan for the first unified recording/document workspace rollout and local AI architecture baseline
 - **[Workspace Experience Rearchitecture Plan](plans/archive/2026-03-15-workspace-experience-rearchitecture.md)** - Historical plan for the first workspace shell rebuild; superseded by the Obsidian-alignment follow-up plan
 - **[Workspace Gap Closure Plan](plans/archive/2026-03-15-workspace-gap-closure.md)** - Completed follow-up plan for closing the remaining unified workspace gaps after the hard switch
@@ -78,6 +78,8 @@ For contributors and developers:
 - **[Workspace Risk Closure And Polish Plan](plans/archive/2026-03-15-workspace-risk-closure-plan.md)** - Historical risk-closure plan after the first workspace hard switch; superseded by the red-box closure plan
 - **[Superseded Realtime Recording Workflow Plan](plans/archive/2026-03-16-realtime-recording-workflow-refactor-superseded.md)** - Historical recording-shell plan that incorrectly put `setup / live / results` workflow inside the bottom dock; kept only as context for the current correction plan
 - **[Superseded Workspace Navigation / Drag-Drop Plan](plans/archive/2026-03-16-workspace-navigation-drag-drop-refactor-superseded.md)** - Historical narrow-scope drag-drop plan; superseded by the tree context menu / constrained drag semantics / Markdown Vault master plan
+- **[Superseded Workspace Red-Box Closure Plan](plans/archive/2026-03-15-workspace-redbox-closure-plan-superseded.md)** - Historical duplicate handoff preserved as the superseded workspace-redbox record
+- **[Superseded Workspace Obsidian Screenshot Shell Refactor Plan](plans/archive/2026-03-18-workspace-obsidian-screenshot-shell-refactor-superseded.md)** - Historical duplicate handoff preserved as the superseded screenshot-shell record
 
 ---
 
