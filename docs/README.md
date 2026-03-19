@@ -37,6 +37,9 @@ For contributors and developers:
 - **[Implementation Plans](plans/)** - Active architecture and rollout plans for multi-step feature work
 - Unified workspace architecture note: `core/workspace/` is now the single asset layer for imported documents, batch transcriptions, realtime recordings, summaries, and meeting briefs; the desktop entry lives in `ui/workspace/`.
 - Workspace interaction note: the `ui/workspace/` page now owns the navigator-shell header actions inside `ui/workspace/library_panel.py`, an Obsidian-style single tree that switches between structure/event modes, the card-based multi-document editor, and detached document windows; the batch transcription/translation queue opens as a shell-level utility window through `ui/main_window.py` + `ui/workspace/task_window.py`, with queue content still rendered by `ui/workspace/task_panel.py`.
+- Workspace drag protocol note: `ui/workspace_drag_payload.py` is now the shared mime/payload contract for dragging text-backed event cards and batch-task cards into the workspace tree, while `ui/workspace/library_panel.py` remains the only drop-policy entry that decides copy-vs-move and target validity.
+- Workspace vault note: `core/workspace/vault_layout.py` is now the single path-planning layer for tree-aligned Markdown files and copied attachments, while `ui/settings/workspace_page.py` owns the configurable Vault root.
+- Workspace tree follow-up note: the latest tree interaction handoff is archived in `plans/archive/2026-03-18-workspace-tree-context-dnd-markdown-vault-superseded.md`, which covers the missing right-click menu, constrained copy/move drag semantics, and the Markdown Vault hard switch that aligns the tree with the local folder structure.
 - Workspace red-box closure note: the latest implementation track consolidates the screenshot red-box issues into one execution plan covering navigator-shell hard switch, event-folder and batch-task-folder semantics, stable results-list rendering, and inspector transport-player redesign; use `plans/2026-03-15-workspace-redbox-closure-plan.md` as the primary handoff before touching workspace layout code.
 - Workspace copy note: shell task-window title and recording-console section labels are now governed by `workspace.task_window_title` and `workspace.recording_console.*` in `resources/translations/*.json`, with `resources/translations/i18n_outline.json` as the outline SSOT.
 - Workspace visual polish note: top-bar tool grouping, explorer compact shell, item meta/badges, inspector section titles, and recording-dock summary semantics are all contract-driven by `ui/constants.py`, `resources/themes/theme_outline.json`, and `resources/translations/i18n_outline.json`; theme/i18n/tests/docs are expected to land in the same change.
@@ -52,6 +55,7 @@ For contributors and developers:
 
 ## 🧭 Active Plans
 
+- **[Workspace Tree Context Menu / Drag-Drop / Markdown Vault Plan](plans/archive/2026-03-18-workspace-tree-context-dnd-markdown-vault-superseded.md)** - Archived execution plan for tree right-click actions, constrained copy-vs-move behavior when content leaves event/batch system domains, and the hard switch to Obsidian-style Markdown Vault storage aligned with the folder tree
 - **[Workspace Red-Box Closure Plan](plans/2026-03-15-workspace-redbox-closure-plan.md)** - Primary execution plan for the four screenshot issues: left navigator hard switch, Obsidian-aligned structure/event navigation, event-folder and batch-task-folder default placement with persistent source linkage, and inspector transport-player redesign
 - **[Realtime Recording Workflow Correction Plan](plans/2026-03-16-realtime-recording-workflow-refactor.md)** - Primary correction plan for the recording shell: remove the bottom results workspace, keep the dock compact and horizontal, route live transcript/translation to the floating overlay, and publish completed recording output only into workspace documents
 
@@ -71,6 +75,7 @@ For contributors and developers:
 - **[Workspace Visual Density & Layout Polish Plan](plans/archive/2026-03-15-workspace-visual-density-and-layout-polish-plan.md)** - Historical visual polish plan; superseded by the red-box closure plan
 - **[Workspace Risk Closure And Polish Plan](plans/archive/2026-03-15-workspace-risk-closure-plan.md)** - Historical risk-closure plan after the first workspace hard switch; superseded by the red-box closure plan
 - **[Superseded Realtime Recording Workflow Plan](plans/archive/2026-03-16-realtime-recording-workflow-refactor-superseded.md)** - Historical recording-shell plan that incorrectly put `setup / live / results` workflow inside the bottom dock; kept only as context for the current correction plan
+- **[Superseded Workspace Navigation / Drag-Drop Plan](plans/archive/2026-03-16-workspace-navigation-drag-drop-refactor-superseded.md)** - Historical narrow-scope drag-drop plan; superseded by the tree context menu / constrained drag semantics / Markdown Vault master plan
 
 ---
 
@@ -159,5 +164,5 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ---
 
-**Last Updated**: March 16, 2026
-**Version**: v2.1.0
+**Last Updated**: March 18, 2026
+**Version**: v2.1.3

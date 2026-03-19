@@ -39,7 +39,12 @@ class FileManager:
     proper permission settings and directory management.
     """
 
-    def __init__(self, base_dir: Optional[str] = None, recordings_dir: Optional[str] = None):
+    def __init__(
+        self,
+        base_dir: Optional[str] = None,
+        recordings_dir: Optional[str] = None,
+        workspace_root: Optional[str] = None,
+    ):
         """
         Initialize file manager.
 
@@ -49,6 +54,7 @@ class FileManager:
             recordings_dir: Optional directory dedicated to recording files.
                      When provided, ``subdirectory="Recordings"`` operations
                      target this directory directly.
+            workspace_root: Optional directory dedicated to the workspace vault.
         """
         if base_dir is None:
             self.base_dir = Path.home() / "Documents" / "EchoNote"
@@ -60,7 +66,10 @@ class FileManager:
         else:
             self.recordings_dir = Path(recordings_dir).expanduser()
 
-        self.workspace_dir = self.base_dir / "Workspace"
+        if workspace_root is None:
+            self.workspace_dir = self.base_dir / "Workspace"
+        else:
+            self.workspace_dir = Path(workspace_root).expanduser()
         self._named_directories: Dict[str, Path] = {
             "Recordings": self.recordings_dir,
             "Workspace": self.workspace_dir,

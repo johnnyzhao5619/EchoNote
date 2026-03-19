@@ -30,6 +30,10 @@ from ui.base_widgets import BaseWidget, create_button, create_primary_button
 from ui.batch_transcribe.task_item import TaskItem
 from ui.common.translation_task_options import prompt_event_translation_languages
 from ui.constants import ROLE_WORKSPACE_PLACEHOLDER, ROLE_WORKSPACE_TASK_SUMMARY
+from ui.workspace_drag_payload import (
+    WORKSPACE_DRAG_SOURCE_BATCH_TASK,
+    build_workspace_text_drag_payload,
+)
 
 logger = logging.getLogger("echonote.ui.workspace.task_panel")
 
@@ -287,7 +291,12 @@ class WorkspaceTaskPanel(BaseWidget):
 
         paused = self._is_processing_paused()
         for task_data in tasks:
-            item = TaskItem(task_data, self.i18n, self)
+            item = TaskItem(
+                task_data,
+                self.i18n,
+                self,
+                drag_payload_provider=self._build_workspace_drag_payload,
+            )
             item.set_processing_paused(paused)
             item.start_clicked.connect(self._on_start_processing_requested)
             item.pause_clicked.connect(self._on_pause_resume_requested)
@@ -660,6 +669,18 @@ class WorkspaceTaskPanel(BaseWidget):
         if item_id:
             self.workspace_refresh_requested.emit()
         return item_id
+
+    def _build_workspace_drag_payload(self, task_id: str) -> Optional[dict[str, str]]:
+        item_id = self._resolve_or_publish_workspace_item_id(task_id)
+        if not item_id or self.workspace_manager is None:
+            return None
+        has_text = getattr(self.workspace_manager, "item_has_text_content", None)
+        if callable(has_text) and not has_text(item_id):
+            return None
+        return build_workspace_text_drag_payload(
+            item_id,
+            WORKSPACE_DRAG_SOURCE_BATCH_TASK,
+        )
 
     def _load_publisheable_task(self, task_id: str) -> Optional[TranscriptionTask]:
         if self.workspace_manager is None or not hasattr(self.workspace_manager, "db"):

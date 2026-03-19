@@ -24,7 +24,7 @@
   - `config/__version__.py`：版本单一事实源（SSOT）。
   - `config/default_config.json`：默认配置。
 - `core/`：核心业务编排与管理器。
-  - `core/workspace/`：统一资产层与 workspace 服务（导入、资产读写、摘要、会议整理）。
+  - `core/workspace/`：统一资产层与 workspace 服务（导入、Vault 路径布局、资产读写、摘要、会议整理）。
   - `core/models/`：模型注册、下载、状态聚合与 Text AI 模型治理。
   - `core/realtime/`：实时录音/转写集成（录音器、路由、归档等）。
   - `core/settings/`：设置读写与偏好聚合。
@@ -39,7 +39,7 @@
 - `ui/workspace/`：统一 workspace 工作台（顶部创建入口、Obsidian 风格单树导航、结构/事件双模式目录、文件夹管理、壳层级批量任务工具窗口、卡片/标签式文本编辑、独立窗口、录音回放与 AI 操作；录音会话完成后的文档、翻译与回放都统一回到 workspace，`recording_session_panel.py` 只承载轻量录音选项弹出层）。
   - `ui/realtime_record/`：实时录音浮动窗与音频可视化组件（主录音入口已硬切到应用壳层底座与 `ui/common/realtime_recording_dock.py`）。
   - `ui/timeline/`：时间线页面与事件卡片（`widget.py`、`event_card.py`、`transcript_viewer.py`）。
-  - `ui/settings/`：设置页面（含 `translation_page.py` 与 `workspace_ai_page.py` 独立默认设置页）。
+  - `ui/settings/`：设置页面（含 `translation_page.py`、`workspace_page.py` 与 `workspace_ai_page.py` 独立默认设置页）。
   - `ui/common/`：通用组件（含音频播放器 `audio_player.py`、启动器 `audio_player_launcher.py`、应用壳层录音底座 `realtime_recording_dock.py`）。
   - `ui/constants.py`：UI尺寸、角色常量与密度基线。
 - `resources/`：主题与国际化资源。
@@ -57,8 +57,9 @@
 
 ## 常用定位建议
 
-- 查“统一工作台/文档资产”：优先看 `core/workspace/` + `ui/workspace/` + `data/database/models.py`。
+- 查“统一工作台/文档资产”：优先看 `core/workspace/`（尤其 `manager.py` + `vault_layout.py`）+ `ui/workspace/` + `data/database/models.py`。
 - 查“工作台批量转写/转译任务”：优先看 `ui/workspace/task_window.py` + `ui/workspace/task_panel.py` + `ui/main_window.py` + `core/transcription/manager.py` + `ui/batch_transcribe/task_item.py` + `ui/workspace/editor_panel.py`。
+- 查“事件/批量任务拖入工作台树”：优先看 `ui/workspace_drag_payload.py` + `ui/workspace/library_panel.py` + `ui/workspace/task_panel.py` + `ui/batch_transcribe/task_item.py` + `ui/timeline/widget.py` + `ui/timeline/event_card.py` + `core/workspace/manager.py`。
 - 查“工作台创建入口/录音主控”：优先看 `ui/workspace/library_panel.py` + `ui/common/realtime_recording_dock.py` + `ui/workspace/recording_session_panel.py` + `core/realtime/recorder.py` + `core/workspace/manager.py`；当前录音工作流已收口为“紧凑横向 dock + 录音选项弹出层 + 悬浮窗实时结果 + workspace 完成结果”。
 - 查“实时录音/浮动窗”：优先看 `ui/common/realtime_recording_dock.py` + `ui/realtime_record/floating_overlay.py` + `core/realtime/` + `resources/themes/*qss`；悬浮窗现在是实时转录/转译主展示面，与壳层录音 dock 共用同一 recorder 状态，录音落盘与资产发布再看 `core/workspace/manager.py`。
 - 查“工作台单树导航/文件夹管理”：优先看 `ui/workspace/library_panel.py` + `ui/workspace/item_list.py` + `core/workspace/manager.py` + `data/database/models.py`。
@@ -76,10 +77,12 @@
 - 统一工作台入口：`ui/workspace/widget.py`、`ui/main_window.py`、`ui/navigation.py`
 - 工作台顶部入口与录音主控：`ui/workspace/library_panel.py`、`ui/common/realtime_recording_dock.py`、`ui/workspace/recording_session_panel.py`、`core/realtime/recorder.py`、`core/workspace/manager.py`
 - 工作台批量任务区：`ui/workspace/task_window.py`、`ui/workspace/task_panel.py`、`ui/main_window.py`、`core/transcription/manager.py`、`ui/batch_transcribe/task_item.py`、`ui/workspace/editor_panel.py`
+- 工作台外部拖拽协议：`ui/workspace_drag_payload.py`、`ui/workspace/library_panel.py`、`ui/workspace/task_panel.py`、`ui/batch_transcribe/task_item.py`、`ui/timeline/widget.py`、`ui/timeline/event_card.py`、`core/workspace/manager.py`
 - 工作台单树导航：`ui/workspace/library_panel.py`、`ui/workspace/item_list.py`、`core/workspace/manager.py`、`data/database/models.py`
 - 工作台文档标签页与独立窗口：`ui/workspace/widget.py`、`ui/workspace/editor_panel.py`、`ui/workspace/detached_document_window.py`
 - 工作台集合筛选与条目元信息：`ui/workspace/item_list.py`、`core/workspace/manager.py`、`data/database/models.py`
 - 统一工作台资产层：`core/workspace/manager.py`、`core/workspace/import_service.py`、`data/database/models.py`
+- Markdown Vault 路径布局：`core/workspace/vault_layout.py`、`core/workspace/manager.py`、`core/workspace/import_service.py`、`ui/settings/workspace_page.py`
 - 文档导入与解析：`core/workspace/document_parser.py`、`core/workspace/import_service.py`、`tests/unit/core/test_workspace_manager.py`
 - 本地摘要与会议整理：`core/workspace/summary_service.py`、`core/workspace/meeting_brief_service.py`、`engines/text_ai/`
 - Text AI 模型管理：`core/models/manager.py`、`core/models/text_ai_registry.py`、`ui/settings/model_management_page.py`、`ui/settings/workspace_ai_page.py`
@@ -88,6 +91,7 @@
 - 主题契约与角色覆盖：`resources/themes/theme_outline.json`、`tests/unit/test_theme_outline_contract.py`、`ui/constants.py`
 - 实时录音偏好设置：`core/settings/manager.py`、`ui/settings/realtime_page.py`、`config/default_config.json`
 - 翻译默认设置：`ui/settings/translation_page.py`、`core/settings/manager.py`、`config/default_config.json`
+- Workspace Vault 默认设置：`ui/settings/workspace_page.py`、`core/settings/manager.py`、`config/default_config.json`
 - Workspace AI 默认设置：`ui/settings/workspace_ai_page.py`、`core/settings/manager.py`、`config/default_config.json`
 - 时间线音频播放器：`ui/common/audio_player.py`、`ui/common/audio_player_launcher.py`、`ui/timeline/transcript_viewer.py`、`tests/ui/test_timeline_audio_player.py`
 - 事件删除与 workspace 清理提示：`ui/calendar_event_actions.py`、`core/calendar/manager.py`、`core/workspace/manager.py`、`tests/ui/test_calendar_event_actions.py`

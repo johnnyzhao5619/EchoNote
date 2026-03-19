@@ -242,7 +242,7 @@ class TextEditorPanel(BaseWidget):
         self.update_translations()
 
     def save_changes(self) -> None:
-        """Persist current content via callback or direct file write."""
+        """Persist current content via the injected save callback."""
         if not self.is_modified:
             self._leave_edit_mode()
             return
@@ -251,10 +251,6 @@ class TextEditorPanel(BaseWidget):
         try:
             if callable(self.save_handler):
                 self.save_handler(content)
-            elif self.current_file_path:
-                target_path = Path(self.current_file_path).expanduser()
-                target_path.parent.mkdir(parents=True, exist_ok=True)
-                target_path.write_text(content, encoding="utf-8")
             else:
                 raise ValueError("Text editor is missing a save target")
 
@@ -533,10 +529,6 @@ class WorkspaceEditorPanel(TextEditorPanel):
                 content = self.text_edit.toPlainText()
                 if callable(self.save_handler):
                     self.save_handler(content)
-                elif self.current_file_path:
-                    target_path = Path(self.current_file_path).expanduser()
-                    target_path.parent.mkdir(parents=True, exist_ok=True)
-                    target_path.write_text(content, encoding="utf-8")
                 else:
                     raise ValueError("Text editor is missing a save target")
                 self.is_modified = False
@@ -630,6 +622,10 @@ class WorkspaceEditorPanel(TextEditorPanel):
     def current_item_id(self) -> str:
         """Expose the currently loaded workspace item identifier."""
         return self.current_item.id if self.current_item is not None else ""
+
+    def current_asset_role(self) -> str | None:
+        """Expose the currently selected editable asset role."""
+        return getattr(self.current_asset, "asset_role", None)
 
     def _on_title_text_changed(self, _text: str) -> None:
         if self.is_edit_mode:

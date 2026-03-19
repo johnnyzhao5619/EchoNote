@@ -586,6 +586,7 @@
     "task_queue_title": "Tâches par lot",
     "task_window_title": "Fenêtre utilitaire des tâches",
     "drag_from_system_prompt": "Vous déplacez un élément généré automatiquement hors du dossier système. Souhaitez-vous créer une copie ou le déplacer de façon permanente ?",
+    "drag_text_only_warning": "Seuls les éléments d'événement ou de tâche par lot contenant du texte peuvent être copiés ou déplacés dans les éléments du workspace.",
     "action_copy": "Copier l'élément",
     "action_move": "Déplacer l'élément",
     "copy_suffix": " [Copie]",
@@ -601,7 +602,13 @@
     "results_section_title": "Documents",
     "event_group_unlinked": "Événements non liés",
     "navigator_group_with_count": "{name} ({count})",
+    "open_item": "Ouvrir",
     "open_in_new_window": "Ouvrir dans une nouvelle fenêtre",
+    "show_inspector_panel": "Afficher le panneau droit",
+    "hide_inspector_panel": "Masquer le panneau droit",
+    "open_local_folder": "Ouvrir le dossier local",
+    "open_vault_root": "Ouvrir le dossier Vault",
+    "copy_local_path": "Copier le chemin",
     "collection_all": "Tout",
     "collection_recordings": "Enregistrements",
     "collection_documents": "Documents",
@@ -694,6 +701,7 @@
       "transcription": "Transcription",
       "realtime": "Enregistrement en temps réel",
       "translation": "Traduction",
+      "workspace": "Workspace",
       "workspace_ai": "Workspace AI",
       "calendar": "Calendrier",
       "timeline": "Chronologie",
@@ -869,6 +877,18 @@
       "opus_mt_not_downloaded": "⚠ Modèle {model} non téléchargé — Veuillez le télécharger dans Modèles",
       "no_translation": "Pas de traduction",
       "google_translate": "Google Traduction"
+    },
+    "workspace": {
+      "title": "Stockage du workspace",
+      "description": "Configurez le répertoire racine du Markdown Vault du workspace. L'arborescence documentaire sera alignée sur cette structure locale.",
+      "storage_root": "Répertoire racine du Vault",
+      "storage_root_hint": "Choisissez un dossier dédié. Les prochaines évolutions organiseront les documents, dossiers et fichiers Markdown sous cette racine.",
+      "restart_hint": "Ce chemin est enregistré immédiatement et s'appliquera de façon fiable au prochain lancement pendant la finalisation du hard switch du système de fichiers.",
+      "browse": "Parcourir",
+      "select_directory": "Sélectionner le dossier du Vault",
+      "error": {
+        "empty_path": "Le répertoire racine du Vault ne peut pas être vide"
+      }
     },
     "workspace_ai": {
       "defaults": "Valeurs par défaut Workspace AI",

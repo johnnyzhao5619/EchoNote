@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from core.qt_imports import QLabel, QPushButton, QVBoxLayout, QWidget
+from core.qt_imports import QLabel, QPushButton, QSplitter, QVBoxLayout, QWidget
 from ui.base_widgets import BaseWidget
 from ui.constants import (
     ROLE_WORKSPACE_AI_ACTION,
@@ -14,6 +14,35 @@ from ui.constants import (
 )
 from ui.workspace.item_list import format_workspace_source_label, format_workspace_updated_at
 from ui.workspace.recording_panel import WorkspaceRecordingPanel
+
+
+def set_trailing_splitter_panel_visible(
+    splitter: QSplitter,
+    panel: QWidget,
+    *,
+    visible: bool,
+    expanded_sizes: list[int] | tuple[int, ...] | None = None,
+    fallback_sizes: list[int] | tuple[int, ...] | None = None,
+) -> list[int]:
+    """Show or hide the trailing splitter panel while preserving usable sizes."""
+    current_sizes = list(splitter.sizes())
+    if visible:
+        panel.show()
+        target_sizes = list(expanded_sizes or fallback_sizes or current_sizes)
+        if len(target_sizes) >= 2 and target_sizes[-1] <= 0:
+            fallback = list(fallback_sizes or current_sizes)
+            if len(fallback) >= 2:
+                target_sizes = fallback
+        splitter.setSizes(target_sizes)
+        return list(target_sizes)
+
+    panel.hide()
+    collapsed_sizes = list(current_sizes)
+    if len(collapsed_sizes) >= 2:
+        collapsed_sizes[-2] = max(0, collapsed_sizes[-2] + collapsed_sizes[-1])
+        collapsed_sizes[-1] = 0
+        splitter.setSizes(collapsed_sizes)
+    return current_sizes
 
 
 class WorkspaceInspectorPanel(BaseWidget):

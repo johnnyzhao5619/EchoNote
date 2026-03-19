@@ -182,12 +182,15 @@ def test_theme_outline_covers_workspace_roles():
     expected_roles = {
         "task-entry-badge",
         "workspace-surface",
+        "workspace-document-tabs",
         "workspace-asset-tabs",
         "workspace-task-summary",
         "workspace-header-action",
         "workspace-explorer-header",
         "workspace-nav-tree",
         "workspace-editor-panel",
+        "workspace-tab-action",
+        "workspace-tab-close",
         "workspace-inspector-section",
         "workspace-meta-value",
         "workspace-recording-panel",
@@ -290,6 +293,27 @@ def test_theme_outline_covers_workspace_asset_tab_selectors():
     }
     missing = sorted(expected_selectors - selectors)
     assert not missing, f"Theme outline is missing workspace asset tab selectors: {missing}"
+
+
+def test_theme_outline_covers_workspace_document_tab_selectors():
+    outline = _load_theme_outline()
+    selectors = {
+        selector
+        for section in outline.get("sections", [])
+        for selector in section.get("selectors", [])
+    }
+    expected_selectors = {
+        'QTabWidget[role="workspace-document-tabs"]::pane',
+        'QTabWidget[role="workspace-document-tabs"] QTabBar::tab',
+        'QTabWidget[role="workspace-document-tabs"] QTabBar::tab:selected',
+        'QTabWidget[role="workspace-document-tabs"] QTabBar::tab:hover',
+        'QToolButton[role="workspace-tab-action"]',
+        'QToolButton[role="workspace-tab-action"]:hover',
+        'QToolButton[role="workspace-tab-close"]',
+        'QToolButton[role="workspace-tab-close"]:hover',
+    }
+    missing = sorted(expected_selectors - selectors)
+    assert not missing, f"Theme outline is missing workspace document tab selectors: {missing}"
 
 
 def test_theme_outline_no_longer_references_workspace_asset_selector():

@@ -586,6 +586,7 @@
     "task_queue_title": "批量任务",
     "task_window_title": "任务工具窗口",
     "drag_from_system_prompt": "您正在将系统自动生成的条目移出，请选择复制副本还是剪切？",
+    "drag_text_only_warning": "只有包含文本内容的事件/批量任务条目才能复制或移动到工作台条目。",
     "action_copy": "复制副本",
     "action_move": "移动剪切",
     "copy_suffix": " [副本]",
@@ -601,7 +602,13 @@
     "results_section_title": "文档结果",
     "event_group_unlinked": "未关联事件",
     "navigator_group_with_count": "{name} ({count})",
+    "open_item": "打开",
     "open_in_new_window": "在新窗口打开",
+    "show_inspector_panel": "打开右侧栏",
+    "hide_inspector_panel": "关闭右侧栏",
+    "open_local_folder": "打开本地文件夹",
+    "open_vault_root": "打开 Vault 文件夹",
+    "copy_local_path": "复制路径",
     "collection_all": "全部",
     "collection_recordings": "录音",
     "collection_documents": "文档",
@@ -694,6 +701,7 @@
       "transcription": "转写",
       "realtime": "实时录音",
       "translation": "翻译",
+      "workspace": "工作台",
       "workspace_ai": "Workspace AI",
       "calendar": "日历",
       "timeline": "时间线",
@@ -869,6 +877,18 @@
       "opus_mt_not_downloaded": "⚠ 模型 {model} 未下载 — 请前往模型管理页面下载",
       "no_translation": "不翻译",
       "google_translate": "Google 翻译"
+    },
+    "workspace": {
+      "title": "工作台存储",
+      "description": "配置工作台 Markdown Vault 的根目录。文档树会逐步与该本地目录对齐。",
+      "storage_root": "Vault 根目录",
+      "storage_root_hint": "建议选择一个专用文件夹，后续工作台文档、目录和 Markdown 文件都会围绕这个根目录组织。",
+      "restart_hint": "该路径保存后将在下次启动时稳定生效；后续任务会继续把工作台树与本地目录完全对齐。",
+      "browse": "浏览",
+      "select_directory": "选择 Vault 目录",
+      "error": {
+        "empty_path": "Vault 根目录不能为空"
+      }
     },
     "workspace_ai": {
       "defaults": "Workspace AI 默认设置",

@@ -586,6 +586,7 @@
     "task_queue_title": "Batch Tasks",
     "task_window_title": "Task Utility Window",
     "drag_from_system_prompt": "You are moving an automatically generated item out of the system folder. Would you like to create a copy or move it permanently?",
+    "drag_text_only_warning": "Only event or batch-task items with text content can be copied or moved into workspace items.",
     "action_copy": "Copy Item",
     "action_move": "Move Item",
     "copy_suffix": " [Copy]",
@@ -601,7 +602,13 @@
     "results_section_title": "Documents",
     "event_group_unlinked": "Unlinked Events",
     "navigator_group_with_count": "{name} ({count})",
+    "open_item": "Open",
     "open_in_new_window": "Open in New Window",
+    "show_inspector_panel": "Show Right Panel",
+    "hide_inspector_panel": "Hide Right Panel",
+    "open_local_folder": "Open Local Folder",
+    "open_vault_root": "Open Vault Folder",
+    "copy_local_path": "Copy Path",
     "collection_all": "All",
     "collection_recordings": "Recordings",
     "collection_documents": "Documents",
@@ -694,6 +701,7 @@
       "transcription": "Transcription",
       "realtime": "Real-time Recording",
       "translation": "Translation",
+      "workspace": "Workspace",
       "workspace_ai": "Workspace AI",
       "calendar": "Calendar",
       "timeline": "Timeline",
@@ -869,6 +877,18 @@
       "opus_mt_not_downloaded": "⚠ Model {model} not downloaded — go to Model Management to download",
       "no_translation": "No Translation",
       "google_translate": "Google Translate"
+    },
+    "workspace": {
+      "title": "Workspace Storage",
+      "description": "Configure the root directory for the workspace Markdown vault. The document tree will be aligned with this local folder structure.",
+      "storage_root": "Vault Root Directory",
+      "storage_root_hint": "Choose a dedicated folder. Upcoming workspace tasks will organize documents, folders, and Markdown files under this root.",
+      "restart_hint": "This path is saved immediately and will apply reliably on the next launch while the filesystem hard switch is completed.",
+      "browse": "Browse",
+      "select_directory": "Select Vault Directory",
+      "error": {
+        "empty_path": "Vault root directory cannot be empty"
+      }
     },
     "workspace_ai": {
       "defaults": "Workspace AI Defaults",

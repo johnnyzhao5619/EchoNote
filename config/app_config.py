@@ -94,6 +94,7 @@ class ConfigManager:
             "database": dict,
             "transcription": dict,
             "realtime": dict,
+            "workspace": dict,
             "calendar": dict,
             "timeline": dict,
             "resource_monitor": dict,
@@ -114,6 +115,7 @@ class ConfigManager:
         # Validate nested required fields
         self._validate_database_config()
         self._validate_transcription_config()
+        self._validate_workspace_config()
         self._validate_resource_monitor_config()
         self._validate_ui_config()
 
@@ -234,6 +236,16 @@ class ConfigManager:
         if not (1 <= float(high_cpu_percent) <= 100):
             raise ValueError("resource_monitor.high_cpu_percent must be between 1 and 100")
 
+    def _validate_workspace_config(self) -> None:
+        """Validate workspace configuration."""
+        workspace_config = self._config["workspace"]
+        if "storage_root" not in workspace_config:
+            raise ValueError("Missing required field: workspace.storage_root")
+        if not isinstance(workspace_config["storage_root"], str):
+            raise TypeError("workspace.storage_root must be a string")
+        if not workspace_config["storage_root"].strip():
+            raise ValueError("workspace.storage_root must not be empty")
+
     def _validate_ui_config(self) -> None:
         """Validate UI configuration."""
         ui_config = self._config["ui"]
@@ -330,6 +342,8 @@ class ConfigManager:
                 return self._validate_realtime_setting(setting, value)
             elif category == "translation":
                 return self._validate_translation_setting(setting, value)
+            elif category == "workspace":
+                return self._validate_workspace_setting(setting, value)
             elif category == "calendar":
                 return self._validate_calendar_setting(setting, value)
             elif category == "timeline":
@@ -423,6 +437,11 @@ class ConfigManager:
         if setting in ("translation_source_lang", "translation_target_lang"):
             # "auto" or ISO 639-1/639-2 language code (non-empty string)
             return isinstance(value, str) and len(value.strip()) >= 2
+        return True
+
+    def _validate_workspace_setting(self, setting: str, value: Any) -> bool:
+        if setting == "storage_root":
+            return isinstance(value, str) and len(value.strip()) > 0
         return True
 
     def _validate_calendar_setting(self, setting: str, value: Any) -> bool:

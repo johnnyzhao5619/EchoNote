@@ -20,15 +20,18 @@ Displays event information with different layouts for past and future events.
 """
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 from core.qt_imports import (
     QCheckBox,
     QComboBox,
+    QDrag,
     QFrame,
     QHBoxLayout,
     QLabel,
+    QMimeData,
     QPushButton,
+    Qt,
     QVBoxLayout,
     QWidget,
     Signal,
@@ -65,6 +68,10 @@ from ui.constants import (
 )
 from utils.i18n import LANGUAGE_OPTION_KEYS, I18nQtManager
 from utils.time_utils import format_localized_datetime, to_local_datetime
+from ui.workspace_drag_payload import (
+    WORKSPACE_TEXT_DRAG_MIME,
+    serialize_workspace_text_drag_payload,
+)
 
 logger = logging.getLogger("echonote.ui.timeline.event_card")
 
@@ -139,6 +146,7 @@ class EventCard(BaseEventCard):
         event_data: Dict[str, Any],
         is_future: bool,
         i18n: I18nQtManager,
+        drag_payload_provider: Optional[Callable[[str, Dict[str, Any]], Optional[dict[str, str]]]] = None,
         parent: Optional[QWidget] = None,
     ):
         """
@@ -157,6 +165,8 @@ class EventCard(BaseEventCard):
         self.is_future = is_future
 
         self.artifacts = event_data.get("artifacts", {})
+        self._drag_payload_provider = drag_payload_provider
+        self._drag_start_pos = None
 
         # Additional badge/control labels
         self.recording_btn = None
@@ -174,6 +184,33 @@ class EventCard(BaseEventCard):
         self.setup_ui()
 
         logger.debug(f"Timeline event card created: {self.calendar_event.id}")
+
+    def mousePressEvent(self, event):
+        """Track background left-click presses for possible drag start."""
+        child = self.childAt(event.position().toPoint())
+        if (
+            event.button() == Qt.MouseButton.LeftButton
+            and not isinstance(child, (QPushButton, QCheckBox, QComboBox))
+        ):
+            self._drag_start_pos = event.position().toPoint()
+        else:
+            self._drag_start_pos = None
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        """Start workspace-text drag when the user drags a text-backed event card."""
+        if not (event.buttons() & Qt.MouseButton.LeftButton) or self._drag_start_pos is None:
+            super().mouseMoveEvent(event)
+            return
+        distance = (event.position().toPoint() - self._drag_start_pos).manhattanLength()
+        if distance < 8:
+            super().mouseMoveEvent(event)
+            return
+        if self._start_workspace_drag():
+            self._drag_start_pos = None
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
 
     def setup_ui(self):
         """Set up the card UI."""
@@ -525,6 +562,29 @@ class EventCard(BaseEventCard):
     def _on_delete_clicked(self):
         """Handle delete action click."""
         self.delete_requested.emit(self.calendar_event.id)
+
+    def _start_workspace_drag(self) -> bool:
+        payload = self._build_drag_payload()
+        if payload is None:
+            return False
+        drag = QDrag(self)
+        mime_data = QMimeData()
+        mime_data.setData(
+            WORKSPACE_TEXT_DRAG_MIME,
+            serialize_workspace_text_drag_payload(payload),
+        )
+        drag.setMimeData(mime_data)
+        drag.exec(Qt.DropAction.CopyAction | Qt.DropAction.MoveAction)
+        return True
+
+    def _build_drag_payload(self) -> Optional[dict[str, str]]:
+        if not callable(self._drag_payload_provider):
+            return None
+        try:
+            return self._drag_payload_provider(self.calendar_event.id, self.artifacts)
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Failed to build timeline event drag payload for %s: %s", self.calendar_event.id, exc)
+            return None
 
     def update_translations(self):
         """Update UI text when language changes."""

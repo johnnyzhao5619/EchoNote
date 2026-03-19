@@ -8,13 +8,17 @@ import wave
 import pytest
 
 import ui.workspace as workspace_module
-from core.qt_imports import QWidget, Qt
+from core.qt_imports import QMenu, QWidget, Qt
 from core.workspace.manager import WorkspaceManager
 from data.database.connection import DatabaseConnection
 from data.database.models import CalendarEvent, TranscriptionTask, WorkspaceAsset, WorkspaceItem
 from data.storage.file_manager import FileManager
 from ui.common.audio_player import AudioPlayer
 from ui.main_window import MainWindow
+from ui.workspace_drag_payload import (
+    WORKSPACE_DRAG_SOURCE_BATCH_TASK,
+    build_workspace_text_drag_payload,
+)
 from ui.workspace.detached_document_window import DetachedDocumentWindow
 from ui.workspace.widget import WorkspaceWidget
 
@@ -705,9 +709,128 @@ def test_workspace_structure_drag_moves_items_without_menu_action(
 
     widget.library_panel._on_tree_drop_requested("item", note_id, "folder", folder_id)
     moved = workspace_manager.get_item(note_id)
+    moved_asset = workspace_manager.get_primary_text_asset(note_id)
 
     assert moved is not None
+    assert moved_asset is not None
     assert moved.folder_id == folder_id
+    assert moved_asset.file_path.endswith("工作台条目/Archive/Plan.md")
+
+
+def test_workspace_item_context_menu_surfaces_expected_actions(
+    qapp, mock_i18n, workspace_manager
+):
+    note_id = workspace_manager.create_note(title="Plan")
+    widget = WorkspaceWidget(workspace_manager, mock_i18n)
+
+    menu = QMenu(widget)
+    widget.library_panel._populate_item_context_menu(menu, note_id)
+    action_texts = [action.text() for action in menu.actions() if action.text()]
+
+    assert mock_i18n.t("workspace.open_item") in action_texts
+    assert mock_i18n.t("workspace.open_in_new_window") in action_texts
+    assert mock_i18n.t("workspace.copy_local_path") in action_texts
+    assert mock_i18n.t("common.rename") in action_texts
+    assert mock_i18n.t("common.delete") in action_texts
+
+
+def test_workspace_structure_drag_blocks_non_text_system_item_move(
+    qapp, mock_i18n, workspace_manager
+):
+    archive_folder_id = workspace_manager.create_folder("Archive")
+    event = CalendarEvent(
+        title="Audio Only Session",
+        start_time="2026-03-18T10:00:00+00:00",
+        end_time="2026-03-18T11:00:00+00:00",
+    )
+    event.save(workspace_manager.db)
+    event_folder_id = workspace_manager.resolve_default_folder_id(event_id=event.id)
+
+    item = WorkspaceItem(
+        title="Audio Only Session",
+        item_type="recording",
+        folder_id=event_folder_id,
+        source_kind="realtime_recording",
+        source_event_id=event.id,
+        status="completed",
+    )
+    item.save(workspace_manager.db)
+    audio_path = workspace_manager.file_manager.get_workspace_path("fixtures", "audio-only.wav")
+    Path(audio_path).parent.mkdir(parents=True, exist_ok=True)
+    _write_valid_wav(Path(audio_path))
+    audio_asset = WorkspaceAsset(
+        item_id=item.id,
+        asset_role="audio",
+        file_path=audio_path,
+        content_type="audio/wav",
+    )
+    audio_asset.save(workspace_manager.db)
+
+    widget = WorkspaceWidget(workspace_manager, mock_i18n)
+    widget.show()
+    qapp.processEvents()
+
+    with patch.object(widget.library_panel, "show_warning") as show_warning:
+        widget.library_panel._on_tree_drop_requested("item", item.id, "folder", archive_folder_id)
+        qapp.processEvents()
+
+    unchanged_item = workspace_manager.get_item(item.id)
+
+    assert unchanged_item is not None
+    assert unchanged_item.folder_id == event_folder_id
+    show_warning.assert_called()
+
+
+def test_workspace_structure_accepts_external_batch_task_payload_move(
+    qapp, mock_i18n, workspace_manager
+):
+    archive_folder_id = workspace_manager.create_folder("Archive")
+    batch_root_folder = workspace_manager.ensure_batch_task_root_folder()
+    task = TranscriptionTask(
+        id="task-external-drag",
+        file_path="/tmp/imported-notes.wav",
+        file_name="imported-notes.wav",
+        status="completed",
+    )
+    task.save(workspace_manager.db)
+    item = WorkspaceItem(
+        title="Imported Notes",
+        item_type="document",
+        folder_id=batch_root_folder.id,
+        source_kind="batch_transcription",
+        source_task_id="task-external-drag",
+        status="completed",
+    )
+    item.save(workspace_manager.db)
+    text_path = Path(workspace_manager.file_manager.get_workspace_path("Batch Notes.md"))
+    text_path.parent.mkdir(parents=True, exist_ok=True)
+    text_path.write_text("batch notes", encoding="utf-8")
+    text_asset = WorkspaceAsset(
+        item_id=item.id,
+        asset_role="transcript",
+        file_path=str(text_path),
+        content_type="text/markdown",
+    )
+    text_asset.save(workspace_manager.db)
+    item.primary_text_asset_id = text_asset.id
+    item.save(workspace_manager.db)
+
+    widget = WorkspaceWidget(workspace_manager, mock_i18n)
+    widget.show()
+    qapp.processEvents()
+
+    payload = build_workspace_text_drag_payload(item.id, WORKSPACE_DRAG_SOURCE_BATCH_TASK)
+    with patch.object(widget.library_panel, "_confirm_system_item_transfer", return_value="move"):
+        widget.library_panel._on_external_workspace_drop_requested(payload, "folder", archive_folder_id)
+        qapp.processEvents()
+
+    moved_item = workspace_manager.get_item(item.id)
+    moved_asset = workspace_manager.get_primary_text_asset(item.id)
+
+    assert moved_item is not None
+    assert moved_asset is not None
+    assert moved_item.folder_id == archive_folder_id
+    assert moved_asset.file_path.endswith("工作台条目/Archive/Imported Notes/Batch Notes.md")
 
 
 def test_workspace_structure_drag_keeps_moved_item_visible_and_selected(
@@ -823,12 +946,15 @@ def test_workspace_editor_edit_mode_saves_title_and_content_together(
 
     renamed_item = workspace_manager.get_item(note_id)
     renamed_node = widget.library_panel.find_item_node(note_id)
+    renamed_asset = workspace_manager.get_primary_text_asset(note_id)
 
     assert renamed_item is not None
+    assert renamed_asset is not None
     assert renamed_item.title == "Renamed Plan"
     assert widget.editor_panel.document_title_label.text() == "Renamed Plan"
     assert renamed_node is not None
     assert renamed_node.text(0) == "Renamed Plan"
+    assert renamed_asset.file_path.endswith("工作台条目/Renamed Plan.md")
     assert workspace_manager.get_item_text_content(note_id) == "Updated content"
 
 
@@ -992,6 +1118,64 @@ def test_workspace_supports_document_tabs_and_detached_window(
     qapp.processEvents()
 
     assert second_id in widget._detached_windows
+
+
+def test_workspace_document_tabs_expose_semantic_roles(qapp, mock_i18n, workspace_manager):
+    widget = WorkspaceWidget(workspace_manager, mock_i18n)
+
+    assert widget.document_tabs.property("role") == "workspace-document-tabs"
+    assert widget.open_in_window_button.property("role") == "workspace-tab-action"
+    assert widget.inspector_toggle_button.property("role") == "workspace-tab-action"
+    close_button = widget.document_tabs.tabBar().tabButton(0, widget.document_tabs.tabBar().ButtonPosition.RightSide)
+    assert close_button is not None
+    assert close_button.property("role") == "workspace-tab-close"
+
+
+def test_workspace_detached_window_is_top_level_and_preserves_current_asset_tab(
+    qapp, mock_i18n, workspace_manager
+):
+    item_id = workspace_manager.list_items()[0].id
+    workspace_manager.save_text_asset(item_id, "translation", "已翻译文本")
+    widget = WorkspaceWidget(workspace_manager, mock_i18n)
+    widget.open_item(item_id)
+    widget.editor_panel.select_asset_role("translation")
+    qapp.processEvents()
+
+    widget.open_current_item_in_window_action.trigger()
+    qapp.processEvents()
+
+    detached_window = widget._detached_windows[item_id]
+    assert detached_window.isWindow()
+    assert detached_window.editor_panel.current_asset_role() == "translation"
+    assert not hasattr(detached_window, "document_title_label")
+
+
+def test_workspace_and_detached_window_can_toggle_inspector_panel(
+    qapp, mock_i18n, workspace_manager
+):
+    item_id = workspace_manager.list_items()[0].id
+    widget = WorkspaceWidget(workspace_manager, mock_i18n)
+    widget.open_item(item_id)
+
+    assert not widget.inspector_panel.isHidden()
+    widget.inspector_toggle_button.click()
+    qapp.processEvents()
+    assert widget.inspector_panel.isHidden()
+    widget.inspector_toggle_button.click()
+    qapp.processEvents()
+    assert not widget.inspector_panel.isHidden()
+
+    widget.open_current_item_in_window_action.trigger()
+    qapp.processEvents()
+    detached_window = widget._detached_windows[item_id]
+
+    assert not detached_window.inspector_panel.isHidden()
+    detached_window.inspector_toggle_button.click()
+    qapp.processEvents()
+    assert detached_window.inspector_panel.isHidden()
+    detached_window.inspector_toggle_button.click()
+    qapp.processEvents()
+    assert not detached_window.inspector_panel.isHidden()
 
 
 def test_workspace_module_does_not_export_legacy_recording_control_panel():

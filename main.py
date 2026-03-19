@@ -208,7 +208,15 @@ def main():
         default_recordings_path = get_i18n_default_recordings_path(i18n)
         recordings_path = config.get("realtime.recording_save_path", default_recordings_path)
         default_base_dir = str(Path(default_recordings_path).expanduser().parent)
-        file_manager = FileManager(base_dir=default_base_dir, recordings_dir=recordings_path)
+        workspace_root = config.get(
+            "workspace.storage_root",
+            str(Path(default_base_dir).expanduser() / "WorkspaceVault"),
+        )
+        file_manager = FileManager(
+            base_dir=default_base_dir,
+            recordings_dir=recordings_path,
+            workspace_root=workspace_root,
+        )
         managers["file_manager"] = file_manager
         logger.info("File manager initialized")
 

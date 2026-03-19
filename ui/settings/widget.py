@@ -170,11 +170,14 @@ class SettingsWidget(BaseWidget):
         category_list = QListWidget()
         category_list.setFixedWidth(SETTINGS_NAV_WIDTH)
         category_list.setProperty("role", ROLE_SETTINGS_NAV)
+        category_list.setSpacing(4)
+        category_list.setUniformItemSizes(True)
+        category_list.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
         # Define categories based on available pages/managers
         categories = [
             (category_id, f"settings.category.{category_id}")
-            for category_id in self._get_available_category_ids()
+            for category_id, _factory in self._page_specs()
         ]
 
         # Add category items
@@ -193,65 +196,9 @@ class SettingsWidget(BaseWidget):
 
     def _create_settings_pages(self):
         """Create all settings pages and add to container."""
-        # Import page classes
-        from ui.settings.appearance_page import AppearanceSettingsPage
-        from ui.settings.calendar_page import CalendarSettingsPage
-        from ui.settings.language_page import LanguageSettingsPage
-        from ui.settings.model_management_page import ModelManagementPage
-        from ui.settings.realtime_page import RealtimeSettingsPage
-        from ui.settings.timeline_page import TimelineSettingsPage
-        from ui.settings.translation_page import TranslationSettingsPage
-        from ui.settings.transcription_page import TranscriptionSettingsPage
-        from ui.settings.workspace_ai_page import WorkspaceAISettingsPage
-
-        # Page definitions: (id, class, args)
-        page_defs = [
-            (
-                "transcription",
-                TranscriptionSettingsPage,
-                (self.settings_manager, self.i18n, self.managers),
-            ),
-            (
-                "realtime",
-                RealtimeSettingsPage,
-                (self.settings_manager, self.i18n, self.managers),
-            ),
-            (
-                "translation",
-                TranslationSettingsPage,
-                (self.settings_manager, self.i18n, self.managers),
-            ),
-            (
-                "model_management",
-                ModelManagementPage,
-                (self.settings_manager, self.i18n, self.managers.get("model_manager")),
-            ),
-            (
-                "workspace_ai",
-                WorkspaceAISettingsPage,
-                (self.settings_manager, self.i18n, self.managers),
-            ),
-            (
-                "calendar",
-                CalendarSettingsPage,
-                (self.settings_manager, self.i18n, self.managers),
-            ),
-            ("timeline", TimelineSettingsPage, (self.settings_manager, self.i18n)),
-            (
-                "appearance",
-                AppearanceSettingsPage,
-                (self.settings_manager, self.i18n, self.managers),
-            ),
-            ("language", LanguageSettingsPage, (self.settings_manager, self.i18n)),
-        ]
-
-        for page_id, page_class, args in page_defs:
-            # Skip model management if manager not available
-            if page_id == "model_management" and "model_manager" not in self.managers:
-                continue
-
+        for page_id, factory in self._page_specs():
             try:
-                page_widget = page_class(*args)
+                page_widget = factory()
                 self.pages_container.addWidget(page_widget)
                 self.settings_pages[page_id] = page_widget
 
@@ -275,21 +222,106 @@ class SettingsWidget(BaseWidget):
 
         logger.debug(f"Created settings pages: {list(self.settings_pages.keys())}")
 
-    def _get_available_category_ids(self) -> list[str]:
-        """Return category IDs that should be visible for this session."""
-        categories = [
-            "transcription",
-            "realtime",
-            "translation",
-            "workspace_ai",
-            "calendar",
-            "timeline",
-            "appearance",
-            "language",
+    def _page_specs(self):
+        """Return page factories in the exact order used by navigation and stack."""
+        from ui.settings.appearance_page import AppearanceSettingsPage
+        from ui.settings.calendar_page import CalendarSettingsPage
+        from ui.settings.language_page import LanguageSettingsPage
+        from ui.settings.model_management_page import ModelManagementPage
+        from ui.settings.realtime_page import RealtimeSettingsPage
+        from ui.settings.timeline_page import TimelineSettingsPage
+        from ui.settings.translation_page import TranslationSettingsPage
+        from ui.settings.workspace_page import WorkspaceSettingsPage
+        from ui.settings.transcription_page import TranscriptionSettingsPage
+        from ui.settings.workspace_ai_page import WorkspaceAISettingsPage
+
+        specs = [
+            (
+                "transcription",
+                lambda: TranscriptionSettingsPage(
+                    self.settings_manager,
+                    self.i18n,
+                    self.managers,
+                ),
+            ),
+            (
+                "realtime",
+                lambda: RealtimeSettingsPage(
+                    self.settings_manager,
+                    self.i18n,
+                    self.managers,
+                ),
+            ),
+            (
+                "translation",
+                lambda: TranslationSettingsPage(
+                    self.settings_manager,
+                    self.i18n,
+                    self.managers,
+                ),
+            ),
         ]
         if "model_manager" in self.managers:
-            categories.insert(3, "model_management")
-        return categories
+            specs.append(
+                (
+                    "model_management",
+                    lambda: ModelManagementPage(
+                        self.settings_manager,
+                        self.i18n,
+                        self.managers.get("model_manager"),
+                    ),
+                )
+            )
+        specs.extend(
+            [
+                (
+                    "workspace",
+                    lambda: WorkspaceSettingsPage(
+                        self.settings_manager,
+                        self.i18n,
+                    ),
+                ),
+                (
+                    "workspace_ai",
+                    lambda: WorkspaceAISettingsPage(
+                        self.settings_manager,
+                        self.i18n,
+                        self.managers,
+                    ),
+                ),
+                (
+                    "calendar",
+                    lambda: CalendarSettingsPage(
+                        self.settings_manager,
+                        self.i18n,
+                        self.managers,
+                    ),
+                ),
+                (
+                    "timeline",
+                    lambda: TimelineSettingsPage(
+                        self.settings_manager,
+                        self.i18n,
+                    ),
+                ),
+                (
+                    "appearance",
+                    lambda: AppearanceSettingsPage(
+                        self.settings_manager,
+                        self.i18n,
+                        self.managers,
+                    ),
+                ),
+                (
+                    "language",
+                    lambda: LanguageSettingsPage(
+                        self.settings_manager,
+                        self.i18n,
+                    ),
+                ),
+            ]
+        )
+        return specs
 
     def _on_category_changed(self, index: int):
         """
@@ -298,12 +330,17 @@ class SettingsWidget(BaseWidget):
         Args:
             index: Selected category index
         """
-        # Switch to corresponding page if index is valid
-        if 0 <= index < self.pages_container.count():
-            self.pages_container.setCurrentIndex(index)
-            logger.debug(f"Switched to settings category: {index}")
-        else:
+        if not (0 <= index < self.category_list.count()):
             logger.warning("Invalid settings category index: %s", index)
+            return
+        item = self.category_list.item(index)
+        page_id = item.data(Qt.ItemDataRole.UserRole) if item is not None else None
+        page_widget = self.settings_pages.get(page_id) if isinstance(page_id, str) else None
+        if page_widget is None:
+            logger.warning("Settings page '%s' is not available", page_id)
+            return
+        self.pages_container.setCurrentWidget(page_widget)
+        logger.debug("Switched to settings category: %s", page_id)
 
     def show_page(self, page_id: str) -> bool:
         """Navigate to a settings category by page identifier."""
@@ -417,9 +454,7 @@ class SettingsWidget(BaseWidget):
                     if not is_valid:
                         self.show_warning(self.i18n.t("settings.validation.title"), error_msg)
                         # Switch to the page with error
-                        page_index = self.pages_container.indexOf(page_widget)
-                        if page_index >= 0:
-                            self.category_list.setCurrentRow(page_index)
+                        self.show_page(_page_id)
                         return False
 
             # Save settings from each page

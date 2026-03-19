@@ -188,6 +188,22 @@ class TestSettingsWidgetCategories:
         ]
         assert "workspace_ai" in category_ids
 
+    def test_workspace_category_exists(self, widget):
+        """Workspace storage settings category should be available."""
+        category_ids = [
+            widget.category_list.item(i).data(Qt.ItemDataRole.UserRole)
+            for i in range(widget.category_list.count())
+        ]
+        assert "workspace" in category_ids
+
+    def test_workspace_category_precedes_workspace_ai(self, widget):
+        """Workspace storage should appear before Workspace AI in navigation."""
+        category_ids = [
+            widget.category_list.item(i).data(Qt.ItemDataRole.UserRole)
+            for i in range(widget.category_list.count())
+        ]
+        assert category_ids.index("workspace") < category_ids.index("workspace_ai")
+
     def test_category_count_matches_page_count(self, widget):
         """Category list and page stack should stay aligned."""
         assert widget.category_list.count() == len(widget.settings_pages)
@@ -207,6 +223,34 @@ class TestSettingsWidgetCategories:
             for i in range(widget.category_list.count())
         ]
         assert "model_management" not in category_ids
+
+    def test_category_selection_tracks_matching_page_when_model_manager_present(
+        self,
+        qapp,
+        mock_settings_manager,
+        mock_i18n,
+        mock_model_manager,
+    ):
+        managers = {
+            "settings_manager": mock_settings_manager,
+            "model_manager": mock_model_manager,
+        }
+        widget = SettingsWidget(
+            settings_manager=mock_settings_manager,
+            i18n=mock_i18n,
+            managers=managers,
+        )
+
+        category_rows = {
+            widget.category_list.item(i).data(Qt.ItemDataRole.UserRole): i
+            for i in range(widget.category_list.count())
+        }
+
+        widget.category_list.setCurrentRow(category_rows["model_management"])
+        assert widget.pages_container.currentWidget() is widget.settings_pages["model_management"]
+
+        widget.category_list.setCurrentRow(category_rows["workspace"])
+        assert widget.pages_container.currentWidget() is widget.settings_pages["workspace"]
 
     def test_category_change_updates_page(self, widget):
         """Test changing category updates the displayed page."""

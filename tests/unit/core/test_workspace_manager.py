@@ -123,7 +123,36 @@ def test_import_document_copies_source_and_extracted_text(tmp_path):
 
     assert Path(source_asset.file_path).exists()
     assert Path(text_asset.file_path).exists()
+    assert Path(source_asset.file_path).parent.name == "notes.assets"
+    assert text_asset.file_path.endswith("工作台条目/notes.md")
     assert Path(text_asset.file_path).read_text(encoding="utf-8") == "meeting notes"
+    assert text_asset.text_content is None
+
+
+def test_workspace_note_is_stored_as_markdown_file_in_vault(tmp_path):
+    manager = build_workspace_manager(tmp_path)
+
+    note_id = manager.create_note(title="Plan", text_content="hello")
+    asset = manager.get_primary_text_asset(note_id)
+
+    assert asset is not None
+    assert asset.file_path.endswith("工作台条目/Plan.md")
+    assert Path(asset.file_path).read_text(encoding="utf-8") == "hello"
+    assert asset.content_type == "text/markdown"
+    assert asset.text_content is None
+
+
+def test_read_asset_text_prefers_file_over_stale_database_content(tmp_path):
+    manager = build_workspace_manager(tmp_path)
+
+    note_id = manager.create_note(title="Plan", text_content="hello")
+    asset = manager.get_primary_text_asset(note_id)
+
+    assert asset is not None
+    asset.text_content = "stale"
+    asset.save(manager.db)
+
+    assert manager.read_asset_text(asset) == "hello"
 
 
 def test_save_text_asset_preserves_existing_primary_text_asset(tmp_path):
@@ -471,6 +500,36 @@ def test_workspace_manager_renames_moves_and_deletes_folders(tmp_path):
     assert manager.delete_folder(source_folder_id) is True
 
 
+def test_rename_and_move_item_sync_markdown_file_path(tmp_path):
+    manager = build_workspace_manager(tmp_path)
+    folder_id = manager.create_folder("Projects")
+    note_id = manager.create_note(title="Plan", text_content="hello")
+
+    manager.move_item_to_folder(note_id, folder_id)
+    manager.rename_item(note_id, "Spec")
+
+    asset = manager.get_primary_text_asset(note_id)
+
+    assert asset is not None
+    assert asset.file_path.endswith("工作台条目/Projects/Spec.md")
+    assert Path(asset.file_path).read_text(encoding="utf-8") == "hello"
+
+
+def test_rename_folder_syncs_descendant_markdown_paths(tmp_path):
+    manager = build_workspace_manager(tmp_path)
+    folder_id = manager.create_folder("Projects")
+    note_id = manager.create_note(title="Plan", text_content="hello")
+    manager.move_item_to_folder(note_id, folder_id)
+
+    manager.rename_folder(folder_id, "Active Projects")
+
+    asset = manager.get_primary_text_asset(note_id)
+
+    assert asset is not None
+    assert asset.file_path.endswith("工作台条目/Active Projects/Plan.md")
+    assert Path(asset.file_path).read_text(encoding="utf-8") == "hello"
+
+
 def test_workspace_manager_creates_unique_note_titles_within_same_folder(tmp_path):
     manager = build_workspace_manager(tmp_path)
 
@@ -528,6 +587,7 @@ def test_workspace_manager_move_item_rejects_duplicate_names_and_system_root_tar
     first_note_id = manager.create_note(title="Plan")
     second_note_id = manager.create_note(title="Plan")
     event_root_folder = manager.ensure_event_root_folder()
+    batch_root_folder = manager.ensure_batch_task_root_folder()
 
     manager.move_item_to_folder(first_note_id, archive_folder_id)
     manager.move_item_to_folder(second_note_id, drafts_folder_id)
@@ -538,6 +598,9 @@ def test_workspace_manager_move_item_rejects_duplicate_names_and_system_root_tar
 
     with pytest.raises(WorkspaceValidationError, match="invalid_move_target"):
         manager.move_item_to_folder(second_note_id, event_root_folder.id)
+
+    with pytest.raises(WorkspaceValidationError, match="invalid_move_target"):
+        manager.move_item_to_folder(second_note_id, batch_root_folder.id)
 
 
 def test_workspace_manager_move_and_delete_cleanup_empty_event_folder(tmp_path):

@@ -175,3 +175,29 @@ def test_event_card_view_text_uses_translation_when_transcript_missing(qapp, moc
 
     assert transcript_captured == []
     assert translation_captured == ["/tmp/meeting_zh.txt"]
+
+
+def test_event_card_uses_drag_payload_provider_for_workspace_transfer(qapp, mock_i18n):
+    event = SimpleNamespace(
+        id="evt-drag",
+        title="Drag Event",
+        start_time=datetime(2026, 1, 3, 9, 0, 0),
+        end_time=datetime(2026, 1, 3, 10, 0, 0),
+        source="local",
+        event_type="event",
+        location="",
+        attendees=[],
+        description="",
+    )
+    artifacts = {"transcript": "/tmp/meeting.txt"}
+    payload = {"workspace_item_id": "workspace-item-1", "source_domain": "event"}
+    card = EventCard(
+        {"event": event, "artifacts": artifacts},
+        is_future=False,
+        i18n=mock_i18n,
+        drag_payload_provider=lambda event_id, drag_artifacts: payload
+        if event_id == "evt-drag" and drag_artifacts == artifacts
+        else None,
+    )
+
+    assert card._build_drag_payload() == payload

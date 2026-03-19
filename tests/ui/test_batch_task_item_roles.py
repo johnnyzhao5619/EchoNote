@@ -69,3 +69,15 @@ def test_task_window_groups_creation_actions_task_item_exposes_task_kind_propert
     widget = TaskItem(task_data=task, i18n=mock_i18n)
 
     assert widget.property("taskKind") == "translation"
+
+
+def test_task_item_uses_drag_payload_provider_for_workspace_transfer(qapp, mock_i18n):
+    payload = {"workspace_item_id": "workspace-item-1", "source_domain": "batch_task"}
+    task = {"id": "task-drag", "file_name": "notes.txt", "status": "completed"}
+    widget = TaskItem(
+        task_data=task,
+        i18n=mock_i18n,
+        drag_payload_provider=lambda task_id: payload if task_id == "task-drag" else None,
+    )
+
+    assert widget._build_drag_payload() == payload

@@ -945,6 +945,48 @@ QWidget[role="workspace-editor-panel"] {
     border-radius: 12px;
 }
 
+QTabWidget[role="workspace-document-tabs"]::pane {
+    border: none;
+    background-color: transparent;
+    margin-top: 6px;
+}
+
+QTabWidget[role="workspace-document-tabs"] QTabBar::tab {
+    background-color: #eef5ff;
+    color: #35527d;
+    border: 1px solid #cfdef3;
+    border-radius: 10px;
+    padding: 8px 12px;
+    margin-right: 8px;
+    margin-bottom: 6px;
+    min-height: 20px;
+}
+
+QTabWidget[role="workspace-document-tabs"] QTabBar::tab:selected {
+    background-color: #ffffff;
+    color: #123b75;
+    border-color: #8fb2e6;
+    font-weight: 700;
+}
+
+QTabWidget[role="workspace-document-tabs"] QTabBar::tab:hover {
+    background-color: #f7fbff;
+    border-color: #7fa3db;
+}
+
+QToolButton[role="workspace-tab-close"] {
+    background-color: #e8f1ff;
+    color: #365078;
+    border: 1px solid #c8d8ef;
+    border-radius: 9px;
+    padding: 0;
+}
+
+QToolButton[role="workspace-tab-close"]:hover {
+    background-color: #dceaff;
+    border-color: #90b4ea;
+}
+
 QTabWidget[role="workspace-asset-tabs"]::pane {
     border: none;
     margin-top: 4px;
@@ -3319,20 +3361,40 @@ QListWidget[role="settings-nav"] {
     background-color: #f7faff;
     border: 1px solid #d7e1f0;
     border-radius: 10px;
-    padding: 4px;
+    padding: 6px;
 }
 
 QListWidget[role="settings-nav"]::item {
-    border-radius: 7px;
-    min-height: 30px;
-    padding: 6px 10px;
+    border-radius: 9px;
+    min-height: 32px;
+    padding: 7px 12px;
+    margin: 1px 0;
     color: #2e466c;
 }
 
+QListWidget[role="settings-nav"]::item:hover {
+    background-color: #edf4ff;
+    color: #214372;
+}
+
 QListWidget[role="settings-nav"]::item:selected {
-    background-color: #e8f1ff;
-    color: #12408f;
+    background-color: #dfeeff;
+    color: #123e8b;
     font-weight: 700;
+}
+
+QToolButton[role="workspace-tab-action"] {
+    background-color: #eef5ff;
+    color: #274673;
+    border: 1px solid #cfdef3;
+    border-radius: 10px;
+    padding: 7px 12px;
+    min-height: 20px;
+}
+
+QToolButton[role="workspace-tab-action"]:hover {
+    background-color: #f7fbff;
+    border-color: #7fa3db;
 }
 
 QLabel[role="oauth-status"][state="success"],

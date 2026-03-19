@@ -20,11 +20,15 @@ Displays individual transcription task information and controls.
 """
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 from core.qt_imports import (
+    QAction,
+    QDrag,
     QHBoxLayout,
     QLabel,
+    QMenu,
+    QMimeData,
     QProgressBar,
     QPushButton,
     Qt,
@@ -51,6 +55,10 @@ from ui.constants import (
     ROLE_TASK_STATUS,
     TASK_ITEM_MIN_HEIGHT,
 )
+from ui.workspace_drag_payload import (
+    WORKSPACE_TEXT_DRAG_MIME,
+    serialize_workspace_text_drag_payload,
+)
 from utils.i18n import I18nQtManager
 
 logger = logging.getLogger("echonote.ui.batch_transcribe.task_item")
@@ -74,7 +82,12 @@ class TaskItem(BaseWidget):
     retry_clicked = Signal(str)  # task_id
 
     def __init__(
-        self, task_data: Dict[str, Any], i18n: I18nQtManager, parent: Optional[QWidget] = None
+        self,
+        task_data: Dict[str, Any],
+        i18n: I18nQtManager,
+        parent: Optional[QWidget] = None,
+        *,
+        drag_payload_provider: Optional[Callable[[str], Optional[dict[str, str]]]] = None,
     ):
         """
         Initialize task item widget.
@@ -90,6 +103,8 @@ class TaskItem(BaseWidget):
         self.task_id = task_data["id"]
         self.i18n = i18n
         self._processing_paused = False
+        self._drag_payload_provider = drag_payload_provider
+        self._drag_start_pos = None
 
         # Setup UI
         self.setup_ui()
@@ -220,6 +235,27 @@ class TaskItem(BaseWidget):
         self.setMinimumHeight(TASK_ITEM_MIN_HEIGHT)
 
         logger.debug("Task item UI setup complete")
+
+    def mousePressEvent(self, event):
+        """Track left-button presses so completed task items can start drags."""
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._drag_start_pos = event.position().toPoint()
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        """Start a workspace-text drag when the pointer exceeds drag threshold."""
+        if not (event.buttons() & Qt.MouseButton.LeftButton) or self._drag_start_pos is None:
+            super().mouseMoveEvent(event)
+            return
+        distance = (event.position().toPoint() - self._drag_start_pos).manhattanLength()
+        if distance < 8:
+            super().mouseMoveEvent(event)
+            return
+        if self._start_workspace_drag():
+            self._drag_start_pos = None
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
 
     def update_translations(self):
         """Update all UI text with current language translations."""
@@ -447,6 +483,29 @@ class TaskItem(BaseWidget):
         merged.update(task_data)
         self.task_data = merged
         self.update_display()
+
+    def _start_workspace_drag(self) -> bool:
+        payload = self._build_drag_payload()
+        if payload is None:
+            return False
+        drag = QDrag(self)
+        mime_data = QMimeData()
+        mime_data.setData(
+            WORKSPACE_TEXT_DRAG_MIME,
+            serialize_workspace_text_drag_payload(payload),
+        )
+        drag.setMimeData(mime_data)
+        drag.exec(Qt.DropAction.CopyAction | Qt.DropAction.MoveAction)
+        return True
+
+    def _build_drag_payload(self) -> Optional[dict[str, str]]:
+        if not callable(self._drag_payload_provider):
+            return None
+        try:
+            return self._drag_payload_provider(self.task_id)
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Failed to build task drag payload for %s: %s", self.task_id, exc)
+            return None
 
     def contextMenuEvent(self, event):
         """

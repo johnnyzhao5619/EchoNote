@@ -65,6 +65,16 @@ class TestFileManagerInitialization:
 
         assert Path(file_path).parent == base_dir / "Workspace"
 
+    def test_init_with_custom_workspace_root(self, tmp_path):
+        """Explicit workspace root should override the default workspace alias target."""
+        base_dir = tmp_path / "echonote"
+        workspace_root = tmp_path / "vault"
+        fm = FileManager(str(base_dir), workspace_root=str(workspace_root))
+
+        assert fm.workspace_dir == workspace_root
+        assert workspace_root.exists()
+        assert Path(fm.get_workspace_path("Note.md")).parent == workspace_root
+
 
 class TestFileSaveOperations:
     """Test file saving operations."""

@@ -68,6 +68,10 @@ from ui.constants import (
     ZERO_MARGINS,
 )
 from ui.utils import calculate_date_range_defaults, normalize_day_span
+from ui.workspace_drag_payload import (
+    WORKSPACE_DRAG_SOURCE_EVENT,
+    build_workspace_text_drag_payload,
+)
 from utils.i18n import I18nQtManager
 from utils.time_utils import now_local, to_local_datetime, to_utc_iso
 
@@ -639,7 +643,13 @@ class TimelineWidget(BaseWidget):
         # Import here to avoid circular imports
         from ui.timeline.event_card import CurrentTimeIndicator, EventCard
 
-        card = EventCard(event_data=event_data, is_future=is_future, i18n=self.i18n, parent=self)
+        card = EventCard(
+            event_data=event_data,
+            is_future=is_future,
+            i18n=self.i18n,
+            drag_payload_provider=self._build_workspace_drag_payload_for_event,
+            parent=self,
+        )
 
         # Connect signals
         card.auto_task_changed.connect(self._on_auto_task_changed)
@@ -1060,6 +1070,29 @@ class TimelineWidget(BaseWidget):
         if not item_id:
             return False
         return bool(open_workspace_item(item_id=item_id, asset_role=asset_role, view_mode="event"))
+
+    def _build_workspace_drag_payload_for_event(
+        self,
+        event_id: str,
+        artifacts: Dict[str, Any],
+    ) -> Optional[dict[str, str]]:
+        workspace_manager = getattr(self.timeline_manager, "workspace_manager", None)
+        if workspace_manager is None:
+            return None
+        item_id = workspace_manager.get_event_item_id(event_id)
+        if item_id is None:
+            for path_key in ("transcript", "translation"):
+                artifact_path = artifacts.get(path_key)
+                if artifact_path:
+                    item_id = workspace_manager.find_item_id_by_asset_path(artifact_path)
+                    if item_id:
+                        break
+        if not item_id:
+            return None
+        has_text = getattr(workspace_manager, "item_has_text_content", None)
+        if callable(has_text) and not has_text(item_id):
+            return None
+        return build_workspace_text_drag_payload(item_id, WORKSPACE_DRAG_SOURCE_EVENT)
 
     def _update_shell_message(self, message: str) -> None:
         """Show a short status message on shell footer when available."""

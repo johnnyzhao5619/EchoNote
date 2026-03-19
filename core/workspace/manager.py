@@ -12,6 +12,7 @@ from data.storage.file_manager import FileManager
 
 from core.workspace.document_parser import DocumentParser
 from core.workspace.import_service import WorkspaceImportService
+from core.workspace.vault_layout import WorkspaceVaultLayout
 
 TEXT_ASSET_ROLE_PRIORITY = {
     "document_text": 0,
@@ -62,10 +63,12 @@ class WorkspaceManager:
         self.settings_manager = settings_manager
         self.model_manager = model_manager
         self.document_parser = document_parser or DocumentParser()
+        self.vault_layout = WorkspaceVaultLayout(self.file_manager.workspace_dir)
         self.import_service = import_service or WorkspaceImportService(
             db_connection,
             file_manager,
             document_parser=self.document_parser,
+            vault_layout=self.vault_layout,
         )
 
     def set_settings_manager(self, settings_manager) -> None:
@@ -78,16 +81,18 @@ class WorkspaceManager:
 
     def import_document(self, file_path: str) -> str:
         """Import a document into the unified workspace store."""
-        item = self.import_service.import_document(file_path)
-        if item.folder_id is None:
-            default_folder_id = self.ensure_inbox_folder().id
-            item.folder_id = default_folder_id
-        item.title = self._build_unique_entry_name(
-            item.title or Path(file_path).stem or Path(file_path).name,
-            container_id=item.folder_id,
-            exclude_item_id=item.id,
+        folder_id = self.ensure_inbox_folder().id
+        item = WorkspaceItem(
+            title=self._build_unique_entry_name(
+                Path(file_path).stem or Path(file_path).name,
+                container_id=folder_id,
+            ),
+            item_type="document",
+            source_kind="manual_import",
+            folder_id=folder_id,
         )
         item.save(self.db)
+        self.import_service.import_document(item, file_path)
         return item.id
 
     def create_note(
@@ -96,9 +101,18 @@ class WorkspaceManager:
         title: str,
         text_content: str = "",
         event_id: Optional[str] = None,
+        folder_id: Optional[str] = None,
     ) -> str:
         """Create a workspace-native note item backed by a document text asset."""
-        folder_id = self.resolve_default_folder_id(event_id=event_id)
+        folder_id = folder_id or self.resolve_default_folder_id(event_id=event_id)
+        target_folder = self.get_folder(folder_id) if folder_id else None
+        if (
+            folder_id is not None
+            and event_id is None
+            and target_folder is not None
+            and not self._folder_accepts_direct_items(target_folder)
+        ):
+            raise WorkspaceValidationError("invalid_move_target")
         item = WorkspaceItem(
             title=self._build_unique_entry_name(title, container_id=folder_id),
             item_type="document",
@@ -108,13 +122,7 @@ class WorkspaceManager:
             status="active",
         )
         item.save(self.db)
-        self.save_text_asset(
-            item.id,
-            "document_text",
-            text_content,
-            filename="note.md",
-            subfolder="notes",
-        )
+        self.save_text_asset(item.id, "document_text", text_content)
         return item.id
 
     def create_folder(
@@ -229,6 +237,7 @@ class WorkspaceManager:
         )
         folder.name = normalized_name
         folder.save(self.db)
+        self._sync_folder_tree_asset_paths(folder.id)
         return folder
 
     def rename_item(self, item_id: str, title: str) -> WorkspaceItem:
@@ -246,6 +255,7 @@ class WorkspaceManager:
         )
         item.title = normalized_title
         item.save(self.db)
+        self._sync_item_asset_paths(item)
         return item
 
     def move_folder(self, folder_id: str, parent_id: Optional[str]) -> WorkspaceFolder:
@@ -265,8 +275,11 @@ class WorkspaceManager:
                     raise ValueError("Folder move would create a cycle")
                 ancestor = self.get_folder(ancestor_id)
                 ancestor_id = ancestor.parent_id if ancestor is not None else None
+            if getattr(parent, "folder_kind", "") != WORKSPACE_FOLDER_KIND_USER:
+                raise WorkspaceValidationError("invalid_move_target")
         folder.parent_id = parent_id
         folder.save(self.db)
+        self._sync_folder_tree_asset_paths(folder.id)
         return folder
 
     def delete_folder(self, folder_id: str) -> bool:
@@ -314,6 +327,14 @@ class WorkspaceManager:
             raise ValueError(f"Unknown workspace folder: {folder_id}")
         if not self._folder_accepts_direct_items(target_folder):
             raise WorkspaceValidationError("invalid_move_target")
+        source_folder = self.get_folder(item.folder_id) if item.folder_id else None
+        if (
+            source_folder is not None
+            and getattr(source_folder, "folder_kind", "") in {WORKSPACE_FOLDER_KIND_EVENT, WORKSPACE_FOLDER_KIND_BATCH_TASK}
+            and getattr(target_folder, "folder_kind", "") in {WORKSPACE_FOLDER_KIND_USER, WORKSPACE_FOLDER_KIND_INBOX}
+            and not self.item_has_text_content(item.id)
+        ):
+            raise WorkspaceValidationError("invalid_move_target")
         self._ensure_entry_name_available(
             item.title or item.id,
             container_id=folder_id,
@@ -322,6 +343,7 @@ class WorkspaceManager:
         previous_folder_id = item.folder_id
         item.folder_id = folder_id
         item.save(self.db)
+        self._sync_item_asset_paths(item)
         self._cleanup_empty_folder(previous_folder_id)
         return item
 
@@ -336,6 +358,14 @@ class WorkspaceManager:
         if target_folder is None:
             raise ValueError(f"Unknown workspace folder: {target_folder_id}")
         if not self._folder_accepts_direct_items(target_folder):
+            raise WorkspaceValidationError("invalid_move_target")
+        source_folder = self.get_folder(item.folder_id) if item.folder_id else None
+        if (
+            source_folder is not None
+            and getattr(source_folder, "folder_kind", "") in {WORKSPACE_FOLDER_KIND_EVENT, WORKSPACE_FOLDER_KIND_BATCH_TASK}
+            and getattr(target_folder, "folder_kind", "") in {WORKSPACE_FOLDER_KIND_USER, WORKSPACE_FOLDER_KIND_INBOX}
+            and not self.item_has_text_content(item.id)
+        ):
             raise WorkspaceValidationError("invalid_move_target")
         
         base_title = item.title or item.id
@@ -363,7 +393,6 @@ class WorkspaceManager:
             new_asset = WorkspaceAsset(
                 item_id=new_item.id,
                 asset_role=asset.asset_role,
-                text_content=asset.text_content,
                 content_type=asset.content_type,
                 metadata_json=asset.metadata_json,
             )
@@ -372,14 +401,29 @@ class WorkspaceManager:
                 source_path = Path(asset.file_path).expanduser()
                 if source_path.exists():
                     try:
-                        target_path_str = self.file_manager.get_workspace_path(
-                            new_item.id, "assets", source_path.name
-                        )
-                        self.file_manager.copy_file(str(source_path), target_path_str, overwrite=True)
-                        new_asset.file_path = target_path_str
-                    except Exception as e:
+                        if self._asset_has_readable_text(asset):
+                            target_path = self._resolve_text_asset_path(
+                                new_item,
+                                asset.asset_role,
+                                filename=self._preferred_text_asset_filename(asset),
+                            )
+                            self._write_text_file(target_path, self.read_asset_text(asset))
+                        else:
+                            target_path = self._resolve_attachment_asset_path(
+                                new_item,
+                                asset.asset_role,
+                                source_path.name,
+                            )
+                            self.file_manager.copy_file(str(source_path), str(target_path), overwrite=True)
+                        new_asset.file_path = str(target_path)
+                    except Exception as exc:
                         import logging
-                        logging.getLogger("echonote.workspace").error(f"Failed to copy asset file {source_path}: {e}")
+
+                        logging.getLogger("echonote.workspace").error(
+                            "Failed to copy asset file %s: %s",
+                            source_path,
+                            exc,
+                        )
             
             new_asset.save(self.db)
             
@@ -558,10 +602,7 @@ class WorkspaceManager:
                 ),
                 "updated_at": item.updated_at,
                 "has_audio": any(asset.asset_role == "audio" for asset in assets),
-                "has_text": any(
-                    asset.asset_role in TEXT_ASSET_ROLE_PRIORITY or bool(asset.text_content)
-                    for asset in assets
-                ),
+                "has_text": any(self._asset_has_readable_text(asset) for asset in assets),
                 "is_orphaned": item.status == "orphaned",
             }
         return metadata_by_item
@@ -605,16 +646,46 @@ class WorkspaceManager:
             return ""
         return self.read_asset_text(primary_asset)
 
+    def item_has_text_content(self, item_id: str) -> bool:
+        """Return whether an item has at least one readable text asset."""
+        return any(self._asset_has_readable_text(asset) for asset in self.get_assets(item_id))
+
+    def get_folder_filesystem_path(self, folder_id: str) -> Optional[str]:
+        """Return the resolved vault directory for a workspace folder."""
+        folder = self.get_folder(folder_id)
+        if folder is None:
+            return None
+        return str(self.vault_layout.folder_path(folder, folders_by_id=self._folder_lookup()))
+
+    def get_item_filesystem_path(self, item_id: str) -> Optional[str]:
+        """Return the most useful local path for a workspace item."""
+        item = self.get_item(item_id)
+        if item is None:
+            return None
+        primary_text_asset = self.get_primary_text_asset(item_id)
+        if primary_text_asset is not None and primary_text_asset.file_path:
+            return primary_text_asset.file_path
+        primary_audio_asset_id = getattr(item, "primary_audio_asset_id", None)
+        if primary_audio_asset_id:
+            audio_asset = WorkspaceAsset.get_by_id(self.db, primary_audio_asset_id)
+            if audio_asset is not None and audio_asset.file_path:
+                return audio_asset.file_path
+        assets = self.get_assets(item_id)
+        if assets:
+            if assets[0].file_path:
+                return assets[0].file_path
+        return str(self.vault_layout.item_asset_directory(item, folders_by_id=self._folder_lookup()))
+
     def read_asset_text(self, asset: WorkspaceAsset | None) -> str:
         """Read text content from a workspace asset."""
         if asset is None:
             return ""
-        if asset.text_content:
-            return asset.text_content
         if asset.file_path:
             asset_path = Path(asset.file_path).expanduser()
             if asset_path.exists():
                 return asset_path.read_text(encoding="utf-8")
+        if asset.text_content:
+            return asset.text_content
         return ""
 
     def update_text_asset(self, asset_id: str, text_content: str) -> WorkspaceAsset:
@@ -623,30 +694,27 @@ class WorkspaceManager:
         if asset is None:
             raise ValueError(f"Unknown workspace asset: {asset_id}")
 
-        target_path: Optional[Path] = None
-        if asset.file_path:
-            target_path = Path(asset.file_path).expanduser()
-        elif asset.item_id:
-            item = self.get_item(asset.item_id)
-            if item is None:
-                raise ValueError(f"Unknown workspace item for asset: {asset_id}")
-            target_path = self.file_manager.get_workspace_path(item.id, "edited", f"{asset.asset_role}.md")
+        item = self.get_item(asset.item_id)
+        if item is None:
+            raise ValueError(f"Unknown workspace item for asset: {asset_id}")
 
-        if target_path is None:
-            raise ValueError(f"Workspace asset is missing a writable path: {asset_id}")
-
-        target_path.parent.mkdir(parents=True, exist_ok=True)
-        target_path.write_text(text_content, encoding="utf-8")
+        previous_path = str(asset.file_path or "").strip()
+        target_path = self._resolve_text_asset_path(
+            item,
+            asset.asset_role,
+            filename=self._preferred_text_asset_filename(asset),
+        )
+        self._write_text_file(target_path, text_content)
+        if previous_path and previous_path != str(target_path):
+            self._delete_owned_file(previous_path)
 
         asset.file_path = str(target_path)
-        asset.text_content = text_content
+        asset.text_content = None
         asset.content_type = self._guess_content_type(target_path)
         asset.metadata_json = json.dumps({"size_bytes": target_path.stat().st_size})
         asset.save(self.db)
-        item = self.get_item(asset.item_id)
-        if item is not None:
-            self._sync_primary_asset_refs(item)
-        return asset
+        self._sync_primary_asset_refs(item)
+        return WorkspaceAsset.get_by_id(self.db, asset.id) or asset
 
     def save_text_asset(
         self,
@@ -662,19 +730,15 @@ class WorkspaceManager:
         if item is None:
             raise ValueError(f"Unknown workspace item: {item_id}")
 
-        target_subdirectory = str(Path("Workspace") / item_id / subfolder)
-        target_filename = filename or f"{asset_role}.md"
-        file_path = self.file_manager.save_text_file(
-            text_content,
-            target_filename,
-            subdirectory=target_subdirectory,
-            overwrite=True,
-        )
+        _ = filename, subfolder
+        file_path = self._resolve_text_asset_path(item, asset_role, filename=filename)
+        self._write_text_file(file_path, text_content)
         asset = self._save_asset(
             item,
             asset_role,
-            file_path=file_path,
-            text_content=text_content,
+            file_path=str(file_path),
+            text_content=None,
+            metadata_json=json.dumps({"size_bytes": file_path.stat().st_size}),
         )
         self._sync_primary_asset_refs(item)
         return asset
@@ -857,14 +921,7 @@ class WorkspaceManager:
         assets = WorkspaceAsset.get_by_item_and_role(self.db, item.id, asset_role)
         if not assets:
             return ""
-        asset = assets[-1]
-        if asset.text_content:
-            return asset.text_content
-        if asset.file_path:
-            asset_path = Path(asset.file_path).expanduser()
-            if asset_path.exists():
-                return asset_path.read_text(encoding="utf-8")
-        return ""
+        return self.read_asset_text(assets[-1])
 
     def has_event_asset_role(self, event_id: str, asset_role: str) -> bool:
         """Return whether an event currently has a workspace asset for role."""
@@ -1093,8 +1150,6 @@ class WorkspaceManager:
         return folder_kind in {
             WORKSPACE_FOLDER_KIND_USER,
             WORKSPACE_FOLDER_KIND_INBOX,
-            WORKSPACE_FOLDER_KIND_EVENT,
-            WORKSPACE_FOLDER_KIND_BATCH_TASK,
         }
 
     def _cleanup_empty_folder(self, folder_id: Optional[str]) -> None:
@@ -1213,6 +1268,156 @@ class WorkspaceManager:
             for row in rows
         }
 
+    def _resolve_text_asset_path(
+        self,
+        item: WorkspaceItem,
+        asset_role: str,
+        *,
+        filename: Optional[str] = None,
+    ) -> Path:
+        return self.vault_layout.text_asset_path(
+            item,
+            asset_role=asset_role,
+            folders_by_id=self._folder_lookup(),
+            filename=filename,
+        )
+
+    def _resolve_attachment_asset_path(
+        self,
+        item: WorkspaceItem,
+        asset_role: str,
+        source_filename: str,
+    ) -> Path:
+        return self.vault_layout.file_asset_path(
+            item,
+            asset_role=asset_role,
+            original_name=source_filename,
+            folders_by_id=self._folder_lookup(),
+        )
+
+    @staticmethod
+    def _asset_has_readable_text(asset: WorkspaceAsset) -> bool:
+        if asset.asset_role in TEXT_ASSET_ROLE_PRIORITY:
+            return True
+        content_type = str(getattr(asset, "content_type", "") or "").lower()
+        if content_type.startswith("text/"):
+            return True
+        suffix = Path(str(getattr(asset, "file_path", "") or "")).suffix.lower()
+        return suffix in {".md", ".txt", ".srt"}
+
+    def _write_text_file(self, target_path: Path, text_content: str) -> None:
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        target_path.write_text(text_content, encoding="utf-8")
+
+    def _delete_owned_file(self, file_path: Optional[str]) -> None:
+        if not file_path:
+            return
+        path = Path(file_path).expanduser()
+        if not self.vault_layout.contains_path(path):
+            return
+        if path.exists() and path.is_file():
+            self.file_manager.delete_file(str(path))
+
+    def _sync_item_asset_paths(self, item: WorkspaceItem) -> None:
+        stale_directories: list[Path] = []
+        for asset in WorkspaceAsset.get_by_item_id(self.db, item.id):
+            previous_path = Path(asset.file_path).expanduser() if asset.file_path else None
+            if self._asset_has_readable_text(asset):
+                target_path = self._resolve_text_asset_path(
+                    item,
+                    asset.asset_role,
+                    filename=self._preferred_text_asset_filename(asset),
+                )
+                if previous_path and previous_path.exists():
+                    if previous_path != target_path:
+                        self.file_manager.move_file(str(previous_path), str(target_path), overwrite=True)
+                        stale_directories.append(previous_path.parent)
+                else:
+                    self._write_text_file(target_path, self.read_asset_text(asset))
+                asset.file_path = str(target_path)
+                asset.text_content = None
+                asset.content_type = self._guess_content_type(target_path)
+                asset.metadata_json = json.dumps({"size_bytes": target_path.stat().st_size})
+                asset.save(self.db)
+                continue
+
+            if previous_path is None:
+                continue
+            target_path = self._resolve_attachment_asset_path(
+                item,
+                asset.asset_role,
+                previous_path.name,
+            )
+            if previous_path.exists() and previous_path != target_path:
+                self.file_manager.move_file(str(previous_path), str(target_path), overwrite=True)
+                stale_directories.append(previous_path.parent)
+            elif not previous_path.exists():
+                continue
+            asset.file_path = str(target_path)
+            asset.content_type = self._guess_content_type(target_path)
+            asset.metadata_json = json.dumps({"size_bytes": target_path.stat().st_size})
+            asset.save(self.db)
+
+        self._prune_empty_vault_directories(stale_directories)
+
+    def _sync_folder_tree_asset_paths(self, folder_id: str) -> None:
+        for item in self._list_items_in_folder_subtree(folder_id):
+            self._sync_item_asset_paths(item)
+
+    def _list_items_in_folder_subtree(self, folder_id: str) -> list[WorkspaceItem]:
+        subtree_folder_ids = self._folder_subtree_ids(folder_id)
+        if not subtree_folder_ids:
+            return []
+        placeholders = ", ".join(["?"] * len(subtree_folder_ids))
+        rows = self.db.execute(
+            "SELECT * FROM workspace_items WHERE folder_id IN (" + placeholders + ") ORDER BY updated_at DESC",
+            tuple(subtree_folder_ids),
+        )
+        return [WorkspaceItem.from_db_row(row) for row in rows]
+
+    def _folder_subtree_ids(self, folder_id: str) -> list[str]:
+        folders = self._list_folders_raw()
+        child_map: dict[str, list[str]] = {}
+        for folder in folders:
+            if folder.parent_id:
+                child_map.setdefault(folder.parent_id, []).append(folder.id)
+
+        queue = [folder_id]
+        ordered_ids: list[str] = []
+        while queue:
+            current_id = queue.pop(0)
+            ordered_ids.append(current_id)
+            queue.extend(child_map.get(current_id, []))
+        return ordered_ids
+
+    def _prune_empty_vault_directories(self, directories: list[Path]) -> None:
+        seen: set[Path] = set()
+        vault_root = self.vault_layout.vault_root.resolve(strict=False)
+        for directory in directories:
+            current = directory.resolve(strict=False)
+            if not current.is_relative_to(vault_root):
+                continue
+            while current not in seen and current != vault_root:
+                seen.add(current)
+                if not current.exists() or not current.is_dir():
+                    break
+                try:
+                    next(current.iterdir())
+                except StopIteration:
+                    current.rmdir()
+                    current = current.parent.resolve(strict=False)
+                    continue
+                break
+
+    def _folder_lookup(self) -> dict[str, WorkspaceFolder]:
+        return {folder.id: folder for folder in self._list_folders_raw()}
+
+    @staticmethod
+    def _preferred_text_asset_filename(asset: WorkspaceAsset) -> Optional[str]:
+        if asset.asset_role == "document_text" or not asset.file_path:
+            return None
+        return Path(asset.file_path).name
+
     def _resolve_original_file_name(
         self,
         item: WorkspaceItem,
@@ -1241,12 +1446,15 @@ class WorkspaceManager:
         source_path = Path(file_path).expanduser()
         if not source_path.exists():
             return None
+        target_path = self._resolve_attachment_asset_path(item, asset_role, source_path.name)
+        if source_path != target_path:
+            self.file_manager.copy_file(str(source_path), str(target_path), overwrite=True)
         return self._save_asset(
             item,
             asset_role,
-            file_path=str(source_path),
+            file_path=str(target_path),
             text_content=None,
-            metadata_json=json.dumps({"size_bytes": source_path.stat().st_size}),
+            metadata_json=json.dumps({"size_bytes": target_path.stat().st_size}),
         )
 
     def _upsert_text_asset(
@@ -1258,12 +1466,14 @@ class WorkspaceManager:
         if not source_path.exists():
             return None
         text_content = source_path.read_text(encoding="utf-8")
+        target_path = self._resolve_text_asset_path(item, asset_role)
+        self._write_text_file(target_path, text_content)
         return self._save_asset(
             item,
             asset_role,
-            file_path=str(source_path),
-            text_content=text_content,
-            metadata_json=json.dumps({"size_bytes": source_path.stat().st_size}),
+            file_path=str(target_path),
+            text_content=None,
+            metadata_json=json.dumps({"size_bytes": target_path.stat().st_size}),
         )
 
     def _save_asset(
@@ -1277,11 +1487,14 @@ class WorkspaceManager:
     ) -> WorkspaceAsset:
         existing_assets = WorkspaceAsset.get_by_item_and_role(self.db, item.id, asset_role)
         asset = existing_assets[-1] if existing_assets else WorkspaceAsset(item_id=item.id, asset_role=asset_role)
+        previous_path = str(asset.file_path or "").strip()
         asset.file_path = file_path
-        asset.text_content = text_content
+        asset.text_content = None if asset.asset_role in TEXT_ASSET_ROLE_PRIORITY else text_content
         asset.metadata_json = metadata_json
         asset.content_type = self._guess_content_type(Path(file_path))
         asset.save(self.db)
+        if previous_path and previous_path != file_path:
+            self._delete_owned_file(previous_path)
         return asset
 
     def _sync_primary_asset_refs(
@@ -1381,7 +1594,7 @@ class WorkspaceManager:
                     "path": asset.file_path,
                     "size": self._extract_size(asset.metadata_json),
                     "created_at": asset.created_at,
-                    "text_content": asset.text_content,
+                    "text_content": self.read_asset_text(asset) if self._asset_has_readable_text(asset) else None,
                 }
                 for asset in assets
             ],
@@ -1397,7 +1610,14 @@ class WorkspaceManager:
             return "text/markdown"
         if suffix == ".srt":
             return "application/x-subrip"
-        return "text/plain"
+        if suffix == ".txt":
+            return "text/plain"
+        if suffix == ".pdf":
+            return "application/pdf"
+        if suffix == ".docx":
+            return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        guessed, _ = mimetypes.guess_type(str(path))
+        return guessed or "application/octet-stream"
 
     def _extract_size(self, metadata_json: Optional[str]) -> Optional[int]:
         if not metadata_json:

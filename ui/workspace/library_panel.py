@@ -3,16 +3,23 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
 from datetime import datetime
+from pathlib import Path
 
 from core.qt_imports import (
     QAbstractItemView,
+    QApplication,
     QButtonGroup,
     QFont,
     QHBoxLayout,
     QIcon,
     QLabel,
     QInputDialog,
+    QMenu,
+    QMessageBox,
     QPalette,
     QPixmap,
     QPushButton,
@@ -21,6 +28,7 @@ from core.qt_imports import (
     QToolButton,
     QTreeWidget,
     QTreeWidgetItem,
+    QUrl,
     QVBoxLayout,
     QWidget,
     Qt,
@@ -46,12 +54,19 @@ _TREE_CONTEXT_ROLE = Qt.ItemDataRole.UserRole + 3
 _HEADER_ACTION_ICON_SIZE = 16
 
 from ui.common.svg_icons import build_svg_icon
+from ui.workspace_drag_payload import (
+    WORKSPACE_DRAG_SOURCE_BATCH_TASK,
+    WORKSPACE_DRAG_SOURCE_EVENT,
+    WORKSPACE_TEXT_DRAG_MIME,
+    parse_workspace_text_drag_payload,
+)
 
 
 class WorkspaceNavigationTree(QTreeWidget):
     """Tree widget with structure drag-and-drop hooks."""
 
     drop_requested = Signal(str, str, str, str)
+    external_drop_requested = Signal(object, str, str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -64,6 +79,14 @@ class WorkspaceNavigationTree(QTreeWidget):
         self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
 
     def dropEvent(self, event) -> None:
+        payload = self._external_workspace_drag_payload(event)
+        if payload is not None:
+            target_item = self.itemAt(event.position().toPoint())
+            target_kind = str(target_item.data(0, _TREE_KIND_ROLE) or "") if target_item else ""
+            target_value = str(target_item.data(0, _TREE_VALUE_ROLE) or "") if target_item else ""
+            self.external_drop_requested.emit(payload, target_kind, target_value)
+            event.acceptProposedAction()
+            return
         source_item = self.currentItem()
         target_item = self.itemAt(event.position().toPoint())
         if source_item is None:
@@ -79,6 +102,26 @@ class WorkspaceNavigationTree(QTreeWidget):
         self.drop_requested.emit(source_kind, source_value, target_kind, target_value)
         event.ignore()
 
+    def dragEnterEvent(self, event) -> None:
+        if self._external_workspace_drag_payload(event) is not None:
+            event.acceptProposedAction()
+            return
+        super().dragEnterEvent(event)
+
+    def dragMoveEvent(self, event) -> None:
+        if self._external_workspace_drag_payload(event) is not None:
+            event.acceptProposedAction()
+            return
+        super().dragMoveEvent(event)
+
+    @staticmethod
+    def _external_workspace_drag_payload(event) -> dict | None:
+        mime_data = event.mimeData()
+        if mime_data is None or not mime_data.hasFormat(WORKSPACE_TEXT_DRAG_MIME):
+            return None
+        raw_payload = mime_data.data(WORKSPACE_TEXT_DRAG_MIME)
+        return parse_workspace_text_drag_payload(bytes(raw_payload))
+
 
 class WorkspaceLibraryPanel(BaseWidget):
     """Left-side workspace navigator using a single tree structure."""
@@ -88,6 +131,7 @@ class WorkspaceLibraryPanel(BaseWidget):
     library_changed = Signal()
     import_document_requested = Signal()
     new_note_requested = Signal()
+    open_in_window_requested = Signal(str)
 
     def __init__(self, workspace_manager, i18n, parent=None):
         super().__init__(i18n, parent)
@@ -179,6 +223,9 @@ class WorkspaceLibraryPanel(BaseWidget):
         self.folder_tree.setTextElideMode(Qt.TextElideMode.ElideRight)
         self.folder_tree.itemSelectionChanged.connect(self._on_navigation_selection_changed)
         self.folder_tree.drop_requested.connect(self._on_tree_drop_requested)
+        self.folder_tree.external_drop_requested.connect(self._on_external_workspace_drop_requested)
+        self.folder_tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.folder_tree.customContextMenuRequested.connect(self._on_custom_context_menu_requested)
         layout.addWidget(self.folder_tree, 1)
 
         self.folder_tree.setDragEnabled(True)
@@ -484,6 +531,146 @@ class WorkspaceLibraryPanel(BaseWidget):
         if item_id:
             self.item_selected.emit(item_id)
 
+    def _on_custom_context_menu_requested(self, position) -> None:
+        if self.current_view_mode() != "structure":
+            return
+        target_item = self.folder_tree.itemAt(position)
+        if target_item is not None:
+            self._set_current_tree_item(target_item)
+
+        menu = QMenu(self)
+        if target_item is None:
+            self._populate_empty_context_menu(menu)
+        else:
+            kind = str(target_item.data(0, _TREE_KIND_ROLE) or "")
+            value = str(target_item.data(0, _TREE_VALUE_ROLE) or "")
+            if kind == "folder":
+                self._populate_folder_context_menu(menu, value)
+            elif kind == "item":
+                self._populate_item_context_menu(menu, value)
+
+        if menu.actions():
+            menu.exec(self.folder_tree.viewport().mapToGlobal(position))
+
+    def _populate_empty_context_menu(self, menu: QMenu) -> None:
+        self._add_menu_action(
+            menu,
+            self.i18n.t("workspace.new_note"),
+            lambda: self._create_note_in_folder(self.workspace_manager.ensure_inbox_folder().id),
+        )
+        self._add_menu_action(menu, self.i18n.t("workspace.new_folder"), self._on_create_folder)
+        menu.addSeparator()
+        self._add_menu_action(menu, self.i18n.t("workspace.import_document"), self.import_document_requested.emit)
+        self._add_menu_action(
+            menu,
+            self.i18n.t("workspace.open_vault_root"),
+            lambda: self._open_local_path(Path(self.workspace_manager.file_manager.workspace_dir)),
+        )
+
+    def _populate_folder_context_menu(self, menu: QMenu, folder_id: str) -> None:
+        folder = self.workspace_manager.get_folder(folder_id)
+        if folder is None:
+            return
+        folder_kind = getattr(folder, "folder_kind", "") or ""
+        folder_path = self.workspace_manager.get_folder_filesystem_path(folder_id)
+
+        if folder_kind in {"user", "inbox"}:
+            self._add_menu_action(
+                menu,
+                self.i18n.t("workspace.new_note"),
+                lambda: self._create_note_in_folder(folder_id),
+            )
+            self._add_menu_action(menu, self.i18n.t("workspace.new_folder"), self._on_create_folder)
+            menu.addSeparator()
+
+        if folder_path:
+            self._add_menu_action(
+                menu,
+                self.i18n.t("workspace.open_local_folder"),
+                lambda: self._open_local_path(Path(folder_path)),
+            )
+            self._add_menu_action(
+                menu,
+                self.i18n.t("workspace.copy_local_path"),
+                lambda: self._copy_local_path(folder_path),
+            )
+
+        if self._can_manage_folder(folder_id):
+            menu.addSeparator()
+            self._add_menu_action(menu, self.i18n.t("common.rename"), self._on_rename_selection)
+            self._add_menu_action(menu, self.i18n.t("common.delete"), self._on_delete_selection)
+        elif self._can_delete_generated_folder(folder_id):
+            menu.addSeparator()
+            self._add_menu_action(menu, self.i18n.t("common.delete"), self._on_delete_selection)
+
+    def _populate_item_context_menu(self, menu: QMenu, item_id: str) -> None:
+        item = self.workspace_manager.get_item(item_id)
+        if item is None:
+            return
+        item_path = self.workspace_manager.get_item_filesystem_path(item_id)
+
+        self._add_menu_action(menu, self.i18n.t("workspace.open_item"), lambda: self._open_item(item_id))
+        self._add_menu_action(
+            menu,
+            self.i18n.t("workspace.open_in_new_window"),
+            lambda: self.open_in_window_requested.emit(item_id),
+        )
+
+        if item_path:
+            menu.addSeparator()
+            self._add_menu_action(
+                menu,
+                self.i18n.t("workspace.open_local_folder"),
+                lambda: self._open_local_path(Path(item_path), open_parent=True),
+            )
+            self._add_menu_action(
+                menu,
+                self.i18n.t("workspace.copy_local_path"),
+                lambda: self._copy_local_path(item_path),
+            )
+
+        menu.addSeparator()
+        self._add_menu_action(menu, self.i18n.t("common.rename"), self._on_rename_selection)
+        self._add_menu_action(menu, self.i18n.t("common.delete"), self._on_delete_selection)
+
+    @staticmethod
+    def _add_menu_action(menu: QMenu, text: str, callback) -> None:
+        action = menu.addAction(text)
+        action.triggered.connect(lambda _checked=False: callback())
+
+    def _create_note_in_folder(self, folder_id: str) -> None:
+        try:
+            item_id = self.workspace_manager.create_note(
+                title=self.i18n.t("workspace.new_note_default_title"),
+                folder_id=folder_id,
+            )
+        except WorkspaceValidationError as exc:
+            self._show_workspace_validation_error(exc)
+            return
+        self._pending_selection = ("item", item_id)
+        self.library_changed.emit()
+
+    def _open_item(self, item_id: str) -> None:
+        current_item_id = self.current_item_id()
+        self.select_item(item_id)
+        if current_item_id == item_id:
+            self.item_selected.emit(item_id)
+
+    def _copy_local_path(self, path: str) -> None:
+        QApplication.clipboard().setText(path)
+        self.show_info(self.i18n.t("common.success"), self.i18n.t("common.copied"))
+
+    def _open_local_path(self, path: Path, *, open_parent: bool = False) -> None:
+        target_path = path.expanduser()
+        if open_parent and target_path.is_file():
+            target_path = target_path.parent
+        if sys.platform == "darwin":
+            subprocess.run(["open", str(target_path)], check=False)
+        elif sys.platform.startswith("win"):
+            os.startfile(str(target_path))  # type: ignore[attr-defined]
+        else:
+            subprocess.run(["xdg-open", str(target_path)], check=False)
+
     def _on_create_folder(self) -> None:
         if self.current_view_mode() != "structure":
             return
@@ -634,6 +821,88 @@ class WorkspaceLibraryPanel(BaseWidget):
             message = self.i18n.t("workspace.invalid_name")
         self.show_warning(self.i18n.t("common.warning"), message)
 
+    def _confirm_system_item_transfer(self) -> str:
+        msg_box = QMessageBox(self)
+        msg_box.setIcon(QMessageBox.Icon.Question)
+        msg_box.setWindowTitle(self.i18n.t("common.confirm"))
+        msg_box.setText(self.i18n.t("workspace.drag_from_system_prompt"))
+        copy_btn = msg_box.addButton(
+            self.i18n.t("workspace.action_copy"),
+            QMessageBox.ButtonRole.AcceptRole,
+        )
+        move_btn = msg_box.addButton(
+            self.i18n.t("workspace.action_move"),
+            QMessageBox.ButtonRole.DestructiveRole,
+        )
+        cancel_btn = msg_box.addButton(
+            self.i18n.t("common.cancel"),
+            QMessageBox.ButtonRole.RejectRole,
+        )
+        msg_box.exec()
+        clicked_btn = msg_box.clickedButton()
+        if clicked_btn == copy_btn:
+            return "copy"
+        if clicked_btn == move_btn:
+            return "move"
+        if clicked_btn == cancel_btn:
+            return "cancel"
+        return "cancel"
+
+    def _handle_workspace_item_transfer(
+        self,
+        item_id: str,
+        target_folder_id: str,
+        *,
+        source_domain: str | None = None,
+    ) -> None:
+        item = self.workspace_manager.get_item(item_id)
+        if item is None or item.folder_id == target_folder_id:
+            return
+        target_folder = self.workspace_manager.get_folder(target_folder_id)
+        if target_folder is None:
+            return
+
+        resolved_source_domain = source_domain or ""
+        if not resolved_source_domain:
+            source_folder = self.workspace_manager.get_folder(item.folder_id)
+            resolved_source_domain = getattr(source_folder, "folder_kind", "") if source_folder is not None else ""
+
+        if resolved_source_domain in {WORKSPACE_DRAG_SOURCE_EVENT, WORKSPACE_DRAG_SOURCE_BATCH_TASK}:
+            if not self.workspace_manager.item_has_text_content(item_id):
+                self.show_warning(
+                    self.i18n.t("common.warning"),
+                    self.i18n.t("workspace.drag_text_only_warning"),
+                )
+                return
+            transfer_mode = self._confirm_system_item_transfer()
+            if transfer_mode == "cancel":
+                return
+            if transfer_mode == "copy":
+                try:
+                    suffix = self.i18n.t("workspace.copy_suffix")
+                    new_item = self.workspace_manager.copy_item_to_folder(
+                        item_id,
+                        target_folder_id,
+                        copy_suffix=suffix,
+                    )
+                    self._pending_selection = ("item", new_item.id)
+                    self.library_changed.emit()
+                    return
+                except WorkspaceValidationError as exc:
+                    self._show_workspace_validation_error(exc)
+                    return
+                except Exception as exc:  # noqa: BLE001
+                    self.show_warning(self.i18n.t("common.warning"), str(exc))
+                    return
+
+        try:
+            self.workspace_manager.move_item_to_folder(item_id, target_folder_id)
+        except WorkspaceValidationError as exc:
+            self._show_workspace_validation_error(exc)
+            return
+        self._pending_selection = ("item", item_id)
+        self.library_changed.emit()
+
     def _on_tree_drop_requested(
         self,
         source_kind: str,
@@ -645,46 +914,9 @@ class WorkspaceLibraryPanel(BaseWidget):
             return
         if source_kind == "item":
             target_folder_id = self._resolve_item_drop_target_folder_id(target_kind, target_value)
-            item = self.workspace_manager.get_item(source_value)
-            if item is None or target_folder_id is None or item.folder_id == target_folder_id:
+            if target_folder_id is None:
                 return
-
-            source_folder = self.workspace_manager.get_folder(item.folder_id)
-            target_folder = self.workspace_manager.get_folder(target_folder_id)
-            if source_folder and target_folder:
-                s_kind = getattr(source_folder, "folder_kind", "")
-                t_kind = getattr(target_folder, "folder_kind", "")
-                if s_kind in {"event", "batch_task"} and t_kind in {"user", "inbox"}:
-                    from PySide6.QtWidgets import QMessageBox
-                    msg_box = QMessageBox(self)
-                    msg_box.setIcon(QMessageBox.Icon.Question)
-                    msg_box.setWindowTitle(self.i18n.t("common.confirm"))
-                    msg_box.setText(self.i18n.t("workspace.drag_from_system_prompt", default="您正在将系统自动生成的条目移出，请选择复制副本还是剪切？"))
-                    copy_btn = msg_box.addButton(self.i18n.t("workspace.action_copy", default="复制副本"), QMessageBox.ButtonRole.AcceptRole)
-                    move_btn = msg_box.addButton(self.i18n.t("workspace.action_move", default="移动剪切"), QMessageBox.ButtonRole.DestructiveRole)
-                    cancel_btn = msg_box.addButton(self.i18n.t("common.cancel", default="取消"), QMessageBox.ButtonRole.RejectRole)
-                    msg_box.exec()
-                    clicked_btn = msg_box.clickedButton()
-                    if clicked_btn == cancel_btn:
-                        return
-                    elif clicked_btn == copy_btn:
-                        try:
-                            suffix = self.i18n.t("workspace.copy_suffix", default=" [副本]")
-                            new_item = self.workspace_manager.copy_item_to_folder(source_value, target_folder_id, copy_suffix=suffix)
-                            self._pending_selection = ("item", new_item.id)
-                            self.library_changed.emit()
-                            return
-                        except Exception as exc:
-                            self.show_warning(self.i18n.t("common.warning"), str(exc))
-                            return
-
-            try:
-                self.workspace_manager.move_item_to_folder(source_value, target_folder_id)
-            except WorkspaceValidationError as exc:
-                self._show_workspace_validation_error(exc)
-                return
-            self._pending_selection = ("item", source_value)
-            self.library_changed.emit()
+            self._handle_workspace_item_transfer(source_value, target_folder_id)
             return
 
         if source_kind == "folder":
@@ -700,6 +932,30 @@ class WorkspaceLibraryPanel(BaseWidget):
                 return
             self._pending_selection = ("folder", source_value)
             self.library_changed.emit()
+
+    def _on_external_workspace_drop_requested(
+        self,
+        payload: dict,
+        target_kind: str,
+        target_value: str,
+    ) -> None:
+        if self.current_view_mode() != "structure":
+            return
+        target_folder_id = self._resolve_item_drop_target_folder_id(target_kind, target_value)
+        if target_folder_id is None:
+            return
+        item_id = str(payload.get("workspace_item_id") or "")
+        source_domain = str(payload.get("source_domain") or "")
+        if not item_id or source_domain not in {
+            WORKSPACE_DRAG_SOURCE_EVENT,
+            WORKSPACE_DRAG_SOURCE_BATCH_TASK,
+        }:
+            return
+        self._handle_workspace_item_transfer(
+            item_id,
+            target_folder_id,
+            source_domain=source_domain,
+        )
 
     def _resolve_item_drop_target_folder_id(self, target_kind: str, target_value: str) -> str | None:
         if target_kind == "folder":

@@ -1,5 +1,7 @@
 # 工作台导航与拖拽交互改进计划
 
+> **归档说明（2026-03-18）**：本文已归档并停止作为执行入口。其范围只覆盖单树拖拽和局部导航精简，已经无法覆盖右键上下文菜单、跨来源域 copy/move 约束，以及 Markdown Vault 本地目录对齐等新要求。后续统一以 `/Users/weijiazhao/Dev/EchoNote/docs/plans/archive/2026-03-18-workspace-tree-context-dnd-markdown-vault-superseded.md` 对应的已完成实现为准。
+
 **日期**: 2026-03-16
 **目标**: 移除冗余的视图切换控件，彻底固化单树导航界面，修复项间拖放逻辑，增加具有约束性的跨层拖放提醒机制。
 

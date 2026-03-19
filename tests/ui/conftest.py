@@ -107,6 +107,9 @@ def mock_settings_manager():
             "gguf_runtime_command": [],
         }
     )
+    manager.get_workspace_preferences = Mock(
+        return_value={"storage_root": "~/Documents/EchoNote/WorkspaceVault"}
+    )
     manager.setting_changed = Mock()
     manager.setting_changed.connect = Mock()
     return manager

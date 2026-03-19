@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Corrected the shell realtime-recording architecture after the first refactor overshot into a second bottom workspace: the dock is now a compact horizontal transport/status bar with icon actions, live transcript/translation is shown through the floating overlay instead of a dock results pane, completed recording output is published only into workspace documents, and the shared `.txt + .json` timeline asset path plus secondary retranscription reuse remain intact.
 
+## [2.1.3] - 2026-03-18
+
+### Changed
+
+- Released `v2.1.3` with the workspace shell release train that hard-switched document storage to local Markdown Vault semantics, aligned the tree with the on-disk folder layout, constrained cross-domain drag/drop behavior, and added right-click tree actions plus detachable document windows.
+- Reworked settings navigation so model management and workspace preferences now map to the correct pages through a shared page-spec source of truth instead of stack-index assumptions.
+- Cleaned the workspace document tab strip and detached-window presentation so tab actions, close affordances, and inspector toggles use consistent semantic roles and avoid duplicate filename chrome.
+- Synchronized project, packaging, documentation, and landing metadata version references to `v2.1.3`.
+
 ## [2.1.0] - 2026-03-16
 
 ### Changed

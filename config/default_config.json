@@ -1,5 +1,5 @@
 {
-  "version": "2.1.0",
+  "version": "2.1.3",
   "database": {
     "path": "~/.echonote/data.db",
     "encryption_enabled": true
@@ -47,6 +47,9 @@
   },
   "text_ai": {
     "models_dir": "~/.echonote/text_ai_models"
+  },
+  "workspace": {
+    "storage_root": "~/Documents/EchoNote/WorkspaceVault"
   },
   "workspace_ai": {
     "default_summary_strategy": "extractive",

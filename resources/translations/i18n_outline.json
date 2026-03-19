@@ -36,8 +36,20 @@
     "constants"
   ],
   "required_nested_keys": {
+    "settings": [
+      "category.workspace",
+      "workspace.title",
+      "workspace.description",
+      "workspace.storage_root",
+      "workspace.storage_root_hint",
+      "workspace.restart_hint",
+      "workspace.browse",
+      "workspace.select_directory",
+      "workspace.error.empty_path"
+    ],
     "workspace": [
       "drag_from_system_prompt",
+      "drag_text_only_warning",
       "action_copy",
       "action_move",
       "copy_suffix",
@@ -49,7 +61,13 @@
       "results_section_title",
       "event_group_unlinked",
       "navigator_group_with_count",
+      "open_item",
       "open_in_new_window",
+      "show_inspector_panel",
+      "hide_inspector_panel",
+      "open_local_folder",
+      "open_vault_root",
+      "copy_local_path",
       "task_window_title",
       "task_summary_total",
       "task_summary_active",

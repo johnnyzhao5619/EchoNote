@@ -270,6 +270,20 @@ class SettingsManager(QObject):
             preferences.update(current_settings)
         return preferences
 
+    def get_workspace_preferences(self) -> Dict[str, Any]:
+        """Return workspace storage preferences with defaults applied."""
+        workspace_defaults = self._default_config.get("workspace", {})
+        preferences = {
+            "storage_root": workspace_defaults.get(
+                "storage_root",
+                "~/Documents/EchoNote/WorkspaceVault",
+            ),
+        }
+        current_settings = self.config_manager.get("workspace", {})
+        if isinstance(current_settings, dict):
+            preferences.update(current_settings)
+        return preferences
+
     def resolve_realtime_translation_languages(
         self,
         *,
