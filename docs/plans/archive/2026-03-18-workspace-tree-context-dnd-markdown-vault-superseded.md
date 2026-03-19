@@ -401,7 +401,7 @@ git commit -m "feat: constrain workspace drag and drop semantics"
 ```python
 def test_visual_polish_contracts_are_documented_in_project_guides():
     docs_readme_text = (PROJECT_ROOT / "docs" / "README.md").read_text(encoding="utf-8")
-    assert "2026-03-18-workspace-tree-context-dnd-markdown-vault.md" in docs_readme_text
+    assert "2026-03-18-workspace-tree-context-dnd-markdown-vault-superseded.md" in docs_readme_text
 ```
 
 **Step 2: Run test to verify it fails**
@@ -413,7 +413,7 @@ Expected: FAIL，因为文档导航尚未指向新计划。
 **Step 3: Write minimal implementation**
 
 ```python
-assert "2026-03-18-workspace-tree-context-dnd-markdown-vault.md" in docs_readme_text
+assert "2026-03-18-workspace-tree-context-dnd-markdown-vault-superseded.md" in docs_readme_text
 ```
 
 实现要求：
