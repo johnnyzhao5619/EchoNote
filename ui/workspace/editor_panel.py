@@ -34,9 +34,11 @@ from ui.common.style_utils import set_widget_state
 from ui.constants import (
     ROLE_TOOLBAR_SECONDARY_ACTION,
     ROLE_WORKSPACE_ASSET_TABS,
+    ROLE_WORKSPACE_CONTEXT_LABEL,
     ROLE_WORKSPACE_EDITOR_PANEL,
 )
 from utils.i18n import I18nQtManager
+from ui.workspace.item_list import format_workspace_updated_at
 
 logger = logging.getLogger("echonote.ui.workspace.editor_panel")
 
@@ -413,6 +415,7 @@ class WorkspaceEditorPanel(TextEditorPanel):
         self.layout().insertWidget(1, self.document_title_edit)
 
         self.document_context_label = QLabel()
+        self.document_context_label.setProperty("role", ROLE_WORKSPACE_CONTEXT_LABEL)
         self.document_context_label.setVisible(False)
         self.layout().insertWidget(2, self.document_context_label)
 
@@ -485,6 +488,8 @@ class WorkspaceEditorPanel(TextEditorPanel):
     def _load_current_asset(self) -> None:
         if self.current_asset is None:
             self.set_text_content("")
+            self.document_context_label.clear()
+            self.document_context_label.setVisible(False)
             return
         display_name = Path(self.current_asset.file_path).name if self.current_asset.file_path else self.current_asset.asset_role
         self.set_document_context(
@@ -493,8 +498,7 @@ class WorkspaceEditorPanel(TextEditorPanel):
             save_handler=self._save_current_asset,
             export_formats=("txt", "md"),
         )
-        self.document_context_label.clear()
-        self.document_context_label.setVisible(False)
+        self._update_document_context_label()
         self.set_text_content(self.workspace_manager.read_asset_text(self.current_asset))
 
     def _save_current_asset(self, text_content: str) -> None:
@@ -591,12 +595,34 @@ class WorkspaceEditorPanel(TextEditorPanel):
         self._generate_meeting_brief()
 
     def _label_for_asset(self, asset) -> str:
-        role_label = WORKSPACE_ASSET_LABELS.get(
+        return WORKSPACE_ASSET_LABELS.get(
             asset.asset_role,
             asset.asset_role.replace("_", " ").title(),
         )
-        file_name = Path(asset.file_path).name if asset.file_path else role_label
-        return f"{role_label}: {file_name}"
+
+    def _update_document_context_label(self) -> None:
+        if self.current_item is None or self.current_asset is None:
+            self.document_context_label.clear()
+            self.document_context_label.setVisible(False)
+            return
+
+        metadata = self.workspace_manager.get_item_context_metadata(self.current_item.id)
+        context_parts: list[str] = []
+        current_file_name = Path(self.current_asset.file_path).name if self.current_asset.file_path else ""
+        if current_file_name:
+            context_parts.append(current_file_name)
+        event_label = str(metadata.get("event_title") or metadata.get("event_id") or "").strip()
+        if event_label:
+            context_parts.append(event_label)
+        task_label = str(metadata.get("task_id") or "").strip()
+        if task_label:
+            context_parts.append(task_label)
+        updated_label = format_workspace_updated_at(str(metadata.get("updated_at") or ""))
+        if updated_label:
+            context_parts.append(updated_label)
+
+        self.document_context_label.setText(" · ".join(context_parts))
+        self.document_context_label.setVisible(bool(context_parts))
 
     def _is_editable_text_asset(self, asset) -> bool:
         """Return whether the asset should surface as an editable text tab."""

@@ -267,17 +267,20 @@ def test_workspace_recording_panel_reuses_shared_audio_player(qapp, mock_i18n, w
     assert widget.recording_panel.audio_player.surface.property("state") == "inspector"
 
 
-def test_workspace_editor_panel_uses_stable_asset_tab_labels(qapp, mock_i18n, workspace_manager):
+def test_workspace_editor_chrome_uses_compact_title_and_asset_context(
+    qapp, mock_i18n, workspace_manager
+):
+    item_id = workspace_manager.list_items()[0].id
+    workspace_manager.save_text_asset(item_id, "translation", "translated")
     widget = WorkspaceWidget(workspace_manager, mock_i18n)
-    item = workspace_manager.list_items()[0]
+    widget.open_item(item_id)
 
-    widget._on_item_selected(item.id)
-    labels = [
-        widget.editor_panel.asset_tabs.tabText(index)
-        for index in range(widget.editor_panel.asset_tabs.count())
-    ]
+    tab_text = widget.document_tabs.tabText(widget.document_tabs.currentIndex())
 
-    assert any(label.startswith("Transcript:") for label in labels)
+    assert tab_text == "Sprint Sync"
+    assert widget.editor_panel.document_title_label.text() == "Sprint Sync"
+    assert widget.editor_panel.asset_tabs.count() >= 2
+    assert ":" not in widget.editor_panel.asset_tabs.tabText(0)
 
 
 def test_workspace_editor_uses_asset_tabs_and_inspector_hosts_ai_actions(
