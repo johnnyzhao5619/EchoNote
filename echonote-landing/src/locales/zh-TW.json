@@ -81,6 +81,39 @@
       }
     }
   },
+  "valueProps": {
+    "local": {
+      "title": "全在地化",
+      "description": "無需複雜配置，開箱即用，所有模型、文件和處理全在您的裝置本地運行。"
+    },
+    "private": {
+      "title": "隱私至上",
+      "description": "杜絕資料外洩。所有的語音和筆記資料預設皆不上傳雲端，完全由您主導。"
+    },
+    "powerful": {
+      "title": "無縫且強大",
+      "description": "從逐字稿到 AI 梳理總結，全套流程無縫整合，享受最高效的知識提煉體驗。"
+    }
+  },
+  "faq": {
+    "title": "常見問題",
+    "q1": {
+      "question": "EchoNote 是免費開源的嗎？",
+      "answer": "是的，EchoNote 是採用 Apache 2.0 授權條款完全開源的免費專案。"
+    },
+    "q2": {
+      "question": "我的語音資料會被上傳嗎？",
+      "answer": "不會。EchoNote 預設使用本地 AI 模型（如 Faster-Whisper 和本地 LLM）進行處理，斷網可用。"
+    },
+    "q3": {
+      "question": "支援哪些作業系統？",
+      "answer": "EchoNote 是一款跨平台桌面應用程式，全面支援 macOS、Windows 以及 Linux。"
+    },
+    "q4": {
+      "question": "一般使用者用起來複雜嗎？",
+      "answer": "完全不複雜。我們將強大的 AI 工具鏈封裝成了開箱即用的現代化介面，無需任何開發背景。"
+    }
+  },
   "github": {
     "title": "專案統計",
     "subtitle": "查看 EchoNote 在 GitHub 上的即時儲存庫數據與社群活躍度。",

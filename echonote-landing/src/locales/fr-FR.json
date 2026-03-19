@@ -81,6 +81,39 @@
       }
     }
   },
+  "valueProps": {
+    "local": {
+      "title": "Local par défaut",
+      "description": "Conservez vos modèles, documents et chats stockés en toute sécurité sur votre propre appareil."
+    },
+    "private": {
+      "title": "Confidentialité totale",
+      "description": "Rien n'est partagé sans votre consentement explicite. Vos données vous appartiennent."
+    },
+    "powerful": {
+      "title": "Puissance sans compromis",
+      "description": "Exploitez plusieurs LLMs locaux ou cloud efficacement, sans configuration complexe."
+    }
+  },
+  "faq": {
+    "title": "Foire aux questions",
+    "q1": {
+      "question": "EchoNote est-il vraiment gratuit et open source ?",
+      "answer": "Oui, EchoNote est entièrement gratuit et open source sous licence Apache 2.0."
+    },
+    "q2": {
+      "question": "Mes données vocales quittent-elles mon appareil ?",
+      "answer": "Non. Par défaut, toute transcription et synthèse s'effectuent via des modèles d'IA locaux, hors ligne."
+    },
+    "q3": {
+      "question": "Quels systèmes d'exploitation sont pris en charge ?",
+      "answer": "EchoNote est une application de bureau multiplateforme compatible avec macOS, Windows et Linux."
+    },
+    "q4": {
+      "question": "Dois-je être développeur pour l'utiliser ?",
+      "answer": "Pas du tout. EchoNote intègre une IA puissante dans une interface épurée, facile à utiliser pour tous."
+    }
+  },
   "github": {
     "title": "Statistiques du projet",
     "subtitle": "Consultez les données du dépôt en temps réel et l'activité de la communauté sur GitHub.",

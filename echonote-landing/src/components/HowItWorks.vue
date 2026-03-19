@@ -12,7 +12,11 @@ defineProps<Props>()
 </script>
 
 <template>
-  <section id="how-it-works" aria-labelledby="how-it-works-title" class="section-shell bg-slate-50/70">
+  <section
+    id="how-it-works"
+    aria-labelledby="how-it-works-title"
+    class="section-shell bg-slate-50/70"
+  >
     <div class="site-container">
       <div class="section-head mb-14">
         <h2 id="how-it-works-title" class="mb-4 text-3xl font-semibold text-slate-900 sm:text-4xl">

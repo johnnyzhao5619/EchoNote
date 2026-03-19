@@ -81,6 +81,39 @@
       }
     }
   },
+  "valueProps": {
+    "local": {
+      "title": "全本地化",
+      "description": "无需复杂的配置，开箱即用，所有模型、文档和处理全在你的设备本地运行。"
+    },
+    "private": {
+      "title": "隐私至上",
+      "description": "杜绝数据泄露。所有的语音和笔记数据默认均不上传云端，完全由你主导。"
+    },
+    "powerful": {
+      "title": "无缝且强大",
+      "description": "从转写到 AI 梳理总结，全套流程无缝集成，享受最高效的知识提炼体验。"
+    }
+  },
+  "faq": {
+    "title": "常见问题",
+    "q1": {
+      "question": "EchoNote 是免费开源的吗？",
+      "answer": "是的，EchoNote 是采用 Apache 2.0 许可证完全开源的免费项目。"
+    },
+    "q2": {
+      "question": "我的语音数据会被上传吗？",
+      "answer": "不会。EchoNote 默认使用本地 AI 模型（如 Faster-Whisper 和本地 LLM）进行处理，断网可用。"
+    },
+    "q3": {
+      "question": "支持哪些操作系统？",
+      "answer": "EchoNote 是一款跨平台桌面应用，全面支持 macOS、Windows 以及 Linux。"
+    },
+    "q4": {
+      "question": "普通用户使用起来复杂吗？",
+      "answer": "完全不复杂。我们将强大的 AI 工具链封装成了开箱即用的现代化界面，无需任何开发背景。"
+    }
+  },
   "github": {
     "title": "项目统计",
     "subtitle": "查看 EchoNote 在 GitHub 上的实时仓库数据与社区活跃度。",

@@ -34,8 +34,8 @@ export const resolveInitialLocale = (): string => {
     return browserLocale
   }
 
-  const languageOnlyMatch = SUPPORTED_LOCALES.find((locale) =>
-    locale.code.split('-')[0] === browserLocale.split('-')[0],
+  const languageOnlyMatch = SUPPORTED_LOCALES.find(
+    (locale) => locale.code.split('-')[0] === browserLocale.split('-')[0],
   )
   return languageOnlyMatch?.code || DEFAULT_LOCALE
 }

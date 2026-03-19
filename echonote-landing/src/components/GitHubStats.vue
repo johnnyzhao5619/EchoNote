@@ -26,8 +26,15 @@ if (!owner || !repo) {
   throw new Error('Invalid repository format. Expected "owner/repo"')
 }
 
-const { stats, loading, error, fetchAll, refresh, repository: repoData, latestRelease } =
-  useGitHubApi(owner, repo)
+const {
+  stats,
+  loading,
+  error,
+  fetchAll,
+  refresh,
+  repository: repoData,
+  latestRelease,
+} = useGitHubApi(owner, repo)
 
 const compactFormatter = new Intl.NumberFormat(undefined, {
   notation: 'compact',
@@ -106,17 +113,34 @@ onUnmounted(() => {
       </div>
 
       <div v-if="loading && !stats" aria-live="polite" class="text-center">
-        <div class="inline-flex items-center rounded-lg border border-slate-200 bg-white px-5 py-3 text-sm text-slate-600 shadow-sm">
+        <div
+          class="inline-flex items-center rounded-lg border border-slate-200 bg-white px-5 py-3 text-sm text-slate-600 shadow-sm"
+        >
           <svg class="mr-2 h-4 w-4 animate-spin text-blue-600" viewBox="0 0 24 24" fill="none">
-            <circle class="opacity-30" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-90" d="M22 12a10 10 0 00-10-10" stroke="currentColor" stroke-width="4" stroke-linecap="round"></path>
+            <circle
+              class="opacity-30"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              stroke-width="4"
+            ></circle>
+            <path
+              class="opacity-90"
+              d="M22 12a10 10 0 00-10-10"
+              stroke="currentColor"
+              stroke-width="4"
+              stroke-linecap="round"
+            ></path>
           </svg>
           {{ t('github.loading') }}
         </div>
       </div>
 
       <div v-else-if="error" class="text-center">
-        <div class="inline-flex items-center rounded-lg border border-rose-200 bg-rose-50 px-6 py-3 text-rose-700">
+        <div
+          class="inline-flex items-center rounded-lg border border-rose-200 bg-rose-50 px-6 py-3 text-rose-700"
+        >
           {{ t('github.error') }}
         </div>
       </div>
@@ -126,7 +150,10 @@ onUnmounted(() => {
           <article
             v-for="item in statsItems"
             :key="item.id"
-            :class="['rounded-xl border p-5 text-center transition hover:-translate-y-0.5 hover:shadow-md', item.tone]"
+            :class="[
+              'rounded-xl border p-5 text-center transition hover:-translate-y-0.5 hover:shadow-md',
+              item.tone,
+            ]"
           >
             <div class="mb-2 text-2xl">{{ item.icon }}</div>
             <div class="text-3xl font-semibold">{{ item.value }}</div>
@@ -185,7 +212,12 @@ onUnmounted(() => {
               >
                 {{ t('github.viewRelease') }}
                 <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                  />
                 </svg>
               </a>
             </div>
@@ -196,7 +228,12 @@ onUnmounted(() => {
         </div>
 
         <div class="text-center">
-          <a :href="projectConfig.githubUrl" target="_blank" rel="noopener noreferrer" class="ui-primary-action">
+          <a
+            :href="projectConfig.githubUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="ui-primary-action"
+          >
             <GitHubIcon icon-class="h-5 w-5" />
             <span>{{ t('github.viewOnGitHub') }}</span>
           </a>

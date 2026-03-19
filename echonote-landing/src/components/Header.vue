@@ -60,9 +60,15 @@ onUnmounted(() => {
 
     <div class="site-container">
       <div class="flex h-16 items-center justify-between gap-4">
-        <a href="#top" class="inline-flex items-center gap-3 text-slate-900" @click="closeMobileMenu">
+        <a
+          href="#top"
+          class="inline-flex items-center gap-3 text-slate-900"
+          @click="closeMobileMenu"
+        >
           <Logo class-name="h-8 w-8" loading="eager" />
-          <span class="text-base font-semibold tracking-tight sm:text-lg">{{ projectConfig.name }}</span>
+          <span class="text-base font-semibold tracking-tight sm:text-lg">{{
+            projectConfig.name
+          }}</span>
         </a>
 
         <nav class="hidden items-center gap-1 lg:flex" aria-label="Primary">
@@ -122,7 +128,11 @@ onUnmounted(() => {
         </button>
       </div>
 
-      <div v-if="isMobileMenuOpen" id="mobile-nav" class="border-t border-slate-200/70 py-4 lg:hidden">
+      <div
+        v-if="isMobileMenuOpen"
+        id="mobile-nav"
+        class="border-t border-slate-200/70 py-4 lg:hidden"
+      >
         <nav class="flex flex-col gap-1" aria-label="Mobile">
           <a
             v-for="item in mobileNavItems"

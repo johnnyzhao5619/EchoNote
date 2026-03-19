@@ -8,11 +8,29 @@ const BASE_URL = `https://${GITHUB_OWNER}.github.io/${GITHUB_REPO}`
 const GITHUB_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`
 const DOCS_URL = `${GITHUB_URL}/tree/main/docs`
 
-export const projectConfig: ProjectConfig = {
+export const projectConfig: ProjectConfig & any = {
   name: PROJECT_NAME,
   description:
     'A local-first desktop application for comprehensive note management, voice transcription, and AI-powered note summarization.',
   githubUrl: GITHUB_URL,
+
+  valueProps: [
+    {
+      id: 'local',
+      title: 'valueProps.local.title',
+      description: 'valueProps.local.description',
+    },
+    {
+      id: 'private',
+      title: 'valueProps.private.title',
+      description: 'valueProps.private.description',
+    },
+    {
+      id: 'powerful',
+      title: 'valueProps.powerful.title',
+      description: 'valueProps.powerful.description',
+    },
+  ],
 
   features: [
     {
@@ -53,25 +71,48 @@ export const projectConfig: ProjectConfig = {
     },
   ],
 
+  faqs: [
+    {
+      id: 'q1',
+      question: 'faq.q1.question',
+      answer: 'faq.q1.answer',
+    },
+    {
+      id: 'q2',
+      question: 'faq.q2.question',
+      answer: 'faq.q2.answer',
+    },
+    {
+      id: 'q3',
+      question: 'faq.q3.question',
+      answer: 'faq.q3.answer',
+    },
+    {
+      id: 'q4',
+      question: 'faq.q4.question',
+      answer: 'faq.q4.answer',
+    },
+  ],
+
   howItWorks: [
     {
       step: 1,
       title: 'howItWorks.steps.capture.title',
       description: 'howItWorks.steps.capture.description',
-      icon: 'mic'
+      icon: 'mic',
     },
     {
       step: 2,
       title: 'howItWorks.steps.transcribe.title',
       description: 'howItWorks.steps.transcribe.description',
-      icon: 'cpu'
+      icon: 'cpu',
     },
     {
       step: 3,
       title: 'howItWorks.steps.organize.title',
       description: 'howItWorks.steps.organize.description',
-      icon: 'search'
-    }
+      icon: 'search',
+    },
   ],
 
   links: {

@@ -7,7 +7,11 @@
       class="h-10 min-w-[7.5rem] rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none transition-colors hover:border-slate-300 focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
       :aria-label="t('header.languageSwitcher')"
     >
-      <option v-for="localeConfig in supportedLocales" :key="localeConfig.code" :value="localeConfig.code">
+      <option
+        v-for="localeConfig in supportedLocales"
+        :key="localeConfig.code"
+        :value="localeConfig.code"
+      >
         {{ localeConfig.name }}
       </option>
     </select>
