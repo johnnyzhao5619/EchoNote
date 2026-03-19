@@ -292,8 +292,9 @@ def test_workspace_editor_uses_asset_tabs_and_inspector_hosts_ai_actions(
     widget.open_item(item.id)
 
     assert widget.editor_panel.asset_tabs is not None
-    assert widget.inspector_panel.summary_button is not None
-    assert widget.inspector_panel.meeting_brief_button is not None
+    assert widget.inspector_panel.ai_launch_button is not None
+    assert widget.inspector_panel.ai_popover.summary_button is not None
+    assert widget.inspector_panel.ai_popover.meeting_brief_button is not None
 
 
 def test_workspace_task_window_renders_existing_tasks(
@@ -620,9 +621,11 @@ def test_workspace_inspector_exposes_section_titles_and_user_facing_metadata(
     item = workspace_manager.list_items()[0]
     widget.open_item(item.id)
 
-    assert widget.inspector_panel.ai_section_title.text()
+    assert widget.inspector_panel.ai_launch_button.property("role") == "workspace-ai-launcher"
+    assert widget.inspector_panel.ai_popover.summary_button.property("role") == "workspace-ai-action"
     assert widget.inspector_panel.media_section_title.text()
     assert widget.inspector_panel.metadata_section_title.text()
+    assert widget.inspector_panel.source_title_label.property("role") == "workspace-meta-label"
     assert widget.inspector_panel.source_value_label.property("role") == "workspace-meta-value"
     assert "T" not in widget.inspector_panel.updated_value_label.text()
 
@@ -1209,8 +1212,7 @@ def test_workspace_tab_stack_close_all_tabs_clears_editor_and_inspector_state(
     assert widget.editor_panel is None
     assert widget.current_item_id() == ""
     assert widget.inspector_panel._current_item is None
-    assert not widget.inspector_panel.summary_button.isEnabled()
-    assert not widget.inspector_panel.meeting_brief_button.isEnabled()
+    assert widget.inspector_panel._editor_panel is None
 
 
 def test_workspace_document_tabs_expose_semantic_roles(qapp, mock_i18n, workspace_manager):
@@ -1219,6 +1221,7 @@ def test_workspace_document_tabs_expose_semantic_roles(qapp, mock_i18n, workspac
     assert widget.document_tabs.property("role") == "workspace-document-tabs"
     assert widget.open_in_window_button.property("role") == "workspace-tab-action"
     assert widget.inspector_toggle_button.property("role") == "workspace-tab-action"
+    assert widget.hidden_inspector_reveal_button.property("role") == "workspace-tab-action"
     close_button = widget.document_tabs.tabBar().tabButton(0, widget.document_tabs.tabBar().ButtonPosition.RightSide)
     assert close_button is not None
     assert close_button.property("role") == "workspace-tab-close"
@@ -1237,11 +1240,13 @@ def test_workspace_shell_uses_svg_icons_instead_of_text_glyphs(
     assert not widget.library_panel.import_document_button.icon().isNull()
     assert not widget.open_in_window_button.icon().isNull()
     assert not widget.inspector_toggle_button.icon().isNull()
+    assert not widget.hidden_inspector_reveal_button.icon().isNull()
     assert close_button is not None
     assert not close_button.icon().isNull()
     assert close_button.text() == ""
     assert widget.open_in_window_button.text() == ""
     assert widget.inspector_toggle_button.text() == ""
+    assert widget.hidden_inspector_reveal_button.text() == ""
 
 
 def test_workspace_detached_window_is_top_level_and_preserves_current_asset_tab(
@@ -1274,7 +1279,8 @@ def test_workspace_and_detached_window_can_toggle_inspector_panel(
     widget.inspector_toggle_button.click()
     qapp.processEvents()
     assert widget.inspector_panel.isHidden()
-    widget.inspector_toggle_button.click()
+    assert not widget.hidden_inspector_reveal_button.isHidden()
+    widget.hidden_inspector_reveal_button.click()
     qapp.processEvents()
     assert not widget.inspector_panel.isHidden()
 

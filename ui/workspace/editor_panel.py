@@ -24,6 +24,7 @@ from core.qt_imports import (
     QTimer,
     QVBoxLayout,
     QWidget,
+    Qt,
     Signal,
 )
 from core.workspace.manager import WorkspaceValidationError
@@ -32,10 +33,20 @@ from ui.base_widgets import BaseWidget, connect_button_with_callback
 from ui.batch_transcribe.search_widget import SearchWidget
 from ui.common.style_utils import set_widget_state
 from ui.constants import (
+    DEFAULT_MARGINS,
+    PAGE_LAYOUT_SPACING,
     ROLE_TOOLBAR_SECONDARY_ACTION,
+    ROLE_WORKSPACE_AI_ACTION,
+    ROLE_WORKSPACE_AI_POPOVER,
+    ROLE_WORKSPACE_AI_POPOVER_DESCRIPTION,
+    ROLE_WORKSPACE_AI_POPOVER_TITLE,
     ROLE_WORKSPACE_ASSET_TABS,
     ROLE_WORKSPACE_CONTEXT_LABEL,
+    ROLE_WORKSPACE_DOCUMENT_TITLE,
+    ROLE_WORKSPACE_EDITOR_HEADER,
     ROLE_WORKSPACE_EDITOR_PANEL,
+    ROLE_WORKSPACE_EDITOR_TOOLBAR,
+    WORKSPACE_AI_POPOVER_WIDTH,
 )
 from utils.i18n import I18nQtManager
 from ui.workspace.item_list import format_workspace_updated_at
@@ -73,7 +84,7 @@ BATCH_VIEWER_ROLE_SET = EditorRoleSet(
 )
 
 WORKSPACE_EDITOR_ROLE_SET = EditorRoleSet(
-    toolbar=ROLE_WORKSPACE_EDITOR_PANEL,
+    toolbar=ROLE_WORKSPACE_EDITOR_TOOLBAR,
     edit=ROLE_TOOLBAR_SECONDARY_ACTION,
     export=ROLE_TOOLBAR_SECONDARY_ACTION,
     copy=ROLE_TOOLBAR_SECONDARY_ACTION,
@@ -149,11 +160,15 @@ class TextEditorPanel(BaseWidget):
 
     def _init_ui(self) -> None:
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(*DEFAULT_MARGINS)
+        layout.setSpacing(PAGE_LAYOUT_SPACING)
 
         self.toolbar_frame = QFrame()
         self.toolbar_frame.setProperty("role", self.role_set.toolbar)
         self.toolbar_frame.setFrameShape(QFrame.Shape.NoFrame)
         self.toolbar_layout = QHBoxLayout(self.toolbar_frame)
+        self.toolbar_layout.setContentsMargins(0, 0, 0, 0)
+        self.toolbar_layout.setSpacing(PAGE_LAYOUT_SPACING)
 
         self.edit_button = QPushButton()
         self.edit_button.setProperty("role", self.role_set.edit)
@@ -381,6 +396,76 @@ class TextEditorPanel(BaseWidget):
             return
 
 
+class WorkspaceAIPopover(BaseWidget):
+    """Floating AI action surface anchored to the workspace editor header."""
+
+    summary_requested = Signal()
+    meeting_brief_requested = Signal()
+
+    def __init__(self, i18n: I18nQtManager, parent: Optional[QWidget] = None):
+        super().__init__(i18n, parent)
+        self.setWindowFlags(
+            Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint | Qt.WindowType.NoDropShadowWindowHint
+        )
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
+        self._init_ui()
+        self.update_translations()
+
+    def _init_ui(self) -> None:
+        self.setProperty("role", ROLE_WORKSPACE_AI_POPOVER)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(10)
+
+        self.title_label = QLabel(self)
+        self.title_label.setProperty("role", ROLE_WORKSPACE_AI_POPOVER_TITLE)
+        layout.addWidget(self.title_label)
+
+        self.description_label = QLabel(self)
+        self.description_label.setProperty("role", ROLE_WORKSPACE_AI_POPOVER_DESCRIPTION)
+        self.description_label.setWordWrap(True)
+        layout.addWidget(self.description_label)
+
+        self.summary_button = QPushButton(self)
+        self.summary_button.setProperty("role", ROLE_WORKSPACE_AI_ACTION)
+        connect_button_with_callback(self.summary_button, self._emit_summary_requested)
+        layout.addWidget(self.summary_button)
+
+        self.meeting_brief_button = QPushButton(self)
+        self.meeting_brief_button.setProperty("role", ROLE_WORKSPACE_AI_ACTION)
+        connect_button_with_callback(
+            self.meeting_brief_button,
+            self._emit_meeting_brief_requested,
+        )
+        layout.addWidget(self.meeting_brief_button)
+
+        self.setFixedWidth(WORKSPACE_AI_POPOVER_WIDTH)
+
+    def update_translations(self) -> None:
+        self.title_label.setText(self.i18n.t("workspace.inspector_section_ai"))
+        self.description_label.setText(self.i18n.t("workspace.ai_panel_subtitle"))
+        self.summary_button.setText(self.i18n.t("workspace.generate_summary"))
+        self.meeting_brief_button.setText(self.i18n.t("workspace.generate_meeting_brief"))
+
+    def popup_from(self, anchor: QWidget) -> None:
+        self.update_translations()
+        self.adjustSize()
+        anchor_point = anchor.mapToGlobal(anchor.rect().bottomRight())
+        x = anchor_point.x() - self.width()
+        y = anchor_point.y() + 8
+        self.move(x, y)
+        self.show()
+        self.raise_()
+
+    def _emit_summary_requested(self) -> None:
+        self.summary_requested.emit()
+        self.hide()
+
+    def _emit_meeting_brief_requested(self) -> None:
+        self.meeting_brief_requested.emit()
+        self.hide()
+
+
 class WorkspaceEditorPanel(TextEditorPanel):
     """Workspace-specific editor with asset switching and AI actions."""
 
@@ -407,24 +492,47 @@ class WorkspaceEditorPanel(TextEditorPanel):
 
     def _init_workspace_controls(self) -> None:
         self.setProperty("role", ROLE_WORKSPACE_EDITOR_PANEL)
+        self.editor_header = QFrame()
+        self.editor_header.setProperty("role", ROLE_WORKSPACE_EDITOR_HEADER)
+        header_layout = QVBoxLayout(self.editor_header)
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        header_layout.setSpacing(8)
+
+        header_top_row = QWidget(self.editor_header)
+        header_top_layout = QHBoxLayout(header_top_row)
+        header_top_layout.setContentsMargins(0, 0, 0, 0)
+        header_top_layout.setSpacing(12)
+
+        title_stack = QWidget(header_top_row)
+        title_layout = QVBoxLayout(title_stack)
+        title_layout.setContentsMargins(0, 0, 0, 0)
+        title_layout.setSpacing(4)
+
         self.document_title_label = QLabel()
-        self.layout().insertWidget(0, self.document_title_label)
+        self.document_title_label.setProperty("role", ROLE_WORKSPACE_DOCUMENT_TITLE)
+        title_layout.addWidget(self.document_title_label)
+
         self.document_title_edit = QLineEdit()
         self.document_title_edit.setVisible(False)
         self.document_title_edit.textChanged.connect(self._on_title_text_changed)
-        self.layout().insertWidget(1, self.document_title_edit)
+        title_layout.addWidget(self.document_title_edit)
 
         self.document_context_label = QLabel()
         self.document_context_label.setProperty("role", ROLE_WORKSPACE_CONTEXT_LABEL)
         self.document_context_label.setVisible(False)
-        self.layout().insertWidget(2, self.document_context_label)
+        title_layout.addWidget(self.document_context_label)
+        header_top_layout.addWidget(title_stack, 1)
+
+        header_top_layout.addStretch()
+        header_layout.addWidget(header_top_row)
 
         self.asset_tabs = QTabWidget()
         self.asset_tabs.setProperty("role", ROLE_WORKSPACE_ASSET_TABS)
         self.asset_tabs.setDocumentMode(True)
         self.asset_tabs.setMaximumHeight(36)
         self.asset_tabs.currentChanged.connect(self._on_asset_tab_changed)
-        self.layout().insertWidget(3, self.asset_tabs)
+        header_layout.addWidget(self.asset_tabs)
+        self.layout().insertWidget(0, self.editor_header)
 
     def set_item(self, item) -> None:
         """Load editable assets for the selected workspace item."""

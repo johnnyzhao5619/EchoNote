@@ -30,7 +30,6 @@ from ui.constants import (
     WORKSPACE_EDITOR_STAGE_MIN_WIDTH,
     WORKSPACE_INSPECTOR_PANEL_MIN_WIDTH,
     WORKSPACE_LIBRARY_PANEL_MIN_WIDTH,
-    WORKSPACE_TAB_ACTION_SPACING,
 )
 from ui.workspace.detached_document_window import DetachedDocumentWindow
 from ui.workspace.editor_panel import WorkspaceEditorPanel
@@ -82,32 +81,34 @@ class WorkspaceWidget(BaseWidget):
         )
         self.toggle_inspector_action = QAction(self)
         self.toggle_inspector_action.triggered.connect(self._toggle_inspector_panel)
-        self.tab_actions_container = QWidget(self.document_tabs)
-        self.tab_actions_layout = QHBoxLayout(self.tab_actions_container)
-        self.tab_actions_layout.setContentsMargins(0, 0, 0, 0)
-        self.tab_actions_layout.setSpacing(WORKSPACE_TAB_ACTION_SPACING)
-        self.inspector_toggle_button = QToolButton(self.tab_actions_container)
+        self.inspector_toggle_button = QToolButton(self)
         self.inspector_toggle_button.setProperty("role", ROLE_WORKSPACE_TAB_ACTION)
         self.inspector_toggle_button.setAutoRaise(False)
         self.inspector_toggle_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
         self.inspector_toggle_button.setIconSize(QSize(16, 16))
         self.inspector_toggle_button.setDefaultAction(self.toggle_inspector_action)
-        self.tab_actions_layout.addWidget(self.inspector_toggle_button)
         self.open_in_window_button = QToolButton(self)
         self.open_in_window_button.setProperty("role", ROLE_WORKSPACE_TAB_ACTION)
         self.open_in_window_button.setAutoRaise(False)
         self.open_in_window_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
         self.open_in_window_button.setIconSize(QSize(16, 16))
         self.open_in_window_button.setDefaultAction(self.open_current_item_in_window_action)
-        self.tab_actions_layout.addWidget(self.open_in_window_button)
-        self.tab_stack_button = QToolButton(self.tab_actions_container)
+        self.tab_stack_button = QToolButton(self)
         self.tab_stack_button.setProperty("role", ROLE_WORKSPACE_TAB_ACTION)
         self.tab_stack_button.setAutoRaise(False)
         self.tab_stack_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
         self.tab_stack_button.setIconSize(QSize(16, 16))
         self.tab_stack_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        self.tab_actions_layout.addWidget(self.tab_stack_button)
-        self.document_tabs.setCornerWidget(self.tab_actions_container, Qt.Corner.TopRightCorner)
+        self.hidden_inspector_reveal_button = QToolButton(self.document_tabs)
+        self.hidden_inspector_reveal_button.setProperty("role", ROLE_WORKSPACE_TAB_ACTION)
+        self.hidden_inspector_reveal_button.setAutoRaise(False)
+        self.hidden_inspector_reveal_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+        self.hidden_inspector_reveal_button.setIconSize(QSize(16, 16))
+        self.hidden_inspector_reveal_button.setDefaultAction(self.toggle_inspector_action)
+        self.document_tabs.setCornerWidget(
+            self.hidden_inspector_reveal_button,
+            Qt.Corner.TopRightCorner,
+        )
 
         editor_stage = QWidget(self)
         editor_stage.setMinimumWidth(WORKSPACE_EDITOR_STAGE_MIN_WIDTH)
@@ -116,6 +117,13 @@ class WorkspaceWidget(BaseWidget):
         editor_stage_layout.addWidget(self.document_tabs)
         self.inspector_panel = WorkspaceInspectorPanel(self.workspace_manager, self.i18n, self)
         self.inspector_panel.setMinimumWidth(WORKSPACE_INSPECTOR_PANEL_MIN_WIDTH)
+        self.inspector_panel.attach_shell_action_widgets(
+            [
+                self.inspector_toggle_button,
+                self.open_in_window_button,
+                self.tab_stack_button,
+            ]
+        )
         self.recording_panel = self.inspector_panel.recording_panel
         self.task_panel = None
         self.inspector_panel.set_editor_panel(None)
@@ -165,11 +173,17 @@ class WorkspaceWidget(BaseWidget):
             text=self.i18n.t("workspace.stacked_tabs_menu"),
             icon_name="workspace_tabs_menu",
         )
+        self._update_tab_action_button(
+            self.hidden_inspector_reveal_button,
+            text=self.i18n.t("workspace.show_inspector_panel"),
+            icon_name="workspace_inspector",
+        )
         for index in range(self.document_tabs.count()):
             editor_panel = self.document_tabs.widget(index)
             if hasattr(editor_panel, "update_translations"):
                 editor_panel.update_translations()
         self._sync_document_tab_buttons()
+        self.hidden_inspector_reveal_button.setVisible(not self._is_inspector_panel_open())
         for detached_window in self._detached_windows.values():
             detached_window.update_translations()
 
@@ -425,6 +439,7 @@ class WorkspaceWidget(BaseWidget):
             fallback_sizes=WORKSPACE_CONTENT_SPLITTER_DEFAULT_SIZES,
         )
         self._update_inspector_toggle_action()
+        self.hidden_inspector_reveal_button.setVisible(not self._is_inspector_panel_open())
 
     def _is_inspector_panel_open(self) -> bool:
         return not self.inspector_panel.isHidden()
@@ -441,6 +456,11 @@ class WorkspaceWidget(BaseWidget):
         self._update_tab_action_button(
             self.inspector_toggle_button,
             text=text,
+            icon_name="workspace_inspector",
+        )
+        self._update_tab_action_button(
+            self.hidden_inspector_reveal_button,
+            text=self.i18n.t("workspace.show_inspector_panel"),
             icon_name="workspace_inspector",
         )
 

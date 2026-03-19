@@ -189,9 +189,17 @@ def test_theme_outline_covers_workspace_roles():
         "workspace-explorer-header",
         "workspace-nav-tree",
         "workspace-editor-panel",
+        "workspace-editor-header",
+        "workspace-editor-toolbar",
+        "workspace-document-title",
         "workspace-tab-action",
         "workspace-tab-close",
+        "workspace-ai-launcher",
+        "workspace-ai-popover",
+        "workspace-ai-popover-title",
+        "workspace-ai-popover-description",
         "workspace-inspector-section",
+        "workspace-meta-label",
         "workspace-meta-value",
         "workspace-recording-panel",
         "workspace-ai-action",
@@ -222,6 +230,8 @@ def test_theme_outline_covers_workspace_compact_shell_selectors():
         'QToolButton[role="workspace-header-action"]',
         'QToolButton[role="workspace-header-action"]:hover',
         'QLabel[role="workspace-context-label"]',
+        'QFrame[role="workspace-editor-header"]',
+        'QLabel[role="workspace-document-title"]',
     }
     missing = sorted(expected_selectors - selectors)
     assert not missing, f"Theme outline is missing workspace compact shell selectors: {missing}"

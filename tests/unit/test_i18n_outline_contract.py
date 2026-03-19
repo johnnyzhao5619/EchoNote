@@ -136,6 +136,12 @@ def test_i18n_outline_covers_workspace_inspector_section_titles():
     assert "inspector_section_ai" in workspace_keys
     assert "inspector_section_media" in workspace_keys
     assert "inspector_section_metadata" in workspace_keys
+    assert "ai_panel_subtitle" in workspace_keys
+    assert "inspector_label_source" in workspace_keys
+    assert "inspector_label_event" in workspace_keys
+    assert "inspector_label_task" in workspace_keys
+    assert "inspector_label_original_file" in workspace_keys
+    assert "inspector_label_updated" in workspace_keys
     assert "inspector_event" in workspace_keys
     assert "inspector_task" in workspace_keys
     assert "inspector_original_file" in workspace_keys
