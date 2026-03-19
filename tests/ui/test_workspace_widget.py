@@ -698,6 +698,31 @@ def test_workspace_structure_view_surfaces_system_folders_and_inbox_items(
     assert note_node.parent().text(0) == "工作台条目"
 
 
+def test_workspace_library_panel_can_switch_between_structure_and_event_modes(
+    qapp, mock_i18n, workspace_manager
+):
+    event = CalendarEvent(
+        title="Design Review",
+        start_time="2026-03-18T09:00:00+00:00",
+        end_time="2026-03-18T10:00:00+00:00",
+    )
+    event.save(workspace_manager.db)
+    event_note_id = workspace_manager.create_note(title="Review Notes", event_id=event.id)
+
+    widget = WorkspaceWidget(workspace_manager, mock_i18n)
+    widget.library_panel.event_view_button.click()
+    qapp.processEvents()
+
+    assert widget.library_panel.current_view_mode() == "event"
+    assert widget.library_panel.find_event_node(event.id) is not None
+
+    widget.library_panel.select_event(event.id)
+    qapp.processEvents()
+
+    assert widget.current_item_id() == event_note_id
+    assert not widget.library_panel.new_folder_button.isEnabled()
+
+
 def test_workspace_structure_drag_moves_items_without_menu_action(
     qapp, mock_i18n, workspace_manager
 ):

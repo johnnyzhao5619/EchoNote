@@ -32,7 +32,11 @@ from core.qt_imports import (
     Qt,
     Signal,
 )
-from core.workspace.manager import WorkspaceValidationError
+from core.workspace.manager import (
+    LIBRARY_VIEW_EVENT,
+    LIBRARY_VIEW_STRUCTURE,
+    WorkspaceValidationError,
+)
 from ui.base_widgets import BaseWidget
 from ui.constants import (
     CONTROL_BUTTON_MIN_HEIGHT,
@@ -42,6 +46,8 @@ from ui.constants import (
     ROLE_WORKSPACE_HEADER_ACTION,
     ROLE_WORKSPACE_LIBRARY_PANEL,
     ROLE_WORKSPACE_NAV_TREE,
+    ROLE_WORKSPACE_VIEW_MODE_TOGGLE,
+    WORKSPACE_VIEW_MODE_BUTTON_SIZE,
 )
 from ui.workspace.item_list import build_workspace_item_tooltip
 
@@ -137,7 +143,9 @@ class WorkspaceLibraryPanel(BaseWidget):
         self._workspace_items = []
         self._metadata_by_item: dict[str, dict] = {}
         self._pending_selection: tuple[str, str] | None = None
+        self._view_mode = LIBRARY_VIEW_STRUCTURE
         self._folder_nodes: dict[str, QTreeWidgetItem] = {}
+        self._event_nodes: dict[str, QTreeWidgetItem] = {}
         self._item_nodes: dict[str, QTreeWidgetItem] = {}
         self._init_ui()
 
@@ -171,6 +179,21 @@ class WorkspaceLibraryPanel(BaseWidget):
         header_action_bar_layout = QHBoxLayout(self.header_action_bar)
         header_action_bar_layout.setContentsMargins(0, 0, 0, 0)
         header_action_bar_layout.setSpacing(PAGE_DENSE_SPACING)
+
+        self.view_mode_button_group = QButtonGroup(self)
+        self.view_mode_button_group.setExclusive(True)
+        self.structure_view_button = self._create_view_mode_button(
+            self.header_action_bar,
+            icon_name="workspace_structure_mode",
+            mode=LIBRARY_VIEW_STRUCTURE,
+        )
+        header_action_bar_layout.addWidget(self.structure_view_button)
+        self.event_view_button = self._create_view_mode_button(
+            self.header_action_bar,
+            icon_name="workspace_event_mode",
+            mode=LIBRARY_VIEW_EVENT,
+        )
+        header_action_bar_layout.addWidget(self.event_view_button)
 
         self.import_document_button = self._create_header_action_button(
             self.header_action_bar,
@@ -236,6 +259,16 @@ class WorkspaceLibraryPanel(BaseWidget):
 
     def update_translations(self) -> None:
         self.title_label.setText(self.i18n.t("workspace.library_title"))
+        self._update_view_mode_button(
+            self.structure_view_button,
+            tooltip=self.i18n.t("workspace.structure_view"),
+            icon_name="workspace_structure_mode",
+        )
+        self._update_view_mode_button(
+            self.event_view_button,
+            tooltip=self.i18n.t("workspace.event_view"),
+            icon_name="workspace_event_mode",
+        )
         self._update_header_action_button(
             self.import_document_button,
             tooltip=self.i18n.t("workspace.import_document"),
@@ -261,8 +294,38 @@ class WorkspaceLibraryPanel(BaseWidget):
             tooltip=self.i18n.t("common.delete"),
             icon_name="delete",
         )
+        self._sync_view_mode_buttons()
         self.refresh_navigation()
         self._update_context_label()
+
+    def _create_view_mode_button(self, parent: QWidget, *, icon_name: str, mode: str) -> QToolButton:
+        button = QToolButton(parent)
+        button.setProperty("role", ROLE_WORKSPACE_VIEW_MODE_TOGGLE)
+        button.setProperty("view-mode", mode)
+        button.setCheckable(True)
+        button.setAutoRaise(False)
+        button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+        button.setFixedSize(WORKSPACE_VIEW_MODE_BUTTON_SIZE, WORKSPACE_VIEW_MODE_BUTTON_SIZE)
+        button.setIconSize(QSize(_HEADER_ACTION_ICON_SIZE, _HEADER_ACTION_ICON_SIZE))
+        button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._update_view_mode_button(button, tooltip="", icon_name=icon_name)
+        self.view_mode_button_group.addButton(button)
+        button.clicked.connect(
+            lambda _checked=False, target_mode=mode: self.set_view_mode(target_mode)
+        )
+        return button
+
+    def _update_view_mode_button(
+        self,
+        button: QToolButton,
+        *,
+        tooltip: str,
+        icon_name: str,
+    ) -> None:
+        button.setText("")
+        button.setToolTip(tooltip)
+        button.setAccessibleName(tooltip)
+        button.setIcon(self._build_header_action_icon(icon_name))
 
     def _create_header_action_button(self, parent: QWidget, *, icon_name: str) -> QToolButton:
         button = QToolButton(parent)
@@ -303,12 +366,16 @@ class WorkspaceLibraryPanel(BaseWidget):
         selected_folder_id = self.current_folder_id()
 
         self._folder_nodes.clear()
+        self._event_nodes.clear()
         self._item_nodes.clear()
 
         self.folder_tree.blockSignals(True)
         self.folder_tree.clear()
 
-        self._build_structure_tree()
+        if self._view_mode == LIBRARY_VIEW_EVENT:
+            self._build_event_tree()
+        else:
+            self._build_structure_tree()
 
         if pending_selection is not None:
             self._select_tree_identity(*pending_selection)
@@ -360,6 +427,40 @@ class WorkspaceLibraryPanel(BaseWidget):
         for node in self._folder_nodes.values():
             node.setExpanded(True)
 
+    def _build_event_tree(self) -> None:
+        entries = self.workspace_manager.get_event_navigation_entries()
+        items_by_event: dict[str, list] = {}
+        for item in self._workspace_items:
+            items_by_event.setdefault(item.source_event_id or "", []).append(item)
+
+        for entry in entries:
+            event_value = str(entry.get("event_id") or "")
+            display_name = (entry.get("event_title") or "").strip() or self.i18n.t(
+                "workspace.event_group_unlinked"
+            )
+            node = QTreeWidgetItem(
+                [
+                    self.i18n.t(
+                        "workspace.navigator_group_with_count",
+                        name=display_name,
+                        count=entry.get("item_count", 0),
+                    )
+                ]
+            )
+            node.setData(0, _TREE_KIND_ROLE, "event")
+            node.setData(0, _TREE_VALUE_ROLE, event_value)
+            node.setData(0, _TREE_LABEL_ROLE, display_name)
+            node.setData(0, _TREE_CONTEXT_ROLE, event_value)
+            node.setIcon(0, self._build_tree_icon("workspace_event_group"))
+            event_font = QFont(self.font())
+            event_font.setBold(True)
+            node.setFont(0, event_font)
+            self.folder_tree.addTopLevelItem(node)
+            self._event_nodes[event_value] = node
+            for item in items_by_event.get(event_value, []):
+                node.addChild(self._create_item_node(item, context_value=event_value))
+            node.setExpanded(True)
+
 
 
     def _create_item_node(self, item, *, context_value: str | None) -> QTreeWidgetItem:
@@ -389,7 +490,21 @@ class WorkspaceLibraryPanel(BaseWidget):
             return 0
 
     def current_view_mode(self) -> str:
-        return "structure"
+        return self._view_mode
+
+    def set_view_mode(self, mode: str) -> None:
+        resolved_mode = LIBRARY_VIEW_EVENT if mode == LIBRARY_VIEW_EVENT else LIBRARY_VIEW_STRUCTURE
+        if self._view_mode == resolved_mode:
+            self._sync_view_mode_buttons()
+            return
+        self._view_mode = resolved_mode
+        self._sync_view_mode_buttons()
+        self.refresh_navigation()
+        self.view_mode_changed.emit(resolved_mode)
+
+    def _sync_view_mode_buttons(self) -> None:
+        self.structure_view_button.setChecked(self._view_mode == LIBRARY_VIEW_STRUCTURE)
+        self.event_view_button.setChecked(self._view_mode == LIBRARY_VIEW_EVENT)
 
     def current_item_id(self) -> str:
         current_item = self._current_tree_item()
@@ -453,6 +568,13 @@ class WorkspaceLibraryPanel(BaseWidget):
         if self.current_view_mode() != "event":
             return
         self._select_tree_identity("event", event_id or "")
+
+    def find_event_node(self, event_id: str | None) -> QTreeWidgetItem | None:
+        resolved_event_id = event_id or ""
+        live_node = self._find_tree_node("event", resolved_event_id)
+        if live_node is not None:
+            self._event_nodes[resolved_event_id] = live_node
+        return live_node
 
     def find_item_node(self, item_id: str) -> QTreeWidgetItem | None:
         live_node = self._find_tree_node("item", item_id)
@@ -526,6 +648,12 @@ class WorkspaceLibraryPanel(BaseWidget):
         self._update_context_label()
         self._update_header_action_states()
         item_id = self.current_item_id()
+        if not item_id and self.current_view_mode() == LIBRARY_VIEW_EVENT:
+            current_item = self._current_tree_item()
+            if current_item is not None and str(current_item.data(0, _TREE_KIND_ROLE) or "") == "event":
+                first_child = current_item.child(0)
+                if first_child is not None:
+                    item_id = str(first_child.data(0, _TREE_VALUE_ROLE) or "")
         if item_id:
             self.item_selected.emit(item_id)
 
@@ -791,11 +919,17 @@ class WorkspaceLibraryPanel(BaseWidget):
 
     def _update_header_action_states(self) -> None:
         selected_kind, selected_value = self._current_selection_identity()
-        can_manage_folder = selected_kind == "folder" and self._can_manage_folder(selected_value)
-        can_delete_generated_folder = selected_kind == "folder" and self._can_delete_generated_folder(
+        structure_mode = self.current_view_mode() == LIBRARY_VIEW_STRUCTURE
+        can_manage_folder = structure_mode and selected_kind == "folder" and self._can_manage_folder(
             selected_value
         )
+        can_delete_generated_folder = (
+            structure_mode
+            and selected_kind == "folder"
+            and self._can_delete_generated_folder(selected_value)
+        )
         can_manage_item = selected_kind == "item" and self.workspace_manager.get_item(selected_value) is not None
+        self.new_folder_button.setEnabled(structure_mode)
         self.rename_folder_button.setEnabled(can_manage_folder or can_manage_item)
         self.delete_folder_button.setEnabled(
             can_manage_folder or can_delete_generated_folder or can_manage_item

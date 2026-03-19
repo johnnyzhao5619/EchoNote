@@ -844,6 +844,27 @@ QWidget[role="workspace-task-summary"] {
     padding: 8px 10px;
 }
 
+QToolButton[role="workspace-view-mode-toggle"] {
+    background-color: #ffffff;
+    border: 1px solid #d2dff3;
+    border-radius: 8px;
+    padding: 0;
+    min-width: 28px;
+    max-width: 28px;
+    min-height: 28px;
+    max-height: 28px;
+}
+
+QToolButton[role="workspace-view-mode-toggle"]:hover {
+    background-color: #eef4ff;
+    border-color: #9fbae7;
+}
+
+QToolButton[role="workspace-view-mode-toggle"]:checked {
+    background-color: #dceaff;
+    border-color: #8badde;
+}
+
 QToolButton[role="workspace-header-action"] {
     background-color: #ffffff;
     border: 1px solid #d2dff3;
