@@ -561,9 +561,6 @@ def main():
             is_first_run=is_first_run,
         )
 
-        # Validate local models before prompting download recommendations.
-        logger.info("Starting model validation...")
-        model_manager.start_validation(deferred=False)
         check_model_availability(config, model_manager, i18n, main_window)
 
         logger.info("Application initialization complete")

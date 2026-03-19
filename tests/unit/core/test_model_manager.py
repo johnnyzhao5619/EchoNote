@@ -28,7 +28,7 @@ def _build_config(
 
 @patch("core.models.manager.TranslationModelRecord.get_all", return_value=[])
 @patch("core.models.manager.ModelUsageStats.get_all", return_value=[])
-def test_validation_removes_invalid_model_and_keeps_cache_consistent(
+def test_model_manager_treats_incomplete_speech_model_as_not_downloaded(
     _mock_usage, _mock_trans, tmp_path
 ):
 
@@ -38,13 +38,6 @@ def test_validation_removes_invalid_model_and_keeps_cache_consistent(
     (base_dir / "config.json").write_text("{}", encoding="utf-8")
 
     manager = ModelManager(_build_config(models_dir), Mock())
-    assert manager.get_model("base").is_downloaded
-
-    manager.start_validation(deferred=False)
-    assert not base_dir.exists()
-    assert not manager.get_model("base").is_downloaded
-
-    manager._refresh_cache()
     assert not manager.get_model("base").is_downloaded
 
 

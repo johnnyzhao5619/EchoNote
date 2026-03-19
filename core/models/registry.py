@@ -58,11 +58,8 @@ class ModelInfo:
 
         candidate = models_dir / self.name
         if candidate.exists() and candidate.is_dir():
-            try:
-                has_content = any(candidate.iterdir())
-            except OSError:
-                has_content = False
-            if has_content:
+            has_required = all((candidate / required).exists() for required in self.required_files)
+            if has_required:
                 self.local_path = str(candidate)
                 try:
                     self.download_date = datetime.fromtimestamp(candidate.stat().st_mtime)

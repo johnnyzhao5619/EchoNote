@@ -86,7 +86,6 @@ def model_manager():
 
     manager = Mock()
     manager.models_updated = _make_signal_stub()
-    manager.model_validation_failed = _make_signal_stub()
     manager.translation_models_updated = _make_signal_stub()
     manager.text_ai_models_updated = _make_signal_stub()
     manager.downloader = SimpleNamespace(

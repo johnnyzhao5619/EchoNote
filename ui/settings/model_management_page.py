@@ -102,7 +102,6 @@ class ModelManagementPage(BaseSettingsPage):
         self.model_manager.downloader.download_completed.connect(self._on_download_completed)
         self.model_manager.downloader.download_cancelled.connect(self._on_download_cancelled)
         self.model_manager.downloader.download_failed.connect(self._on_download_failed)
-        self.model_manager.model_validation_failed.connect(self._on_validation_failed)
 
         # 连接翻译模型下载器信号
         self.model_manager.translation_models_updated.connect(self._refresh_translation_model_list)
@@ -561,31 +560,6 @@ class ModelManagementPage(BaseSettingsPage):
 
         # 通用建议
         return self.i18n.t("settings.model_management.delete_suggestion_general")
-
-    @Slot(str, str)
-    def _on_validation_failed(self, model_name: str, error_message: str):
-        """
-        处理模型验证失败事件
-
-        Args:
-            model_name: 模型名称
-            error_message: 错误消息
-        """
-        logger.warning(f"Model validation failed for {model_name}: {error_message}")
-
-        # 显示错误对话框
-        error_title = self.i18n.t("settings.model_management.validation_error_title")
-        error_msg = self.i18n.t(
-            "settings.model_management.validation_error_message", model=model_name
-        )
-
-        # 提供解决建议
-        suggestions = self.i18n.t("settings.model_management.validation_suggestion")
-        error_msg += f"\n\n{suggestions}"
-
-        show_error_dialog(
-            title=error_title, message=error_msg, details=error_message, i18n=self.i18n, parent=self
-        )
 
     def _on_view_details_clicked(self, model_name: str):
         """

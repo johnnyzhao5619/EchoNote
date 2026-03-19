@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional, Set
 
 import psutil
-from core.qt_imports import QCoreApplication, QObject, QTimer, Signal
+from core.qt_imports import QObject, Signal
 
 from config.app_config import ConfigManager, get_app_dir
 from core.models.downloader import ModelDownloader
@@ -46,7 +46,6 @@ class ModelManager(QObject):
     """管理可用模型及其生命周期。"""
 
     models_updated = Signal()
-    model_validation_failed = Signal(str, str)
     translation_models_updated = Signal()
     text_ai_models_updated = Signal()
 
@@ -306,14 +305,9 @@ class ModelManager(QObject):
             self.models_updated.emit()
 
     def start_validation(self, deferred: bool = True) -> None:
-        """启动模型验证过程，检查已下载模型的完整性。"""
-        logger.info("Starting model validation")
-        self._refresh_cache()
-        app = QCoreApplication.instance()
-        if not deferred or app is None:
-            self._validate_models()
-        else:
-            QTimer.singleShot(0, self._validate_models)
+        """保留空实现，语音模型完整性由缓存刷新阶段统一判定。"""
+        _ = deferred
+        logger.info("Speech model validation is handled during cache refresh; skipping startup scan")
 
     def recommend_model(self) -> str:
         """根据系统资源和使用历史推荐最佳模型。
@@ -426,49 +420,6 @@ class ModelManager(QObject):
             return False
         configured_model = self._config.get("transcription.faster_whisper.model_size")
         return configured_model == name
-
-    def _validate_models(self) -> None:
-        logger.info("Validating downloaded models")
-        updated = False
-        for model in self.get_all_models():
-            if not model.is_downloaded or not model.local_path:
-                continue
-
-            local_path = Path(model.local_path)
-            missing = self._collect_missing_files(local_path, model)
-            if missing:
-                message = f"Missing files: {', '.join(missing)}"
-                logger.warning(f"Model {model.name} validation failed: {message}")
-                self.model_validation_failed.emit(model.name, message)
-
-                with self._lock:
-                    self._invalid_models.add(model.name)
-
-                try:
-                    if local_path.exists():
-                        import shutil
-
-                        shutil.rmtree(local_path)
-                except Exception as exc:
-                    logger.error("Failed to remove invalid model directory %s: %s", local_path, exc)
-
-                with self._lock:
-                    cached = self._model_cache.get(model.name)
-                    if cached:
-                        cached.is_downloaded = False
-                        cached.local_path = None
-                        cached.download_date = None
-                        updated = True
-
-        if updated:
-            self.models_updated.emit()
-
-    def _collect_missing_files(self, base_path: Path, model: ModelInfo) -> List[str]:
-        missing: List[str] = []
-        for required in model.required_files:
-            if not (base_path / required).exists():
-                missing.append(required)
-        return missing
 
     @staticmethod
     def _parse_datetime(value: Optional[str]) -> Optional[datetime]:

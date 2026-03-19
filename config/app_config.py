@@ -68,13 +68,21 @@ class ConfigManager:
                 with open(self.user_config_path, "r", encoding="utf-8") as f:
                     user_config = json.load(f)
 
-            self._config = self._deep_merge(self._default_config, user_config)
+            sanitized_user_config, removed_legacy_keys = self._prune_legacy_model_path_keys(
+                user_config
+            )
+            self._config = self._deep_merge(self._default_config, sanitized_user_config)
 
             # Ensure version is always current from code, not config file
             self._config["version"] = get_version()
 
             # Validate the loaded configuration
             self._validate_config()
+            if removed_legacy_keys:
+                logger.info(
+                    "Ignoring legacy model path keys from user config: %s",
+                    ", ".join(removed_legacy_keys),
+                )
             logger.info("Configuration loaded and validated successfully")
 
         except FileNotFoundError as e:
@@ -306,6 +314,9 @@ class ConfigManager:
             value: Value to set
         """
         # Validate before setting
+        if self._is_deprecated_model_path_key(key):
+            raise ValueError(f"Deprecated configuration key is not supported: {key}")
+
         if not self.validate_setting(key, value):
             raise ValueError(f"Invalid value for configuration key '{key}': {value}")
 
@@ -341,6 +352,8 @@ class ConfigManager:
         setting = ".".join(parts[1:])
 
         try:
+            if self._is_deprecated_model_path_key(key):
+                return False
             if category == "transcription":
                 return self._validate_transcription_setting(setting, value)
             elif category == "realtime":
@@ -502,26 +515,12 @@ class ConfigManager:
     def save(self) -> None:
         """Save the current configuration to the user config file."""
         try:
-            # Ensure the user config directory exists
-            self.user_config_dir.mkdir(parents=True, exist_ok=True)
-
+            sanitized_config, _ = self._prune_legacy_model_path_keys(self._config)
+            self._config = sanitized_config
             # Validate before saving
             self._validate_config()
 
-            # Write configuration to file
-            with open(self.user_config_path, "w", encoding="utf-8") as f:
-                json.dump(self._config, f, indent=2, ensure_ascii=False)
-
-            # Set secure file permissions (owner read/write only)
-            import os
-
-            try:
-                os.chmod(self.user_config_path, 0o600)
-                logger.debug("Set secure permissions for config file")
-            except Exception as e:
-                logger.warning(f"Could not set file permissions: {e}")
-
-            logger.info(f"Configuration saved to {self.user_config_path}")
+            self._write_user_config(self._config, user_config_path=self.user_config_path)
 
         except Exception as e:
             logger.error(f"Error saving configuration: {e}")
@@ -547,6 +546,7 @@ class ConfigManager:
             raise TypeError("config must be a dictionary")
 
         candidate = self._clone_value(config)
+        candidate, _ = self._prune_legacy_model_path_keys(candidate)
         candidate["version"] = get_version()
 
         previous = self._config
@@ -604,6 +604,58 @@ class ConfigManager:
         if isinstance(value, list):
             return tuple(cls._deep_freeze(v) for v in value)
         return value
+
+    @classmethod
+    def _prune_legacy_model_path_keys(cls, config: Dict[str, Any]) -> tuple[Dict[str, Any], list[str]]:
+        """移除已经废弃的模型路径配置键。"""
+        sanitized = cls._clone_value(config)
+        removed: list[str] = []
+        legacy_paths = (
+            ("transcription", "faster_whisper", "model_dir"),
+            ("translation", "models_dir"),
+            ("text_ai", "models_dir"),
+        )
+
+        for path in legacy_paths:
+            node: Any = sanitized
+            for key in path[:-1]:
+                if not isinstance(node, dict) or key not in node:
+                    node = None
+                    break
+                node = node[key]
+            if not isinstance(node, dict):
+                continue
+            leaf_key = path[-1]
+            if leaf_key in node:
+                node.pop(leaf_key, None)
+                removed.append(".".join(path))
+
+        return sanitized, removed
+
+    @staticmethod
+    def _is_deprecated_model_path_key(key: str) -> bool:
+        return key in {
+            "transcription.faster_whisper.model_dir",
+            "translation.models_dir",
+            "text_ai.models_dir",
+        }
+
+    def _write_user_config(self, config: Dict[str, Any], *, user_config_path: Path) -> None:
+        """Persist a configuration snapshot to the user config file."""
+        self.user_config_dir.mkdir(parents=True, exist_ok=True)
+
+        with open(user_config_path, "w", encoding="utf-8") as f:
+            json.dump(config, f, indent=2, ensure_ascii=False)
+
+        import os
+
+        try:
+            os.chmod(user_config_path, 0o600)
+            logger.debug("Set secure permissions for config file")
+        except Exception as e:
+            logger.warning(f"Could not set file permissions: {e}")
+
+        logger.info(f"Configuration saved to {user_config_path}")
 
     def get_i18n_default_paths(self) -> Dict[str, str]:
         """
