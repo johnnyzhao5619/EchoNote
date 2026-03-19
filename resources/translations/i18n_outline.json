@@ -1,5 +1,5 @@
 {
-  "version": 6,
+  "version": 8,
   "description": "I18n outline contract for translation file structure parity.",
   "base_locale": "zh_CN",
   "locales": [
@@ -45,7 +45,18 @@
       "workspace.restart_hint",
       "workspace.browse",
       "workspace.select_directory",
-      "workspace.error.empty_path"
+      "workspace.error.empty_path",
+      "transcription.provider",
+      "transcription.provider_description",
+      "translation.provider",
+      "translation.configure_google_credentials",
+      "workspace_ai.provider_extractive",
+      "workspace_ai.provider_gguf",
+      "workspace_ai.gguf_runtime_required",
+      "model_management.speech_models_desc",
+      "model_management.suggestion_auth",
+      "model_management.text_ai_summary_group",
+      "model_management.text_ai_meeting_group"
     ],
     "workspace": [
       "drag_from_system_prompt",

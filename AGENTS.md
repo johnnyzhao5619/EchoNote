@@ -22,7 +22,7 @@
 - `main.py`：应用启动入口，初始化管理器与主窗口。
 - `config/`：配置与版本信息。
   - `config/__version__.py`：版本单一事实源（SSOT）。
-  - `config/default_config.json`：默认配置。
+  - `config/default_config.json`：默认配置；模型统一存储根目录由 `models.root_dir` 管理，运行时固定拆分到 `speech/`、`translation/`、`text_ai/` 子目录。
 - `core/`：核心业务编排与管理器。
   - `core/workspace/`：统一资产层与 workspace 服务（导入、Vault 路径布局、资产读写、摘要、会议整理）。
   - `core/models/`：模型注册、下载、状态聚合与 Text AI 模型治理。
@@ -66,8 +66,10 @@
 - 查“文档标签页/独立窗口”：优先看 `ui/workspace/widget.py` + `ui/workspace/editor_panel.py` + `ui/workspace/detached_document_window.py`。
 - 查“时间线音频播放”：优先看 `ui/common/audio_player.py` + `ui/common/audio_player_launcher.py` + `ui/timeline/widget.py`。
 - 查“本地摘要/会议整理/Text AI”：优先看 `engines/text_ai/` + `core/workspace/summary_service.py` + `core/workspace/meeting_brief_service.py` + `core/models/manager.py`。
+- 查“模型下载失败/模型落盘位置”：优先看 `core/models/downloader.py` + `core/models/manager.py` + `core/models/text_ai_registry.py` + `config/default_config.json`；所有受管模型现在统一落在 `models.root_dir/{speech,translation,text_ai}`。
 - 查“工作台任务窗口/录音控制台文案”：优先看 `resources/translations/i18n_outline.json` + `resources/translations/zh_CN.json` + `resources/translations/en_US.json` + `resources/translations/fr_FR.json` + `ui/workspace/task_window.py` + `ui/workspace/recording_session_panel.py`。
 - 查“工作台红框问题总计划/布局精修”：优先看 `docs/plans/archive/2026-03-15-workspace-redbox-closure-plan-superseded.md` + `ui/constants.py` + `resources/themes/theme_outline.json` + `tests/unit/test_main_window_shell.py` + `tests/ui/test_workspace_widget.py` + `tests/unit/test_i18n_outline_contract.py` + `tests/unit/test_theme_outline_contract.py`。
+  历史原始计划文件名 `docs/plans/2026-03-15-workspace-redbox-closure-plan.md` 已被归档 superseded，当前只作为旧引用名保留。
 - 查“主题覆盖缺失”：先对照 `ui/constants.py` 的 role，再查双主题与 `theme_outline.json`。
 - 查“版本发布遗漏”：先看 `config/__version__.py`，再按发布清单同步其他文件。
 - 查“新功能实施计划”：优先看 `docs/plans/`，再回到对应模块代码与测试。
@@ -86,6 +88,9 @@
 - 文档导入与解析：`core/workspace/document_parser.py`、`core/workspace/import_service.py`、`tests/unit/core/test_workspace_manager.py`
 - 本地摘要与会议整理：`core/workspace/summary_service.py`、`core/workspace/meeting_brief_service.py`、`engines/text_ai/`
 - Text AI 模型管理：`core/models/manager.py`、`core/models/text_ai_registry.py`、`ui/settings/model_management_page.py`、`ui/settings/workspace_ai_page.py`
+- 统一模型存储根目录：`config/default_config.json`、`config/app_config.py`、`core/models/manager.py`、`core/models/downloader.py`
+- 设置页提供商选择骨架：`ui/settings/components/provider_selector.py`、`ui/settings/components/section_card.py`、`ui/settings/transcription_page.py`、`ui/settings/translation_page.py`、`ui/settings/workspace_ai_page.py`
+- 设置页导航与模型管理页签：`ui/settings/widget.py`、`ui/settings/model_management_page.py`、`resources/themes/theme_outline.json`、`resources/themes/light.qss`、`resources/themes/dark.qss`
 - 录音设备刷新：`ui/settings/realtime_page.py`、`engines/audio/capture.py`、`core/realtime/recorder.py`
 - 壳层录音底座与浮动窗布局：`ui/common/realtime_recording_dock.py`、`ui/workspace/recording_session_panel.py`、`ui/realtime_record/floating_overlay.py`、`ui/constants.py`、`resources/themes/light.qss`、`resources/themes/dark.qss`；dock 只负责 transport/status 与少量图标动作，实时结果走悬浮窗，播放跟随文本依赖 `core/realtime/archiver.py` 写出的同名 `.txt + .json` 资产对
 - 主题契约与角色覆盖：`resources/themes/theme_outline.json`、`tests/unit/test_theme_outline_contract.py`、`ui/constants.py`
@@ -101,6 +106,7 @@
 - 版本号与发布：`config/__version__.py`、`CHANGELOG.md`、`scripts/build_config.py`、`pyproject.toml`
 - 统一工作台规划：`docs/plans/archive/2026-03-15-workspace-redbox-closure-plan-superseded.md`、`docs/plans/archive/2026-03-15-workspace-polish-and-obsidian-alignment.md`、`docs/plans/archive/2026-03-15-workspace-experience-rearchitecture.md`、`docs/plans/archive/2026-03-15-unified-workspace-and-local-ai.md`、`ui/main_window.py`、`ui/navigation.py`、`core/transcription/manager.py`
 - 工作台视觉精修计划：`docs/plans/archive/2026-03-15-workspace-redbox-closure-plan-superseded.md`、`ui/main_window.py`、`ui/common/realtime_recording_dock.py`、`ui/workspace/library_panel.py`、`ui/workspace/item_list.py`、`ui/workspace/inspector_panel.py`、`ui/workspace/recording_session_panel.py`、`resources/themes/theme_outline.json`、`resources/translations/i18n_outline.json`
+  历史原始文件名 `docs/plans/2026-03-15-workspace-redbox-closure-plan.md` 已 superseded 到 archive 路径。
 
 ## 结构变更同步更新要求（强制）
 

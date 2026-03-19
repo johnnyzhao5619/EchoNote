@@ -36,7 +36,7 @@ python main.py
 #### First Launch Setup
 
 1. **Storage Configuration**: Choose paths for recordings and transcripts
-2. **Model Download**: Download a Faster-Whisper model (recommend `base` for most users)
+2. **Model Download**: Download a Faster-Whisper or Text AI model as needed. Managed models now live under one root at `~/.echonote/models/`, split into `speech/`, `translation/`, and `text_ai/`
 3. **FFmpeg Check**: Verify FFmpeg installation for media format support
 4. **Loopback Check (First Run)**: Detect loopback input and show setup guidance if missing (one-click setup supports macOS/Windows/Linux with system authorization where required)
 5. **Optional**: Configure calendar sync (Google/Outlook OAuth)
@@ -91,6 +91,7 @@ EchoNote/
 
 Workspace architecture highlights:
 - `core/workspace/`: unified asset layer for `workspace_items` and `workspace_assets`
+- `core/models/manager.py`: unified model governance and storage root planning for `speech/`, `translation/`, and `text_ai` assets under `models.root_dir`
 - `engines/text_ai/`: extractive, ONNX, and GGUF local text AI runtimes
 - `ui/workspace/`: single workbench featuring a Navigator shell, Document Editor, Results List, and Inspector with an integrated media transport player
 
@@ -131,7 +132,7 @@ Released under the [Apache 2.0 License](LICENSE). PySide6 (LGPL v3) is used for 
 
 ## 📊 Project Status
 
-- **Version**: v2.1.3 (Latest release)
+- **Version**: v2.2.0 (Latest release)
 - **Test Suite**: unit / integration / UI / performance categories
 - **Code Quality**: Excellent (PEP 8 compliant, type-annotated)
 - **Documentation**: Complete and restructured

@@ -275,18 +275,18 @@ class SettingsWidget(BaseWidget):
         specs.extend(
             [
                 (
-                    "workspace",
-                    lambda: WorkspaceSettingsPage(
-                        self.settings_manager,
-                        self.i18n,
-                    ),
-                ),
-                (
                     "workspace_ai",
                     lambda: WorkspaceAISettingsPage(
                         self.settings_manager,
                         self.i18n,
                         self.managers,
+                    ),
+                ),
+                (
+                    "workspace",
+                    lambda: WorkspaceSettingsPage(
+                        self.settings_manager,
+                        self.i18n,
                     ),
                 ),
                 (

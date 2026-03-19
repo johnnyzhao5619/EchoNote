@@ -47,6 +47,36 @@ class _FakeSession:
         return [logits]
 
 
+class _FakeEncoderSession:
+    def get_inputs(self):
+        return [
+            SimpleNamespace(name="input_ids"),
+            SimpleNamespace(name="attention_mask"),
+        ]
+
+    def run(self, _outputs, _inputs):
+        return [np.ones((1, 2, 4), dtype=np.float32)]
+
+
+class _FakeDecoderSession:
+    def __init__(self):
+        self._step = 0
+
+    def get_inputs(self):
+        return [
+            SimpleNamespace(name="input_ids"),
+            SimpleNamespace(name="encoder_hidden_states"),
+            SimpleNamespace(name="encoder_attention_mask"),
+        ]
+
+    def run(self, _outputs, _inputs):
+        next_token = 5 if self._step == 0 else 2
+        logits = np.zeros((1, 1, 8), dtype=np.float32)
+        logits[0, -1, next_token] = 1.0
+        self._step += 1
+        return [logits]
+
+
 def test_onnx_summarizer_generates_text_with_seq2seq_assets(tmp_path):
     model_dir = tmp_path / "onnx-model"
     model_dir.mkdir(parents=True)
@@ -61,6 +91,45 @@ def test_onnx_summarizer_generates_text_with_seq2seq_assets(tmp_path):
     fake_onnxruntime = SimpleNamespace(
         InferenceSession=lambda *_args, **_kwargs: fake_session
     )
+    fake_transformers = SimpleNamespace(
+        AutoTokenizer=SimpleNamespace(
+            from_pretrained=lambda *_args, **_kwargs: fake_tokenizer
+        )
+    )
+
+    with patch.dict(
+        "sys.modules",
+        {
+            "onnxruntime": fake_onnxruntime,
+            "transformers": fake_transformers,
+        },
+    ):
+        summarizer = OnnxSummarizer("flan-t5-small-int8", model_dir)
+        summary = summarizer.generate(TextAIRequest(text="meeting transcript", max_output_tokens=8))
+
+    assert summary == "short summary"
+
+
+def test_onnx_summarizer_generates_text_with_split_encoder_decoder_assets(tmp_path):
+    model_dir = tmp_path / "onnx-split-model"
+    model_dir.mkdir(parents=True)
+    (model_dir / "encoder_model.onnx").write_bytes(b"encoder")
+    (model_dir / "decoder_model.onnx").write_bytes(b"decoder")
+    (model_dir / "config.json").write_text(
+        '{"decoder_start_token_id": 0, "eos_token_id": 2}',
+        encoding="utf-8",
+    )
+
+    fake_encoder_session = _FakeEncoderSession()
+    fake_decoder_session = _FakeDecoderSession()
+    fake_tokenizer = _FakeTokenizer()
+
+    def _inference_session(path, **_kwargs):
+        if str(path).endswith("encoder_model.onnx"):
+            return fake_encoder_session
+        return fake_decoder_session
+
+    fake_onnxruntime = SimpleNamespace(InferenceSession=_inference_session)
     fake_transformers = SimpleNamespace(
         AutoTokenizer=SimpleNamespace(
             from_pretrained=lambda *_args, **_kwargs: fake_tokenizer

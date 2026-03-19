@@ -37,7 +37,8 @@ class DownloadCancelled(Exception):
 
 @dataclass
 class _RemoteFile:
-    path: str
+    remote_path: str
+    local_path: str
     size: int
 
 
@@ -124,6 +125,14 @@ class ModelDownloader(QObject):
             total_bytes = model.size_mb * 1024 * 1024
 
         total_bytes = max(total_bytes, 1)  # 最终安全网
+        free_bytes = shutil.disk_usage(self._models_dir).free
+        required_bytes = int(total_bytes * 1.05)
+        if free_bytes < required_bytes:
+            raise OSError(
+                "Insufficient disk space for model download "
+                f"(required {required_bytes // (1024 * 1024)} MB, "
+                f"available {free_bytes // (1024 * 1024)} MB)"
+            )
         downloaded_bytes = 0
         start_ts = time.monotonic()
 
@@ -175,11 +184,15 @@ class ModelDownloader(QObject):
         )
         logger.info(f"Fetching manifest for {model.repo_id}@{model.revision}")
         response = requests.get(api_url, timeout=30)
+        if response.status_code in (401, 403):
+            raise PermissionError(
+                f"Model source '{model.repo_id}' is not publicly accessible or requires authentication"
+            )
         response.raise_for_status()
         payload = response.json()
 
         siblings = payload.get("siblings", [])
-        files_list: List[_RemoteFile] = []
+        manifest_sizes: Dict[str, int] = {}
 
         for sibling in siblings:
             path = sibling.get("rfilename")
@@ -200,7 +213,31 @@ class ModelDownloader(QObject):
                 except Exception as e:
                     logger.warning(f"Failed to get size for {path} via HEAD: {e}")
 
-            files_list.append(_RemoteFile(path=path, size=int(size or 0)))
+            manifest_sizes[path] = int(size or 0)
+
+        requested_files = getattr(model, "download_files", ()) or ()
+        files_list: List[_RemoteFile] = []
+        if requested_files:
+            for item in requested_files:
+                if isinstance(item, str):
+                    remote_path = item
+                    local_path = item
+                else:
+                    remote_path, local_path = item
+                if remote_path not in manifest_sizes:
+                    raise RuntimeError(
+                        f"Required remote file '{remote_path}' is missing from manifest for {model.repo_id}"
+                    )
+                files_list.append(
+                    _RemoteFile(
+                        remote_path=remote_path,
+                        local_path=local_path,
+                        size=manifest_sizes[remote_path],
+                    )
+                )
+        else:
+            for path, size in manifest_sizes.items():
+                files_list.append(_RemoteFile(remote_path=path, local_path=path, size=size))
 
         files = tuple(files_list)
 
@@ -224,14 +261,24 @@ class ModelDownloader(QObject):
 
         url = (
             f"https://huggingface.co/{model.repo_id}/resolve/{model.revision}/"
-            f"{remote_file.path}"
+            f"{remote_file.remote_path}"
         )
-        target = destination / remote_file.path
+        target = destination / remote_file.local_path
         target.parent.mkdir(parents=True, exist_ok=True)
 
-        logger.info(f"Downloading {remote_file.path} ({remote_file.size} bytes)")
+        logger.info(
+            "Downloading %s -> %s (%s bytes)",
+            remote_file.remote_path,
+            remote_file.local_path,
+            remote_file.size,
+        )
 
         with requests.get(url, stream=True, timeout=60) as response:
+            if response.status_code in (401, 403):
+                raise PermissionError(
+                    f"Model file '{remote_file.remote_path}' from '{model.repo_id}' "
+                    "is not publicly accessible or requires authentication"
+                )
             response.raise_for_status()
 
             with open(target, "wb") as fh:

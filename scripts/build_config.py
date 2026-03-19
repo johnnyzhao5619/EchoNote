@@ -17,7 +17,7 @@ BUILD_DIR = PROJECT_ROOT / "build"
 
 # App metadata
 APP_NAME = "EchoNote"
-APP_VERSION = "2.1.3"
+APP_VERSION = "2.2.0"
 
 # PySide6 hidden imports
 HIDDEN_IMPORTS = [

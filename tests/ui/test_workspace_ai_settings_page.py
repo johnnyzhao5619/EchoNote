@@ -39,8 +39,8 @@ class _FakeSettingsManager:
 
 
 class _FakeModelManager:
-    def get_all_text_ai_models(self):
-        return [
+    def __init__(self):
+        self._models = [
             TextAIModelInfo(
                 model_id="extractive-default",
                 display_name="Extractive Summary",
@@ -60,7 +60,7 @@ class _FakeModelManager:
                 description="summary",
                 family="summary",
                 size_mb=310,
-                is_downloaded=False,
+                is_downloaded=True,
             ),
             TextAIModelInfo(
                 model_id="gemma-3-1b-it-gguf",
@@ -70,9 +70,15 @@ class _FakeModelManager:
                 description="meeting",
                 family="meeting",
                 size_mb=1200,
-                is_downloaded=False,
+                is_downloaded=True,
             ),
         ]
+
+    def get_all_text_ai_models(self):
+        return list(self._models)
+
+    def get_text_ai_model(self, model_id: str):
+        return next((model for model in self._models if model.model_id == model_id), None)
 
 
 def test_workspace_ai_page_loads_workspace_defaults(qapp, mock_i18n):
@@ -85,11 +91,14 @@ def test_workspace_ai_page_loads_workspace_defaults(qapp, mock_i18n):
 
     page.load_settings()
 
-    assert page.summary_strategy_combo.currentData() == "extractive"
+    assert page.summary_provider_selector.current_provider() == "extractive"
+    assert page.meeting_provider_selector.current_provider() == "extractive"
     assert page.summary_model_combo.currentData() == "flan-t5-small-int8"
     assert page.meeting_model_combo.currentData() == "extractive-default"
     assert page.meeting_template_combo.currentData() == "standard"
     assert page.runtime_command_edit.text() == ""
+    assert not page.summary_model_row.isVisible()
+    assert not page.meeting_model_row.isVisible()
 
 
 def test_workspace_ai_page_save_settings_persists_preferences(qapp, mock_i18n):
@@ -100,7 +109,8 @@ def test_workspace_ai_page_save_settings_persists_preferences(qapp, mock_i18n):
         managers={"model_manager": _FakeModelManager()},
     )
 
-    page.summary_strategy_combo.setCurrentIndex(page.summary_strategy_combo.findData("abstractive"))
+    page.summary_provider_selector.set_current_provider("onnx")
+    page.meeting_provider_selector.set_current_provider("gguf")
     page.summary_model_combo.setCurrentIndex(
         page.summary_model_combo.findData("flan-t5-small-int8")
     )
@@ -126,10 +136,10 @@ def test_workspace_ai_page_download_shortcut_uses_text_ai_tab(qapp, mock_i18n):
     page = WorkspaceAISettingsPage(settings_manager, mock_i18n)
 
     model_page = Mock()
-    model_page.tabs = Mock()
+    model_page.focus_section = Mock()
     page._open_settings_page = Mock(return_value=model_page)
 
     page._on_go_to_model_management()
 
     page._open_settings_page.assert_called_once_with("model_management")
-    model_page.tabs.setCurrentIndex.assert_called_once_with(2)
+    model_page.focus_section.assert_called_once_with("text_ai")

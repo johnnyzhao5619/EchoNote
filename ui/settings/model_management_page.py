@@ -54,6 +54,7 @@ from ui.constants import (
     MODEL_MANAGEMENT_MODEL_NAME_FONT_SIZE,
     MODEL_MANAGEMENT_RECOMMENDED_BUTTON_MAX_WIDTH,
     MODEL_MANAGEMENT_SECTION_TITLE_FONT_SIZE,
+    ROLE_MODEL_MANAGEMENT_TABS,
     ROLE_AUDIO_FILE,
     ROLE_MODEL_REASON,
     ROLE_SETTINGS_INLINE_ACTION,
@@ -174,15 +175,28 @@ class ModelManagementPage(BaseSettingsPage):
 
         self.add_spacing()
 
-        # 引入标签页
         self.tabs = QTabWidget()
-        self.tabs.setObjectName("model_management_tabs")
+        self.tabs.setProperty("role", ROLE_MODEL_MANAGEMENT_TABS)
         self.content_layout.addWidget(self.tabs)
+
+        self.tab_index_by_section = {
+            "speech": 0,
+            "translation": 1,
+            "text_ai": 2,
+        }
 
         # ---- 语音模型标签页 ----
         self.speech_tab = QWidget()
         self.speech_layout = create_vbox(margins=(10, 10, 10, 10), spacing=20)
         self.speech_tab.setLayout(self.speech_layout)
+        self.speech_title = self.add_section_title(
+            self.i18n.t("settings.model_management.speech_tab"),
+            layout=self.speech_layout,
+        )
+        self.speech_desc = QLabel(self.i18n.t("settings.model_management.speech_models_desc"))
+        self.speech_desc.setWordWrap(True)
+        self.speech_desc.setObjectName("description_label")
+        self.speech_layout.addWidget(self.speech_desc)
 
         # 推荐模型卡片区域（条件显示）
         self.recommendation_container = QWidget()
@@ -250,9 +264,7 @@ class ModelManagementPage(BaseSettingsPage):
         self.translation_layout.addWidget(self.translation_models_container)
 
         self.translation_layout.addStretch()
-        self.tabs.addTab(
-            self.translation_tab, self.i18n.t("settings.model_management.translation_tab")
-        )
+        self.tabs.addTab(self.translation_tab, self.i18n.t("settings.model_management.translation_tab"))
 
         # ---- Text AI 模型标签页 ----
         self.text_ai_tab = QWidget()
@@ -268,13 +280,29 @@ class ModelManagementPage(BaseSettingsPage):
         self.text_ai_models_desc.setObjectName("description_label")
         self.text_ai_layout.addWidget(self.text_ai_models_desc)
 
-        self.text_ai_models_container = QWidget()
-        self.text_ai_models_layout = create_vbox(
+        self.text_ai_summary_title = self.add_section_title(
+            self.i18n.t("settings.model_management.text_ai_summary_group"),
+            layout=self.text_ai_layout,
+        )
+        self.text_ai_summary_container = QWidget()
+        self.text_ai_summary_layout = create_vbox(
             spacing=self.MODEL_LIST_SPACING,
             margins=ZERO_MARGINS,
         )
-        self.text_ai_models_container.setLayout(self.text_ai_models_layout)
-        self.text_ai_layout.addWidget(self.text_ai_models_container)
+        self.text_ai_summary_container.setLayout(self.text_ai_summary_layout)
+        self.text_ai_layout.addWidget(self.text_ai_summary_container)
+
+        self.text_ai_meeting_title = self.add_section_title(
+            self.i18n.t("settings.model_management.text_ai_meeting_group"),
+            layout=self.text_ai_layout,
+        )
+        self.text_ai_meeting_container = QWidget()
+        self.text_ai_meeting_layout = create_vbox(
+            spacing=self.MODEL_LIST_SPACING,
+            margins=ZERO_MARGINS,
+        )
+        self.text_ai_meeting_container.setLayout(self.text_ai_meeting_layout)
+        self.text_ai_layout.addWidget(self.text_ai_meeting_container)
 
         self.text_ai_layout.addStretch()
         self.tabs.addTab(self.text_ai_tab, self.i18n.t("settings.model_management.text_ai_tab"))
@@ -327,14 +355,24 @@ class ModelManagementPage(BaseSettingsPage):
             self.translation_models_desc.setText(
                 self.i18n.t("settings.model_management.translation_models_desc")
             )
+        if hasattr(self, "speech_title"):
+            self.speech_title.setText(self.i18n.t("settings.model_management.speech_tab"))
+        if hasattr(self, "speech_desc"):
+            self.speech_desc.setText(self.i18n.t("settings.model_management.speech_models_desc"))
         if hasattr(self, "text_ai_models_title"):
             self.text_ai_models_title.setText(self.i18n.t("settings.model_management.text_ai_models"))
         if hasattr(self, "text_ai_models_desc"):
             self.text_ai_models_desc.setText(
                 self.i18n.t("settings.model_management.text_ai_models_desc")
             )
-
-        # 更新标签页标题
+        if hasattr(self, "text_ai_summary_title"):
+            self.text_ai_summary_title.setText(
+                self.i18n.t("settings.model_management.text_ai_summary_group")
+            )
+        if hasattr(self, "text_ai_meeting_title"):
+            self.text_ai_meeting_title.setText(
+                self.i18n.t("settings.model_management.text_ai_meeting_group")
+            )
         if hasattr(self, "tabs"):
             self.tabs.setTabText(0, self.i18n.t("settings.model_management.speech_tab"))
             self.tabs.setTabText(1, self.i18n.t("settings.model_management.translation_tab"))
@@ -886,6 +924,22 @@ class ModelManagementPage(BaseSettingsPage):
         ):
             return self.i18n.t("settings.model_management.suggestion_network")
 
+        if any(
+            keyword in error_lower
+            for keyword in [
+                "401",
+                "403",
+                "unauthorized",
+                "forbidden",
+                "authentication",
+                "requires authentication",
+                "not publicly accessible",
+                "private",
+                "invalid username or password",
+            ]
+        ):
+            return self.i18n.t("settings.model_management.suggestion_auth")
+
         # 磁盘空间不足
         if any(keyword in error_lower for keyword in ["disk", "space", "storage", "insufficient"]):
             return self.i18n.t("settings.model_management.suggestion_disk_space")
@@ -902,6 +956,12 @@ class ModelManagementPage(BaseSettingsPage):
 
     def save_settings(self):
         """保存设置（模型管理页面不需要保存设置）"""
+
+    def focus_section(self, section_id: str) -> None:
+        target_index = self.tab_index_by_section.get(section_id)
+        if target_index is None or not hasattr(self, "tabs"):
+            return
+        self.tabs.setCurrentIndex(target_index)
 
     def _on_go_to_transcription_settings(self) -> None:
         """Navigate to transcription settings page."""
@@ -977,17 +1037,21 @@ class ModelManagementPage(BaseSettingsPage):
     @Slot()
     def _refresh_text_ai_model_list(self):
         """刷新 Text AI 模型列表。"""
-        if not hasattr(self, "text_ai_models_layout"):
+        if not hasattr(self, "text_ai_summary_layout") or not hasattr(self, "text_ai_meeting_layout"):
             return
 
         logger.debug("Refreshing text ai model list")
-        self._clear_layout(self.text_ai_models_layout)
+        self._clear_layout(self.text_ai_summary_layout)
+        self._clear_layout(self.text_ai_meeting_layout)
         self.text_ai_model_cards.clear()
 
         all_models = self.model_manager.get_all_text_ai_models()
         for model in all_models:
             card = self._create_unified_card(model)
-            self.text_ai_models_layout.addWidget(card)
+            target_layout = (
+                self.text_ai_summary_layout if model.family == "summary" else self.text_ai_meeting_layout
+            )
+            target_layout.addWidget(card)
             self.text_ai_model_cards[model.model_id] = card
 
     def _on_view_text_ai_details_clicked(self, model_id: str) -> None:

@@ -41,13 +41,18 @@ For contributors and developers:
 - Workspace vault note: `core/workspace/vault_layout.py` is now the single path-planning layer for tree-aligned Markdown files and copied attachments, while `ui/settings/workspace_page.py` owns the configurable Vault root.
 - Workspace tree follow-up note: the latest tree interaction handoff is archived in `plans/archive/2026-03-18-workspace-tree-context-dnd-markdown-vault-superseded.md`, which covers the missing right-click menu, constrained copy/move drag semantics, and the Markdown Vault hard switch that aligns the tree with the local folder structure.
 - Workspace red-box closure note: the screenshot red-box implementation track is archived in `plans/archive/2026-03-15-workspace-redbox-closure-plan-superseded.md`; use the archived plan only as historical context for the navigator-shell hard switch, event-folder and batch-task-folder semantics, results-list rendering, and inspector transport-player redesign.
+  The original reference name `plans/2026-03-15-workspace-redbox-closure-plan.md` is retained only as a historical alias for older guides/tests.
 - Workspace screenshot shell note: the screenshot-specific shell chrome track is archived in `plans/archive/2026-03-18-workspace-obsidian-screenshot-shell-refactor-superseded.md`; use the archived plan only as historical context before changing workspace tab chrome, structure/event mode exposure, or workspace SVG icon semantics.
 - Workspace copy note: shell task-window title and recording-console section labels are now governed by `workspace.task_window_title` and `workspace.recording_console.*` in `resources/translations/*.json`, with `resources/translations/i18n_outline.json` as the outline SSOT.
 - Workspace visual polish note: top-bar tool grouping, explorer compact shell, item meta/badges, inspector section titles, and recording-dock summary semantics are all contract-driven by `ui/constants.py`, `resources/themes/theme_outline.json`, and `resources/translations/i18n_outline.json`; theme/i18n/tests/docs are expected to land in the same change.
 - Shell recording note: the primary realtime recording entry is now the persistent compact dock in `ui/common/realtime_recording_dock.py`; `ui/workspace/recording_session_panel.py` has been reduced to a lightweight popup settings form, while `ui/realtime_record/` owns the floating live-result surface and visualization helpers.
 - Realtime workflow note: live transcript/translation now belong to the floating overlay, while completed recording output is published only into the workspace document tree; the dock no longer hosts a second bottom results workspace.
 - Model governance note: `core/models/manager.py` now governs `speech` / `translation` / `text-ai` catalogs together, with workspace defaults exposed in `ui/settings/workspace_ai_page.py`.
+- Managed model storage note: model downloads are now hard-switched to a unified root from `config/default_config.json` via `models.root_dir`, and `core/models/manager.py` materializes fixed `speech/`, `translation/`, and `text_ai/` subdirectories under that root.
 - Settings ownership note: translation defaults are managed in `ui/settings/translation_page.py`, realtime recording controls remain in `ui/settings/realtime_page.py`, and workspace summary/meeting preferences live in `ui/settings/workspace_ai_page.py`.
+- Provider-first settings note: transcription, translation, and Workspace AI share the provider-card abstraction in `ui/settings/components/provider_selector.py`, while reusable settings surface cards live in `ui/settings/components/section_card.py`.
+- Model management note: `ui/settings/model_management_page.py` is organized as speech / translation / Text AI tabs again, and cross-page shortcuts select the target tab directly instead of scrolling inside a long page.
+- Settings navigation note: `ui/settings/widget.py` owns the single source of truth for the left-nav order; the desktop settings rail is grouped by AI workflow first (`transcription -> realtime -> translation -> model management -> workspace AI`) before workspace/application pages.
 - Shared playback architecture note: reusable audio playback lives in `ui/common/audio_player.py` and is opened via `ui/common/audio_player_launcher.py`.
 - Shared delete-flow note: calendar hub and timeline both use `ui/calendar_event_actions.py` so event deletion copy and workspace cleanup choices stay consistent.
 - Shared routing note: timeline and calendar artifact actions now route into `MainWindow.open_workspace_item()` first, switching between structure/event workspace views before focusing transcript/translation/audio assets, so viewing prefers the unified workspace over ad-hoc modal viewers.
@@ -67,7 +72,7 @@ All workspace implementation plans listed here are historical references only. N
 
 ## 🗃️ Archived Plans
 
-- **[Workspace Red-Box Closure Plan](plans/archive/2026-03-15-workspace-redbox-closure-plan-superseded.md)** - Archived execution plan for the four screenshot issues: left navigator hard switch, Obsidian-aligned structure/event navigation, event-folder and batch-task-folder default placement with persistent source linkage, and inspector transport-player redesign
+- **[Workspace Red-Box Closure Plan](plans/archive/2026-03-15-workspace-redbox-closure-plan-superseded.md)** - Archived execution plan for the four screenshot issues: left navigator hard switch, Obsidian-aligned structure/event navigation, event-folder and batch-task-folder default placement with persistent source linkage, and inspector transport-player redesign. Historical alias: `plans/2026-03-15-workspace-redbox-closure-plan.md`
 - **[Realtime Recording Workflow Correction Plan](plans/archive/2026-03-16-realtime-recording-workflow-refactor-superseded.md)** - Archived correction plan for the recording shell: remove the bottom results workspace, keep the dock compact and horizontal, route live transcript/translation to the floating overlay, and publish completed recording output only into workspace documents
 - **[Workspace Obsidian Screenshot Shell Refactor Plan](plans/archive/2026-03-18-workspace-obsidian-screenshot-shell-refactor-superseded.md)** - Archived screenshot-scoped shell plan for real structure/event mode exposure, stacked-tabs menu, unified SVG icon pipeline, and tighter workspace tab/editor chrome semantics
 - **[Unified Workspace & Local AI Plan](plans/archive/2026-03-15-unified-workspace-and-local-ai.md)** - Historical hard-switch plan for the first unified recording/document workspace rollout and local AI architecture baseline
@@ -168,5 +173,5 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ---
 
-**Last Updated**: March 18, 2026
-**Version**: v2.1.3
+**Last Updated**: March 19, 2026
+**Version**: v2.2.0

@@ -1,8 +1,11 @@
 {
-  "version": "2.1.3",
+  "version": "2.2.0",
   "database": {
     "path": "~/.echonote/data.db",
     "encryption_enabled": true
+  },
+  "models": {
+    "root_dir": "~/.echonote/models"
   },
   "transcription": {
     "default_engine": "faster-whisper",
@@ -15,8 +18,7 @@
     "faster_whisper": {
       "model_size": "base",
       "device": "auto",
-      "compute_type": "int8",
-      "model_dir": "~/.echonote/models"
+      "compute_type": "int8"
     }
   },
   "realtime": {
@@ -40,14 +42,11 @@
     "translation_task_shutdown_timeout": 2.0
   },
   "translation": {
-    "models_dir": "~/.echonote/translation_models",
     "translation_engine": "none",
     "translation_source_lang": "auto",
     "translation_target_lang": "en"
   },
-  "text_ai": {
-    "models_dir": "~/.echonote/text_ai_models"
-  },
+  "text_ai": {},
   "workspace": {
     "storage_root": "~/Documents/EchoNote/WorkspaceVault"
   },

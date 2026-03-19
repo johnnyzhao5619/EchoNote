@@ -19,3 +19,22 @@ def test_text_ai_registry_includes_builtin_extractive_model():
 
     assert model is not None
     assert model.provider == "builtin"
+
+
+def test_text_ai_registry_uses_public_remote_repositories_for_downloadable_models():
+    registry = TextAIModelRegistry()
+
+    downloadable = [model for model in registry.get_all() if model.runtime != "extractive"]
+
+    assert downloadable
+    assert all(not model.repo_id.startswith("echonote/") for model in downloadable)
+    assert all(model.repo_id for model in downloadable)
+
+
+def test_text_ai_registry_declares_explicit_download_file_mapping_for_downloadable_models():
+    registry = TextAIModelRegistry()
+
+    downloadable = [model for model in registry.get_all() if model.runtime != "extractive"]
+
+    assert downloadable
+    assert all(model.download_files for model in downloadable)

@@ -61,12 +61,14 @@ class ModelManager(QObject):
         self._config = config
         self._database = database
         self._registry = registry or ModelRegistry()
-        self._models_dir = Path(
+        self._models_root_dir = Path(
             self._config.get(
-                "transcription.faster_whisper.model_dir",
+                "models.root_dir",
                 str(get_app_dir() / "models"),
             )
         ).expanduser()
+        self._models_root_dir.mkdir(parents=True, exist_ok=True)
+        self._models_dir = self._models_root_dir / "speech"
         self._models_dir.mkdir(parents=True, exist_ok=True)
 
         self.downloader = downloader or ModelDownloader(self._models_dir, self)
@@ -75,12 +77,7 @@ class ModelManager(QObject):
 
         # ---------- 翻译模型（独立目录和下载器，不与语音模型混用） ----------
         self._translation_registry = TranslationModelRegistry()
-        self._translation_models_dir = Path(
-            self._config.get(
-                "translation.models_dir",
-                str(Path.home() / ".echonote" / "translation_models"),
-            )
-        ).expanduser()
+        self._translation_models_dir = self._models_root_dir / "translation"
         self._translation_models_dir.mkdir(parents=True, exist_ok=True)
         # 独立的 ModelDownloader 实例：目录不同，信号不同，互不干扰
         self.translation_downloader = ModelDownloader(self._translation_models_dir, self)
@@ -93,12 +90,7 @@ class ModelManager(QObject):
 
         self._ensure_text_ai_record_table()
         self._text_ai_registry = TextAIModelRegistry()
-        self._text_ai_models_dir = Path(
-            self._config.get(
-                "text_ai.models_dir",
-                str(Path.home() / ".echonote" / "text_ai_models"),
-            )
-        ).expanduser()
+        self._text_ai_models_dir = self._models_root_dir / "text_ai"
         self._text_ai_models_dir.mkdir(parents=True, exist_ok=True)
         self.text_ai_downloader = ModelDownloader(self._text_ai_models_dir, self)
         self.text_ai_downloader.download_completed.connect(self._on_text_ai_download_completed)

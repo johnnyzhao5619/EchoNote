@@ -7,9 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-03-19
+
 ### Changed
 
 - Corrected the shell realtime-recording architecture after the first refactor overshot into a second bottom workspace: the dock is now a compact horizontal transport/status bar with icon actions, live transcript/translation is shown through the floating overlay instead of a dock results pane, completed recording output is published only into workspace documents, and the shared `.txt + .json` timeline asset path plus secondary retranscription reuse remain intact.
+- Refactored AI/model settings into a provider-first flow inspired by AnythingLLM: transcription, translation, and Workspace AI now share provider-card selection semantics, model management is back to speech/translation/Text AI tabs with direct tab focusing instead of long-page scrolling, and settings navigation is reordered around the AI workflow.
+- Hard-switched managed model storage to `models.root_dir` with fixed `speech/`, `translation/`, and `text_ai/` subdirectories, replaced private `echonote/*` Text AI download sources with public Hugging Face repositories, and taught the downloader/UI to distinguish authentication failures from real disk-space errors.
+- Removed stale test assumptions tied to the old long-page model-management flow and the legacy split model-directory keys, replacing them with tab-focused navigation, unified storage-root, downloader, and ONNX runtime regression coverage.
 
 ## [2.1.3] - 2026-03-18
 

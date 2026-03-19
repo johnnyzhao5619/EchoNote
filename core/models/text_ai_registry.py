@@ -23,6 +23,7 @@ class TextAIModelInfo:
     repo_id: str = ""
     revision: str = "main"
     required_files: Tuple[str, ...] = field(default_factory=tuple)
+    download_files: Tuple[Tuple[str, str], ...] = field(default_factory=tuple)
     optional_files: Tuple[str, ...] = field(default_factory=tuple)
     local_path: Optional[str] = None
     is_downloaded: bool = False
@@ -84,15 +85,33 @@ class TextAIModelRegistry:
             ),
             TextAIModelInfo(
                 model_id="flan-t5-small-int8",
-                display_name="Flan-T5 Small INT8",
+                display_name="Flan-T5 Small ONNX",
                 runtime="onnx",
                 provider="onnxruntime",
                 description="Lightweight local abstractive summarizer for short meeting notes.",
                 family="summary",
-                size_mb=310,
-                repo_id="echonote/flan-t5-small-int8",
-                required_files=("model.onnx", "config.json", "tokenizer_config.json"),
-                optional_files=("tokenizer.json", "special_tokens_map.json"),
+                size_mb=380,
+                repo_id="dmmagdal/flan-t5-small-onnx",
+                required_files=(
+                    "encoder_model.onnx",
+                    "decoder_model.onnx",
+                    "config.json",
+                    "generation_config.json",
+                    "tokenizer_config.json",
+                    "tokenizer.json",
+                    "special_tokens_map.json",
+                    "spiece.model",
+                ),
+                download_files=(
+                    ("encoder_model.onnx", "encoder_model.onnx"),
+                    ("decoder_model.onnx", "decoder_model.onnx"),
+                    ("config.json", "config.json"),
+                    ("generation_config.json", "generation_config.json"),
+                    ("tokenizer_config.json", "tokenizer_config.json"),
+                    ("tokenizer.json", "tokenizer.json"),
+                    ("special_tokens_map.json", "special_tokens_map.json"),
+                    ("spiece.model", "spiece.model"),
+                ),
             ),
             TextAIModelInfo(
                 model_id="gemma-3-1b-it-gguf",
@@ -101,9 +120,10 @@ class TextAIModelRegistry:
                 provider="llama_cpp",
                 description="Fast local meeting cleanup model for concise structured outputs.",
                 family="meeting",
-                size_mb=1200,
-                repo_id="echonote/gemma-3-1b-it-gguf",
+                size_mb=770,
+                repo_id="ggml-org/gemma-3-1b-it-GGUF",
                 required_files=("model.gguf",),
+                download_files=(("gemma-3-1b-it-Q4_K_M.gguf", "model.gguf"),),
             ),
             TextAIModelInfo(
                 model_id="gemma-3-4b-it-gguf",
@@ -112,9 +132,10 @@ class TextAIModelRegistry:
                 provider="llama_cpp",
                 description="Balanced local meeting model with better reasoning on action items.",
                 family="meeting",
-                size_mb=3400,
-                repo_id="echonote/gemma-3-4b-it-gguf",
+                size_mb=2375,
+                repo_id="ggml-org/gemma-3-4b-it-GGUF",
                 required_files=("model.gguf",),
+                download_files=(("gemma-3-4b-it-Q4_K_M.gguf", "model.gguf"),),
             ),
             TextAIModelInfo(
                 model_id="apertus-8b-instruct-gguf",
@@ -123,9 +144,10 @@ class TextAIModelRegistry:
                 provider="llama_cpp",
                 description="Higher-quality local meeting summarization model for structured briefs.",
                 family="meeting",
-                size_mb=6200,
-                repo_id="echonote/apertus-8b-instruct-gguf",
+                size_mb=4825,
+                repo_id="MaziyarPanahi/Apertus-8B-Instruct-2509-GGUF",
                 required_files=("model.gguf",),
+                download_files=(("Apertus-8B-Instruct-2509.Q4_K_M.gguf", "model.gguf"),),
             ),
         ]
 

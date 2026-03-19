@@ -126,6 +126,16 @@
         "QPushButton[role=\"settings-cancel-action\"]",
         "QPushButton[role=\"settings-reset-action\"]",
         "QPushButton[role=\"settings-inline-action\"]",
+        "QTabWidget[role=\"model-management-tabs\"]::pane",
+        "QTabWidget[role=\"model-management-tabs\"] QTabBar::tab",
+        "QTabWidget[role=\"model-management-tabs\"] QTabBar::tab:selected",
+        "QFrame[role=\"settings-section-card\"]",
+        "QWidget[role=\"settings-provider-selector\"]",
+        "QFrame[role=\"settings-provider-option\"]",
+        "QFrame[role=\"settings-provider-option\"][state=\"selected\"]",
+        "QLabel[role=\"settings-provider-title\"]",
+        "QLabel[role=\"settings-provider-description\"]",
+        "QLabel[role=\"settings-provider-badge\"]",
         "QGroupBox[role=\"settings-config-group\"]",
         "QGroupBox[role=\"settings-config-group-nested\"]"
       ]

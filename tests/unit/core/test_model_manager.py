@@ -14,12 +14,8 @@ def _build_config(
     config = Mock()
 
     def _get(key, default=None):
-        if key == "transcription.faster_whisper.model_dir":
+        if key == "models.root_dir":
             return str(models_dir)
-        if key == "translation.models_dir":
-            return str(models_dir.parent / "translation_models")
-        if key == "text_ai.models_dir":
-            return str(models_dir.parent / "text_ai_models")
         if key == "transcription.default_engine":
             return default_engine
         if key == "transcription.faster_whisper.model_size":
@@ -37,7 +33,7 @@ def test_validation_removes_invalid_model_and_keeps_cache_consistent(
 ):
 
     models_dir = tmp_path / "models"
-    base_dir = models_dir / "base"
+    base_dir = models_dir / "speech" / "base"
     base_dir.mkdir(parents=True, exist_ok=True)
     (base_dir / "config.json").write_text("{}", encoding="utf-8")
 
@@ -122,6 +118,21 @@ def test_model_manager_lists_text_ai_models(_mock_usage, _mock_trans, tmp_path):
     models = manager.get_all_text_ai_models()
 
     assert any(model.model_id == "flan-t5-small-int8" for model in models)
+
+
+@patch("core.models.manager.TranslationModelRecord.get_all", return_value=[])
+@patch("core.models.manager.ModelUsageStats.get_all", return_value=[])
+def test_model_manager_uses_unified_model_root_with_fixed_subdirectories(
+    _mock_usage, _mock_trans, tmp_path
+):
+    models_root = tmp_path / "managed-models"
+
+    manager = ModelManager(_build_config(models_root), Mock())
+
+    assert manager._models_root_dir == models_root
+    assert manager._models_dir == models_root / "speech"
+    assert manager._translation_models_dir == models_root / "translation"
+    assert manager._text_ai_models_dir == models_root / "text_ai"
 
 
 def test_model_manager_tracks_text_ai_model_usage(tmp_path):

@@ -80,13 +80,13 @@ def test_translation_page_download_shortcut_uses_model_management_tab(qapp, mock
     settings_manager = _FakeSettingsManager()
     page = TranslationSettingsPage(settings_manager, mock_i18n)
     model_page = Mock()
-    model_page.tabs = Mock()
+    model_page.focus_section = Mock()
     page._open_settings_page = Mock(return_value=model_page)
 
     page._on_go_to_model_management()
 
     page._open_settings_page.assert_called_once_with("model_management")
-    model_page.tabs.setCurrentIndex.assert_called_once_with(1)
+    model_page.focus_section.assert_called_once_with("translation")
 
 
 def test_translation_page_download_button_has_semantic_role(qapp, mock_i18n):

@@ -61,6 +61,7 @@ from ui.constants import (
     STANDARD_LABEL_WIDTH,
 )
 from ui.common.style_utils import set_widget_state
+from ui.settings.components.provider_selector import ProviderOptionSpec, ProviderSelectorWidget
 from ui.settings.base_page import BaseSettingsPage, PostSaveMessage
 from utils.i18n import I18nQtManager
 from utils.time_utils import now_local
@@ -195,17 +196,28 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         # Engine settings section
         self.engine_title = self.add_section_title(self.i18n.t("settings.transcription.engine"))
 
-        # Engine selection
-        engine_layout = create_hbox()
-        self.engine_label = QLabel(self.i18n.t("settings.transcription.engine_select"))
+        self.engine_description_label = QLabel(
+            self.i18n.t("settings.transcription.provider_description")
+        )
+        self.engine_description_label.setWordWrap(True)
+        self.engine_description_label.setProperty("role", ROLE_DEVICE_INFO)
+        self.content_layout.addWidget(self.engine_description_label)
+
+        self.engine_label = QLabel(self.i18n.t("settings.transcription.provider"))
         self.engine_label.setMinimumWidth(STANDARD_LABEL_WIDTH)
+        self.content_layout.addWidget(self.engine_label)
+
+        # Keep a hidden combo as the single source of truth for persistence and side effects.
         self.engine_combo = QComboBox()
         self.engine_combo.addItems(SUPPORTED_TRANSCRIPTION_ENGINES)
         self.engine_combo.currentTextChanged.connect(self._on_engine_changed)
-        engine_layout.addWidget(self.engine_label)
-        engine_layout.addWidget(self.engine_combo)
-        engine_layout.addStretch()
-        self.content_layout.addLayout(engine_layout)
+        self.engine_combo.hide()
+        self.content_layout.addWidget(self.engine_combo)
+
+        self.provider_selector = ProviderSelectorWidget()
+        self.provider_selector.provider_changed.connect(self._on_provider_selected)
+        self.content_layout.addWidget(self.provider_selector)
+        self._configure_provider_selector()
 
         # Engine-specific configuration
         self._create_engine_configs()
@@ -264,6 +276,7 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         self.whisper_group.setLayout(whisper_layout)
         self.content_layout.addWidget(self.whisper_group)
 
+        self.model_guidance_widget = QWidget()
         self.model_guidance_layout = create_hbox()
         self.model_guidance_label = QLabel()
         self.model_guidance_label.setWordWrap(True)
@@ -273,7 +286,8 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         self.model_management_button.setProperty("role", ROLE_SETTINGS_INLINE_ACTION)
         self.model_management_button.clicked.connect(self._on_go_to_model_management)
         self.model_guidance_layout.addWidget(self.model_management_button)
-        self.content_layout.addLayout(self.model_guidance_layout)
+        self.model_guidance_widget.setLayout(self.model_guidance_layout)
+        self.content_layout.addWidget(self.model_guidance_widget)
         self._update_model_guidance(has_downloaded_models=True)
 
         # Cloud engine configuration (will be shown/hidden based on selection)
@@ -304,6 +318,48 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         self.cloud_group.setLayout(cloud_layout)
         self.cloud_group.setVisible(False)
         self.content_layout.addWidget(self.cloud_group)
+
+    def _configure_provider_selector(self) -> None:
+        current_provider = self.provider_selector.current_provider() if hasattr(
+            self, "provider_selector"
+        ) else ""
+        self.provider_selector.set_options(
+            (
+                ProviderOptionSpec(
+                    provider_id=ENGINE_FASTER_WHISPER,
+                    title=self.i18n.t("settings.transcription.provider_faster_whisper"),
+                    description=self.i18n.t(
+                        "settings.transcription.provider_faster_whisper_desc"
+                    ),
+                    badge=self.i18n.t("settings.transcription.provider_badge_local"),
+                ),
+                ProviderOptionSpec(
+                    provider_id=ENGINE_OPENAI,
+                    title=self.i18n.t("settings.transcription.provider_openai"),
+                    description=self.i18n.t("settings.transcription.provider_openai_desc"),
+                    badge=self.i18n.t("settings.transcription.provider_badge_cloud"),
+                ),
+                ProviderOptionSpec(
+                    provider_id=ENGINE_GOOGLE,
+                    title=self.i18n.t("settings.transcription.provider_google"),
+                    description=self.i18n.t("settings.transcription.provider_google_desc"),
+                    badge=self.i18n.t("settings.transcription.provider_badge_cloud"),
+                ),
+                ProviderOptionSpec(
+                    provider_id=ENGINE_AZURE,
+                    title=self.i18n.t("settings.transcription.provider_azure"),
+                    description=self.i18n.t("settings.transcription.provider_azure_desc"),
+                    badge=self.i18n.t("settings.transcription.provider_badge_cloud"),
+                ),
+            ),
+            selected_id=current_provider or self.engine_combo.currentText() or ENGINE_FASTER_WHISPER,
+        )
+
+    def _on_provider_selected(self, provider_id: str) -> None:
+        if self.engine_combo.currentText() != provider_id:
+            self.engine_combo.setCurrentText(provider_id)
+            return
+        self._on_engine_changed(provider_id)
 
     def _update_model_guidance(self, *, has_downloaded_models: bool) -> None:
         """Update model availability hint and download shortcut visibility."""
@@ -711,8 +767,17 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         is_whisper = engine == ENGINE_FASTER_WHISPER
         is_cloud = engine in [ENGINE_OPENAI, ENGINE_GOOGLE, ENGINE_AZURE]
 
+        if hasattr(self, "provider_selector"):
+            self.provider_selector.set_current_provider(engine, emit_signal=False)
         self.whisper_group.setVisible(is_whisper)
+        self.model_guidance_widget.setVisible(is_whisper)
         self.cloud_group.setVisible(is_cloud)
+        if hasattr(self, "openai_group"):
+            self.openai_group.setVisible(engine == ENGINE_OPENAI)
+        if hasattr(self, "google_group"):
+            self.google_group.setVisible(engine == ENGINE_GOOGLE)
+        if hasattr(self, "azure_group"):
+            self.azure_group.setVisible(engine == ENGINE_AZURE)
 
         self._emit_changed()
 
@@ -814,8 +879,8 @@ class TranscriptionSettingsPage(BaseSettingsPage):
     def _on_go_to_model_management(self) -> None:
         """Navigate to settings model management page for model download."""
         model_page = self._open_settings_page("model_management")
-        if model_page and hasattr(model_page, "tabs"):
-            model_page.tabs.setCurrentIndex(0)
+        if model_page and hasattr(model_page, "focus_section"):
+            model_page.focus_section("speech")
 
     def load_settings(self):
         """Load transcription settings into UI."""
@@ -1145,6 +1210,10 @@ class TranscriptionSettingsPage(BaseSettingsPage):
             self.ffmpeg_title.setText(self.i18n.t("settings.transcription.ffmpeg_status"))
         if hasattr(self, "engine_title"):
             self.engine_title.setText(self.i18n.t("settings.transcription.engine"))
+        if hasattr(self, "engine_description_label"):
+            self.engine_description_label.setText(
+                self.i18n.t("settings.transcription.provider_description")
+            )
 
         # Update labels
         if hasattr(self, "format_label"):
@@ -1156,7 +1225,9 @@ class TranscriptionSettingsPage(BaseSettingsPage):
         if hasattr(self, "path_label"):
             self.path_label.setText(self.i18n.t("settings.transcription.save_path"))
         if hasattr(self, "engine_label"):
-            self.engine_label.setText(self.i18n.t("settings.transcription.engine_select"))
+            self.engine_label.setText(self.i18n.t("settings.transcription.provider"))
+        if hasattr(self, "provider_selector"):
+            self._configure_provider_selector()
 
         # Update Whisper config labels
         if hasattr(self, "model_size_label"):

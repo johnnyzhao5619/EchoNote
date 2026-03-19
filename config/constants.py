@@ -420,9 +420,6 @@ SUPPORTED_REALTIME_TRANSLATION_ENGINES = [
     TRANSLATION_ENGINE_GOOGLE,
 ]
 
-# Local translation model storage (Opus-MT / MarianMT)
-DEFAULT_TRANSLATION_MODELS_DIR = "~/.echonote/translation_models"
-
 
 # ============================================================================
 # Transcription Status Constants

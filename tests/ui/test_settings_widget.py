@@ -147,6 +147,8 @@ class TestSettingsWidgetButtons:
 
     def test_reset_button_click(self, widget):
         """Test reset button click."""
+        widget.show_info = Mock()
+        widget.show_error = Mock()
         with patch.object(widget, "show_question", return_value=True):
             # Should not raise exception
             widget._on_reset_clicked()
@@ -196,13 +198,13 @@ class TestSettingsWidgetCategories:
         ]
         assert "workspace" in category_ids
 
-    def test_workspace_category_precedes_workspace_ai(self, widget):
-        """Workspace storage should appear before Workspace AI in navigation."""
+    def test_workspace_ai_category_precedes_workspace(self, widget):
+        """Workspace AI should appear before workspace storage in navigation."""
         category_ids = [
             widget.category_list.item(i).data(Qt.ItemDataRole.UserRole)
             for i in range(widget.category_list.count())
         ]
-        assert category_ids.index("workspace") < category_ids.index("workspace_ai")
+        assert category_ids.index("workspace_ai") < category_ids.index("workspace")
 
     def test_category_count_matches_page_count(self, widget):
         """Category list and page stack should stay aligned."""
@@ -252,6 +254,40 @@ class TestSettingsWidgetCategories:
         widget.category_list.setCurrentRow(category_rows["workspace"])
         assert widget.pages_container.currentWidget() is widget.settings_pages["workspace"]
 
+    def test_category_order_follows_ai_workflow_when_model_manager_present(
+        self,
+        qapp,
+        mock_settings_manager,
+        mock_i18n,
+        mock_model_manager,
+    ):
+        widget = SettingsWidget(
+            settings_manager=mock_settings_manager,
+            i18n=mock_i18n,
+            managers={
+                "settings_manager": mock_settings_manager,
+                "model_manager": mock_model_manager,
+            },
+        )
+
+        category_ids = [
+            widget.category_list.item(i).data(Qt.ItemDataRole.UserRole)
+            for i in range(widget.category_list.count())
+        ]
+
+        assert category_ids == [
+            "transcription",
+            "realtime",
+            "translation",
+            "model_management",
+            "workspace_ai",
+            "workspace",
+            "calendar",
+            "timeline",
+            "appearance",
+            "language",
+        ]
+
     def test_category_change_updates_page(self, widget):
         """Test changing category updates the displayed page."""
         initial_index = widget.pages_container.currentIndex()
@@ -276,11 +312,12 @@ def test_save_failure_rolls_back_settings_and_runtime_state(qapp, mock_i18n):
     main_window = Mock()
     mock_i18n.change_language = Mock()
 
-    widget = SettingsWidget(
-        settings_manager=settings_manager,
-        i18n=mock_i18n,
-        managers={"settings_manager": settings_manager, "main_window": main_window},
-    )
+    with patch.object(SettingsWidget, "load_settings", autospec=True, return_value=None):
+        widget = SettingsWidget(
+            settings_manager=settings_manager,
+            i18n=mock_i18n,
+            managers={"settings_manager": settings_manager, "main_window": main_window},
+        )
 
     page = Mock()
     page.validate_settings.return_value = (True, "")
@@ -314,11 +351,12 @@ def test_save_success_applies_runtime_state_once(qapp, mock_i18n):
     main_window = Mock()
     mock_i18n.change_language = Mock()
 
-    widget = SettingsWidget(
-        settings_manager=settings_manager,
-        i18n=mock_i18n,
-        managers={"settings_manager": settings_manager, "main_window": main_window},
-    )
+    with patch.object(SettingsWidget, "load_settings", autospec=True, return_value=None):
+        widget = SettingsWidget(
+            settings_manager=settings_manager,
+            i18n=mock_i18n,
+            managers={"settings_manager": settings_manager, "main_window": main_window},
+        )
 
     page = Mock()
     page.validate_settings.return_value = (True, "")
@@ -338,11 +376,12 @@ def test_save_success_runs_page_post_save_hook(qapp, mock_i18n):
     settings_manager.config_manager.get_all.return_value = {"ui": {}}
     settings_manager.get_setting.return_value = None
 
-    widget = SettingsWidget(
-        settings_manager=settings_manager,
-        i18n=mock_i18n,
-        managers={"settings_manager": settings_manager},
-    )
+    with patch.object(SettingsWidget, "load_settings", autospec=True, return_value=None):
+        widget = SettingsWidget(
+            settings_manager=settings_manager,
+            i18n=mock_i18n,
+            managers={"settings_manager": settings_manager},
+        )
 
     page = Mock()
     page.validate_settings.return_value = (True, "")
@@ -360,11 +399,12 @@ def test_save_failure_skips_page_post_save_hook(qapp, mock_i18n):
     settings_manager.config_manager.save.side_effect = RuntimeError("write failed")
     settings_manager.config_manager.get_all.return_value = {"ui": {}}
 
-    widget = SettingsWidget(
-        settings_manager=settings_manager,
-        i18n=mock_i18n,
-        managers={"settings_manager": settings_manager},
-    )
+    with patch.object(SettingsWidget, "load_settings", autospec=True, return_value=None):
+        widget = SettingsWidget(
+            settings_manager=settings_manager,
+            i18n=mock_i18n,
+            managers={"settings_manager": settings_manager},
+        )
 
     page = Mock()
     page.validate_settings.return_value = (True, "")
@@ -383,11 +423,12 @@ def test_save_success_with_post_save_warning_shows_warning_only(qapp, mock_i18n)
     settings_manager.config_manager.get_all.return_value = {"ui": {}}
     settings_manager.get_setting.return_value = None
 
-    widget = SettingsWidget(
-        settings_manager=settings_manager,
-        i18n=mock_i18n,
-        managers={"settings_manager": settings_manager},
-    )
+    with patch.object(SettingsWidget, "load_settings", autospec=True, return_value=None):
+        widget = SettingsWidget(
+            settings_manager=settings_manager,
+            i18n=mock_i18n,
+            managers={"settings_manager": settings_manager},
+        )
 
     page = Mock()
     page.validate_settings.return_value = (True, "")
