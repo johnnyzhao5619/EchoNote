@@ -1145,6 +1145,28 @@ def test_workspace_supports_document_tabs_and_detached_window(
     assert second_id in widget._detached_windows
 
 
+def test_workspace_tab_strip_exposes_stacked_tabs_menu_and_batch_close_actions(
+    qapp, mock_i18n, workspace_manager
+):
+    first_id = workspace_manager.list_items()[0].id
+    second_id = workspace_manager.create_note(title="Plan")
+    third_id = workspace_manager.create_note(title="Spec")
+
+    widget = WorkspaceWidget(workspace_manager, mock_i18n)
+    widget.open_item(first_id)
+    widget.open_item(second_id)
+    widget.open_item(third_id)
+
+    menu = widget._build_tab_stack_menu()
+    action_texts = [action.text() for action in menu.actions() if action.text()]
+
+    assert widget.tab_stack_button is not None
+    assert "Plan" in action_texts
+    assert "Spec" in action_texts
+    assert mock_i18n.t("workspace.close_other_tabs") in action_texts
+    assert mock_i18n.t("workspace.close_all_tabs") in action_texts
+
+
 def test_workspace_document_tabs_expose_semantic_roles(qapp, mock_i18n, workspace_manager):
     widget = WorkspaceWidget(workspace_manager, mock_i18n)
 

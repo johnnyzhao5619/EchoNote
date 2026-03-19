@@ -177,6 +177,8 @@
         "QTabWidget[role=\"workspace-document-tabs\"] QTabBar::tab",
         "QTabWidget[role=\"workspace-document-tabs\"] QTabBar::tab:selected",
         "QTabWidget[role=\"workspace-document-tabs\"] QTabBar::tab:hover",
+        "QMenu[role=\"workspace-tab-menu\"]",
+        "QMenu[role=\"workspace-tab-menu\"]::item:selected",
         "QTabWidget[role=\"workspace-asset-tabs\"]::pane",
         "QTabWidget[role=\"workspace-asset-tabs\"] QTabBar::tab",
         "QTabWidget[role=\"workspace-asset-tabs\"] QTabBar::tab:selected",

@@ -995,6 +995,19 @@ QTabWidget[role="workspace-document-tabs"] QTabBar::tab:hover {
     border-color: #7fa3db;
 }
 
+QMenu[role="workspace-tab-menu"] {
+    background-color: #ffffff;
+    border: 1px solid #d9deea;
+    border-radius: 10px;
+    padding: 6px;
+}
+
+QMenu[role="workspace-tab-menu"]::item:selected {
+    background-color: #eef4ff;
+    color: #17335d;
+    border-radius: 6px;
+}
+
 QToolButton[role="workspace-tab-close"] {
     background-color: #e8f1ff;
     color: #365078;

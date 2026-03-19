@@ -7,6 +7,7 @@ from core.qt_imports import (
     QAction,
     QFileDialog,
     QHBoxLayout,
+    QMenu,
     QPalette,
     QSplitter,
     QSize,
@@ -24,10 +25,12 @@ from ui.constants import (
     ROLE_WORKSPACE_SURFACE,
     ROLE_WORKSPACE_TAB_ACTION,
     ROLE_WORKSPACE_TAB_CLOSE,
+    ROLE_WORKSPACE_TAB_MENU,
     WORKSPACE_CONTENT_SPLITTER_DEFAULT_SIZES,
     WORKSPACE_EDITOR_STAGE_MIN_WIDTH,
     WORKSPACE_INSPECTOR_PANEL_MIN_WIDTH,
     WORKSPACE_LIBRARY_PANEL_MIN_WIDTH,
+    WORKSPACE_TAB_ACTION_SPACING,
 )
 from ui.workspace.detached_document_window import DetachedDocumentWindow
 from ui.workspace.editor_panel import WorkspaceEditorPanel
@@ -82,7 +85,7 @@ class WorkspaceWidget(BaseWidget):
         self.tab_actions_container = QWidget(self.document_tabs)
         self.tab_actions_layout = QHBoxLayout(self.tab_actions_container)
         self.tab_actions_layout.setContentsMargins(0, 0, 0, 0)
-        self.tab_actions_layout.setSpacing(8)
+        self.tab_actions_layout.setSpacing(WORKSPACE_TAB_ACTION_SPACING)
         self.inspector_toggle_button = QToolButton(self.tab_actions_container)
         self.inspector_toggle_button.setProperty("role", ROLE_WORKSPACE_TAB_ACTION)
         self.inspector_toggle_button.setAutoRaise(False)
@@ -97,6 +100,13 @@ class WorkspaceWidget(BaseWidget):
         self.open_in_window_button.setIconSize(QSize(16, 16))
         self.open_in_window_button.setDefaultAction(self.open_current_item_in_window_action)
         self.tab_actions_layout.addWidget(self.open_in_window_button)
+        self.tab_stack_button = QToolButton(self.tab_actions_container)
+        self.tab_stack_button.setProperty("role", ROLE_WORKSPACE_TAB_ACTION)
+        self.tab_stack_button.setAutoRaise(False)
+        self.tab_stack_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+        self.tab_stack_button.setIconSize(QSize(16, 16))
+        self.tab_stack_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.tab_actions_layout.addWidget(self.tab_stack_button)
         self.document_tabs.setCornerWidget(self.tab_actions_container, Qt.Corner.TopRightCorner)
 
         editor_stage = QWidget(self)
@@ -149,6 +159,11 @@ class WorkspaceWidget(BaseWidget):
             self.open_in_window_button,
             text=self.i18n.t("workspace.open_in_new_window"),
             icon_name="workspace_open_window",
+        )
+        self._update_tab_action_button(
+            self.tab_stack_button,
+            text=self.i18n.t("workspace.stacked_tabs_menu"),
+            icon_name="workspace_tabs_menu",
         )
         for index in range(self.document_tabs.count()):
             editor_panel = self.document_tabs.widget(index)
@@ -336,6 +351,42 @@ class WorkspaceWidget(BaseWidget):
             button.setToolTip(close_label)
             button.setAccessibleName(close_label)
             button.setIcon(self._build_shell_icon("workspace_tab_close"))
+        self._sync_tab_stack_menu()
+
+    def _sync_tab_stack_menu(self) -> None:
+        menu = self._build_tab_stack_menu()
+        self.tab_stack_button.setMenu(menu)
+        self.tab_stack_button.setEnabled(self.document_tabs.count() > 0)
+
+    def _build_tab_stack_menu(self) -> QMenu:
+        menu = QMenu(self)
+        menu.setProperty("role", ROLE_WORKSPACE_TAB_MENU)
+
+        current_index = self.document_tabs.currentIndex()
+        for index in range(self.document_tabs.count()):
+            title = self.document_tabs.tabText(index)
+            action = menu.addAction(title)
+            action.setCheckable(True)
+            action.setChecked(index == current_index)
+            action.triggered.connect(
+                lambda _checked=False, target_index=index: self.document_tabs.setCurrentIndex(target_index)
+            )
+
+        if self.document_tabs.count() > 0:
+            menu.addSeparator()
+
+        close_current_action = menu.addAction(self.i18n.t("workspace.close_current_tab"))
+        close_current_action.setEnabled(current_index >= 0)
+        close_current_action.triggered.connect(self._close_current_tab)
+
+        close_other_action = menu.addAction(self.i18n.t("workspace.close_other_tabs"))
+        close_other_action.setEnabled(self.document_tabs.count() > 1)
+        close_other_action.triggered.connect(self._close_other_tabs)
+
+        close_all_action = menu.addAction(self.i18n.t("workspace.close_all_tabs"))
+        close_all_action.setEnabled(self.document_tabs.count() > 0)
+        close_all_action.triggered.connect(self._close_all_tabs)
+        return menu
 
     def _close_document_tab_from_button(self) -> None:
         sender = self.sender()
@@ -344,6 +395,23 @@ class WorkspaceWidget(BaseWidget):
             if tab_bar.tabButton(index, QTabBar.ButtonPosition.RightSide) is sender:
                 self._close_document_tab(index)
                 return
+
+    def _close_current_tab(self) -> None:
+        current_index = self.document_tabs.currentIndex()
+        if current_index >= 0:
+            self._close_document_tab(current_index)
+
+    def _close_other_tabs(self) -> None:
+        current_index = self.document_tabs.currentIndex()
+        if current_index < 0:
+            return
+        for index in range(self.document_tabs.count() - 1, -1, -1):
+            if index != current_index:
+                self._close_document_tab(index)
+
+    def _close_all_tabs(self) -> None:
+        for index in range(self.document_tabs.count() - 1, -1, -1):
+            self._close_document_tab(index)
 
     def _toggle_inspector_panel(self) -> None:
         self._set_inspector_visible(not self._is_inspector_panel_open())
