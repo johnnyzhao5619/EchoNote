@@ -1170,6 +1170,49 @@ def test_workspace_tab_strip_exposes_stacked_tabs_menu_and_batch_close_actions(
     assert mock_i18n.t("workspace.close_all_tabs") in action_texts
 
 
+def test_workspace_tab_stack_close_other_tabs_keeps_current_document_and_inspector_in_sync(
+    qapp, mock_i18n, workspace_manager
+):
+    first_id = workspace_manager.list_items()[0].id
+    second_id = workspace_manager.create_note(title="Plan")
+    third_id = workspace_manager.create_note(title="Spec")
+    widget = WorkspaceWidget(workspace_manager, mock_i18n)
+    widget.open_item(first_id)
+    widget.open_item(second_id)
+    widget.open_item(third_id)
+    qapp.processEvents()
+
+    widget._close_other_tabs()
+    qapp.processEvents()
+
+    assert widget.document_tabs.count() == 1
+    assert widget.document_tabs.tabText(0) == "Spec"
+    assert widget.current_item_id() == third_id
+    assert widget.inspector_panel._current_item is not None
+    assert widget.inspector_panel._current_item.id == third_id
+
+
+def test_workspace_tab_stack_close_all_tabs_clears_editor_and_inspector_state(
+    qapp, mock_i18n, workspace_manager
+):
+    first_id = workspace_manager.list_items()[0].id
+    second_id = workspace_manager.create_note(title="Plan")
+    widget = WorkspaceWidget(workspace_manager, mock_i18n)
+    widget.open_item(first_id)
+    widget.open_item(second_id)
+    qapp.processEvents()
+
+    widget._close_all_tabs()
+    qapp.processEvents()
+
+    assert widget.document_tabs.count() == 0
+    assert widget.editor_panel is None
+    assert widget.current_item_id() == ""
+    assert widget.inspector_panel._current_item is None
+    assert not widget.inspector_panel.summary_button.isEnabled()
+    assert not widget.inspector_panel.meeting_brief_button.isEnabled()
+
+
 def test_workspace_document_tabs_expose_semantic_roles(qapp, mock_i18n, workspace_manager):
     widget = WorkspaceWidget(workspace_manager, mock_i18n)
 

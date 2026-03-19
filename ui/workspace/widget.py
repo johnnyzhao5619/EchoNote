@@ -241,11 +241,11 @@ class WorkspaceWidget(BaseWidget):
         return current_widget if isinstance(current_widget, WorkspaceEditorPanel) else None
 
     def current_item_id(self) -> str:
-        """Return the currently selected workspace item identifier."""
+        """Return the currently opened workspace item identifier."""
         editor_panel = self.editor_panel
         if editor_panel is not None:
             return editor_panel.current_item_id()
-        return self.library_panel.current_item_id()
+        return ""
 
     def _on_item_selected(self, item_id: str) -> None:
         if not item_id:
