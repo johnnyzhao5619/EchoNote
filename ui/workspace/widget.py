@@ -7,7 +7,9 @@ from core.qt_imports import (
     QAction,
     QFileDialog,
     QHBoxLayout,
+    QPalette,
     QSplitter,
+    QSize,
     QTabBar,
     QTabWidget,
     QToolButton,
@@ -16,6 +18,7 @@ from core.qt_imports import (
     Qt,
 )
 from ui.base_widgets import BaseWidget
+from ui.common.svg_icons import build_svg_icon
 from ui.constants import (
     ROLE_WORKSPACE_DOCUMENT_TABS,
     ROLE_WORKSPACE_SURFACE,
@@ -83,13 +86,15 @@ class WorkspaceWidget(BaseWidget):
         self.inspector_toggle_button = QToolButton(self.tab_actions_container)
         self.inspector_toggle_button.setProperty("role", ROLE_WORKSPACE_TAB_ACTION)
         self.inspector_toggle_button.setAutoRaise(False)
-        self.inspector_toggle_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+        self.inspector_toggle_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+        self.inspector_toggle_button.setIconSize(QSize(16, 16))
         self.inspector_toggle_button.setDefaultAction(self.toggle_inspector_action)
         self.tab_actions_layout.addWidget(self.inspector_toggle_button)
         self.open_in_window_button = QToolButton(self)
         self.open_in_window_button.setProperty("role", ROLE_WORKSPACE_TAB_ACTION)
         self.open_in_window_button.setAutoRaise(False)
-        self.open_in_window_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+        self.open_in_window_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+        self.open_in_window_button.setIconSize(QSize(16, 16))
         self.open_in_window_button.setDefaultAction(self.open_current_item_in_window_action)
         self.tab_actions_layout.addWidget(self.open_in_window_button)
         self.document_tabs.setCornerWidget(self.tab_actions_container, Qt.Corner.TopRightCorner)
@@ -139,6 +144,11 @@ class WorkspaceWidget(BaseWidget):
         )
         self.open_current_item_in_window_action.setToolTip(
             self.i18n.t("workspace.open_in_new_window")
+        )
+        self._update_tab_action_button(
+            self.open_in_window_button,
+            text=self.i18n.t("workspace.open_in_new_window"),
+            icon_name="workspace_open_window",
         )
         for index in range(self.document_tabs.count()):
             editor_panel = self.document_tabs.widget(index)
@@ -316,11 +326,16 @@ class WorkspaceWidget(BaseWidget):
                 button = QToolButton(tab_bar)
                 button.setProperty("role", ROLE_WORKSPACE_TAB_CLOSE)
                 button.setAutoRaise(False)
-                button.setText("x")
+                button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+                button.setIconSize(QSize(14, 14))
                 button.setFixedSize(18, 18)
                 button.clicked.connect(self._close_document_tab_from_button)
                 tab_bar.setTabButton(index, QTabBar.ButtonPosition.RightSide, button)
-            button.setToolTip(self.i18n.t("common.close"))
+            close_label = self.i18n.t("common.close")
+            button.setText("")
+            button.setToolTip(close_label)
+            button.setAccessibleName(close_label)
+            button.setIcon(self._build_shell_icon("workspace_tab_close"))
 
     def _close_document_tab_from_button(self) -> None:
         sender = self.sender()
@@ -355,6 +370,21 @@ class WorkspaceWidget(BaseWidget):
         text = self.i18n.t(text_key)
         self.toggle_inspector_action.setText(text)
         self.toggle_inspector_action.setToolTip(text)
+        self._update_tab_action_button(
+            self.inspector_toggle_button,
+            text=text,
+            icon_name="workspace_inspector",
+        )
+
+    def _update_tab_action_button(self, button: QToolButton, *, text: str, icon_name: str) -> None:
+        button.setText("")
+        button.setToolTip(text)
+        button.setAccessibleName(text)
+        button.setIcon(self._build_shell_icon(icon_name))
+
+    def _build_shell_icon(self, icon_name: str):
+        color = self.palette().color(QPalette.ColorRole.ButtonText).name()
+        return build_svg_icon(icon_name, color)
 
     def _clear_document_stage(self) -> None:
         self.inspector_panel.set_item(None)

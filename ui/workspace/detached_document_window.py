@@ -3,7 +3,8 @@
 
 from __future__ import annotations
 
-from core.qt_imports import QSplitter, QToolButton, QVBoxLayout, QWidget, Qt
+from core.qt_imports import QPalette, QSplitter, QSize, QToolButton, QVBoxLayout, QWidget, Qt
+from ui.common.svg_icons import build_svg_icon
 from ui.constants import ROLE_WORKSPACE_TAB_ACTION, WORKSPACE_CONTENT_SPLITTER_DEFAULT_SIZES
 from ui.workspace.editor_panel import WorkspaceEditorPanel
 from ui.workspace.inspector_panel import WorkspaceInspectorPanel, set_trailing_splitter_panel_visible
@@ -31,7 +32,8 @@ class DetachedDocumentWindow(QWidget):
         self.inspector_toggle_button = QToolButton(self)
         self.inspector_toggle_button.setProperty("role", ROLE_WORKSPACE_TAB_ACTION)
         self.inspector_toggle_button.setAutoRaise(False)
-        self.inspector_toggle_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+        self.inspector_toggle_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+        self.inspector_toggle_button.setIconSize(QSize(16, 16))
         self.inspector_toggle_button.clicked.connect(self._toggle_inspector_panel)
         self.editor_panel.insert_toolbar_widget(self.inspector_toggle_button)
 
@@ -95,5 +97,11 @@ class DetachedDocumentWindow(QWidget):
             else "workspace.show_inspector_panel"
         )
         text = self.i18n.t(text_key)
-        self.inspector_toggle_button.setText(text)
+        self.inspector_toggle_button.setText("")
         self.inspector_toggle_button.setToolTip(text)
+        self.inspector_toggle_button.setAccessibleName(text)
+        self.inspector_toggle_button.setIcon(self._build_shell_icon("workspace_inspector"))
+
+    def _build_shell_icon(self, icon_name: str):
+        color = self.palette().color(QPalette.ColorRole.ButtonText).name()
+        return build_svg_icon(icon_name, color)

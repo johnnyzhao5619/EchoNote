@@ -1131,6 +1131,26 @@ def test_workspace_document_tabs_expose_semantic_roles(qapp, mock_i18n, workspac
     assert close_button.property("role") == "workspace-tab-close"
 
 
+def test_workspace_shell_uses_svg_icons_instead_of_text_glyphs(
+    qapp, mock_i18n, workspace_manager
+):
+    widget = WorkspaceWidget(workspace_manager, mock_i18n)
+
+    close_button = widget.document_tabs.tabBar().tabButton(
+        0,
+        widget.document_tabs.tabBar().ButtonPosition.RightSide,
+    )
+
+    assert not widget.library_panel.import_document_button.icon().isNull()
+    assert not widget.open_in_window_button.icon().isNull()
+    assert not widget.inspector_toggle_button.icon().isNull()
+    assert close_button is not None
+    assert not close_button.icon().isNull()
+    assert close_button.text() == ""
+    assert widget.open_in_window_button.text() == ""
+    assert widget.inspector_toggle_button.text() == ""
+
+
 def test_workspace_detached_window_is_top_level_and_preserves_current_asset_tab(
     qapp, mock_i18n, workspace_manager
 ):

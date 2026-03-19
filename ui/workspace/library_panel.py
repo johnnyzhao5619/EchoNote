@@ -15,13 +15,11 @@ from core.qt_imports import (
     QButtonGroup,
     QFont,
     QHBoxLayout,
-    QIcon,
     QLabel,
     QInputDialog,
     QMenu,
     QMessageBox,
     QPalette,
-    QPixmap,
     QPushButton,
     QSize,
     QSizePolicy,
@@ -371,7 +369,7 @@ class WorkspaceLibraryPanel(BaseWidget):
         node.setData(0, _TREE_VALUE_ROLE, item.id)
         node.setData(0, _TREE_LABEL_ROLE, title)
         node.setData(0, _TREE_CONTEXT_ROLE, context_value or "")
-        node.setIcon(0, self._build_tree_icon("item"))
+        node.setIcon(0, self._build_tree_icon("workspace_item"))
         tooltip = build_workspace_item_tooltip(
             self.i18n,
             title,
@@ -1016,74 +1014,18 @@ class WorkspaceLibraryPanel(BaseWidget):
     def _folder_icon_name(folder) -> str:
         folder_kind = getattr(folder, "folder_kind", "") or ""
         if folder_kind == "inbox":
-            return "folder_inbox"
+            return "workspace_folder_inbox"
         if folder_kind == "system_root":
-            return "folder_event_root"
+            return "workspace_folder_event_root"
         if folder_kind == "batch_task":
-            return "folder_batch_root"
+            return "workspace_folder_batch_root"
         if folder_kind == "event":
-            return "folder_event"
-        return "folder"
+            return "workspace_folder_event"
+        return "workspace_folder"
 
-    def _build_tree_icon(self, icon_name: str) -> QIcon:
+    def _build_tree_icon(self, icon_name: str):
         color = self.palette().color(QPalette.ColorRole.ButtonText).name()
-        svg_markup = self._tree_icon_svg(icon_name, color)
-        pixmap = QPixmap()
-        if not pixmap.loadFromData(svg_markup.encode("utf-8"), "SVG"):
-            return QIcon()
-        return QIcon(pixmap)
-
-    @staticmethod
-    def _tree_icon_svg(icon_name: str, color: str) -> str:
-        icons = {
-            "folder": f"""
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <path d="M1.75 4.25C1.75 3.83579 2.08579 3.5 2.5 3.5H4.7L5.6 4.4H11.5C11.9142 4.4 12.25 4.73579 12.25 5.15V10.75C12.25 11.1642 11.9142 11.5 11.5 11.5H2.5C2.08579 11.5 1.75 11.1642 1.75 10.75V4.25Z" stroke="{color}" stroke-width="1.2" stroke-linejoin="round"/>
-                </svg>
-            """,
-            "folder_inbox": f"""
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <path d="M2 3.25H12V8.25L10.75 10.75H3.25L2 8.25V3.25Z" stroke="{color}" stroke-width="1.2" stroke-linejoin="round"/>
-                  <path d="M4 8.25H10" stroke="{color}" stroke-width="1.2" stroke-linecap="round"/>
-                </svg>
-            """,
-            "folder_event_root": f"""
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <rect x="2" y="3" width="10" height="8.5" rx="1.25" stroke="{color}" stroke-width="1.2"/>
-                  <path d="M4.5 2V4.2" stroke="{color}" stroke-width="1.2" stroke-linecap="round"/>
-                  <path d="M9.5 2V4.2" stroke="{color}" stroke-width="1.2" stroke-linecap="round"/>
-                  <path d="M2 5.3H12" stroke="{color}" stroke-width="1.2"/>
-                </svg>
-            """,
-            "folder_batch_root": f"""
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <rect x="2" y="2.5" width="10" height="3" rx="1" stroke="{color}" stroke-width="1.2"/>
-                  <rect x="2" y="5.5" width="10" height="3" rx="1" stroke="{color}" stroke-width="1.2"/>
-                  <rect x="2" y="8.5" width="10" height="3" rx="1" stroke="{color}" stroke-width="1.2"/>
-                </svg>
-            """,
-            "folder_event": f"""
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <rect x="2" y="3" width="10" height="8.5" rx="1.25" stroke="{color}" stroke-width="1.2"/>
-                  <path d="M2 5.3H12" stroke="{color}" stroke-width="1.2"/>
-                </svg>
-            """,
-            "event_group": f"""
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <rect x="2" y="2.5" width="10" height="9" rx="1.25" stroke="{color}" stroke-width="1.2"/>
-                  <path d="M4.25 1.75V3.75" stroke="{color}" stroke-width="1.2" stroke-linecap="round"/>
-                  <path d="M9.75 1.75V3.75" stroke="{color}" stroke-width="1.2" stroke-linecap="round"/>
-                  <path d="M2 5H12" stroke="{color}" stroke-width="1.2"/>
-                </svg>
-            """,
-            "item": f"""
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <path d="M4 2.5H8.4L10.5 4.6V11C10.5 11.2761 10.2761 11.5 10 11.5H4C3.72386 11.5 3.5 11.2761 3.5 11V3C3.5 2.72386 3.72386 2.5 4 2.5Z" stroke="{color}" stroke-width="1.2" stroke-linejoin="round"/>
-                  <path d="M8 2.5V5H10.5" stroke="{color}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-            """,
-        }
-        return icons[icon_name]
+        return build_svg_icon(icon_name, color)
 
     def _update_context_label(self) -> None:
         mode_key = (

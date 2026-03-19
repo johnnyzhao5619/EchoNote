@@ -118,6 +118,82 @@ _SVG_TEMPLATES = {
           <path d="M9.25 6.5V10.25" stroke="{color}" stroke-width="1.3" stroke-linecap="round"/>
         </svg>
     """,
+    "workspace_tab_close": """
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M4 4L10 10" stroke="{color}" stroke-width="1.3" stroke-linecap="round"/>
+          <path d="M10 4L4 10" stroke="{color}" stroke-width="1.3" stroke-linecap="round"/>
+        </svg>
+    """,
+    "workspace_open_window": """
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M3.25 4.25C3.25 3.83579 3.58579 3.5 4 3.5H9.5" stroke="{color}" stroke-width="1.3" stroke-linecap="round"/>
+          <path d="M12.5 6V12C12.5 12.4142 12.1642 12.75 11.75 12.75H4C3.58579 12.75 3.25 12.4142 3.25 12V4.25" stroke="{color}" stroke-width="1.3" stroke-linejoin="round"/>
+          <path d="M8.5 3.5H12.5V7.5" stroke="{color}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M12.25 3.75L7.75 8.25" stroke="{color}" stroke-width="1.3" stroke-linecap="round"/>
+        </svg>
+    """,
+    "workspace_inspector": """
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <rect x="2.75" y="3" width="10.5" height="10" rx="1" stroke="{color}" stroke-width="1.3"/>
+          <path d="M9 3.25V12.75" stroke="{color}" stroke-width="1.3"/>
+          <path d="M5 6H7" stroke="{color}" stroke-width="1.3" stroke-linecap="round"/>
+          <path d="M5 8.5H7" stroke="{color}" stroke-width="1.3" stroke-linecap="round"/>
+          <path d="M5 11H6.5" stroke="{color}" stroke-width="1.3" stroke-linecap="round"/>
+        </svg>
+    """,
+    "workspace_tabs_menu": """
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <rect x="2.5" y="3.5" width="7" height="5" rx="1" stroke="{color}" stroke-width="1.2"/>
+          <rect x="6.5" y="7.5" width="7" height="5" rx="1" stroke="{color}" stroke-width="1.2"/>
+        </svg>
+    """,
+    "workspace_structure_mode": """
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M4 3.5H12" stroke="{color}" stroke-width="1.3" stroke-linecap="round"/>
+          <path d="M4 8H9.5" stroke="{color}" stroke-width="1.3" stroke-linecap="round"/>
+          <path d="M4 12.5H11" stroke="{color}" stroke-width="1.3" stroke-linecap="round"/>
+          <circle cx="2.75" cy="3.5" r="0.75" fill="{color}"/>
+          <circle cx="2.75" cy="8" r="0.75" fill="{color}"/>
+          <circle cx="2.75" cy="12.5" r="0.75" fill="{color}"/>
+        </svg>
+    """,
+    "workspace_event_mode": """
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <rect x="2.75" y="3.25" width="10.5" height="9.5" rx="1.25" stroke="{color}" stroke-width="1.2"/>
+          <path d="M2.75 6H13.25" stroke="{color}" stroke-width="1.2"/>
+          <path d="M5.25 2.25V4.25" stroke="{color}" stroke-width="1.2" stroke-linecap="round"/>
+          <path d="M10.75 2.25V4.25" stroke="{color}" stroke-width="1.2" stroke-linecap="round"/>
+        </svg>
+    """,
+    "workspace_folder_event_root": """
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <rect x="2" y="3" width="10" height="8.5" rx="1.25" stroke="{color}" stroke-width="1.2"/>
+          <path d="M4.5 2V4.2" stroke="{color}" stroke-width="1.2" stroke-linecap="round"/>
+          <path d="M9.5 2V4.2" stroke="{color}" stroke-width="1.2" stroke-linecap="round"/>
+          <path d="M2 5.3H12" stroke="{color}" stroke-width="1.2"/>
+        </svg>
+    """,
+    "workspace_folder_batch_root": """
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <rect x="2" y="2.5" width="10" height="3" rx="1" stroke="{color}" stroke-width="1.2"/>
+          <rect x="2" y="5.5" width="10" height="3" rx="1" stroke="{color}" stroke-width="1.2"/>
+          <rect x="2" y="8.5" width="10" height="3" rx="1" stroke="{color}" stroke-width="1.2"/>
+        </svg>
+    """,
+    "workspace_folder_event": """
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <rect x="2" y="3" width="10" height="8.5" rx="1.25" stroke="{color}" stroke-width="1.2"/>
+          <path d="M2 5.3H12" stroke="{color}" stroke-width="1.2"/>
+        </svg>
+    """,
+    "workspace_event_group": """
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <rect x="2" y="2.5" width="10" height="9" rx="1.25" stroke="{color}" stroke-width="1.2"/>
+          <path d="M4.25 1.75V3.75" stroke="{color}" stroke-width="1.2" stroke-linecap="round"/>
+          <path d="M9.75 1.75V3.75" stroke="{color}" stroke-width="1.2" stroke-linecap="round"/>
+          <path d="M2 5H12" stroke="{color}" stroke-width="1.2"/>
+        </svg>
+    """,
 
     # Recording Control (Realtime Base)
     "record_start": """
@@ -237,6 +313,12 @@ _SVG_TEMPLATES = {
     """
 }
 
+_SVG_ALIASES = {
+    "workspace_folder": "node_folder",
+    "workspace_folder_inbox": "node_inbox",
+    "workspace_item": "node_text",
+}
+
 def build_svg_icon(icon_name: str, color: str) -> QIcon:
     """
     Generate a recolored QIcon from a central SVG template.
@@ -245,10 +327,11 @@ def build_svg_icon(icon_name: str, color: str) -> QIcon:
         icon_name: The name of the SVG template defined in _SVG_TEMPLATES.
         color: The hex/rgb string representation for recoloring.
     """
-    if icon_name not in _SVG_TEMPLATES:
+    resolved_icon_name = _SVG_ALIASES.get(icon_name, icon_name)
+    if resolved_icon_name not in _SVG_TEMPLATES:
         return QIcon()
 
-    svg_markup = _SVG_TEMPLATES[icon_name].format(color=color)
+    svg_markup = _SVG_TEMPLATES[resolved_icon_name].format(color=color)
     pixmap = QPixmap()
     if not pixmap.loadFromData(svg_markup.encode("utf-8"), "SVG"):
         return QIcon()
