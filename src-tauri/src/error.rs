@@ -48,14 +48,8 @@ impl AppError {
     }
 }
 
-// 让 Tauri 能序列化错误返回给前端
-impl From<AppError> for tauri::ipc::InvokeError {
-    fn from(e: AppError) -> Self {
-        tauri::ipc::InvokeError::from_serde_json(
-            serde_json::to_value(&e).unwrap_or_default()
-        )
-    }
-}
+// Tauri 2.x 已有 impl<T: Serialize> From<T> for InvokeError 泛型实现，
+// AppError 派生了 Serialize，无需手动实现 From。
 
 #[cfg(test)]
 mod tests {

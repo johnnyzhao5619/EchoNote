@@ -6,7 +6,7 @@ __pycache__/
 .Python
 build/
 develop-eggs/
-dist/
+# dist/ kept intentionally (dist/.gitkeep needed by Tauri generate_context!())
 downloads/
 eggs/
 .eggs/
@@ -166,8 +166,7 @@ logs/
 config/local_config.json
 config/secrets.json
 
-# Build artifacts
-dist/
+# Build artifacts (dist/ kept for Tauri generate_context!() via dist/.gitkeep)
 build/
 *.dmg
 *.exe
@@ -250,7 +249,7 @@ skills/
 
 # Node / Frontend
 node_modules/
-dist/
+# dist/ is intentionally kept for Tauri generate_context!() macro; only build artifacts ignored
 .turbo/
 
 # Rust / Tauri
