@@ -141,6 +141,8 @@ dmypy.json
 # Downloaded models (large files)
 models/
 !core/models/
+# Allow Rust source directory named models/
+!src-tauri/src/models/
 *.bin
 *.pt
 *.pth
