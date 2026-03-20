@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import {
   createMemoryHistory,
@@ -6,6 +6,24 @@ import {
   RouterProvider,
 } from "@tanstack/react-router";
 import { routeTree } from "../../../routeTree.gen";
+
+// Default AppConfig returned by the mocked invoke in settings tests
+const MOCK_APP_CONFIG = {
+  locale: "zh_CN",
+  active_theme: "tokyo-night",
+  active_whisper_model: "whisper/base",
+  active_llm_model: "llm/qwen2.5-3b-q4",
+  llm_context_size: 4096,
+  vault_path: "/data/vault",
+  recordings_path: "/data/recordings",
+  default_recording_mode: "transcribe_only",
+  default_language: null,
+  default_target_language: "en",
+  vad_threshold: 0.02,
+  audio_chunk_ms: 500,
+  auto_llm_on_stop: false,
+  default_llm_task: "summary",
+};
 
 function renderApp(initialPath = "/recording") {
   const history = createMemoryHistory({ initialEntries: [initialPath] });
@@ -36,8 +54,11 @@ describe("M1 Integration: Shell + Router + Theme", () => {
     await screen.findByText(/coming in m4/i);
   });
 
-  it("navigating to /settings shows settings placeholder", async () => {
+  it("navigating to /settings shows settings form", async () => {
+    // Make invoke return a valid AppConfig so SettingsMain renders
+    const { invoke } = await import("@tauri-apps/api/core");
+    vi.mocked(invoke).mockResolvedValueOnce(MOCK_APP_CONFIG);
     renderApp("/settings");
-    await screen.findByText(/coming in m5/i);
+    await screen.findByText(/general settings/i);
   });
 });
