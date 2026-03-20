@@ -32,7 +32,8 @@ fn specta_builder() -> Builder {
 fn export_bindings() {
     specta_builder()
         .export(
-            &specta_typescript::Typescript::default(),
+            &specta_typescript::Typescript::default()
+                .bigint(specta_typescript::BigIntExportBehavior::Number),
             "../src/lib/bindings.ts",
         )
         .expect("Failed to export TypeScript bindings");
