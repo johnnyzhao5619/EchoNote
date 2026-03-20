@@ -494,6 +494,7 @@ CREATE TABLE timeline_events (
     description  TEXT,
     tags         TEXT,                     -- JSON array
     recording_id TEXT REFERENCES recordings(id) ON DELETE SET NULL,
+    document_id  TEXT REFERENCES workspace_documents(id) ON DELETE SET NULL,
     created_at   INTEGER NOT NULL
 );
 

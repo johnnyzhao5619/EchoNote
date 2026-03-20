@@ -85,9 +85,22 @@ pub enum RecordingStatus {
 }
 
 #[derive(Serialize, Deserialize, Clone, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum RecordingMode {
+    /// 仅录音，不做任何转写（用于纯音频存档）
+    RecordOnly,
+    /// 录音 + 实时转写（不翻译）
+    TranscribeOnly,
+    /// 录音 + 实时转写 + 实时翻译为目标语言
+    /// whisper 使用 `task = translate`，目标固定为 target_language
+    TranscribeAndTranslate { target_language: String },
+}
+
+#[derive(Serialize, Deserialize, Clone, Type)]
 pub struct RealtimeConfig {
     pub device_id: Option<String>,        // None = 系统默认设备
-    pub language: Option<String>,         // None = 自动检测
+    pub language: Option<String>,         // None = 自动检测；TranscribeAndTranslate 下为源语言
+    pub mode: RecordingMode,              // 默认 TranscribeOnly
     pub vad_threshold: f32,               // 0.0-1.0，默认 0.02（RMS 能量阈值）
     pub chunk_duration_ms: u32,           // 默认 500ms
 }
@@ -125,41 +138,54 @@ get_recording_status() -> Result<RecordingStatus, AppError>
 ### 1.4 音频管线实现细节
 
 **audio/capture.rs**
-- 调用 `cpal::default_host().input_devices()` 枚举设备
+- 调用 `cpal::default_host().input_devices()` 枚举设备，`device.name()` 对比 `default_input_device().name()` 确定 `is_default`（cpal 的 `Device` 不实现 `PartialEq`，只能通过名称字符串比对）
 - 用 `device.default_input_config()` 获取原生格式（采样率、声道数、样本格式）
-- 开流时 callback 是 `move |data: &[f32], _| { sender.send(data.to_vec()) }`
-- **样本格式**：cpal 支持 i16/u16/f32，必须统一转 f32 后再送重采样
+- **样本格式**：cpal 支持 i16/u16/f32，建议在 callback 中用 `cpal::SampleFormat` match 统一转 f32
+- **Channel 类型**：cpal callback 在系统线程（非 tokio 线程）执行，必须使用 `std::sync::mpsc::SyncSender`（有界），在 callback 中调用 `sender.try_send()`；若队列满（推理跟不上采集）则丢弃最老的块（在 pipeline.rs 的接收侧 `try_recv` 清空积压）
+- `audio:level` 的 100ms 降频：在 `audio/vad.rs` 维护 `last_level_emit: Instant`，每次处理块时若距上次 emit > 100ms 则触发 `app_handle.emit("audio:level", ...)`
 
 **audio/resampler.rs**
 ```rust
 pub struct AudioResampler {
     inner: rubato::FftFixedIn<f32>,
     in_rate: u32,
-    out_rate: u32,  // 固定 16000
+    out_rate: u32,       // 固定 16000
     channels: usize,
-    chunk_size: usize, // rubato 要求固定输入块大小
+    chunk_size: usize,   // rubato 输入块大小 = inner.input_frames_next()
+    input_buf: Vec<f32>, // 内部积攒缓冲（interleaved）
 }
 
 impl AudioResampler {
+    /// chunk_size 计算：rubato::FftFixedIn 构造时传入 output_chunk = 1600（100ms @ 16kHz），
+    /// 实际 input_frames_next() = ceil(1600 * in_rate / 16000)
     pub fn new(in_rate: u32, channels: usize) -> Result<Self, rubato::ResampleError>
 
-    // 输入：interleaved 多声道 f32
-    // 输出：16000Hz 单声道 f32（whisper-rs 要求的格式）
-    pub fn process(&mut self, input: &[f32]) -> Result<Vec<f32>, rubato::ResampleError>
+    /// 输入：interleaved 多声道 f32（来自 cpal callback，大小不定）
+    /// 输出：16000Hz 单声道 f32 的累积块（每积攒够 chunk_size 就 flush 一次）
+    /// 余量：积攒到 input_buf，下次调用继续拼接；不截断、不丢失
+    pub fn push(&mut self, input: &[f32]) -> Result<Vec<f32>, rubato::ResampleError>
+    // 内部逻辑：
+    // 1. 将 input append 到 self.input_buf
+    // 2. while self.input_buf.len() >= self.chunk_size * self.channels:
+    //    a. 取出 chunk_size * channels 个样本
+    //    b. 平均声道 → 单声道（每 channels 个样本取平均）
+    //    c. rubato process → 输出 1600 个 f32（100ms @ 16kHz）
+    //    d. 追加到结果 Vec
+    // 3. 返回所有已处理的输出，余量留在 input_buf
 }
 ```
-- 多声道 → 单声道：平均所有声道（`interleaved[ch::channels].iter().sum() / channels`）
-- rubato `FftFixedIn` 需要恰好 `chunk_size` 个输入样本；用内部缓冲积攒到 chunk_size 后再调用 `process_into_buffer`
 
 **audio/vad.rs**
 - 计算输入块的 RMS：`(samples.iter().map(|s| s*s).sum::<f32>() / len as f32).sqrt()`
-- 连续 N 块（默认 N=6，即 ~3s）RMS < threshold → 静音，不送 whisper
-- 静音状态转为有声时，把缓存的前导静音帧一起送出（保留上下文）
+- 连续 N 块（默认 N=6，即 ~3s @500ms chunk）RMS < threshold → 静音，不送 whisper pipeline
+- 静音状态转为有声时，把缓存的前导静音帧（最多 1s）一起送出，保留上下文
+- 每 100ms emit 一次 `audio:level`（用 `Instant` 计时，在 vad.rs 处理每个块时检查）
 
 **transcription/pipeline.rs**
-- `tokio::spawn` 一个 loop，接收 `AudioChunk` via `mpsc::Receiver`
-- 维护内部音频累积缓冲区，积攒到 30 秒或检测到长静音再整块送 whisper
-- whisper-rs 推理是同步阻塞调用，必须用 `tokio::task::spawn_blocking` 包裹
+- 用 `tokio::spawn` 开一个长驻 loop，从 `std::sync::mpsc::Receiver<AudioChunk>` 接收（在 tokio 中用 `tokio::task::spawn_blocking` 包裹接收侧，或直接用 `tokio::sync::mpsc` 的 `blocking_recv` 侧加 `try_recv` 在 async 上下文）
+- 维护内部 30 秒累积缓冲区；满 30 秒或检测到 >3s 静音则整块送 whisper
+- whisper-rs 推理是同步阻塞调用，用 `tokio::task::spawn_blocking(|| engine.transcribe(...))` 包裹
+- 推理返回的 Arc<WhisperEngine> 引用：先从 AppState 的外层 Mutex 锁获取 Option，若 Some 则 clone 内部 Arc，立即释放外层锁，再在 spawn_blocking 闭包内通过内层 Arc<Mutex<WhisperContext>> 调用推理（外层锁持有时间极短，不会跨越 spawn_blocking 边界）
 
 **transcription/engine.rs**
 ```rust
@@ -186,27 +212,55 @@ pub struct RawSegment {
 }
 ```
 
-### 1.5 数据库操作
+### 1.5 音频文件存储与数据库操作
 
-录音停止时（`stop_realtime`）执行：
+**音频文件存储规则**：
+- 根目录：`{APP_DATA}/recordings/`（由 `AppConfig.recordings_path` 指定，默认值此处）
+- 文件命名：`recording_{session_id}.wav`（session_id 为 UUID，避免时间戳碰撞）
+- 格式：WAV，16-bit PCM，16000Hz，单声道（whisper 重采样后的格式直接写盘，节省二次转换）
+- 录音结束后先 flush 音频文件，成功后再写数据库（文件写失败 → `AppError::Io`，不写 DB）
+
+录音停止时（`stop_realtime`）执行（单一事务）：
 ```sql
--- 插入录音主记录
+-- 插入录音主记录，file_path 为上述绝对路径
 INSERT INTO recordings (id, title, file_path, duration_ms, language, created_at, updated_at)
 VALUES (?, ?, ?, ?, ?, ?, ?);
 
--- 批量插入 segments（一次 transaction）
+-- 批量插入 segments
 INSERT INTO transcription_segments
   (recording_id, start_ms, end_ms, text, language, confidence)
 VALUES (?, ?, ?, ?, ?, ?);
+
+-- 在 inbox 文件夹自动创建对应 workspace_documents 记录（source_type='recording'）
+INSERT INTO workspace_documents
+  (id, folder_id, title, source_type, recording_id, created_at, updated_at)
+VALUES (?, ?, ?, 'recording', ?, ?, ?);
+
+-- 将转写文本写入 workspace_text_assets（role='transcript'）
+INSERT INTO workspace_text_assets
+  (id, document_id, role, content, file_path, created_at, updated_at)
+VALUES (?, ?, 'transcript', ?, ?, ?, ?);
 ```
+
+录音模式为 `RecordOnly` 时跳过 segments 和 workspace 相关插入，只保留录音文件记录。
 
 ### 1.6 React 组件职责
 
 **RecordingPanel（SecondPanel）**
-- 设备下拉（`list_audio_devices`，页面加载时调用一次）
+- 设备下拉（`list_audio_devices`，页面加载时调用一次；对应 i18n key `workspace.recording_console.input_section`）
 - 语言选择（auto / zh / en / fr / ja 等，对应 whisper language 参数）
+- 录音模式选择（对应 i18n key）：
+  - `RecordOnly`：`workspace.recording_console.mode_record_only`
+  - `TranscribeOnly`：`workspace.recording_console.mode_transcription_only`
+  - `TranscribeAndTranslate`：`workspace.recording_console.mode_translation_target`（目标语言下拉紧跟显示）
+- 目标语言下拉（`TranscribeAndTranslate` 模式下显示）：auto / zh / en / fr（对应 `recording_console.target_language_*`）
 - VAD 灵敏度滑块（0.0-1.0，写入 `useSettingsStore`）
-- 录音模式选择：仅录音 / 转写 / 转写+翻译
+- "录音完成后自动处理"开关：对应 `AppConfig.auto_llm_on_stop`（`workspace.recording_console.auto_secondary_processing`）
+
+**v3.0.0 移除的 recording_console 功能**（不实现，i18n key 可保留但不使用）：
+- overlay 悬浮字幕窗口（`show_overlay_tooltip` / `hide_overlay_tooltip`）：v3.0.0 移除，实时字幕在 RecordingMain 内展示
+- secondary processing 独立面板（`secondary_processing_section`）：合并入 AI 操作区，不单独提供面板
+- 打开最新文档（`open_latest_document_tooltip`）：录音完成后 RecordingMain 底部显示"查看文档"链接，不用 overlay 按钮
 
 **RecordingMain（MainContent）**
 - 顶部：录音控制按钮（开始/暂停/停止），录音时长计时器
@@ -457,18 +511,50 @@ impl LlmEngine {
 - 文本来源优先级：`transcript` > `document_text`（按 `TEXT_ASSET_ROLE_PRIORITY` 排序）
 - 生成完成后：更新 `llm_tasks.status = 'done'`，并在 `workspace_text_assets` 插入结果
 
-**LLM Worker 取消机制**
-```rust
-// 使用 AtomicBool 控制取消
-let cancelled = Arc::new(AtomicBool::new(false));
+**LlmWorker 内部结构（spawn_blocking 协调）**
 
-engine.generate(system, user, max_tokens, |token| {
-    if cancelled.load(Ordering::Relaxed) {
-        return false; // 停止生成
+`LlmWorker::run()` 是 `tokio::spawn` 的 async loop，每次收到任务后必须通过 `spawn_blocking` 调用同步阻塞的 `generate()`，token 回调通过 `tokio::sync::mpsc` 桥接到 async emit：
+
+```rust
+// llm/worker.rs（骨架）
+async fn run(rx: mpsc::Receiver<LlmTaskMessage>, app: AppHandle, state: Arc<AppState>) {
+    while let Some(msg) = rx.recv().await {
+        // 1. 克隆引擎 Arc（外层锁短暂获取后立即释放）
+        let engine_arc = {
+            let guard = state.llm_engine.lock().await;
+            guard.as_ref().map(|e| Arc::clone(&e.inner_model))
+        };
+        let Some(model) = engine_arc else {
+            app.emit("llm:error", ...).ok();
+            continue;
+        };
+
+        // 2. 用 AtomicBool 实现可取消
+        let cancelled = Arc::new(AtomicBool::new(false));
+        state.active_llm_cancels.insert(msg.task_id.clone(), Arc::clone(&cancelled));
+
+        // 3. token 桥接：同步 callback → tokio channel → async emit
+        let (token_tx, mut token_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+        let app_clone = app.clone();
+        let task_id = msg.task_id.clone();
+        tokio::spawn(async move {
+            while let Some(token) = token_rx.recv().await {
+                app_clone.emit("llm:token", TokenPayload { task_id: task_id.clone(), token }).ok();
+            }
+        });
+
+        // 4. spawn_blocking 执行同步推理
+        let result = tokio::task::spawn_blocking(move || {
+            engine_arc_inner.generate(system, user, max_tokens, |token| {
+                if cancelled.load(Ordering::Relaxed) { return false; }
+                token_tx.send(token).ok();  // 同步 send，不 block
+                true
+            })
+        }).await;
+
+        // 5. 处理结果，emit done/error
     }
-    app_handle.emit("llm:token", TokenPayload { task_id, token }).ok();
-    true
-})?;
+}
 ```
 
 ### 3.6 会议纪要特殊处理
@@ -482,11 +568,36 @@ engine.generate(system, user, max_tokens, |token| {
 Rust 端用正则提取各 `## Section` 内容，写入 4 条 `workspace_text_assets` 记录。
 
 解析逻辑（`llm/tasks.rs::parse_meeting_brief`）：
+
+**重要**：Rust `regex` crate 中 `\w` 默认只匹配 ASCII，对中文 section 标题（如 `## 总结`）会静默失败。必须使用 `.+?` 匹配任意 Unicode 字符：
+
 ```rust
 fn parse_meeting_brief(text: &str) -> MeetingBriefSections {
-    let re = Regex::new(r"##\s*([\w\s]+)\n([\s\S]*?)(?=##|\z)").unwrap();
-    // 提取 Summary / Decisions / Action Items / Next Steps
-    // 对未识别到的 section 保留 None，前端展示占位文字
+    // 使用 regex crate，pattern 匹配 Unicode（.+? 默认不跨行，结合 (?s) flag）
+    // 不使用 \w，改用 .+? 匹配 section 标题（支持中英文）
+    let re = Regex::new(r"(?m)^##\s*(.+?)\s*$\n([\s\S]*?)(?=^##|\z)").unwrap();
+
+    let mut sections = MeetingBriefSections::default();
+    for cap in re.captures_iter(text) {
+        let title = cap[1].to_lowercase();
+        let content = cap[2].trim().to_string();
+        // 同时匹配英文和中文 section 标题
+        if title.contains("summary") || title.contains("摘要") || title.contains("总结") {
+            sections.summary = Some(content);
+        } else if title.contains("decision") || title.contains("决策") || title.contains("决定") {
+            sections.decisions = Some(content);
+        } else if title.contains("action") || title.contains("行动") || title.contains("任务") {
+            sections.action_items = Some(content);
+        } else if title.contains("next") || title.contains("下一步") || title.contains("后续") {
+            sections.next_steps = Some(content);
+        }
+    }
+
+    // Fallback：若所有 section 均解析失败（正则完全不匹配），将全文保存为 meeting_brief role
+    if sections.summary.is_none() && sections.decisions.is_none() {
+        sections.full_text_fallback = Some(text.to_string());
+    }
+    sections
 }
 ```
 
@@ -496,20 +607,57 @@ fn parse_meeting_brief(text: &str) -> MeetingBriefSections {
 
 ### 4.1 数据模型（补充 Schema）
 
-在 `0001_initial.sql` 基础上增加：
+**关于 `workspace_documents.content_text` 字段**：总体设计文档的 `0001_initial.sql` 中 `workspace_documents` 表有 `content_text TEXT` 字段和基于它的 FTS5 虚表。在引入 `workspace_text_assets` 后，`content_text` 字段的处理策略如下：
+
+- `content_text` **保留但不直接写入**，改为在 `workspace_text_assets` 写入时通过 SQLite trigger 同步更新，供 FTS5 虚表使用
+- FTS5 虚表 `workspace_fts` 的 `content=workspace_documents` 引用 `content_text` 列，trigger 在 `workspace_text_assets` INSERT/UPDATE 时更新对应文档的 `content_text`（取优先级最高的 asset 内容）
+- 应用层代码**不直接写 `workspace_documents.content_text`**，只通过 trigger 自动维护
 
 ```sql
--- workspace_text_assets：文档的各类文本资产（转写稿、摘要、翻译等）
+-- 在 0001_initial.sql 末尾追加
 CREATE TABLE workspace_text_assets (
     id           TEXT PRIMARY KEY,
     document_id  TEXT NOT NULL REFERENCES workspace_documents(id) ON DELETE CASCADE,
     role         TEXT NOT NULL,   -- 见下方 Asset Role 说明
     content      TEXT NOT NULL,
-    file_path    TEXT,            -- 对应磁盘上的 .md 文件路径
+    file_path    TEXT,            -- 对应磁盘上的 .md 文件路径（可为 NULL）
     created_at   INTEGER NOT NULL,
-    updated_at   INTEGER NOT NULL
+    updated_at   INTEGER NOT NULL,
+    UNIQUE(document_id, role)     -- 每个 role 每个文档只有一条记录
 );
 CREATE INDEX idx_assets_document ON workspace_text_assets(document_id, role);
+
+-- Trigger：asset 写入后自动同步 content_text（FTS 索引源）
+CREATE TRIGGER sync_content_text_on_asset_insert
+AFTER INSERT ON workspace_text_assets
+BEGIN
+    UPDATE workspace_documents
+    SET content_text = (
+        SELECT content FROM workspace_text_assets
+        WHERE document_id = NEW.document_id
+        ORDER BY CASE role
+            WHEN 'document_text' THEN 0
+            WHEN 'transcript'    THEN 1
+            WHEN 'meeting_brief' THEN 2
+            WHEN 'summary'       THEN 3
+            ELSE 99 END
+        LIMIT 1
+    )
+    WHERE id = NEW.document_id;
+END;
+
+-- 同理建 AFTER UPDATE trigger（内容相同，触发时机为 UPDATE）
+CREATE TRIGGER sync_content_text_on_asset_update
+AFTER UPDATE ON workspace_text_assets
+BEGIN
+    UPDATE workspace_documents SET content_text = (
+        SELECT content FROM workspace_text_assets
+        WHERE document_id = NEW.document_id
+        ORDER BY CASE role WHEN 'document_text' THEN 0 WHEN 'transcript' THEN 1
+            WHEN 'meeting_brief' THEN 2 WHEN 'summary' THEN 3 ELSE 99 END
+        LIMIT 1
+    ) WHERE id = NEW.document_id;
+END;
 ```
 
 **Asset Role 优先级**（用于"取最佳可读文本"逻辑）：
@@ -557,6 +705,17 @@ CREATE INDEX idx_assets_document ON workspace_text_assets(document_id, role);
 ```
 
 所有文本 asset 都同步写入磁盘文件（与数据库双写），实现 Obsidian 风格的"本地文件优先"。
+
+**双写失败策略**：数据库为 source of truth，磁盘文件为便于外部访问的副本。
+- 写入顺序：**先写数据库，再写磁盘文件**
+- 数据库写失败 → 返回 `AppError::Storage`，不写磁盘
+- 磁盘写失败 → 记录 `warn!` 日志，**不回滚数据库，返回成功给前端**（数据不丢失，文件可在下次操作时重建）
+- 磁盘路径由 `vault_layout.rs` 计算，从不硬编码
+
+**`event` 文件夹的创建时机**：当 `link_recording_to_event` 或 `link_document_to_event` 被调用时：
+1. 若该事件对应的 `event` 类型文件夹不存在，创建之（命名规则：`{YYYY-MM-DD} {event_title}`，标题截断至 50 字符，非法字符替换为 `-`）
+2. 将文档移入该 event 文件夹（更新 `workspace_documents.folder_id`）
+3. event 文件夹的 `is_system = true`，不可重命名/删除（只能通过删除事件来删除）
 
 ### 4.4 Rust 类型定义
 
@@ -643,10 +802,38 @@ import_file(file_path: String, folder_id: Option<String>) -> Result<DocumentSumm
 // 全文搜索
 search_documents(query: String) -> Result<Vec<SearchResult>, AppError>
 
-// 导出
+// 导出（workspace 文档内容导出）
 export_document_as_markdown(id: String, target_path: String) -> Result<(), AppError>
 export_document_as_txt(id: String, target_path: String) -> Result<(), AppError>
+
+// 导出（转写稿时间轴格式，从 transcription_segments 表取数据，不从 text assets）
+// recording_id: 关联录音的 ID（workspace_documents.recording_id）
+export_transcript_as_srt(
+    document_id: String,
+    target_path: String,
+) -> Result<(), AppError>
+
+export_transcript_as_vtt(
+    document_id: String,
+    target_path: String,
+) -> Result<(), AppError>
 ```
+
+**SRT 格式实现**（`workspace/exporter.rs`）：
+```
+1
+00:00:01,500 --> 00:00:04,000
+转写文本
+
+2
+00:00:04,500 --> 00:00:07,200
+下一句话
+```
+- 时间戳格式：`HH:MM:SS,mmm`（注意 SRT 用逗号分隔毫秒）
+- 每行来自 `transcription_segments` 的 `(start_ms, end_ms, text)` 三元组
+- 通过 `workspace_documents.recording_id` → `recordings.id` 查询 segments
+
+**VTT 格式实现**：首行固定为 `WEBVTT`，时间戳格式为 `HH:MM:SS.mmm`（用点分隔毫秒）。其余与 SRT 相同。
 
 ### 4.6 校验规则（Workspace Validation）
 
@@ -790,7 +977,8 @@ description = "精度更高，需要约 1GB RAM"
 
 [whisper.variants.medium]
 url       = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin"
-sha256    = "fd9727b6e1217c2f614f9b698455c4ffd82463b4"
+# ⚠️ 待填写：SHA256 必须为 64 位十六进制字符串，下方为占位，实施前用 `sha256sum ggml-medium.bin` 核实
+sha256    = "FILL_IN_BEFORE_RELEASE_64_HEX_CHARS_REQUIRED"
 size_bytes = 1528006144
 description = "高精度，需要约 3GB RAM"
 
@@ -799,13 +987,15 @@ default_variant = "qwen2.5-3b-q4"
 
 [llm.variants.qwen2.5-3b-q4]
 url       = "https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q4_k_m.gguf"
-sha256    = "..."
+# ⚠️ 待填写：实施前从 HuggingFace 文件页面或 `sha256sum` 命令获取真实值
+sha256    = "FILL_IN_BEFORE_RELEASE_64_HEX_CHARS_REQUIRED"
 size_bytes = 1890000000
 description = "轻量模型，适合低配设备，需要约 2GB RAM"
 
 [llm.variants.qwen2.5-7b-q4]
 url       = "https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF/resolve/main/qwen2.5-7b-instruct-q4_k_m.gguf"
-sha256    = "..."
+# ⚠️ 待填写：同上
+sha256    = "FILL_IN_BEFORE_RELEASE_64_HEX_CHARS_REQUIRED"
 size_bytes = 4370000000
 description = "推荐模型，效果好，需要约 5GB RAM"
 ```
@@ -1003,9 +1193,52 @@ export function useT() {
 - `loopback`（系统音频回环，v3.0.0 范围外）
 - `wizard`（首次引导改为 React 组件实现）
 
-新增 sections：
-- `models`（模型管理页）
-- `theme`（主题设置页）
+新增 sections 及必要 key（三个语言文件均需添加）：
+
+**`models` section**：
+```
+models.page_title              - "模型管理"
+models.group_whisper           - "语音转写模型（Whisper）"
+models.group_llm               - "本地 AI 模型（LLM）"
+models.status_downloaded       - "已下载"
+models.status_downloading      - "下载中..."
+models.status_not_downloaded   - "未下载"
+models.status_active           - "当前使用"
+models.action_download         - "下载"
+models.action_cancel           - "取消"
+models.action_delete           - "删除"
+models.action_set_active       - "设为当前"
+models.download_speed          - "{speed}/s"
+models.download_eta            - "剩余 {eta}"
+models.delete_confirm          - "删除模型文件？此操作不可撤销。"
+models.required_title          - "需要下载模型"
+models.required_desc           - "首次使用需要下载 AI 模型，请选择要安装的模型。"
+models.sha256_note             - "⚠️ 实施前必须填写真实 SHA256（64位十六进制），否则下载校验将始终失败"
+```
+
+**`theme` section**：
+```
+theme.page_title               - "主题"
+theme.group_builtin            - "内置主题"
+theme.group_custom             - "自定义主题"
+theme.action_new               - "新建主题"
+theme.action_clone             - "克隆"
+theme.action_import            - "导入 JSON"
+theme.action_export            - "导出 JSON"
+theme.action_delete            - "删除"
+theme.action_save              - "保存"
+theme.action_preview           - "预览"
+theme.delete_confirm           - "删除此主题？"
+theme.import_error_invalid     - "无效的主题文件格式"
+theme.editor_title             - "编辑主题"
+theme.token_bg_primary         - "主背景"
+theme.token_bg_sidebar         - "侧栏背景"
+theme.token_text_primary       - "主文字"
+theme.token_accent             - "强调色"
+theme.token_border             - "边框"
+theme.token_status_error       - "错误色"
+theme.token_status_success     - "成功色"
+```
 
 ---
 
@@ -1021,17 +1254,20 @@ export function useT() {
 // config/schema.rs
 #[derive(Serialize, Deserialize, Default, Type)]
 pub struct AppConfig {
-    pub locale: String,               // 默认 "zh_CN"
-    pub active_theme: String,         // 默认 "tokyo-night"
-    pub active_whisper_model: String, // 默认 "whisper/base"
-    pub active_llm_model: String,     // 默认 "llm/qwen2.5-3b-q4"
-    pub llm_context_size: u32,        // 默认 4096
-    pub vault_path: String,           // 文档库路径，默认 {APP_DATA}/vault
-    pub default_language: Option<String>,   // 默认转写语言
-    pub vad_threshold: f32,           // 默认 0.02
-    pub audio_chunk_ms: u32,          // 默认 500
-    pub auto_llm_on_stop: bool,       // 停止录音后自动触发摘要
-    pub default_llm_task: String,     // "summary" | "meeting_brief"
+    pub locale: String,                  // 默认 "zh_CN"
+    pub active_theme: String,            // 默认 "tokyo-night"
+    pub active_whisper_model: String,    // 默认 "whisper/base"
+    pub active_llm_model: String,        // 默认 "llm/qwen2.5-3b-q4"
+    pub llm_context_size: u32,           // 默认 4096
+    pub vault_path: String,              // 文档库路径，默认 {APP_DATA}/vault
+    pub recordings_path: String,         // 音频文件路径，默认 {APP_DATA}/recordings
+    pub default_recording_mode: String,  // 默认 "transcribe_only"（对应 RecordingMode 枚举）
+    pub default_language: Option<String>,// 默认转写语言，None = 自动检测
+    pub default_target_language: String, // 翻译目标语言，默认 "en"
+    pub vad_threshold: f32,              // 默认 0.02
+    pub audio_chunk_ms: u32,             // 默认 500
+    pub auto_llm_on_stop: bool,          // 停止录音后自动触发 AI 处理，默认 false
+    pub default_llm_task: String,        // "summary" | "meeting_brief"，默认 "summary"
 }
 ```
 
@@ -1039,8 +1275,43 @@ pub struct AppConfig {
 
 ```rust
 get_config() -> Result<AppConfig, AppError>
-update_config(partial: PartialAppConfig) -> Result<(), AppError>  // 只更新传入的字段
+
+// PartialAppConfig：每个字段都是 Option<T>，None 表示不修改
+// 前端传入只包含要更新字段的对象，其他字段为 undefined（序列化时被 serde 跳过）
+update_config(partial: PartialAppConfig) -> Result<(), AppError>
+
 reset_config() -> Result<AppConfig, AppError>
+```
+
+**`PartialAppConfig` 定义**（`config/schema.rs`）：
+
+```rust
+/// 每个字段为 Option<T>，None 表示"不更新此字段"
+/// serde: skip_serializing_if = "Option::is_none"，前端传 undefined 时该字段不出现在 JSON
+#[derive(Serialize, Deserialize, Default, Type)]
+pub struct PartialAppConfig {
+    pub locale:                  Option<String>,
+    pub active_theme:            Option<String>,
+    pub active_whisper_model:    Option<String>,
+    pub active_llm_model:        Option<String>,
+    pub llm_context_size:        Option<u32>,
+    pub vault_path:              Option<String>,
+    pub recordings_path:         Option<String>,
+    pub default_recording_mode:  Option<String>,
+    pub default_language:        Option<Option<String>>,  // Some(None) = 清除，Some(Some("zh")) = 设置
+    pub default_target_language: Option<String>,
+    pub vad_threshold:           Option<f32>,
+    pub audio_chunk_ms:          Option<u32>,
+    pub auto_llm_on_stop:        Option<bool>,
+    pub default_llm_task:        Option<String>,
+}
+
+// update_config 实现逻辑（伪代码）：
+// let mut config = state.config.write().await;
+// if let Some(v) = partial.locale { config.locale = v; }
+// if let Some(v) = partial.active_theme { config.active_theme = v; }
+// ... 其余字段同理
+// 写入 app_settings 表（JSON 序列化整个 AppConfig）
 ```
 
 ---
@@ -1054,7 +1325,11 @@ reset_config() -> Result<AppConfig, AppError>
 | `.txt` | 标准库 | 直接读取 |
 | `.md` | 标准库 | 直接读取（保留 markdown） |
 | `.pdf` | `pdf-extract` | 提取纯文本 |
-| `.docx` | `docx-rs` | 提取段落文本 |
+| `.docx` | `zip` + 手动解析 `word/document.xml` | 提取段落文本 |
+
+> **⚠️ 关于 pdf-extract**：该 crate 依赖 PDF 内嵌字体的 ToUnicode CMap，对未嵌入 CMap 的中文 PDF（常见于企业打印/扫描件）会提取乱码或空白。遇到此情况：记录 warn 日志，向前端返回 `AppError::Io("PDF 文本提取失败，该 PDF 可能不包含可选中的文字")` 而非静默成功。
+>
+> **⚠️ 关于 docx-rs**：该 crate 主要用于生成 DOCX，解析能力有限。推荐直接用 `zip` crate 解压 `.docx`（本质是 ZIP）并解析 `word/document.xml` 中的 `<w:t>` 标签提取文本，比依赖 `docx-rs` 解析 API 更可靠。
 
 **导入流程**（`workspace/manager.rs::import_file`）：
 1. 读取文件 → 提取纯文本
@@ -1088,8 +1363,15 @@ pub struct AppState {
     pub download_tx:      mpsc::Sender<DownloadCommand>,
 
     // Engine handles（Option，模型未加载时为 None）
+    // 注意：外层 Mutex 保护 Option 的存在性；内层 Arc<Mutex<WhisperContext>> 保护推理并发
+    // 取用模式：锁外层 Mutex → clone 内层 Arc → 立即释放外层锁 → 在 spawn_blocking 中使用内层 Arc
     pub whisper_engine: Arc<Mutex<Option<WhisperEngine>>>,
     pub llm_engine:     Arc<Mutex<Option<LlmEngine>>>,
+
+    // LLM 任务取消标志表（task_id → AtomicBool）
+    // cancel_llm_task 命令将对应条目设为 true，token 回调检查后返回 false 停止生成
+    pub active_llm_cancels: Arc<DashMap<String, Arc<AtomicBool>>>,
+    // 注：DashMap 来自 dashmap crate，支持并发读写，避免全局 Mutex
 }
 ```
 
