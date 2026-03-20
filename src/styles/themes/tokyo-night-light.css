@@ -1,0 +1,26 @@
+/* Tokyo Night Light */
+[data-theme="tokyo-night-light"] {
+  --color-bg-primary:   #d5d6db;
+  --color-bg-secondary: #cbccd1;
+  --color-bg-sidebar:   #c4c5cc;
+  --color-bg-input:     #d0d1d8;
+  --color-bg-hover:     #bbbcc2;
+  --color-bg-selection: #7890dd44;
+
+  --color-text-primary:   #343b58;
+  --color-text-secondary: #6172b0;
+  --color-text-muted:     #8990b3;
+  --color-text-disabled:  #9699b0;
+
+  --color-accent-primary: #2959aa;
+  --color-accent-hover:   #7890dd;
+  --color-accent-muted:   #7890dd44;
+
+  --color-border-default: #a8aecb;
+  --color-border-focus:   #9699b033;
+
+  --color-status-error:   #8c4351;
+  --color-status-warning: #8f5e15;
+  --color-status-success: #485e30;
+  --color-status-info:    #0f4b6e;
+}

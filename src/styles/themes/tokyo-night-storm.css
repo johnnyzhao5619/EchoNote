@@ -1,0 +1,26 @@
+/* Tokyo Night Storm */
+[data-theme="tokyo-night-storm"] {
+  --color-bg-primary:   #24283b;
+  --color-bg-secondary: #1f2335;
+  --color-bg-sidebar:   #1e2030;
+  --color-bg-input:     #1b1e2e;
+  --color-bg-hover:     #2d3149;
+  --color-bg-selection: #3d59a144;
+
+  --color-text-primary:   #c0caf5;
+  --color-text-secondary: #737aa2;
+  --color-text-muted:     #565f89;
+  --color-text-disabled:  #545c7e;
+
+  --color-accent-primary: #7aa2f7;
+  --color-accent-hover:   #3d59a1;
+  --color-accent-muted:   #3d59a144;
+
+  --color-border-default: #29355a;
+  --color-border-focus:   #545c7e33;
+
+  --color-status-error:   #f7768e;
+  --color-status-warning: #e0af68;
+  --color-status-success: #9ece6a;
+  --color-status-info:    #2ac3de;
+}

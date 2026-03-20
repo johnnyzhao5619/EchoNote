@@ -1,0 +1,68 @@
+{
+  "name": "echonote",
+  "version": "1.0.0",
+  "description": "<div align=\"center\">   <img src=\"resources/icons/echonote.png\" alt=\"EchoNote Logo\" width=\"120\" height=\"120\">   <h1>EchoNote</h1>   <p><em>Local-First AI Voice Notes — Tauri + Rust + React</em></p> </div>",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage",
+    "convert-themes": "tsx scripts/convert-themes.ts",
+    "tauri": "tauri"
+  },
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/johnnyzhao5619/EchoNote.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/johnnyzhao5619/EchoNote/issues"
+  },
+  "homepage": "https://github.com/johnnyzhao5619/EchoNote#readme",
+  "dependencies": {
+    "@radix-ui/react-separator": "^1.1.8",
+    "@radix-ui/react-slot": "^1.2.4",
+    "@radix-ui/react-tooltip": "^1.2.8",
+    "@tanstack/react-router": "^1.168.1",
+    "@tauri-apps/api": "^2.10.1",
+    "@tauri-apps/plugin-os": "^2.3.2",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.577.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "tailwind-merge": "^3.5.0",
+    "zustand": "^5.0.12"
+  },
+  "devDependencies": {
+    "@tailwindcss/typography": "^0.5.19",
+    "@tanstack/router-vite-plugin": "^1.166.16",
+    "@tauri-apps/cli": "^2.10.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^25.5.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "autoprefixer": "^10.4.27",
+    "jsdom": "^29.0.1",
+    "postcss": "^8.5.8",
+    "tailwindcss": "^3.4.19",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.1",
+    "vitest": "^4.1.0"
+  }
+}

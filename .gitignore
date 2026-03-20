@@ -6,11 +6,11 @@ __pycache__/
 .Python
 build/
 develop-eggs/
-dist/
+# dist/ kept intentionally (dist/.gitkeep needed by Tauri generate_context!())
 downloads/
 eggs/
 .eggs/
-lib/
+# lib/ intentionally NOT ignored (src/lib/ is tracked)
 lib64/
 parts/
 sdist/
@@ -166,8 +166,7 @@ logs/
 config/local_config.json
 config/secrets.json
 
-# Build artifacts
-dist/
+# Build artifacts (dist/ kept for Tauri generate_context!() via dist/.gitkeep)
 build/
 *.dmg
 *.exe
@@ -247,6 +246,22 @@ test/*.mp4
 
 # Local Codex skills
 skills/
+
+# Node / Frontend
+node_modules/
+# dist/ is intentionally kept for Tauri generate_context!() macro; only build artifacts ignored
+.turbo/
+
+# Rust / Tauri
+src-tauri/target/
+src-tauri/WixTools/
+
+# Generated files (kept in VCS for CI)
+# src/lib/bindings.ts is committed intentionally
+# src/routeTree.gen.ts is committed intentionally
+
+# Test coverage
+coverage/
 
 # Test artifacts (keep test source tracked)
 tests/output/

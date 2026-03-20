@@ -1,0 +1,25 @@
+{
+  "name": "Tokyo Night Light",
+  "type": "light",
+  "semanticTokens": {
+    "bg.primary": "#e6e7ed",
+    "bg.sidebar": "#d6d8df",
+    "bg.input": "#e6e7ed",
+    "bg.hover": "#e1e2e8",
+    "bg.selection": "#acb0bf40",
+    "bg.secondary": "#d6d8df",
+    "text.secondary": "#363c4d",
+    "text.muted": "#707280",
+    "text.disabled": "#707280",
+    "text.primary": "#343b59",
+    "accent.primary": "#2959aa",
+    "accent.hover": "#2959aaAA",
+    "border.default": "#707280",
+    "border.focus": "#70728033",
+    "status.error": "#bd4040",
+    "status.warning": "#8f5e15",
+    "status.success": "#166775",
+    "status.info": "#0da0ba",
+    "accent.muted": "#2959aa44"
+  }
+}
