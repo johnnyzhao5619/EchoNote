@@ -814,10 +814,10 @@
   ```rust
   use std::sync::Arc;
   use tokio::sync::RwLock;
-  use crate::{config::AppConfig, storage::Db};
+  use crate::{config::AppConfig, storage::db::Database};
 
   pub struct AppState {
-      pub db: Arc<Db>,
+      pub db: Arc<Database>,
       pub config: Arc<RwLock<AppConfig>>,
       // Other fields will be added in later milestones (worker channels, engines, etc.)
   }
@@ -831,7 +831,7 @@
   #[cfg(test)]
   mod tests {
       use super::*;
-      use crate::{config::{AppConfig, apply_partial}, storage::Db};
+      use crate::{config::{AppConfig, apply_partial}, storage::db::Database};
       use std::sync::Arc;
       use tokio::sync::RwLock;
 
@@ -1104,7 +1104,7 @@
 
               // Step 1+2: open DB and run migrations (blocking inside setup)
               let db = tauri::async_runtime::block_on(
-                  crate::storage::Db::open(&db_url)
+                  crate::storage::db::Database::open(&db_url)
               ).expect("DB initialization failed");
               let db = std::sync::Arc::new(db);
 

@@ -1543,7 +1543,7 @@
   );
   ```
 
-  若 M2 已建此表但缺少 `error_msg` 或 `completed_at` 字段，创建 `0003_llm_tasks_patch.sql` 补充 `ALTER TABLE` 语句。
+  若 M2 已建此表但缺少 `error_msg` 或 `completed_at` 字段，创建 `0004_llm_tasks_patch.sql` 补充 `ALTER TABLE` 语句。
 
 - [ ] **Step 8.4: Commit**
 
@@ -1556,14 +1556,14 @@
 ### Task 9: 数据库迁移补充
 
 **Files:**
-- Create（视情况）: `src-tauri/src/storage/migrations/0003_llm_tasks_patch.sql`
+- Create（视情况）: `src-tauri/src/storage/migrations/0004_llm_tasks_patch.sql`
 
 - [ ] **Step 9.1: 检查并补充 `workspace_text_assets` 表**
 
-  若 M4（Workspace）尚未创建 `workspace_text_assets` 表，在此添加：
+  若 M6（Workspace）尚未执行（即 0003_workspace_assets.sql 未运行），`workspace_text_assets` 已由 M2 的 0001_initial.sql 创建，此 patch 仅补充 llm_tasks 字段完整性：
 
   ```sql
-  -- src-tauri/src/storage/migrations/0003_llm_tasks_patch.sql
+  -- src-tauri/src/storage/migrations/0004_llm_tasks_patch.sql
 
   -- workspace_text_assets（若 M4 未创建则在此补充）
   CREATE TABLE IF NOT EXISTS workspace_text_assets (

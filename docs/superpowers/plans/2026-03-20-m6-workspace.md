@@ -15,72 +15,13 @@
 **Files:**
 - Create: `src-tauri/src/storage/migrations/0003_workspace_assets.sql`
 
-- [ ] **Step 1.1: 创建 `workspace_text_assets` 表**
+- [ ] **Step 1.1: 确认前置条件**
 
-  ```sql
-  -- 0003_workspace_assets.sql
+  `workspace_text_assets` 表及其 `content_text` 同步 trigger 已由 M2 的 `0001_initial.sql` 创建，此处**无需重建**。
 
-  -- 文档文本 Asset 表（每个 document_id + role 唯一）
-  CREATE TABLE workspace_text_assets (
-      id          TEXT    PRIMARY KEY,
-      document_id TEXT    NOT NULL REFERENCES workspace_documents(id) ON DELETE CASCADE,
-      role        TEXT    NOT NULL,   -- 'transcript'|'summary'|'meeting_brief'|'translation'
-                                     -- |'document_text'|'decisions'|'action_items'|'next_steps'
-      language    TEXT,
-      content     TEXT    NOT NULL,
-      file_path   TEXT,              -- 对应磁盘上的 .md 文件路径（可为 NULL）
-      created_at  INTEGER NOT NULL,
-      updated_at  INTEGER NOT NULL,
-      UNIQUE(document_id, role)
-  );
-  CREATE INDEX idx_assets_doc ON workspace_text_assets(document_id, role);
-  ```
+  `0003_workspace_assets.sql` 的唯一职责是补充 `workspace_fts` FTS5 虚表的三个维护 trigger（M2 的 0001 创建了虚表但未创建 trigger，SQLite content FTS5 模式需要显式 trigger 维护）：
 
-- [ ] **Step 1.2: 添加 content_text 同步 trigger**
-
-  当 `workspace_text_assets` 写入时，自动按优先级更新 `workspace_documents.content_text`（供 FTS5 虚表使用）。**应用层代码不直接写 `content_text`**。
-
-  ```sql
-  -- Trigger：asset 写入后自动同步 content_text（FTS5 索引源）
-  -- 优先级：document_text(0) > transcript(1) > meeting_brief(2) > summary(3) > 其余(99)
-  CREATE TRIGGER sync_content_text_on_asset_insert
-  AFTER INSERT ON workspace_text_assets
-  BEGIN
-      UPDATE workspace_documents
-      SET content_text = (
-          SELECT content FROM workspace_text_assets
-          WHERE document_id = NEW.document_id
-          ORDER BY CASE role
-              WHEN 'document_text' THEN 0
-              WHEN 'transcript'    THEN 1
-              WHEN 'meeting_brief' THEN 2
-              WHEN 'summary'       THEN 3
-              ELSE 99 END
-          LIMIT 1
-      )
-      WHERE id = NEW.document_id;
-  END;
-
-  CREATE TRIGGER sync_content_text_on_asset_update
-  AFTER UPDATE ON workspace_text_assets
-  BEGIN
-      UPDATE workspace_documents
-      SET content_text = (
-          SELECT content FROM workspace_text_assets
-          WHERE document_id = NEW.document_id
-          ORDER BY CASE role
-              WHEN 'document_text' THEN 0
-              WHEN 'transcript'    THEN 1
-              WHEN 'meeting_brief' THEN 2
-              WHEN 'summary'       THEN 3
-              ELSE 99 END
-          LIMIT 1
-      )
-      WHERE id = NEW.document_id;
-  END;
-  ```
-
-- [ ] **Step 1.3: 添加 FTS5 自动维护 trigger**
+- [ ] **Step 1.2: 添加 FTS5 自动维护 trigger**
 
   `workspace_fts` 虚表基于 `content=workspace_documents`，需要 trigger 手动同步（SQLite content table 模式要求显式维护）。
 
@@ -115,7 +56,7 @@
 - [ ] **Step 1.5: Commit**
 
   ```
-  feat(db): add workspace_text_assets table and FTS5 sync triggers (migration 0003)
+  feat(db): add FTS5 auto-maintenance triggers for workspace_fts (migration 0003)
   ```
 
 ---
