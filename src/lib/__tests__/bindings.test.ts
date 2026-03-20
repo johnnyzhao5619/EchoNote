@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 
 // 验证 bindings.ts 导出预期的命令函数
 describe("bindings smoke test", () => {
