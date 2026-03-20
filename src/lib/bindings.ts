@@ -61,6 +61,46 @@ async resetConfig() : Promise<Result<AppConfig, AppError>> {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async listModelVariants() : Promise<Result<ModelVariant[], AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_model_variants") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async downloadModel(variantId: string) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("download_model", { variantId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async cancelDownload(variantId: string) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cancel_download", { variantId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async deleteModel(variantId: string) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("delete_model", { variantId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async setActiveModel(variantId: string) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_active_model", { variantId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -154,6 +194,29 @@ default_language?: string | null; default_target_language?: string | null; vad_t
  * 主题描述符，仅含元信息（不含完整 token 数据，token 由前端直接读取 JSON 文件）
  */
 export type ThemeInfo = { name: string; type: string }
+/**
+ * 单个模型变体的完整状态（list_model_variants 返回值）
+ */
+export type ModelVariant = {
+  variant_id: string;
+  model_type: string;
+  name: string;
+  description: string;
+  size_bytes: number;
+  size_display: string;
+  is_downloaded: boolean;
+  is_active: boolean;
+}
+/**
+ * 下载进度推送 Payload（models:progress 事件）
+ */
+export type DownloadProgressPayload = {
+  variant_id: string;
+  downloaded_bytes: number;
+  total_bytes: number | null;
+  speed_bps: number;
+  eta_secs: number | null;
+}
 
 /** tauri-specta globals **/
 

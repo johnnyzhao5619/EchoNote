@@ -143,6 +143,8 @@ models/
 !core/models/
 # Allow Rust source directory named models/
 !src-tauri/src/models/
+# Allow React component directory named models/
+!src/components/models/
 *.bin
 *.pt
 *.pth

@@ -1622,5 +1622,23 @@
       "insufficient_resources": "Please free up disk space or memory and retry",
       "validation_failed": "Please check if input content meets requirements"
     }
+  },
+  "models": {
+    "page_title": "Gestion des modèles",
+    "group_whisper": "Modèles de transcription (Whisper)",
+    "group_llm": "Modèles IA locaux (LLM)",
+    "status_downloaded": "Téléchargé",
+    "status_downloading": "Téléchargement...",
+    "status_not_downloaded": "Non téléchargé",
+    "status_active": "Actif",
+    "action_download": "Télécharger",
+    "action_cancel": "Annuler",
+    "action_delete": "Supprimer",
+    "action_set_active": "Définir comme actif",
+    "download_speed": "{speed}/s",
+    "download_eta": "{eta} restant",
+    "delete_confirm": "Supprimer ce fichier de modèle ? Cette action est irréversible.",
+    "required_title": "Modèles requis",
+    "required_desc": "Veuillez télécharger les modèles IA nécessaires à la première utilisation."
   }
 }

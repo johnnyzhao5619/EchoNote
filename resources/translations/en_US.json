@@ -1622,5 +1622,23 @@
       "insufficient_resources": "Please free up disk space or memory and retry",
       "validation_failed": "Please check if input content meets requirements"
     }
+  },
+  "models": {
+    "page_title": "Model Management",
+    "group_whisper": "Speech Recognition Models (Whisper)",
+    "group_llm": "Local AI Models (LLM)",
+    "status_downloaded": "Downloaded",
+    "status_downloading": "Downloading...",
+    "status_not_downloaded": "Not Downloaded",
+    "status_active": "Active",
+    "action_download": "Download",
+    "action_cancel": "Cancel",
+    "action_delete": "Delete",
+    "action_set_active": "Set Active",
+    "download_speed": "{speed}/s",
+    "download_eta": "{eta} remaining",
+    "delete_confirm": "Delete this model file? This action cannot be undone.",
+    "required_title": "Models Required",
+    "required_desc": "Please download the AI models required for first use."
   }
 }

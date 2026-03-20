@@ -1622,5 +1622,23 @@
       "insufficient_resources": "Please free up disk space or memory and retry",
       "validation_failed": "Please check if input content meets requirements"
     }
+  },
+  "models": {
+    "page_title": "模型管理",
+    "group_whisper": "语音转写模型（Whisper）",
+    "group_llm": "本地 AI 模型（LLM）",
+    "status_downloaded": "已下载",
+    "status_downloading": "下载中...",
+    "status_not_downloaded": "未下载",
+    "status_active": "当前使用",
+    "action_download": "下载",
+    "action_cancel": "取消",
+    "action_delete": "删除",
+    "action_set_active": "设为当前",
+    "download_speed": "{speed}/s",
+    "download_eta": "剩余 {eta}",
+    "delete_confirm": "删除模型文件？此操作不可撤销。",
+    "required_title": "需要下载模型",
+    "required_desc": "首次使用需要下载 AI 模型，请选择要安装的模型。"
   }
 }

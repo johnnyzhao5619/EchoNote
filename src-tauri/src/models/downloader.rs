@@ -27,6 +27,12 @@ pub struct SpeedWindow {
     window: Duration,
 }
 
+impl Default for SpeedWindow {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SpeedWindow {
     pub fn new() -> Self {
         Self {

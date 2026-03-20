@@ -124,10 +124,7 @@ pub fn check_required_models(
 /// 解析 "whisper/base" → ("whisper", "base")
 /// 解析 "llm/qwen2.5-3b-q4" → ("llm", "qwen2.5-3b-q4")
 pub fn parse_variant_id(variant_id: &str) -> Option<(&str, &str)> {
-    let mut parts = variant_id.splitn(2, '/');
-    let model_type = parts.next()?;
-    let variant_name = parts.next()?;
-    Some((model_type, variant_name))
+    variant_id.split_once('/')
 }
 
 #[cfg(test)]
