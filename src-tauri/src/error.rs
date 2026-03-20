@@ -51,6 +51,18 @@ impl AppError {
 // Tauri 2.x 已有 impl<T: Serialize> From<T> for InvokeError 泛型实现，
 // AppError 派生了 Serialize，无需手动实现 From。
 
+impl From<sqlx::Error> for AppError {
+    fn from(e: sqlx::Error) -> Self {
+        AppError::Storage(e.to_string())
+    }
+}
+
+impl From<std::io::Error> for AppError {
+    fn from(e: std::io::Error) -> Self {
+        AppError::Io(e.to_string())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
