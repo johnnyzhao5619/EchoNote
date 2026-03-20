@@ -15,8 +15,8 @@ pub struct ThemeInfo {
 pub async fn get_current_theme(
     state: tauri::State<'_, AppState>,
 ) -> Result<String, AppError> {
-    let theme = state.inner.current_theme.lock().await;
-    Ok(theme.clone())
+    let cfg = state.config.read().await;
+    Ok(cfg.active_theme.clone())
 }
 
 /// 设置当前激活主题
@@ -26,9 +26,11 @@ pub async fn set_current_theme(
     name: String,
     state: tauri::State<'_, AppState>,
 ) -> Result<(), AppError> {
-    let mut theme = state.inner.current_theme.lock().await;
-    *theme = name;
-    Ok(())
+    let partial = crate::config::PartialAppConfig {
+        active_theme: Some(name),
+        ..Default::default()
+    };
+    super::settings::update_config_inner(&state, partial).await
 }
 
 /// 列举内置主题信息
