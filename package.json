@@ -7,16 +7,16 @@
     "doc": "docs"
   },
   "scripts": {
-    "dev":            "vite",
-    "build":          "tsc && vite build",
-    "preview":        "vite preview",
-    "typecheck":      "tsc --noEmit",
-    "test":           "vitest run",
-    "test:watch":     "vitest",
-    "test:ui":        "vitest --ui",
-    "test:coverage":  "vitest run --coverage",
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage",
     "convert-themes": "tsx scripts/convert-themes.ts",
-    "tauri":          "tauri"
+    "tauri": "tauri"
   },
   "type": "module",
   "repository": {
