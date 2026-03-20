@@ -1,160 +1,67 @@
 <div align="center">
   <img src="resources/icons/echonote.png" alt="EchoNote Logo" width="120" height="120">
   <h1>EchoNote</h1>
-  <p><em>Unified Recording, Document Workspace & Local AI Meeting Notes</em></p>
+  <p><em>Local-First AI Voice Notes — Tauri + Rust + React</em></p>
 </div>
 
 <p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-2563EB.svg" alt="Apache 2.0 License badge"></a>
-  <img src="https://img.shields.io/badge/Python-3.10%2B-4B5563.svg" alt="Python 3.10+ badge">
-  <img src="https://img.shields.io/badge/Desktop-Local%20First-0EA5E9.svg" alt="Desktop local-first badge">
-  <img src="https://img.shields.io/badge/Privacy-First-10B981.svg" alt="Privacy-first badge">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-2563EB.svg" alt="Apache 2.0 License"></a>
+  <img src="https://img.shields.io/badge/Version-3.0.0--dev-7aa2f7.svg" alt="v3.0.0-dev">
+  <img src="https://img.shields.io/badge/Desktop-Local%20First-0EA5E9.svg" alt="Local First">
+  <img src="https://img.shields.io/badge/Privacy-First-10B981.svg" alt="Privacy First">
 </p>
 
-<p align="center">
-  <strong>🎙️ Capture • 🗂️ Organize • 🧠 Summarize • 🔒 Local First</strong>
-</p>
-
-### 🚀 Quick Start
-
-**EchoNote** is a privacy-first desktop application that unifies recordings, documents, transcripts, summaries, and meeting briefs in a single local-first workspace.
-
-#### Installation & Setup
-
-```bash
-# 1. Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-
-# 2. Install dependencies
-pip install -r requirements.txt
-
-# 3. Launch application
-python main.py
-```
-
-#### First Launch Setup
-
-1. **Storage Configuration**: Choose paths for recordings and transcripts
-2. **Model Download**: Download a Faster-Whisper or Text AI model as needed. Managed models now live under one root at `~/.echonote/models/`, split into `speech/`, `translation/`, and `text_ai/`
-3. **FFmpeg Check**: Verify FFmpeg installation for media format support
-4. **Loopback Check (First Run)**: Detect loopback input and show setup guidance if missing (one-click setup supports macOS/Windows/Linux with system authorization where required)
-5. **Optional**: Configure calendar sync (Google/Outlook OAuth)
-
-### 🎯 Key Features
-
-- **🗂️ Comprehensive Note Management**: A unified workspace to seamlessly manage imported documents, batch transcriptions, realtime recordings, summaries, and meeting briefs within an intuitive folder structure
-- **🎙️ Local Speech Pipelines**: Process audio/video files or capture live recordings, then persist transcript and translation assets back into the workspace
-- **🧠 AI Note Summarization & Organization**: Generate intelligent, extractive summaries, ONNX small-model summaries, and GGUF-backed meeting briefs to perfectly organize your notes
-- **📅 Calendar Integration**: Sync with Google Calendar and Outlook, manage local events
-- **⏰ Timeline Intelligence**: Correlate events with recordings, automated task scheduling
-- **🔒 Privacy-First**: Encrypted local storage, no cloud dependency required
-- **🌍 Multilingual**: Multilingual speech recognition with extensible UI i18n support
-- **🎨 Accessibility**: Keyboard navigation, screen reader support, multiple themes
-
-### 📋 System Requirements
-
-- **Python**: 3.10 or newer
-- **Operating System**: macOS, Linux, Windows
-- **Optional Dependencies**:
-  - PyAudio (microphone capture)
-  - FFmpeg (media format support)
-  - CUDA GPU (Faster-Whisper acceleration)
-
-### 🎧 System Audio & Meeting Capture Plan
-
-- **Microphone-only capture**: Select a physical microphone input.
-- **System audio capture**: Use a loopback input device (e.g., BlackHole, Loopback, VB-CABLE).
-- **Online meeting capture**:
-  - Route meeting/video app output to loopback input.
-  - Keep meeting app microphone as your physical mic.
-  - In EchoNote, select the loopback input device for recording.
-  - If you need both local mic and remote playback in one track, use an aggregate/virtual mixer input.
-- **If no loopback device is installed**:
-  - macOS: install BlackHole/Loopback.
-  - Windows: enable Stereo Mix or install VB-CABLE.
-  - Linux: use PipeWire/PulseAudio monitor source.
-
-### 🏗️ Architecture Overview
-
-```
-EchoNote/
-├── main.py                # Application entry point
-├── config/                # Configuration management & version control
-├── core/                  # Business logic domains (workspace, models, realtime, timeline)
-├── engines/               # Audio, speech, translation, and text-ai runtimes
-├── data/                  # Database, security, storage
-├── ui/                    # PySide6 desktop interface (workspace, timeline, settings)
-├── utils/                 # Cross-cutting utilities
-└── tests/                 # Test suites
-```
-
-Workspace architecture highlights:
-- `core/workspace/`: unified asset layer for `workspace_items` and `workspace_assets`
-- `core/models/manager.py`: unified model governance and storage root planning for `speech/`, `translation/`, and `text_ai` assets under `models.root_dir`
-- `engines/text_ai/`: extractive, ONNX, and GGUF local text AI runtimes
-- `ui/workspace/`: single workbench featuring a Navigator shell, Document Editor, Results List, and Inspector with an integrated media transport player
-
-### 📚 Documentation
-
-| Audience         | Resource           | Location                                                   |
-| ---------------- | ------------------ | ---------------------------------------------------------- |
-| **Developers**   | API reference      | [`docs/DEVELOPER_GUIDE.md`](docs/DEVELOPER_GUIDE.md)       |
-| **Contributors** | Coding standards   | [`docs/CODE_STANDARDS.md`](docs/CODE_STANDARDS.md)         |
-| **Maintainers**  | CI/CD guide        | [`docs/CI_CD_GUIDE.md`](docs/CI_CD_GUIDE.md)               |
-| **Website**      | Landing page source| [`echonote-landing/README.md`](echonote-landing/README.md) |
-
-> Landing maintenance note: the Vue implementation in `echonote-landing/` is the active source.  
-> `docs/landing/` is archived for historical reference only.  
-> The active landing is a single-page, i18n-driven architecture with centralized link composition and GitHub Pages deployment from `.github/workflows/deploy-landing.yml`.
-
-### 🧪 Development & Testing
-
-```bash
-# Install development dependencies
-pip install -r requirements-dev.txt
-
-# Run tests
-pytest tests/unit                    # Unit tests
-pytest tests/integration             # Integration tests
-pytest tests/performance             # Performance tests
-
-# Code quality checks
-python scripts/sync_version.py       # Version consistency
-pre-commit run --all-files          # Code formatting & linting
-```
-
-### 📄 License
-
-Released under the [Apache 2.0 License](LICENSE). PySide6 (LGPL v3) is used for the UI layer and is fully compatible through dynamic linking.
+> **v3 is under active development** (Tauri + Rust rewrite).
+> For the stable v2.x release (Python + PySide6), see the [`main`](../../tree/main) branch.
 
 ---
 
-## 📊 Project Status
+## What is EchoNote?
 
-- **Version**: v2.2.0 (Latest release)
-- **Test Suite**: unit / integration / UI / performance categories
-- **Code Quality**: Excellent (PEP 8 compliant, type-annotated)
-- **Documentation**: Complete and restructured
-- **License**: Apache 2.0 (fully compliant)
+EchoNote is a privacy-first, local-only desktop application that:
 
-## 🤝 Contributing
+- **Records** audio from any microphone
+- **Transcribes** speech in real time using on-device Whisper models
+- **Summarizes** and organizes transcripts using local LLM (no API keys, no cloud)
+- **Manages** a document workspace with full-text search and export
+- **Tracks** notes and events on a local timeline
 
-We welcome contributions! Please see our [Contributing Guide](docs/CONTRIBUTING.md) for details on:
-
-- Code standards and style guide
-- Development workflow
-- Testing requirements
-- Documentation guidelines
-
-## 📞 Support
-
-- **Documentation**: [`docs/`](docs/) directory
-- **Issues**: [GitHub Issues](https://github.com/johnnyzhao5619/EchoNote/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/johnnyzhao5619/EchoNote/discussions)
+Everything runs on your machine. No subscriptions. No data leaves your device.
 
 ---
 
-<p align="center">
-  Made with ❤️ by the EchoNote team
-</p>
+## v3 Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| App framework | Tauri 2.x |
+| Frontend | React 18 + TypeScript + Tailwind CSS + shadcn/ui |
+| Transcription | whisper-rs (whisper.cpp) — CoreML / Metal / CUDA |
+| Local LLM | llama-cpp-2 (llama.cpp) — Metal / CUDA / CPU |
+| Audio | cpal + rubato (real-time resampling) |
+| Database | SQLite via sqlx (WAL mode, FTS5) |
+
+---
+
+## Platform Support
+
+| Platform | Status | Acceleration |
+|----------|--------|-------------|
+| macOS (Universal) | 🔄 In development | CoreML + Metal |
+| Windows x64 | 🔄 In development | CUDA (optional) |
+| Linux x64 | 🔄 In development | CUDA (optional) |
+
+---
+
+## Development
+
+See [`AGENTS.md`](AGENTS.md) for the full architecture, design decisions, and
+milestone-by-milestone execution guide (M1–M11).
+
+Implementation plans are in [`docs/superpowers/plans/`](docs/superpowers/plans/).
+
+---
+
+## License
+
+Apache 2.0 — see [LICENSE](LICENSE).
