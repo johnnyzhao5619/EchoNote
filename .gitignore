@@ -248,6 +248,22 @@ test/*.mp4
 # Local Codex skills
 skills/
 
+# Node / Frontend
+node_modules/
+dist/
+.turbo/
+
+# Rust / Tauri
+src-tauri/target/
+src-tauri/WixTools/
+
+# Generated files (kept in VCS for CI)
+# src/lib/bindings.ts is committed intentionally
+# src/routeTree.gen.ts is committed intentionally
+
+# Test coverage
+coverage/
+
 # Test artifacts (keep test source tracked)
 tests/output/
 tests/tmp/
