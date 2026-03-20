@@ -2,6 +2,7 @@ mod commands;
 mod error;
 mod state;
 pub mod storage;
+pub mod config;
 
 use commands::{settings, theme};
 use state::AppState;
