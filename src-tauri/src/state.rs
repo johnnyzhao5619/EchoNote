@@ -1,9 +1,10 @@
 use std::sync::Arc;
-use tokio::sync::RwLock;
-use crate::{config::AppConfig, storage::db::Db};
+use tokio::sync::{mpsc, RwLock};
+use crate::{config::AppConfig, models::{DownloadCommand, ModelsToml}, storage::db::Db};
 
 pub struct AppState {
     pub db: Arc<Db>,
     pub config: Arc<RwLock<AppConfig>>,
-    // Other fields will be added in later milestones (worker channels, engines, etc.)
+    pub model_config: Arc<ModelsToml>,
+    pub download_tx: mpsc::Sender<DownloadCommand>,
 }

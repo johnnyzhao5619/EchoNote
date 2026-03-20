@@ -35,6 +35,26 @@ impl Db {
 
         Ok(Self { pool })
     }
+
+    /// Upsert a key-value setting into `app_settings`.
+    pub async fn save_setting(&self, key: &str, value: &str) -> Result<(), AppError> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as i64;
+        sqlx::query(
+            "INSERT INTO app_settings (key, value, updated_at)
+             VALUES (?, ?, ?)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at"
+        )
+        .bind(key)
+        .bind(value)
+        .bind(now)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| AppError::Storage(e.to_string()))?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]

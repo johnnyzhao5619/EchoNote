@@ -136,9 +136,23 @@ mod tests {
     use tokio::sync::RwLock;
 
     async fn make_state() -> AppState {
+        use crate::models::{DownloadCommand, ModelsToml};
+        use tokio::sync::mpsc;
+
         let db = Arc::new(Db::open("sqlite::memory:").await.unwrap());
         let config = Arc::new(RwLock::new(AppConfig::default()));
-        AppState { db, config }
+        let model_config = Arc::new(ModelsToml {
+            whisper: crate::models::ModelGroup {
+                default_variant: "base".to_string(),
+                variants: std::collections::HashMap::new(),
+            },
+            llm: crate::models::ModelGroup {
+                default_variant: "qwen2.5-3b-q4".to_string(),
+                variants: std::collections::HashMap::new(),
+            },
+        });
+        let (download_tx, _rx) = mpsc::channel::<DownloadCommand>(1);
+        AppState { db, config, model_config, download_tx }
     }
 
     /// get_config_inner must return the current AppConfig.

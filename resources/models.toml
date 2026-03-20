@@ -32,13 +32,13 @@ description = "高精度，需要约 3GB RAM"
 [llm]
 default_variant = "qwen2.5-3b-q4"
 
-["llm.variants.qwen2.5-3b-q4"]
+[llm.variants."qwen2.5-3b-q4"]
 url         = "https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q4_k_m.gguf"
 sha256      = "FILL_IN_BEFORE_RELEASE_64_HEX_CHARS_REQUIRED"
 size_bytes  = 1890000000
 description = "轻量模型，适合低配设备，需要约 2GB RAM"
 
-["llm.variants.qwen2.5-7b-q4"]
+[llm.variants."qwen2.5-7b-q4"]
 url         = "https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF/resolve/main/qwen2.5-7b-instruct-q4_k_m.gguf"
 sha256      = "FILL_IN_BEFORE_RELEASE_64_HEX_CHARS_REQUIRED"
 size_bytes  = 4370000000
