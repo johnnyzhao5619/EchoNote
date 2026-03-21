@@ -78,11 +78,14 @@ base_multiplier: f32,          // = 4.0
 **Algorithm:**
 
 ```
-Phase 1 — Cold start (frames 1–49):
+Phase 1 — Cold start (fewer than 50 silence frames collected):
   Use initial threshold (0.008 default)
-  Collect RMS into rms_history for every silence frame
+  Collect RMS into rms_history ONLY when rms < initial_threshold (silence frames only)
+  Consistent with Phase 3; prevents speech frames from polluting cold-start estimate
+  If user starts speaking immediately, rms_history may be sparse — that is fine,
+  Phase 2 is delayed until 50 silence frames have been collected
 
-Phase 2 — Stable (frame 50+):
+Phase 2 — Stable (after 50 silence frames collected):
   noise_floor = P25(rms_history)  ← sort, take index 12
   adaptive_threshold = clamp(noise_floor × 4.0, min=0.003, max=0.040)
 
@@ -107,12 +110,21 @@ Phase 3 — Continuous tracking:
 
 ### 2. TranscriptionWorker — Double Buffer + Async Inference (`pipeline.rs`)
 
+**Channel creation:** `result_tx/rx` are created inside `TranscriptionWorker::new()` via `mpsc::sync_channel(4)`. `new()` signature does **not** change (no new external parameters). When triggering inference, `result_tx.clone()` is passed into `tokio::spawn(run_inference(..., result_tx.clone()))`. This keeps the channel internal to the worker.
+
 **New state:**
 ```rust
 active_buf: Vec<f32>              // accumulating new audio
 inference_in_flight: bool         // background task running
-result_tx: mpsc::SyncSender<InferenceResult>   // channel back from inference tasks
-result_rx: mpsc::Receiver<InferenceResult>
+result_tx: mpsc::SyncSender<InferenceResult>   // created in new(), cloned per spawn
+result_rx: mpsc::Receiver<InferenceResult>     // created in new(), polled in Step 1
+// segment_counter: u32 retained from existing code; reset on Start;
+// passed by value into run_inference at spawn time (snapshot, not shared reference)
+```
+
+**`run()` destructure update required:** The existing `run()` begins with `let Self { rx, app, engine, segments_cache } = self;`. After adding the two new fields, this exhaustive destructure will fail to compile. It must be updated to:
+```rust
+let Self { rx, app, engine, segments_cache, result_tx, result_rx } = self;
 ```
 
 **InferenceResult type:**
@@ -159,6 +171,29 @@ const MIN_INFER_SAMPLES: usize = 8_000;        // 0.5s minimum
 2. If active_buf non-empty: sync await flush_to_whisper (final segment, ordered)
 3. session_id = None; send done_tx
 ```
+
+**`run_inference` must be `async fn`** so it can internally call `tokio::task::spawn_blocking` and `.await` its result before sending to `result_tx`. `segment_counter` is passed in by value (snapshot at spawn time) so IDs are assigned deterministically inside the task without shared mutable state. Example structure:
+```rust
+async fn run_inference(
+    audio: Vec<f32>,
+    session_id: String,
+    counter_snapshot: u32,   // value of segment_counter at spawn time
+    engine: Arc<Mutex<Option<WhisperEngine>>>,
+    segments_cache: Arc<Mutex<HashMap<String, Vec<SegmentPayload>>>>,
+    result_tx: mpsc::SyncSender<InferenceResult>,
+) {
+    let result = task::spawn_blocking(move || {
+        // build SegmentPayload with ids starting at counter_snapshot
+        // WhisperEngine::transcribe(...)
+    }).await;
+    let segments = /* extract or default to empty on error */;
+    // Update segment_counter in pipeline loop: counter += segments.len() after receiving result
+    let _ = result_tx.try_send(InferenceResult { session_id, segments });
+}
+```
+After `result_rx` delivers the result in Step 1, the pipeline loop increments `segment_counter += result.segments.len()`.
+
+**Thread safety note:** `Arc<Mutex<Option<WhisperEngine>>>` is safe to pass across `tokio::spawn` because `engine.rs` declares `unsafe impl Send for WhisperEngine`. This relies on whisper-rs documenting `WhisperContext` as `Send`. Any future removal of that `unsafe impl` must be coordinated with this spawn pattern.
 
 **Panic safety:** `run_inference` always sends to `result_tx` even on error (empty segments), ensuring `inference_in_flight` is always cleared.
 
@@ -217,7 +252,8 @@ setVadThreshold(Math.min(cfg.vad_threshold, 0.015))
 #### `store/recording.ts` — Poll frequency
 
 ```ts
-// Segments poll: every 500ms → 300ms
+// Timer interval remains 100ms. Old: tickCount % 5 → fires every 500ms.
+// New: tickCount % 3 → fires every 300ms. Do NOT change the interval itself.
 if (tickCount % 3 === 0 && currentSession) {
 ```
 
@@ -231,8 +267,10 @@ if (tickCount % 3 === 0 && currentSession) {
 | Stop with inference in-flight | Wait `result_rx` up to 30s; timeout → log warning, proceed with `done_tx` |
 | Noise floor drifts (environment change) | EMA tracking with 2.5s time constant; `clamp(max=0.040)` prevents over-filtering |
 | No pause > 800ms (fast continuous speech) | 25s safety flush triggers; entire segment processed at once (better quality) |
-| Audio < 0.5s after pause | `MIN_INFER_SAMPLES` guard skips inference; audio discarded or merged into next buffer |
+| Audio < 0.5s after pause | `MIN_INFER_SAMPLES` guard skips inference; audio remains in `active_buf` and accumulates into the next segment |
 | `result_tx` full (capacity 4) | `try_send` fails silently; Whisper Mutex ensures this never happens in practice |
+| Condition B blocked (`inference_in_flight=true` + `active_buf >= 25s`) | Audio continues to accumulate until in-flight inference completes (Mutex serializes, so finish is imminent). Implementers may add a hard 30s log warning if desired. This is an accepted trade-off: blocking Condition B prevents concurrent inferences that would overload the CPU. |
+| Stop: `active_buf` < MIN_INFER_SAMPLES (0.5s) | Stop handler calls `flush_to_whisper` unconditionally on any non-empty `active_buf`, bypassing the 0.5s guard — the final fragment is always submitted. This is intentional to avoid data loss on stop. |
 
 ---
 
