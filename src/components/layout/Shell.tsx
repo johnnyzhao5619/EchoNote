@@ -3,6 +3,7 @@ import { SecondPanel } from "./SecondPanel";
 import { TopBar } from "./TopBar";
 import { StatusBar } from "./StatusBar";
 import { useShellStore } from "@/store/shell";
+import { useLlmStream } from "@/hooks/useLlmStream";
 
 interface ShellProps {
   children: React.ReactNode;
@@ -27,6 +28,7 @@ interface ShellProps {
  */
 export function Shell({ children }: ShellProps) {
   const secondPanelContent = useShellStore((s) => s.secondPanelContent);
+  useLlmStream();
   return (
     <div className="flex h-screen overflow-hidden bg-bg-primary text-text-primary">
       {/* 左侧活动栏（固定宽度） */}
