@@ -1,8 +1,8 @@
 // src/store/models.ts
 
 import { create } from 'zustand'
-import { invoke } from '@tauri-apps/api/core'
-import type { ModelVariant } from '../lib/bindings'
+import { commands } from '@/lib/bindings'
+import type { ModelVariant } from '@/lib/bindings'
 
 interface DownloadState {
   downloadedBytes: number
@@ -13,20 +13,19 @@ interface DownloadState {
 
 interface ModelsStore {
   variants: ModelVariant[]
-  downloads: Record<string, DownloadState> // variant_id → progress
-  requiredMissing: string[]                 // from models:required event
+  downloads: Record<string, DownloadState>
+  requiredMissing: string[]
   isRequiredDialogOpen: boolean
-  lastError: string | null                  // most recent download error
+  lastError: string | null
 
-  // Actions
   loadVariants: () => Promise<void>
   startDownload: (variantId: string) => Promise<void>
   cancelDownload: (variantId: string) => Promise<void>
   deleteModel: (variantId: string) => Promise<void>
   setActive: (variantId: string) => Promise<void>
   dismissRequiredDialog: () => void
+  clearError: () => void
 
-  // Internal
   _setupListeners: () => () => void
 }
 
@@ -38,41 +37,45 @@ export const useModelsStore = create<ModelsStore>((set, get) => ({
   lastError: null,
 
   loadVariants: async () => {
-    try {
-      const variants = await invoke<ModelVariant[]>('list_model_variants')
-      set({ variants })
-    } catch (e) {
-      console.error('[models] loadVariants error:', e)
+    const result = await commands.listModelVariants()
+    if (result.status === 'ok') {
+      const variants = result.data
+      // Detect missing active models (replaces unreliable models:required Tauri event)
+      const requiredMissing = variants
+        .filter((v) => v.is_active && !v.is_downloaded)
+        .map((v) => v.variant_id)
+      set({
+        variants,
+        requiredMissing,
+        isRequiredDialogOpen: requiredMissing.length > 0,
+      })
+    } else {
+      console.error('[models] loadVariants error:', result.error)
     }
   },
 
   startDownload: async (variantId) => {
-    // 乐观更新：立即显示进度条（0 bytes），让用户知道下载已触发
     set((s) => ({
+      lastError: null,
       downloads: {
         ...s.downloads,
         [variantId]: { downloadedBytes: 0, totalBytes: null, speedBps: 0, etaSecs: null },
       },
     }))
-    try {
-      await invoke('download_model', { variantId })
-    } catch (e) {
-      console.error('[models] startDownload error:', e)
-      // 清除乐观状态
+    const result = await commands.downloadModel(variantId)
+    if (result.status === 'error') {
+      // Synchronous command error (e.g. channel closed)
       set((s) => {
         const d = { ...s.downloads }
         delete d[variantId]
-        return { downloads: d }
+        return { downloads: d, lastError: String(result.error) }
       })
     }
+    // Async download errors are caught by the polling loop via get_download_error
   },
 
   cancelDownload: async (variantId) => {
-    try {
-      await invoke('cancel_download', { variantId })
-    } catch (e) {
-      console.error('[models] cancelDownload error:', e)
-    }
+    await commands.cancelDownload(variantId)
     set((s) => {
       const d = { ...s.downloads }
       delete d[variantId]
@@ -81,56 +84,59 @@ export const useModelsStore = create<ModelsStore>((set, get) => ({
   },
 
   deleteModel: async (variantId) => {
-    try {
-      await invoke('delete_model', { variantId })
-      await get().loadVariants()
-    } catch (e) {
-      console.error('[models] deleteModel error:', e)
-      throw e
-    }
+    const result = await commands.deleteModel(variantId)
+    if (result.status === 'error') throw new Error(String(result.error))
+    await get().loadVariants()
   },
 
   setActive: async (variantId) => {
-    try {
-      await invoke('set_active_model', { variantId })
-      await get().loadVariants()
-    } catch (e) {
-      console.error('[models] setActive error:', e)
-      throw e
-    }
+    const result = await commands.setActiveModel(variantId)
+    if (result.status === 'error') throw new Error(String(result.error))
+    await get().loadVariants()
   },
 
   dismissRequiredDialog: () => set({ isRequiredDialogOpen: false }),
+  clearError: () => set({ lastError: null }),
 
   _setupListeners: () => {
-    // Tauri 事件系统在 macOS 开发模式下不可靠，改用轮询方案。
-    // 当有下载进行中时，每 2 秒刷新一次变体列表以检测下载完成状态。
+    // Tauri events unreliable on macOS dev — poll instead.
+    // When downloads are active: refresh variants + check for async errors every 2s.
     const pollTimer = setInterval(async () => {
       const { downloads } = get()
-      if (Object.keys(downloads).length === 0) return
+      const inProgress = Object.keys(downloads)
+      if (inProgress.length === 0) return
 
-      try {
-        const freshVariants = await invoke<ModelVariant[]>('list_model_variants')
-        const newDownloads = { ...get().downloads }
-        let anyCompleted = false
-        for (const v of freshVariants) {
-          if (newDownloads[v.variant_id] !== undefined && v.is_downloaded) {
-            delete newDownloads[v.variant_id]
-            anyCompleted = true
-          }
+      // Refresh variant list to detect completion
+      const variantsResult = await commands.listModelVariants()
+      if (variantsResult.status !== 'ok') return
+
+      const freshVariants = variantsResult.data
+      const newDownloads = { ...get().downloads }
+
+      for (const v of freshVariants) {
+        if (newDownloads[v.variant_id] !== undefined && v.is_downloaded) {
+          delete newDownloads[v.variant_id]
         }
-        if (anyCompleted) {
-          set({ variants: freshVariants, downloads: newDownloads })
-        } else {
-          set({ variants: freshVariants })
-        }
-      } catch (e) {
-        console.error('[models] poll error:', e)
       }
+
+      // Check for async download errors (pop-once semantics)
+      let lastError: string | null = null
+      for (const variantId of inProgress) {
+        if (newDownloads[variantId] === undefined) continue // already completed above
+        const errResult = await commands.getDownloadError(variantId)
+        if (errResult.status === 'ok' && errResult.data) {
+          delete newDownloads[variantId]
+          lastError = errResult.data
+        }
+      }
+
+      set({
+        variants: freshVariants,
+        downloads: newDownloads,
+        ...(lastError ? { lastError } : {}),
+      })
     }, 2000)
 
-    return () => {
-      clearInterval(pollTimer)
-    }
+    return () => clearInterval(pollTimer)
   },
 }))

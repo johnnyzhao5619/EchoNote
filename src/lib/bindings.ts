@@ -120,6 +120,18 @@ async setActiveModel(variantId: string) : Promise<Result<null, AppError>> {
 }
 },
 /**
+ * Poll and consume one download error (pop-once semantics). Frontend calls every 2s during download.
+ * Returns Some(error_message) if error exists, None if not.
+ */
+async getDownloadError(variantId: string) : Promise<Result<string | null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_download_error", { variantId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * 列出系统可用音频输入设备（前端设备下拉选择器数据源）
  */
 async listAudioDevices() : Promise<Result<AudioDevice[], AppError>> {
@@ -212,6 +224,50 @@ async listRecordings() : Promise<Result<RecordingItem[], AppError>> {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+/**
+ * 提交 LLM 任务，立即返回 task_id
+ */
+async submitLlmTask(request: LlmTaskRequest) : Promise<Result<string, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("submit_llm_task", { request }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 取消 LLM 任务
+ */
+async cancelLlmTask(taskId: string) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cancel_llm_task", { taskId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 查询 LLM 引擎状态
+ */
+async getLlmEngineStatus() : Promise<Result<LlmEngineStatus, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_llm_engine_status") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 查询某文档的 LLM 任务历史
+ */
+async listDocumentLlmTasks(documentId: string) : Promise<Result<LlmTaskRow[], AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_document_llm_tasks", { documentId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -296,6 +352,14 @@ default_llm_task: string;
 model_mirror: string }
 export type AppError = { kind: "Audio"; message: string } | { kind: "Transcription"; message: string } | { kind: "Llm"; message: string } | { kind: "Storage"; message: string } | { kind: "Io"; message: string } | { kind: "Model"; message: string } | { kind: "Workspace"; message: string } | { kind: "NotFound"; message: string } | { kind: "Validation"; message: string } | { kind: "ChannelClosed" }
 export type AudioDevice = { id: string; name: string; is_default: boolean; sample_rate: number; channels: number }
+export type LlmEngineStatus = { status: "not_loaded" } | { status: "loading"; model_id: string } | { status: "ready"; model_id: string; loaded_at: number } | { status: "error"; message: string }
+export type LlmTaskRequest = { document_id: string; task_type: LlmTaskType; 
+/**
+ * Optional role hint for get_best_text (e.g. "transcript")
+ */
+text_role_hint: string | null }
+export type LlmTaskRow = { id: string; document_id: string; task_type: string; status: string; result_text: string | null; error_msg: string | null; created_at: number; completed_at: number | null }
+export type LlmTaskType = { type: "summary" } | { type: "meeting_brief" } | { type: "translation"; data: { target_language: string } } | { type: "qa"; data: { question: string } }
 /**
  * 单个模型变体的完整状态（`list_model_variants` 返回值）
  */
