@@ -46,8 +46,7 @@ export function ModelRequiredDialog() {
   const missingVariants = variants.filter((v) => requiredMissing.includes(v.variant_id))
 
   return (
-    <Dialog open={isRequiredDialogOpen} onOpenChange={() => {}}>
-      {/* Prevent closing by clicking outside — must download to continue */}
+    <Dialog open={isRequiredDialogOpen} onOpenChange={(open) => { if (!open) dismissRequiredDialog(); }}>
       <DialogContent
         className="max-w-lg"
         onPointerDownOutside={(e) => e.preventDefault()}
@@ -118,6 +117,12 @@ export function ModelRequiredDialog() {
               {t('common.loading')}
             </p>
           )}
+        </div>
+
+        <div className="flex justify-end mt-4">
+          <Button variant="ghost" size="sm" onClick={dismissRequiredDialog}>
+            {t('common.later')}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
