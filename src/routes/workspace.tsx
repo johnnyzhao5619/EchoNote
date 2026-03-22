@@ -75,8 +75,7 @@ function WorkspacePage() {
 
   const handleCardClick = (item: RecordingItem) => {
     if (item.document_id) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (navigate as any)({ to: "/workspace/$documentId", params: { documentId: item.document_id } });
+      navigate({ to: "/workspace/$documentId", params: { documentId: item.document_id } });
     }
   };
 
