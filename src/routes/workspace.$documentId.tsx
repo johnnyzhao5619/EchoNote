@@ -3,7 +3,8 @@
 //   Header: source icon + inline-editable title + AI panel + delete
 //   Meta:   date · duration · folder breadcrumb
 //   Audio:  compact player (recording only)
-//   Body:   EditableAsset sections separated by <hr>
+//   Body:   Primary = transcript/document_text (full Obsidian edit/preview)
+//           AI tabs = 摘要 | 会议纪要 | 翻译  (only rendered when content exists)
 
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, useCallback, useRef } from "react";
@@ -25,7 +26,34 @@ export const Route = createFileRoute("/workspace/$documentId")({
   component: DocumentPage,
 });
 
-// Role display metadata — single source of truth for ordering and labels
+// ── Asset grouping ─────────────────────────────────────────────────────────
+
+/** Roles shown in the primary Obsidian-style editable area */
+const PRIMARY_ROLES = new Set(["transcript", "document_text"]);
+
+/** AI tab definitions — order matters for display */
+const AI_TABS = [
+  {
+    id: "summary",
+    label: "摘要",
+    roles: ["summary"],
+  },
+  {
+    id: "meeting",
+    label: "会议纪要",
+    roles: ["meeting_brief", "decisions", "action_items", "next_steps"],
+  },
+  {
+    id: "translation",
+    label: "翻译",
+    roles: ["translation"],
+  },
+] as const;
+
+type AiTabId = (typeof AI_TABS)[number]["id"];
+
+// ── Role display metadata ──────────────────────────────────────────────────
+
 const ROLE_META: Record<string, { label: string; order: number }> = {
   transcript:    { label: "转写原文",  order: 0 },
   document_text: { label: "文档正文",  order: 1 },
@@ -37,7 +65,8 @@ const ROLE_META: Record<string, { label: string; order: number }> = {
   next_steps:    { label: "下一步",    order: 7 },
 };
 
-// Search folderTree for the folder that contains this document
+// ── Helpers ────────────────────────────────────────────────────────────────
+
 function findFolderName(
   tree: ReturnType<typeof useWorkspaceStore.getState>["folderTree"],
   documentId: string
@@ -49,6 +78,8 @@ function findFolderName(
   }
   return null;
 }
+
+// ── DocumentPage ──────────────────────────────────────────────────────────
 
 function DocumentPage() {
   const { documentId } = Route.useParams();
@@ -70,8 +101,10 @@ function DocumentPage() {
 
   // EditableAsset refs (keyed by role) for insert-at-cursor
   const assetRefs = useRef<Map<string, EditableAssetHandle>>(new Map());
-  // Track which asset is currently in edit mode (for insert-at-cursor target)
   const lastFocusedRoleRef = useRef<string | null>(null);
+
+  // Active AI tab
+  const [activeAiTab, setActiveAiTab] = useState<AiTabId | null>(null);
 
   const folderName = findFolderName(folderTree, documentId);
 
@@ -125,6 +158,38 @@ function DocumentPage() {
     return () => clearInterval(timer);
   }, [documentId, sortAssets]);
 
+  // ── Derived groupings ────────────────────────────────────────────────────
+
+  const primaryAssets = assets.filter((a) => PRIMARY_ROLES.has(a.role));
+  const aiAssets = assets.filter((a) => !PRIMARY_ROLES.has(a.role));
+
+  // Only show tabs that have at least one matching asset
+  const visibleTabs = AI_TABS.filter((tab) =>
+    tab.roles.some((role) => aiAssets.some((a) => a.role === role))
+  );
+
+  // Auto-select first available tab when AI content arrives
+  useEffect(() => {
+    if (visibleTabs.length > 0 && !activeAiTab) {
+      setActiveAiTab(visibleTabs[0].id);
+    }
+    // If active tab's content was removed, reset to first
+    if (
+      activeAiTab &&
+      !visibleTabs.some((t) => t.id === activeAiTab) &&
+      visibleTabs.length > 0
+    ) {
+      setActiveAiTab(visibleTabs[0].id);
+    }
+  }, [visibleTabs.length, activeAiTab]);
+
+  const activeTabDef = AI_TABS.find((t) => t.id === activeAiTab);
+  const activeTabAssets = activeTabDef
+    ? activeTabDef.roles.flatMap((role) => aiAssets.filter((a) => a.role === role))
+    : [];
+
+  // ── Title handlers ────────────────────────────────────────────────────────
+
   const handleTitleBlur = useCallback(async () => {
     setTitleEditing(false);
     const trimmed = titleValue.trim();
@@ -172,7 +237,6 @@ function DocumentPage() {
               if (e.key === "Enter") titleInputRef.current?.blur();
               if (e.key === "Escape") {
                 setTitleEditing(false);
-                // Restore original value
                 const orig =
                   folderTree
                     .flatMap((n) => [...n.documents, ...n.children.flatMap((c) => c.documents)])
@@ -225,7 +289,7 @@ function DocumentPage() {
           <AiPanel
             documentId={documentId}
             onInsertAtCursor={(text) => {
-              const role = lastFocusedRoleRef.current ?? assets[0]?.role;
+              const role = lastFocusedRoleRef.current ?? primaryAssets[0]?.role;
               if (role) assetRefs.current.get(role)?.insertAtCursor(text);
             }}
           />
@@ -260,7 +324,7 @@ function DocumentPage() {
           )}
         </div>
 
-        {/* Compact audio player — hidden in subtitle mode (SubtitleEditor has its own) */}
+        {/* Compact audio player — hidden in subtitle mode */}
         {recording?.file_path && mode === "document" && (
           <AudioPlayer
             key={recording.file_path}
@@ -279,38 +343,94 @@ function DocumentPage() {
         />
       )}
 
-      {/* ── Document mode content sections ─────────────────────── */}
+      {/* ── Document mode ─────────────────────────────────────────── */}
       {mode === "document" && (
-      <div className="flex-1 px-6 py-4 flex flex-col overflow-y-auto">
-        {assets.length === 0 ? (
-          <p className="text-sm text-text-muted">
-            暂无内容。录音结束后转写内容会自动显示，或点击上方 AI 工具生成摘要。
-          </p>
-        ) : (
-          assets.map((asset, idx) => {
-            const meta = ROLE_META[asset.role] ?? { label: asset.role, order: 99 };
-            return (
-              <div key={asset.id}>
-                {idx > 0 && <hr className="border-border-default my-3" />}
-                <EditableAsset
-                  ref={(h) => {
-                    if (h) assetRefs.current.set(asset.role, h);
-                    else assetRefs.current.delete(asset.role);
-                  }}
-                  documentId={documentId}
-                  role={asset.role}
-                  label={meta.label}
-                  initialContent={asset.content}
-                  onSaved={loadData}
-                  onFocusChange={(focused) => {
-                    if (focused) lastFocusedRoleRef.current = asset.role;
-                  }}
-                />
+        <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+
+          {/* Primary content: transcript / document_text (Obsidian-style main area) */}
+          <div className="flex-1 overflow-y-auto min-h-0 px-6 py-4">
+            {primaryAssets.length === 0 ? (
+              <p className="text-sm text-text-muted">
+                暂无内容。录音结束后转写内容会自动显示，或点击上方 AI 工具生成摘要。
+              </p>
+            ) : (
+              primaryAssets.map((asset) => {
+                const meta = ROLE_META[asset.role] ?? { label: asset.role, order: 99 };
+                return (
+                  <EditableAsset
+                    key={asset.id}
+                    ref={(h) => {
+                      if (h) assetRefs.current.set(asset.role, h);
+                      else assetRefs.current.delete(asset.role);
+                    }}
+                    documentId={documentId}
+                    role={asset.role}
+                    label={meta.label}
+                    initialContent={asset.content}
+                    onSaved={loadData}
+                    onFocusChange={(focused) => {
+                      if (focused) lastFocusedRoleRef.current = asset.role;
+                    }}
+                  />
+                );
+              })
+            )}
+          </div>
+
+          {/* AI tabs panel — only shown when AI-generated content exists */}
+          {visibleTabs.length > 0 && (
+            <div className="shrink-0 flex flex-col border-t border-border-default" style={{ maxHeight: "45%" }}>
+
+              {/* Tab bar */}
+              <div className="shrink-0 flex items-center border-b border-border-default bg-bg-secondary px-2">
+                {visibleTabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveAiTab(tab.id)}
+                    className={[
+                      "px-3 py-2 text-xs font-medium transition-colors border-b-2 -mb-px",
+                      activeAiTab === tab.id
+                        ? "border-accent-primary text-accent-primary"
+                        : "border-transparent text-text-muted hover:text-text-primary",
+                    ].join(" ")}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
               </div>
-            );
-          })
-        )}
-      </div>
+
+              {/* Tab content */}
+              <div className="flex-1 overflow-y-auto min-h-0 px-6 py-3">
+                {activeTabAssets.length === 0 ? (
+                  <p className="text-sm text-text-muted py-4 text-center">暂无内容</p>
+                ) : (
+                  activeTabAssets.map((asset, idx) => {
+                    const meta = ROLE_META[asset.role] ?? { label: asset.role, order: 99 };
+                    return (
+                      <div key={asset.id}>
+                        {idx > 0 && <hr className="border-border-default my-3" />}
+                        <EditableAsset
+                          ref={(h) => {
+                            if (h) assetRefs.current.set(asset.role, h);
+                            else assetRefs.current.delete(asset.role);
+                          }}
+                          documentId={documentId}
+                          role={asset.role}
+                          label={meta.label}
+                          initialContent={asset.content}
+                          onSaved={loadData}
+                          onFocusChange={(focused) => {
+                            if (focused) lastFocusedRoleRef.current = asset.role;
+                          }}
+                        />
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {/* ── Delete confirmation ──────────────────────────────────── */}
