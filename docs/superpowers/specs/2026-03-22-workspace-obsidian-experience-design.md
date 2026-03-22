@@ -308,6 +308,7 @@ interface WorkspaceStore {
   deleteFolder: (folderId: string) => Promise<void>;
   moveDocument: (documentId: string, folderId: string) => Promise<void>;
   renameDocument: (documentId: string, title: string) => Promise<void>;
+  deleteDocument: (documentId: string) => Promise<void>;
 }
 ```
 
