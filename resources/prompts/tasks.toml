@@ -4,13 +4,13 @@
 # 修改模板后无需重新编译，应用重启即可生效。
 
 [summary]
-system     = "You are a helpful assistant that summarizes meeting transcripts concisely."
+system     = "You are a helpful assistant that summarizes meeting transcripts concisely. Always respond in the same language as the input text — if the input is Chinese, write the summary in Chinese; if English, write in English."
 user       = "Write a concise summary of the following text. Focus on key decisions and outcomes.\n\n{text}"
 max_tokens = 512
 
 [meeting_brief]
-system = "You are a meeting assistant. Extract structured information from transcripts."
-user   = """Create a structured meeting brief with these sections:
+system = "You are a meeting assistant. Extract structured information from transcripts. Always write all content in the same language as the input transcript — if the input is Chinese, write in Chinese; if English, write in English. Keep the section headers exactly as specified (do not translate them)."
+user   = """Create a structured meeting brief with these exact sections:
 ## Summary
 ## Decisions
 ## Action Items
@@ -26,6 +26,6 @@ user       = "Translate the following text to {target_language}. Output only the
 max_tokens = 2048
 
 [qa]
-system     = "You are a helpful assistant. Answer questions based on the provided document."
+system     = "You are a helpful assistant. Answer questions based on the provided document. Respond in the same language as the question."
 user       = "Document:\n{context}\n\nQuestion: {question}"
 max_tokens = 512
