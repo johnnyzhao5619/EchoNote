@@ -226,6 +226,17 @@ async listRecordings() : Promise<Result<RecordingItem[], AppError>> {
 }
 },
 /**
+ * Get all text assets for a document, ordered by role priority
+ */
+async getDocumentAssets(documentId: string) : Promise<Result<DocumentAsset[], AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_document_assets", { documentId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * 提交 LLM 任务，立即返回 task_id
  */
 async submitLlmTask(request: LlmTaskRequest) : Promise<Result<string, AppError>> {
@@ -352,6 +363,10 @@ default_llm_task: string;
 model_mirror: string }
 export type AppError = { kind: "Audio"; message: string } | { kind: "Transcription"; message: string } | { kind: "Llm"; message: string } | { kind: "Storage"; message: string } | { kind: "Io"; message: string } | { kind: "Model"; message: string } | { kind: "Workspace"; message: string } | { kind: "NotFound"; message: string } | { kind: "Validation"; message: string } | { kind: "ChannelClosed" }
 export type AudioDevice = { id: string; name: string; is_default: boolean; sample_rate: number; channels: number }
+/**
+ * Single document text asset (transcript, summary, meeting_brief, etc.)
+ */
+export type DocumentAsset = { id: string; document_id: string; role: string; content: string; created_at: number; updated_at: number }
 export type LlmEngineStatus = { status: "not_loaded" } | { status: "loading"; model_id: string } | { status: "ready"; model_id: string; loaded_at: number } | { status: "error"; message: string }
 export type LlmTaskRequest = { document_id: string; task_type: LlmTaskType; 
 /**
@@ -401,11 +416,15 @@ export type RealtimeConfig = { device_id: string | null; language: string | null
 /**
  * 单条录音摘要（用于 Workspace 列表）
  */
-export type RecordingItem = { id: string; title: string; file_path: string; duration_ms: number; language: string; created_at: number; 
+export type RecordingItem = { id: string; title: string; file_path: string; duration_ms: number; language: string; created_at: number;
 /**
  * 转写全文拼接（来自 workspace_text_assets.content），无则空串
  */
-transcript: string }
+transcript: string;
+/**
+ * workspace_documents.id for this recording (None if not yet indexed)
+ */
+document_id: string | null }
 export type RecordingMode = "record_only" | "transcribe_only" | { transcribe_and_translate: { target_language: string } }
 export type RecordingStatus = { status: "idle" } | { status: "recording"; session_id: string; started_at: number } | { status: "paused"; session_id: string } | { status: "stopped"; session_id: string; recording_id: string }
 export type SegmentPayload = { id: number; recording_session_id: string; start_ms: number; end_ms: number; text: string; language: string; is_partial: boolean }

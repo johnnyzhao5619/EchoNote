@@ -43,6 +43,7 @@ fn specta_builder() -> Builder {
             transcription_cmds::get_realtime_segments,
             transcription_cmds::get_recording_status,
             workspace_cmds::list_recordings,
+            workspace_cmds::get_document_assets,
             llm_cmds::submit_llm_task,
             llm_cmds::cancel_llm_task,
             llm_cmds::get_llm_engine_status,
