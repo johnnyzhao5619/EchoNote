@@ -108,8 +108,8 @@ export const useRecordingStore = create<RecordingStore>((set, get) => ({
       } catch {
         // ignore poll errors
       }
-      // 每 3 次（300ms）轮询一次 segments
-      if (tickCount % 3 === 0 && currentSession) {
+      // 每 2 次（200ms）轮询一次 segments
+      if (tickCount % 2 === 0 && currentSession) {
         try {
           const r = await commands.getRealtimeSegments(currentSession)
           if (r.status === 'ok' && r.data.length > 0) {
