@@ -14,6 +14,7 @@
 2. Markdown 读写双模式编辑器（预览 / 编辑切换）
 3. Obsidian 风格文档页布局（内联标题编辑、紧凑播放条、元信息一行）
 4. 文档级 AI 悬浮面板 + 选中文字内联工具条
+5. 字幕模式：逐段时间轴编辑器，支持原文 + 翻译对齐，导出 SRT / VTT / LRC
 
 ---
 
@@ -21,28 +22,36 @@
 
 ```
 Workspace 路由
-├── WorkspaceFileTree.tsx      ← 左侧文件夹树（完全重写）
+├── WorkspaceFileTree.tsx         ← 左侧文件夹树（完全重写）
 │   ├── FolderNode（递归）
 │   └── 右键 ContextMenu
 └── 文档页 /workspace/$documentId
-    ├── 文档头部
+    ├── 文档头部（[📄 文档] [🎬 字幕] 模式切换）
     │   ├── 内联标题 input
     │   ├── 元信息行（日期 · 时长 · 所属文件夹）
-    │   ├── AiPanel.tsx（悬浮 Popover）         ← 新增
+    │   ├── AiPanel.tsx（悬浮 Popover）          ← 新增
     │   └── 紧凑 AudioPlayer
-    └── 内容区
-        ├── EditableAsset.tsx（双模式改造）
-        └── AiInlineToolbar.tsx（选中工具条）    ← 新增
+    ├── 文档模式（默认）
+    │   ├── EditableAsset.tsx（双模式改造）
+    │   └── AiInlineToolbar.tsx（选中工具条）     ← 新增
+    └── 字幕模式
+        └── SubtitleEditor.tsx                   ← 新增
+            ├── 固定播放条（带段落跳转）
+            ├── 工具栏（语言切换 + 导出按钮）
+            └── SegmentTable（逐行时间编辑）
 ```
 
 **后端新增文件：**
 - `src-tauri/src/commands/workspace.rs`（已存在，需扩充）
+- `src-tauri/src/commands/subtitle.rs`（新增，字幕命令）
+- `src-tauri/src/storage/migrations/0002_segment_translations.sql`（新增 migration）
 
 **前端新增 / 改造文件：**
 - `src/components/workspace/WorkspaceFileTree.tsx`（完全重写）
 - `src/components/workspace/EditableAsset.tsx`（双模式改造）
 - `src/components/workspace/AiPanel.tsx`（新增）
 - `src/components/workspace/AiInlineToolbar.tsx`（新增）
+- `src/components/workspace/SubtitleEditor.tsx`（新增）
 
 ---
 
@@ -683,10 +692,329 @@ const getToolbarPosition = (el: HTMLTextAreaElement) => {
 | Task 1 | 后端：系统文件夹 + CRUD 命令（含 `delete_document`）+ `list_folders_with_documents` + 修改 `ensure_document_for_recording` | 无 |
 | Task 2 | 前端：`WorkspaceFileTree` 重写（文件夹树 + 右键菜单）| Task 1（需要后端命令） |
 | Task 3 | 前端：`EditableAsset` Markdown 双模式（安装 `react-markdown`）| 无（**可与 Task 2 并行**） |
-| Task 4 | 前端：文档页布局重构（Obsidian 风格头部、内联标题编辑）| Task 1（需要 `rename_document`）、Task 3 |
+| Task 4 | 前端：文档页布局重构（Obsidian 风格头部、内联标题编辑、模式切换按钮）| Task 1（需要 `rename_document`）、Task 3 |
 | Task 5 | 前端：`AiPanel` + `AiInlineToolbar` | Task 3（需要 `insertAtCursor` ref）、Task 4（头部按钮） |
+| Task 6 | 后端：字幕命令（migration + `get_segments_with_translations` + `update_segment_timing` + `update_segment_translation` + `align_translation_to_segments` + `export_subtitle`）| Task 1（需要 AppState/DB 模式） |
+| Task 7 | 前端：`SubtitleEditor.tsx`（字幕模式整页，逐段编辑 + 播放同步 + 导出）| Task 4（模式切换入口）、Task 6（后端命令） |
 
-**并行建议：** Task 1 完成后，Task 2 和 Task 3 可同时开发，互不依赖。
+**并行建议：**
+- Task 1 完成后，Task 2、Task 3、Task 6 可同时开发（三者互不依赖）
+- Task 7 依赖 Task 4 和 Task 6，需最后实现
+
+---
+
+## Task 6：后端 — 字幕系统
+
+### 6.1 数据库 Migration
+
+新建文件：`src-tauri/src/storage/migrations/0002_segment_translations.sql`
+
+```sql
+CREATE TABLE segment_translations (
+    id          TEXT PRIMARY KEY,
+    segment_id  TEXT NOT NULL REFERENCES transcription_segments(id) ON DELETE CASCADE,
+    language    TEXT NOT NULL,    -- 语言代码：'en' | 'ja' | 'ko' | 'fr' | 'de' | 'es' | 'ru'
+    text        TEXT NOT NULL,
+    created_at  INTEGER NOT NULL,
+    UNIQUE(segment_id, language)  -- 每段每语言一条记录
+);
+CREATE INDEX idx_seg_translations ON segment_translations(segment_id, language);
+```
+
+> **Migration 集成：** 检查现有 `src-tauri/src/storage/` 目录中 migration 的执行方式（`sqlx::migrate!` 宏），按照同样模式添加新文件。
+
+### 6.2 Rust 类型定义
+
+新建文件：`src-tauri/src/commands/subtitle.rs`
+
+```rust
+use serde::{Deserialize, Serialize};
+use specta::Type;
+use tauri::State;
+use crate::error::AppError;
+use crate::state::AppState;
+
+/// 一个转写段落及其翻译
+#[derive(Debug, Serialize, Deserialize, Clone, Type)]
+pub struct SegmentRow {
+    pub id: String,
+    pub recording_id: String,
+    pub start_ms: i64,
+    pub end_ms: i64,
+    pub text: String,           // 原文
+    pub translated_text: Option<String>,  // 指定语言的译文（无则 None）
+}
+
+/// 字幕导出格式
+#[derive(Debug, Serialize, Deserialize, Clone, Type)]
+pub enum SubtitleFormat {
+    Srt,
+    Vtt,
+    Lrc,
+}
+
+/// 字幕内容语言
+#[derive(Debug, Serialize, Deserialize, Clone, Type)]
+pub enum SubtitleLanguage {
+    Original,                   // 原文
+    Translation(String),        // 翻译，值为语言代码如 "en"
+}
+```
+
+### 6.3 新增命令
+
+**`get_segments_with_translations`**
+
+```rust
+#[tauri::command]
+#[specta::specta]
+pub async fn get_segments_with_translations(
+    recording_id: String,
+    language: Option<String>,   // None = 只返回原文
+    state: State<'_, AppState>,
+) -> Result<Vec<SegmentRow>, AppError>
+```
+
+- 查询 `transcription_segments` 按 `start_ms` 排序
+- 若 `language` 有值，LEFT JOIN `segment_translations` 填入 `translated_text`
+- 返回完整段落列表
+
+**`update_segment_timing`**
+
+```rust
+#[tauri::command]
+#[specta::specta]
+pub async fn update_segment_timing(
+    segment_id: String,
+    start_ms: i64,
+    end_ms: i64,
+    state: State<'_, AppState>,
+) -> Result<(), AppError>
+```
+
+- 校验 `start_ms < end_ms`，否则返回 `AppError::Validation`
+- 更新 `transcription_segments`
+
+**`update_segment_translation`**
+
+```rust
+#[tauri::command]
+#[specta::specta]
+pub async fn update_segment_translation(
+    segment_id: String,
+    language: String,
+    text: String,
+    state: State<'_, AppState>,
+) -> Result<(), AppError>
+```
+
+- UPSERT `segment_translations(segment_id, language)` → `text`
+
+**`align_translation_to_segments`**
+
+```rust
+#[tauri::command]
+#[specta::specta]
+pub async fn align_translation_to_segments(
+    document_id: String,
+    language: String,           // 语言代码，如 "en"
+    state: State<'_, AppState>,
+) -> Result<(), AppError>
+```
+
+对齐算法（方案 C — 比例映射）：
+
+1. 查询 `workspace_documents.recording_id`，获取对应 `recording_id`
+2. 查询 `transcription_segments WHERE recording_id = ?` 按 `start_ms` 排序，得 N 段
+3. 查询 `workspace_text_assets WHERE document_id = ? AND role = 'translation'` 的 `content`
+4. 将 content 按句子分割（正则 `[。.!?！？\n]+` 为分隔符），过滤空串，得 M 句
+5. 比例映射：`segment[i] → translated_sentences[min(round(i * M / N), M-1)]`
+6. 批量 UPSERT 到 `segment_translations`
+
+> 此命令在 LLM 翻译任务完成后由前端主动调用（或在 `AiPanel` 翻译完成回调中触发）。
+
+**`export_subtitle`**
+
+```rust
+#[tauri::command]
+#[specta::specta]
+pub async fn export_subtitle(
+    recording_id: String,
+    format: SubtitleFormat,
+    language: SubtitleLanguage,
+    state: State<'_, AppState>,
+) -> Result<String, AppError>   // 返回导出文件的绝对路径
+```
+
+- 查询段落列表（原文 or 译文）
+- 按格式生成内容字符串
+- 写到 `{recordings_path}/{recording_title}.{ext}`（ext = srt/vtt/lrc）
+- 若文件已存在则覆盖
+- 返回写入路径（前端可用 Tauri 打开文件对话框或通知用户）
+
+**SRT 格式示例：**
+```
+1
+00:00:00,000 --> 00:00:03,200
+你好，今天我们来讨论
+
+2
+00:00:03,210 --> 00:00:05,800
+关于这个项目的进展
+```
+
+**VTT 格式示例：**
+```
+WEBVTT
+
+00:00:00.000 --> 00:00:03.200
+你好，今天我们来讨论
+```
+
+**LRC 格式示例：**
+```
+[00:00.00]你好，今天我们来讨论
+[00:03.21]关于这个项目的进展
+```
+
+### 6.4 注册到 `lib.rs`
+
+```rust
+subtitle_cmds::get_segments_with_translations,
+subtitle_cmds::update_segment_timing,
+subtitle_cmds::update_segment_translation,
+subtitle_cmds::align_translation_to_segments,
+subtitle_cmds::export_subtitle,
+```
+
+并在 `src-tauri/src/commands/mod.rs` 中声明 `pub mod subtitle;`。
+
+---
+
+## Task 7：前端 — SubtitleEditor 字幕模式
+
+### 7.1 模式切换集成（修改 `workspace.$documentId.tsx`）
+
+在文档页头部增加模式切换按钮：
+
+```tsx
+type DocMode = 'document' | 'subtitle';
+const [mode, setMode] = useState<DocMode>('document');
+
+// 头部按钮
+<button onClick={() => setMode('document')} className={mode === 'document' ? 'active' : ''}>
+  📄 文档
+</button>
+<button onClick={() => setMode('subtitle')} className={mode === 'subtitle' ? 'active' : ''}>
+  🎬 字幕
+</button>
+
+// 内容区
+{mode === 'document' ? <DocumentContent ... /> : <SubtitleEditor recordingId={recording.id} audioSrc={audioSrc} />}
+```
+
+字幕模式下隐藏 `EditableAsset` 列表，整页渲染 `SubtitleEditor`。
+
+### 7.2 SubtitleEditor.tsx
+
+**文件：** `src/components/workspace/SubtitleEditor.tsx`
+
+**Props：**
+```ts
+interface SubtitleEditorProps {
+  recordingId: string;
+  filePath: string;       // WAV 路径，传给 AudioPlayer
+  durationMs: number;
+}
+```
+
+**State：**
+```ts
+const [segments, setSegments] = useState<SegmentRow[]>([]);
+const [language, setLanguage] = useState<string | null>(null);  // null = 仅原文
+const [currentSegmentId, setCurrentSegmentId] = useState<string | null>(null);
+const audioRef = useRef<HTMLAudioElement>(null);
+```
+
+**Layout：**
+
+```
+┌────────────────────────────────────────────────────────────┐
+│ ▶ 0:00 ──────────────────────────────────────── 27:13      │  ← 固定播放条
+├────────────────────────────────────────────────────────────┤
+│ [语言: 原文 ▾]  [翻译列: 英文 ▾]  [SRT ↓] [VTT ↓] [LRC ↓]│  ← 工具栏
+├────┬──────────┬──────────┬──────────────────┬──────────────┤
+│ #  │ 开始     │ 结束     │ 原文             │ 英文译文      │
+├────┼──────────┼──────────┼──────────────────┼──────────────┤
+│ ▶1 │[0:00.00] │[0:03.20] │[可编辑 input]    │[可编辑 input]│  ← 高亮行
+│  2 │[0:03.21] │[0:05.80] │...               │...            │
+└────┴──────────┴──────────┴──────────────────┴──────────────┘
+```
+
+**播放同步逻辑：**
+
+```ts
+// 挂载在 <audio> 的 onTimeUpdate
+const handleTimeUpdate = () => {
+  const currentMs = (audioRef.current?.currentTime ?? 0) * 1000;
+  const active = segments.find(s => s.start_ms <= currentMs && currentMs <= s.end_ms);
+  setCurrentSegmentId(active?.id ?? null);
+  // 自动滚动到当前行（rowRef[active.id].scrollIntoView({ block: 'nearest' })）
+};
+```
+
+**时间格编辑：**
+
+```tsx
+// 时间 input 格式：mm:ss.ss
+// 失焦时解析并调用 update_segment_timing
+const parseTime = (s: string): number => {
+  const [m, rest] = s.split(':');
+  return (parseInt(m) * 60 + parseFloat(rest)) * 1000;
+};
+const formatTime = (ms: number): string => {
+  const total = ms / 1000;
+  const m = Math.floor(total / 60);
+  const s = (total % 60).toFixed(2).padStart(5, '0');
+  return `${m}:${s}`;
+};
+```
+
+**点击行跳转：**
+```ts
+// 点击行号列或高亮区域 → 音频跳转
+audioRef.current.currentTime = segment.start_ms / 1000;
+```
+
+**导出按钮：**
+```ts
+const handleExport = async (format: 'srt' | 'vtt' | 'lrc') => {
+  const lang = language
+    ? { type: 'Translation', data: language }
+    : { type: 'Original' };
+  const result = await commands.exportSubtitle(recordingId, format, lang);
+  if (result.status === 'ok') {
+    // 提示用户文件路径（toast 通知）
+  }
+};
+```
+
+**翻译列加载：**
+
+```ts
+// 切换 language 时重新拉取段落
+useEffect(() => {
+  commands.getSegmentsWithTranslations(recordingId, language ?? undefined)
+    .then(r => { if (r.status === 'ok') setSegments(r.data); });
+}, [recordingId, language]);
+```
+
+**翻译对齐触发（在 AiPanel 翻译完成后）：**
+
+`AiPanel` 中检测翻译任务完成后，调用：
+```ts
+await commands.alignTranslationToSegments(documentId, targetLanguage);
+```
 
 ---
 
