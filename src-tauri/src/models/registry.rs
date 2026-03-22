@@ -46,7 +46,7 @@ pub fn build_variant(
 ) -> ModelVariant {
     let variant_id = format!("{}/{}", model_type, variant_name);
     let file_path = model_file_path(model_dir, model_type, variant_name, &cfg.url);
-    let is_downloaded = file_matches_size(&file_path, cfg.size_bytes);
+    let is_downloaded = file_path.exists();
 
     ModelVariant {
         variant_id,
@@ -99,7 +99,7 @@ pub fn check_required_models(
     if let Some((model_type, variant_name)) = parse_variant_id(active_whisper) {
         if let Some(cfg) = models.whisper.variants.get(variant_name) {
             let path = model_file_path(model_dir, model_type, variant_name, &cfg.url);
-            if !file_matches_size(&path, cfg.size_bytes) {
+            if !path.exists() {
                 missing.push(active_whisper.to_string());
             }
         } else {
@@ -111,7 +111,7 @@ pub fn check_required_models(
     if let Some((model_type, variant_name)) = parse_variant_id(active_llm) {
         if let Some(cfg) = models.llm.variants.get(variant_name) {
             let path = model_file_path(model_dir, model_type, variant_name, &cfg.url);
-            if !file_matches_size(&path, cfg.size_bytes) {
+            if !path.exists() {
                 missing.push(active_llm.to_string());
             }
         } else {

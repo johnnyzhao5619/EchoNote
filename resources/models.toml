@@ -26,7 +26,7 @@ description = "精度更高，需要约 1GB RAM"
 
 [whisper.variants.medium]
 url         = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin"
-sha256      = "FILL_IN_BEFORE_RELEASE_64_HEX_CHARS_REQUIRED"
+sha256      = "6c14d5adee5f86394037b4e4e8b59f1673b6cee10e3cf0b11bbdbee79c156208"
 size_bytes  = 1528006144
 description = "高精度，需要约 3GB RAM"
 
@@ -35,12 +35,12 @@ default_variant = "qwen2.5-3b-q4"
 
 [llm.variants."qwen2.5-3b-q4"]
 url         = "https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q4_k_m.gguf"
-sha256      = "FILL_IN_BEFORE_RELEASE_64_HEX_CHARS_REQUIRED"
-size_bytes  = 1890000000
+sha256      = "626b4a6678b86442240e33df819e00132d3ba7dddfe1cdc4fbb18e0a9615c62d"
+size_bytes  = 2257051648
 description = "轻量模型，适合低配设备，需要约 2GB RAM"
 
 [llm.variants."qwen2.5-7b-q4"]
-url         = "https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF/resolve/main/qwen2.5-7b-instruct-q4_k_m.gguf"
-sha256      = "FILL_IN_BEFORE_RELEASE_64_HEX_CHARS_REQUIRED"
-size_bytes  = 4370000000
+url         = "https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF/resolve/main/Qwen2.5-7B-Instruct-Q4_K_M.gguf"
+sha256      = "65b8fcd92af6b4fefa935c625d1ac27ea29dcb6ee14589c55a8f115ceaaa1423"
+size_bytes  = 5027749888
 description = "推荐模型，效果好，需要约 5GB RAM"
