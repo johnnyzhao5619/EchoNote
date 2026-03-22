@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2, X, FileText, Users, Languages } from "lucide-react";
-import { invoke } from "@tauri-apps/api/core";
+import { commands } from "@/lib/bindings";
 import { useLlmStore } from "@/store/llm";
 import { StreamingText } from "@/components/ui/StreamingText";
 
@@ -33,18 +33,18 @@ export function AiTaskBar({
     try {
       const taskType =
         kind === "translation"
-          ? { Translation: { target_language: targetLanguage } }
+          ? ({ type: "translation", data: { target_language: targetLanguage } } as const)
           : kind === "meeting_brief"
-            ? { MeetingBrief: null }
-            : { Summary: null };
+            ? ({ type: "meeting_brief" } as const)
+            : ({ type: "summary" } as const);
 
-      const taskId = await invoke<string>("submit_llm_task", {
-        request: {
-          document_id: documentId,
-          task_type: taskType,
-          text_role_hint: null,
-        },
+      const result = await commands.submitLlmTask({
+        document_id: documentId,
+        task_type: taskType,
+        text_role_hint: null,
       });
+      if (result.status === "error") throw new Error(String(result.error));
+      const taskId = result.data;
 
       initTask(taskId, documentId);
       setActiveTaskId(taskId);
@@ -56,7 +56,8 @@ export function AiTaskBar({
   const handleCancel = async () => {
     if (!activeTaskId) return;
     try {
-      await invoke("cancel_llm_task", { taskId: activeTaskId });
+      const result = await commands.cancelLlmTask(activeTaskId);
+      if (result.status === "error") throw new Error(String(result.error));
     } catch (err) {
       console.error("[AiTaskBar] cancel error:", err);
     }
