@@ -1,9 +1,8 @@
 // src/routes/workspace.$documentId.tsx
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, useCallback } from "react";
 import { commands } from "@/lib/bindings";
 import type { DocumentAsset, RecordingItem } from "@/lib/bindings";
-import { useShellStore } from "@/store/shell";
 import { formatDuration, formatDate } from "@/lib/format";
 import { AiTaskBar } from "@/components/workspace/AiTaskBar";
 import { Mic, Clock, ChevronDown, ChevronRight } from "lucide-react";
@@ -51,54 +50,8 @@ function AssetSection({ asset }: { asset: DocumentAsset }) {
   );
 }
 
-/** Sidebar: list of recordings for navigation */
-function WorkspaceSidebar({
-  currentDocumentId,
-}: {
-  currentDocumentId: string;
-}) {
-  const navigate = useNavigate();
-  const [recordings, setRecordings] = useState<RecordingItem[]>([]);
-
-  useEffect(() => {
-    commands.listRecordings().then((r) => {
-      if (r.status === "ok") setRecordings(r.data);
-    });
-  }, []);
-
-  return (
-    <div className="flex flex-col h-full overflow-y-auto p-2 gap-1">
-      <p className="px-2 py-1 text-xs font-semibold text-text-secondary uppercase tracking-wide">
-        Recordings
-      </p>
-      {recordings.map((item) => (
-        <button
-          key={item.id}
-          className={[
-            "w-full text-left px-2 py-1.5 rounded text-sm truncate transition-colors",
-            item.document_id === currentDocumentId
-              ? "bg-accent-primary/15 text-accent-primary"
-              : "text-text-primary hover:bg-bg-tertiary",
-          ].join(" ")}
-          onClick={() => {
-            if (item.document_id && item.document_id !== currentDocumentId) {
-              navigate({
-                to: "/workspace/$documentId",
-                params: { documentId: item.document_id },
-              });
-            }
-          }}
-        >
-          {item.title}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 function DocumentPage() {
   const { documentId } = Route.useParams();
-  const { setSecondPanelContent } = useShellStore();
   const [assets, setAssets] = useState<DocumentAsset[]>([]);
   const [recording, setRecording] = useState<RecordingItem | null>(null);
   const [loading, setLoading] = useState(true);
@@ -131,14 +84,6 @@ function DocumentPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
-
-  // Inject sidebar into SecondPanel; clean up on unmount
-  useEffect(() => {
-    setSecondPanelContent(
-      <WorkspaceSidebar currentDocumentId={documentId} />
-    );
-    return () => setSecondPanelContent(null);
-  }, [documentId, setSecondPanelContent]);
 
   // Poll for new assets after AI tasks complete
   useEffect(() => {

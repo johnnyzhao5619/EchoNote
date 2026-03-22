@@ -15,6 +15,7 @@ import { Route as TimelineRouteImport } from './routes/timeline'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as RecordingRouteImport } from './routes/recording'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as WorkspaceIndexRouteImport } from './routes/workspace.index'
 import { Route as SettingsIndexRouteImport } from './routes/settings.index'
 import { Route as WorkspaceDocumentIdRouteImport } from './routes/workspace.$documentId'
 import { Route as SettingsThemeRouteImport } from './routes/settings.theme'
@@ -50,6 +51,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const WorkspaceIndexRoute = WorkspaceIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => WorkspaceRoute,
+} as any)
 const SettingsIndexRoute = SettingsIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -82,17 +88,18 @@ export interface FileRoutesByFullPath {
   '/settings/theme': typeof SettingsThemeRoute
   '/workspace/$documentId': typeof WorkspaceDocumentIdRoute
   '/settings/': typeof SettingsIndexRoute
+  '/workspace/': typeof WorkspaceIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/recording': typeof RecordingRoute
   '/timeline': typeof TimelineRoute
   '/transcription': typeof TranscriptionRoute
-  '/workspace': typeof WorkspaceRouteWithChildren
   '/settings/models': typeof SettingsModelsRoute
   '/settings/theme': typeof SettingsThemeRoute
   '/workspace/$documentId': typeof WorkspaceDocumentIdRoute
   '/settings': typeof SettingsIndexRoute
+  '/workspace': typeof WorkspaceIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -106,6 +113,7 @@ export interface FileRoutesById {
   '/settings/theme': typeof SettingsThemeRoute
   '/workspace/$documentId': typeof WorkspaceDocumentIdRoute
   '/settings/': typeof SettingsIndexRoute
+  '/workspace/': typeof WorkspaceIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -120,17 +128,18 @@ export interface FileRouteTypes {
     | '/settings/theme'
     | '/workspace/$documentId'
     | '/settings/'
+    | '/workspace/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/recording'
     | '/timeline'
     | '/transcription'
-    | '/workspace'
     | '/settings/models'
     | '/settings/theme'
     | '/workspace/$documentId'
     | '/settings'
+    | '/workspace'
   id:
     | '__root__'
     | '/'
@@ -143,6 +152,7 @@ export interface FileRouteTypes {
     | '/settings/theme'
     | '/workspace/$documentId'
     | '/settings/'
+    | '/workspace/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -198,6 +208,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/workspace/': {
+      id: '/workspace/'
+      path: '/'
+      fullPath: '/workspace/'
+      preLoaderRoute: typeof WorkspaceIndexRouteImport
+      parentRoute: typeof WorkspaceRoute
+    }
     '/settings/': {
       id: '/settings/'
       path: '/'
@@ -247,10 +264,12 @@ const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
 
 interface WorkspaceRouteChildren {
   WorkspaceDocumentIdRoute: typeof WorkspaceDocumentIdRoute
+  WorkspaceIndexRoute: typeof WorkspaceIndexRoute
 }
 
 const WorkspaceRouteChildren: WorkspaceRouteChildren = {
   WorkspaceDocumentIdRoute: WorkspaceDocumentIdRoute,
+  WorkspaceIndexRoute: WorkspaceIndexRoute,
 }
 
 const WorkspaceRouteWithChildren = WorkspaceRoute._addFileChildren(
