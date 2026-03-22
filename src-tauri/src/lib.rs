@@ -11,6 +11,12 @@ pub mod llm;
 use commands::{settings, theme, models as model_cmds, audio as audio_cmds, transcription as transcription_cmds, workspace as workspace_cmds, llm as llm_cmds};
 use tauri::Manager;
 use tauri_specta::{collect_commands, Builder};
+use crate::llm::{
+    engine::LlmEngine,
+    tasks::PromptTemplates,
+    worker::{LlmWorker, LlmTaskMessage},
+    LlmEngineStatus,
+};
 
 /// tauri-specta builder（构建时自动导出 bindings.ts）
 fn specta_builder() -> Builder {
@@ -104,6 +110,35 @@ pub fn run() {
                     resampler_done_rx: std::sync::Arc::new(tokio::sync::Mutex::new(None)),
                     resampler_stop: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
                     audio_level: std::sync::Arc::new(std::sync::atomic::AtomicU32::new(0)),
+                    llm_tx: {
+                        let (tx, _) = tokio::sync::mpsc::channel(1);
+                        tx
+                    },
+                    llm_engine: std::sync::Arc::new(tokio::sync::Mutex::new(None)),
+                    active_llm_cancels: std::sync::Arc::new(dashmap::DashMap::new()),
+                    prompt_templates: std::sync::Arc::new(PromptTemplates {
+                        summary: crate::llm::tasks::TaskTemplate {
+                            system: String::new(),
+                            user: String::new(),
+                            max_tokens: 256,
+                        },
+                        meeting_brief: crate::llm::tasks::TaskTemplate {
+                            system: String::new(),
+                            user: String::new(),
+                            max_tokens: 1024,
+                        },
+                        translation: crate::llm::tasks::TaskTemplate {
+                            system: String::new(),
+                            user: String::new(),
+                            max_tokens: 2048,
+                        },
+                        qa: crate::llm::tasks::TaskTemplate {
+                            system: String::new(),
+                            user: String::new(),
+                            max_tokens: 512,
+                        },
+                    }),
+                    llm_engine_status: std::sync::Arc::new(tokio::sync::Mutex::new(LlmEngineStatus::NotLoaded)),
                 };
                 let loaded = tauri::async_runtime::block_on(
                     crate::commands::settings::load_config_from_db(&tmp_state)
@@ -167,6 +202,36 @@ pub fn run() {
                 }
             }
 
+            // Step M5: Load prompt templates
+            let prompts_path = {
+                let resource_attempt = app.path()
+                    .resource_dir()
+                    .ok()
+                    .map(|d| d.join("resources/prompts/tasks.toml"))
+                    .filter(|p| p.exists());
+
+                resource_attempt.unwrap_or_else(|| {
+                    // Development fallback: relative to cargo manifest
+                    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                        .join("../resources/prompts/tasks.toml")
+                })
+            };
+
+            let prompt_templates = std::sync::Arc::new(
+                PromptTemplates::load(&prompts_path)
+                    .expect("failed to load tasks.toml — ensure resources/prompts/tasks.toml exists")
+            );
+
+            // LLM channel (bounded 64)
+            let (llm_tx, llm_rx) = tokio::sync::mpsc::channel::<LlmTaskMessage>(64);
+
+            let llm_engine: std::sync::Arc<tokio::sync::Mutex<Option<std::sync::Arc<LlmEngine>>>> =
+                std::sync::Arc::new(tokio::sync::Mutex::new(None));
+            let active_llm_cancels: std::sync::Arc<dashmap::DashMap<String, std::sync::Arc<std::sync::atomic::AtomicBool>>> =
+                std::sync::Arc::new(dashmap::DashMap::new());
+            let llm_engine_status: std::sync::Arc<tokio::sync::Mutex<LlmEngineStatus>> =
+                std::sync::Arc::new(tokio::sync::Mutex::new(LlmEngineStatus::NotLoaded));
+
             // M4 shared state (Arc wrappers for sharing with worker)
             let segments_cache = std::sync::Arc::new(std::sync::Mutex::new(std::collections::HashMap::new()));
             let pcm_cache = std::sync::Arc::new(std::sync::Mutex::new(std::collections::HashMap::new()));
@@ -196,6 +261,14 @@ pub fn run() {
                 resampler_done_rx: std::sync::Arc::clone(&resampler_done_rx),
                 resampler_stop: std::sync::Arc::clone(&resampler_stop),
                 audio_level: std::sync::Arc::clone(&audio_level),
+                llm_tx: {
+                    let (tx, _) = tokio::sync::mpsc::channel(1);
+                    tx
+                },
+                llm_engine: std::sync::Arc::new(tokio::sync::Mutex::new(None)),
+                active_llm_cancels: std::sync::Arc::new(dashmap::DashMap::new()),
+                prompt_templates: std::sync::Arc::clone(&prompt_templates),
+                llm_engine_status: std::sync::Arc::new(tokio::sync::Mutex::new(LlmEngineStatus::NotLoaded)),
             });
 
             // Spawn DownloadWorker
@@ -214,6 +287,21 @@ pub fn run() {
                 std::sync::Arc::clone(&segments_cache),
             );
             tauri::async_runtime::spawn(worker.run());
+
+            // Spawn LlmWorker
+            let llm_app_handle = app_handle.clone();
+            let llm_pool = db.pool.clone();
+            let llm_engine_clone = std::sync::Arc::clone(&llm_engine);
+            let llm_templates_clone = std::sync::Arc::clone(&prompt_templates);
+            let llm_cancels_clone = std::sync::Arc::clone(&active_llm_cancels);
+            tauri::async_runtime::spawn(LlmWorker::run(
+                llm_rx,
+                llm_app_handle,
+                llm_engine_clone,
+                llm_templates_clone,
+                llm_cancels_clone,
+                llm_pool,
+            ));
 
             // Step 7: startup missing-model detection
             let missing = {
@@ -259,6 +347,11 @@ pub fn run() {
                 resampler_done_rx,
                 resampler_stop,
                 audio_level,
+                llm_tx,
+                llm_engine,
+                active_llm_cancels,
+                prompt_templates,
+                llm_engine_status,
             });
             Ok(())
         })
