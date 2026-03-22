@@ -167,6 +167,18 @@ mod tests {
             resampler_done_rx: std::sync::Arc::new(tokio::sync::Mutex::new(None)),
             resampler_stop: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
             audio_level: std::sync::Arc::new(std::sync::atomic::AtomicU32::new(0)),
+            llm_tx: { let (tx, _) = tokio::sync::mpsc::channel(1); tx },
+            llm_engine: std::sync::Arc::new(tokio::sync::Mutex::new(None)),
+            active_llm_cancels: std::sync::Arc::new(dashmap::DashMap::new()),
+            prompt_templates: std::sync::Arc::new(
+                crate::llm::tasks::PromptTemplates {
+                    summary: crate::llm::tasks::TaskTemplate { system: String::new(), user: String::new(), max_tokens: 512 },
+                    meeting_brief: crate::llm::tasks::TaskTemplate { system: String::new(), user: String::new(), max_tokens: 1024 },
+                    translation: crate::llm::tasks::TaskTemplate { system: String::new(), user: String::new(), max_tokens: 2048 },
+                    qa: crate::llm::tasks::TaskTemplate { system: String::new(), user: String::new(), max_tokens: 512 },
+                }
+            ),
+            llm_engine_status: std::sync::Arc::new(tokio::sync::Mutex::new(crate::llm::LlmEngineStatus::NotLoaded)),
         }
     }
 

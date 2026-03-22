@@ -126,23 +126,38 @@ impl MeetingBriefSections {
     }
 }
 
-// ── 全局编译好的正则（lazy，避免重复编译）───────────────────────────────
+// ── 全局编译好的正则（lazy，仅匹配 ## 标题行，不使用不支持的 lookahead）──
 
-fn meeting_brief_regex() -> &'static Regex {
+fn header_regex() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| {
-        Regex::new(r"(?m)^##\s*(.+?)\s*$\n([\s\S]*?)(?=^##|\z)").unwrap()
-    })
+    // 匹配 "## 标题" 行，多行模式
+    RE.get_or_init(|| Regex::new(r"(?m)^##\s+(.+?)\s*$").unwrap())
 }
 
 /// Unicode 安全的会议纪要解析器。
+///
+/// 两遍法：先找所有 ## 标题位置，再按相邻标题间距切割内容。
+/// 支持英文和中文 section 标题。全部 section 失败时 fallback 全文。
 pub fn parse_meeting_brief(text: &str) -> MeetingBriefSections {
-    let re = meeting_brief_regex();
+    let re = header_regex();
     let mut sections = MeetingBriefSections::default();
 
-    for cap in re.captures_iter(text) {
-        let title = cap[1].trim().to_lowercase();
-        let content = cap[2].trim().to_string();
+    // 收集 (match_start, header_end, title_lowercase)
+    let headers: Vec<(usize, usize, String)> = re
+        .captures_iter(text)
+        .map(|cap| {
+            let m = cap.get(0).unwrap();
+            (m.start(), m.end(), cap[1].trim().to_lowercase())
+        })
+        .collect();
+
+    for (i, (_, header_end, title)) in headers.iter().enumerate() {
+        let content_end = if i + 1 < headers.len() {
+            headers[i + 1].0
+        } else {
+            text.len()
+        };
+        let content = text[*header_end..content_end].trim().to_string();
         if content.is_empty() {
             continue;
         }

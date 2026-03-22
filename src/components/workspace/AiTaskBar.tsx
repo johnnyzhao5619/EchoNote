@@ -20,7 +20,7 @@ export function AiTaskBar({
   documentId,
   targetLanguage = "English",
 }: AiTaskBarProps) {
-  const { tasks, initTask, getDocumentTasks } = useLlmStore();
+  const { tasks, initTask } = useLlmStore();
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
 
   const activeTask = activeTaskId ? tasks.get(activeTaskId) : null;

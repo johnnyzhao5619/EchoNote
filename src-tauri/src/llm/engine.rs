@@ -69,7 +69,7 @@ impl LlmEngine {
         system_prompt: &str,
         user_prompt: &str,
         max_tokens: u32,
-        token_cb: impl Fn(String) -> bool,
+        mut token_cb: impl FnMut(String) -> bool,
     ) -> Result<String, AppError> {
         let backend = get_backend()?;
 
