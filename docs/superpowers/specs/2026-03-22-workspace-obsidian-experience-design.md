@@ -44,7 +44,7 @@ Workspace 路由
 **后端新增文件：**
 - `src-tauri/src/commands/workspace.rs`（已存在，需扩充）
 - `src-tauri/src/commands/subtitle.rs`（新增，字幕命令）
-- `src-tauri/src/storage/migrations/0002_segment_translations.sql`（新增 migration）
+- `src-tauri/src/storage/migrations/0003_segment_translations.sql`（新增 migration）
 
 **前端新增 / 改造文件：**
 - `src/components/workspace/WorkspaceFileTree.tsx`（完全重写）
@@ -707,12 +707,12 @@ const getToolbarPosition = (el: HTMLTextAreaElement) => {
 
 ### 6.1 数据库 Migration
 
-新建文件：`src-tauri/src/storage/migrations/0002_segment_translations.sql`
+新建文件：`src-tauri/src/storage/migrations/0003_segment_translations.sql`
 
 ```sql
 CREATE TABLE segment_translations (
     id          TEXT PRIMARY KEY,
-    segment_id  TEXT NOT NULL REFERENCES transcription_segments(id) ON DELETE CASCADE,
+    segment_id  INTEGER NOT NULL REFERENCES transcription_segments(id) ON DELETE CASCADE,
     language    TEXT NOT NULL,    -- 语言代码：'en' | 'ja' | 'ko' | 'fr' | 'de' | 'es' | 'ru'
     text        TEXT NOT NULL,
     created_at  INTEGER NOT NULL,
@@ -735,9 +735,10 @@ use crate::error::AppError;
 use crate::state::AppState;
 
 /// 一个转写段落及其翻译
+// Note: transcription_segments.id is INTEGER AUTOINCREMENT, not UUID
 #[derive(Debug, Serialize, Deserialize, Clone, Type)]
 pub struct SegmentRow {
-    pub id: String,
+    pub id: i64,
     pub recording_id: String,
     pub start_ms: i64,
     pub end_ms: i64,
@@ -747,6 +748,7 @@ pub struct SegmentRow {
 
 /// 字幕导出格式
 #[derive(Debug, Serialize, Deserialize, Clone, Type)]
+#[serde(rename_all = "snake_case")]
 pub enum SubtitleFormat {
     Srt,
     Vtt,
@@ -755,6 +757,7 @@ pub enum SubtitleFormat {
 
 /// 字幕内容语言
 #[derive(Debug, Serialize, Deserialize, Clone, Type)]
+#[serde(tag = "type", content = "data", rename_all = "snake_case")]
 pub enum SubtitleLanguage {
     Original,                   // 原文
     Translation(String),        // 翻译，值为语言代码如 "en"
@@ -826,6 +829,13 @@ pub async fn align_translation_to_segments(
 
 1. 查询 `workspace_documents.recording_id`，获取对应 `recording_id`
 2. 查询 `transcription_segments WHERE recording_id = ?` 按 `start_ms` 排序，得 N 段
+
+边界处理：
+- 若 N = 0（无转写段落），直接返回 Ok(())
+- 若查不到 role='translation' 的 asset，返回 AppError::Validation("no translation asset found")
+- 若 M = 0（翻译内容分割后为空），直接返回 Ok(())
+- 比例映射公式中 N > 0 且 M > 0 才执行
+
 3. 查询 `workspace_text_assets WHERE document_id = ? AND role = 'translation'` 的 `content`
 4. 将 content 按句子分割（正则 `[。.!?！？\n]+` 为分隔符），过滤空串，得 M 句
 5. 比例映射：`segment[i] → translated_sentences[min(round(i * M / N), M-1)]`
@@ -848,8 +858,9 @@ pub async fn export_subtitle(
 
 - 查询段落列表（原文 or 译文）
 - 按格式生成内容字符串
-- 写到 `{recordings_path}/{recording_title}.{ext}`（ext = srt/vtt/lrc）
-- 若文件已存在则覆盖
+- 对 recording_title 执行文件名 sanitize（使用已有的 `sanitize_filename` 函数）
+- 写到 `{recordings_path}/{sanitized_title}.{ext}`，已存在则覆盖（V1 策略）
+- V2 可引入 Tauri dialog API 让用户选择保存位置，本次不实现
 - 返回写入路径（前端可用 Tauri 打开文件对话框或通知用户）
 
 **SRT 格式示例：**
@@ -910,10 +921,15 @@ const [mode, setMode] = useState<DocMode>('document');
 </button>
 
 // 内容区
-{mode === 'document' ? <DocumentContent ... /> : <SubtitleEditor recordingId={recording.id} audioSrc={audioSrc} />}
+{mode === 'document' ? <DocumentContent ... /> : <SubtitleEditor recordingId={recording.id} filePath={filePath} durationMs={durationMs} />}
 ```
 
 字幕模式下隐藏 `EditableAsset` 列表，整页渲染 `SubtitleEditor`。
+
+字幕模式下：
+- 隐藏父级 AudioPlayer 组件（避免双 audio 元素冲突）
+- SubtitleEditor 自带完整播放条（内含独立 `<audio>` 元素）
+- SubtitleEditor Props 增加 `filePath: string`（WAV 文件绝对路径）和 `durationMs: number`
 
 ### 7.2 SubtitleEditor.tsx
 
@@ -923,7 +939,7 @@ const [mode, setMode] = useState<DocMode>('document');
 ```ts
 interface SubtitleEditorProps {
   recordingId: string;
-  filePath: string;       // WAV 路径，传给 AudioPlayer
+  filePath: string;       // WAV 文件绝对路径，内部用 convertFileSrc(filePath) 转换（与 AudioPlayer 相同方式）
   durationMs: number;
 }
 ```
@@ -980,6 +996,13 @@ const formatTime = (ms: number): string => {
 };
 ```
 
+注意：formatTime/parseTime 仅用于编辑器 UI 展示。后端 export_subtitle 直接将 start_ms/end_ms（i64 毫秒）
+格式化为各标准时间字符串：
+- SRT：00:mm:ss,mmm（HH:MM:SS,mmm，3位毫秒，逗号分隔）
+- VTT：00:mm:ss.mmm（HH:MM:SS.mmm，3位毫秒，点分隔）
+- LRC：[mm:ss.xx]（2位厘秒）
+前端无需感知这些格式细节。
+
 **点击行跳转：**
 ```ts
 // 点击行号列或高亮区域 → 音频跳转
@@ -989,10 +1012,11 @@ audioRef.current.currentTime = segment.start_ms / 1000;
 **导出按钮：**
 ```ts
 const handleExport = async (format: 'srt' | 'vtt' | 'lrc') => {
-  const lang = language
-    ? { type: 'Translation', data: language }
-    : { type: 'Original' };
-  const result = await commands.exportSubtitle(recordingId, format, lang);
+  const lang: SubtitleLanguage = language
+    ? { type: 'translation', data: language }
+    : { type: 'original' };
+  const fmt = format as 'srt' | 'vtt' | 'lrc';
+  const result = await commands.exportSubtitle(recordingId, fmt, lang);
   if (result.status === 'ok') {
     // 提示用户文件路径（toast 通知）
   }
