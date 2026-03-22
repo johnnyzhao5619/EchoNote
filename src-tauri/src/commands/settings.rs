@@ -152,7 +152,22 @@ mod tests {
             },
         });
         let (download_tx, _rx) = mpsc::channel::<DownloadCommand>(1);
-        AppState { db, config, model_config, download_tx }
+        let (transcription_tx, _trx) = std::sync::mpsc::sync_channel(1);
+        AppState {
+            db,
+            config,
+            model_config,
+            download_tx,
+            transcription_tx,
+            whisper_engine: std::sync::Arc::new(std::sync::Mutex::new(None)),
+            capture_stop_tx: std::sync::Arc::new(std::sync::Mutex::new(None)),
+            segments_cache: std::sync::Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
+            pcm_cache: std::sync::Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
+            current_session_id: std::sync::Arc::new(tokio::sync::Mutex::new(None)),
+            resampler_done_rx: std::sync::Arc::new(tokio::sync::Mutex::new(None)),
+            resampler_stop: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            audio_level: std::sync::Arc::new(std::sync::atomic::AtomicU32::new(0)),
+        }
     }
 
     /// get_config_inner must return the current AppConfig.
@@ -161,7 +176,7 @@ mod tests {
         let state = make_state().await;
         let cfg = get_config_inner(&state).await.unwrap();
         assert_eq!(cfg.locale, "zh_CN");
-        assert_eq!(cfg.active_theme, "tokyo-night");
+        assert_eq!(cfg.active_theme, "Tokyo Night");
     }
 
     /// update_config_inner must persist a locale change to the DB and update in-memory state.

@@ -9,7 +9,7 @@ pub struct AppConfig {
     /// UI locale. Default: "zh_CN"
     pub locale: String,
 
-    /// Active theme id. Default: "tokyo-night"
+    /// Active theme display name. Default: "Tokyo Night"
     pub active_theme: String,
 
     /// Active whisper model variant id. Default: "whisper/base"
@@ -60,7 +60,7 @@ impl Default for AppConfig {
     fn default() -> Self {
         Self {
             locale:                  "zh_CN".to_string(),
-            active_theme:            "tokyo-night".to_string(),
+            active_theme:            "Tokyo Night".to_string(),
             active_whisper_model:    "whisper/base".to_string(),
             active_llm_model:        "llm/qwen2.5-3b-q4".to_string(),
             llm_context_size:        4096,
@@ -175,11 +175,11 @@ mod tests {
         assert_eq!(cfg.locale, "zh_CN");
     }
 
-    /// Default active_theme must be "tokyo-night".
+    /// Default active_theme must be "Tokyo Night" (display name, not slug).
     #[test]
     fn test_default_theme() {
         let cfg = AppConfig::default();
-        assert_eq!(cfg.active_theme, "tokyo-night");
+        assert_eq!(cfg.active_theme, "Tokyo Night");
     }
 
     /// Default vad_threshold must be 0.010 (iPhone-friendly).
@@ -200,7 +200,7 @@ mod tests {
         apply_partial(&mut cfg, partial);
         assert_eq!(cfg.locale, "en_US");
         // Other fields remain at default
-        assert_eq!(cfg.active_theme, "tokyo-night");
+        assert_eq!(cfg.active_theme, "Tokyo Night");
         assert!((cfg.vad_threshold - 0.010).abs() < f32::EPSILON);
     }
 

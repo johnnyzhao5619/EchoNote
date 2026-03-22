@@ -5,8 +5,14 @@ import { useThemeStore } from "@/store/theme";
 import { act } from "react";
 
 describe("ThemeProvider", () => {
+  const BUILTIN_THEMES = [
+    { name: "Tokyo Night",       type: "dark"  as const },
+    { name: "Tokyo Night Storm", type: "dark"  as const },
+    { name: "Tokyo Night Light", type: "light" as const },
+  ];
+
   beforeEach(() => {
-    useThemeStore.setState({ currentTheme: "Tokyo Night", themes: [] });
+    useThemeStore.setState({ currentTheme: "Tokyo Night", themes: BUILTIN_THEMES });
     document.documentElement.removeAttribute("data-theme");
     document.documentElement.removeAttribute("data-theme-type");
   });
