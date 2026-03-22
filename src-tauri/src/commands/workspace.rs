@@ -3,9 +3,177 @@
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri::State;
+use sqlx::SqlitePool;
 
 use crate::error::AppError;
 use crate::state::AppState;
+
+// ── New types for folder tree ────────────────────────────────────────────────
+
+#[derive(Debug, Serialize, Deserialize, specta::Type, Clone)]
+pub struct SystemFolderIds {
+    pub inbox_id: String,
+    pub batch_task_id: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, specta::Type, Clone)]
+pub struct DocumentSummary {
+    pub id: String,
+    pub title: String,
+    pub source_type: String,
+    pub recording_id: Option<String>,
+    pub created_at: i64,
+}
+
+/// specta note: Vec<FolderNode> is recursive. If cargo check emits a type-export
+/// error, add #[specta(inline)] to the children field.
+#[derive(Debug, Serialize, Deserialize, specta::Type, Clone)]
+pub struct FolderNode {
+    pub id: String,
+    pub name: String,
+    pub folder_kind: String,
+    pub is_system: bool,
+    pub children: Vec<FolderNode>,
+    pub documents: Vec<DocumentSummary>,
+}
+
+// ── Internal helpers ─────────────────────────────────────────────────────────
+
+/// Idempotent: creates inbox + batch_task system folders if missing.
+/// Called from lib.rs setup spawn AND from ensure_document_for_recording.
+pub async fn init_system_folders(pool: &SqlitePool) -> Result<SystemFolderIds, AppError> {
+    let now = chrono::Utc::now().timestamp_millis();
+
+    let inbox_id: Option<String> = sqlx::query_scalar(
+        "SELECT id FROM workspace_folders WHERE folder_kind = 'inbox' AND is_system = 1 LIMIT 1",
+    )
+    .fetch_optional(pool)
+    .await?;
+
+    let inbox_id = if let Some(id) = inbox_id {
+        id
+    } else {
+        let id = uuid::Uuid::new_v4().to_string();
+        sqlx::query(
+            "INSERT INTO workspace_folders (id, name, folder_kind, is_system, created_at)
+             VALUES (?, '收件箱', 'inbox', 1, ?)",
+        )
+        .bind(&id)
+        .bind(now)
+        .execute(pool)
+        .await?;
+        id
+    };
+
+    let batch_id: Option<String> = sqlx::query_scalar(
+        "SELECT id FROM workspace_folders WHERE folder_kind = 'batch_task' AND is_system = 1 LIMIT 1",
+    )
+    .fetch_optional(pool)
+    .await?;
+
+    let batch_task_id = if let Some(id) = batch_id {
+        id
+    } else {
+        let id = uuid::Uuid::new_v4().to_string();
+        sqlx::query(
+            "INSERT INTO workspace_folders (id, name, folder_kind, is_system, created_at)
+             VALUES (?, '批量任务', 'batch_task', 1, ?)",
+        )
+        .bind(&id)
+        .bind(now)
+        .execute(pool)
+        .await?;
+        id
+    };
+
+    Ok(SystemFolderIds { inbox_id, batch_task_id })
+}
+
+/// Internal helper used by list_folders_with_documents command.
+pub async fn list_folders_tree(pool: &SqlitePool) -> Result<Vec<FolderNode>, AppError> {
+    use std::collections::HashMap;
+
+    let folder_rows: Vec<(String, String, String, bool, Option<String>)> = sqlx::query_as(
+        "SELECT id, name, folder_kind, is_system, parent_id
+         FROM workspace_folders
+         ORDER BY is_system DESC, created_at ASC",
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let doc_rows: Vec<(String, String, String, Option<String>, i64, Option<String>)> =
+        sqlx::query_as(
+            "SELECT id, title, source_type, recording_id, created_at, folder_id
+             FROM workspace_documents
+             ORDER BY created_at DESC",
+        )
+        .fetch_all(pool)
+        .await?;
+
+    // Build node map
+    let mut nodes: HashMap<String, FolderNode> = folder_rows
+        .iter()
+        .map(|(id, name, kind, is_sys, _)| {
+            (
+                id.clone(),
+                FolderNode {
+                    id: id.clone(),
+                    name: name.clone(),
+                    folder_kind: kind.clone(),
+                    is_system: *is_sys,
+                    children: vec![],
+                    documents: vec![],
+                },
+            )
+        })
+        .collect();
+
+    // Attach documents to their folders
+    for (id, title, source_type, recording_id, created_at, folder_id) in &doc_rows {
+        let doc = DocumentSummary {
+            id: id.clone(),
+            title: title.clone(),
+            source_type: source_type.clone(),
+            recording_id: recording_id.clone(),
+            created_at: *created_at,
+        };
+        if let Some(fid) = folder_id {
+            if let Some(node) = nodes.get_mut(fid) {
+                node.documents.push(doc);
+            }
+        }
+    }
+
+    // Build parent map
+    let parent_map: HashMap<String, Option<String>> = folder_rows
+        .iter()
+        .map(|(id, _, _, _, parent)| (id.clone(), parent.clone()))
+        .collect();
+
+    // Separate child nodes from top-level
+    let child_ids: Vec<String> = folder_rows
+        .iter()
+        .filter(|(id, _, _, _, _)| parent_map[id].is_some())
+        .map(|(id, _, _, _, _)| id.clone())
+        .collect();
+
+    let mut children_map: HashMap<String, Vec<FolderNode>> = HashMap::new();
+    for cid in &child_ids {
+        if let Some(node) = nodes.remove(cid) {
+            let parent_id = parent_map[cid].clone().unwrap();
+            children_map.entry(parent_id).or_default().push(node);
+        }
+    }
+    for (parent_id, children) in children_map {
+        if let Some(parent) = nodes.get_mut(&parent_id) {
+            parent.children = children;
+        }
+    }
+
+    let mut top: Vec<FolderNode> = nodes.into_values().collect();
+    top.sort_by(|a, b| b.is_system.cmp(&a.is_system).then(a.name.cmp(&b.name)));
+    Ok(top)
+}
 
 /// 单条录音摘要（用于 Workspace 列表）
 #[derive(Debug, Serialize, Deserialize, Clone, Type)]
@@ -129,18 +297,20 @@ pub async fn ensure_document_for_recording(
     .fetch_one(&state.db.pool)
     .await?;
 
-    let now = chrono::Utc::now().timestamp();
+    let inbox_id = init_system_folders(&state.db.pool).await?.inbox_id;
+    let now = chrono::Utc::now().timestamp_millis();
     let doc_id = uuid::Uuid::new_v4().to_string();
 
     let mut tx = state.db.pool.begin().await?;
 
     sqlx::query(
-        "INSERT INTO workspace_documents (id, title, source_type, recording_id, created_at, updated_at)
-         VALUES (?, ?, 'recording', ?, ?, ?)",
+        "INSERT INTO workspace_documents (id, title, source_type, recording_id, folder_id, created_at, updated_at)
+         VALUES (?, ?, 'recording', ?, ?, ?, ?)",
     )
     .bind(&doc_id)
     .bind(&title)
     .bind(&recording_id)
+    .bind(&inbox_id)
     .bind(created_at)
     .bind(now)
     .execute(&mut *tx)
@@ -175,8 +345,8 @@ pub async fn ensure_document_for_recording(
     Ok(doc_id)
 }
 
-/// 清洗文件名：只保留字母、数字、空格、连字符、下划线
-fn sanitize_filename(s: &str) -> String {
+/// 清洗文件名：只保留字母、数字、空格、连字符、下划线（pub(crate) for subtitle.rs）
+pub(crate) fn sanitize_filename(s: &str) -> String {
     s.chars()
         .map(|c| {
             if c.is_alphanumeric() || c == '-' || c == '_' || c == ' ' {
@@ -293,5 +463,161 @@ pub async fn delete_recording(
         tokio::fs::remove_file(&path).await.ok();
     }
 
+    Ok(())
+}
+
+// ── New folder/document commands ─────────────────────────────────────────────
+
+#[tauri::command]
+#[specta::specta]
+pub async fn ensure_system_folders(
+    state: State<'_, AppState>,
+) -> Result<SystemFolderIds, AppError> {
+    init_system_folders(&state.db.pool).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn list_folders_with_documents(
+    state: State<'_, AppState>,
+) -> Result<Vec<FolderNode>, AppError> {
+    list_folders_tree(&state.db.pool).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn create_folder(
+    parent_id: Option<String>,
+    name: String,
+    state: State<'_, AppState>,
+) -> Result<String, AppError> {
+    if name.trim().is_empty() {
+        return Err(AppError::Validation("folder name cannot be empty".into()));
+    }
+    let now = chrono::Utc::now().timestamp_millis();
+    let id = uuid::Uuid::new_v4().to_string();
+    sqlx::query(
+        "INSERT INTO workspace_folders (id, parent_id, name, folder_kind, is_system, created_at)
+         VALUES (?, ?, ?, 'user', 0, ?)",
+    )
+    .bind(&id)
+    .bind(&parent_id)
+    .bind(&name)
+    .bind(now)
+    .execute(&state.db.pool)
+    .await?;
+    Ok(id)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn rename_folder(
+    folder_id: String,
+    name: String,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    let is_system: Option<bool> = sqlx::query_scalar(
+        "SELECT is_system FROM workspace_folders WHERE id = ?",
+    )
+    .bind(&folder_id)
+    .fetch_optional(&state.db.pool)
+    .await?;
+    match is_system {
+        None => return Err(AppError::NotFound(folder_id)),
+        Some(true) => return Err(AppError::Validation("cannot rename system folder".into())),
+        Some(false) => {}
+    }
+    sqlx::query("UPDATE workspace_folders SET name = ? WHERE id = ?")
+        .bind(&name)
+        .bind(&folder_id)
+        .execute(&state.db.pool)
+        .await?;
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn delete_folder(
+    folder_id: String,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    let is_system: Option<bool> = sqlx::query_scalar(
+        "SELECT is_system FROM workspace_folders WHERE id = ?",
+    )
+    .bind(&folder_id)
+    .fetch_optional(&state.db.pool)
+    .await?;
+    match is_system {
+        None => return Err(AppError::NotFound(folder_id)),
+        Some(true) => return Err(AppError::Validation("cannot delete system folder".into())),
+        Some(false) => {}
+    }
+    // Move documents from this folder and its descendants to inbox
+    let ids = init_system_folders(&state.db.pool).await?;
+    sqlx::query(
+        "UPDATE workspace_documents SET folder_id = ?
+         WHERE folder_id IN (
+           WITH RECURSIVE sub(id) AS (
+             SELECT id FROM workspace_folders WHERE id = ?
+             UNION ALL
+             SELECT f.id FROM workspace_folders f JOIN sub ON f.parent_id = sub.id
+           )
+           SELECT id FROM sub
+         )",
+    )
+    .bind(&ids.inbox_id)
+    .bind(&folder_id)
+    .execute(&state.db.pool)
+    .await?;
+    // Delete folder (CASCADE removes children)
+    sqlx::query("DELETE FROM workspace_folders WHERE id = ?")
+        .bind(&folder_id)
+        .execute(&state.db.pool)
+        .await?;
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn move_document_to_folder(
+    document_id: String,
+    folder_id: String,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    sqlx::query("UPDATE workspace_documents SET folder_id = ? WHERE id = ?")
+        .bind(&folder_id)
+        .bind(&document_id)
+        .execute(&state.db.pool)
+        .await?;
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn rename_document(
+    document_id: String,
+    title: String,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    let now = chrono::Utc::now().timestamp_millis();
+    sqlx::query("UPDATE workspace_documents SET title = ?, updated_at = ? WHERE id = ?")
+        .bind(&title)
+        .bind(now)
+        .bind(&document_id)
+        .execute(&state.db.pool)
+        .await?;
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn delete_document(
+    document_id: String,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    sqlx::query("DELETE FROM workspace_documents WHERE id = ?")
+        .bind(&document_id)
+        .execute(&state.db.pool)
+        .await?;
     Ok(())
 }

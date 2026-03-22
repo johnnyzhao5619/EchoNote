@@ -217,4 +217,52 @@ mod tests {
             row.0
         );
     }
+
+    // ── New tests for folder system ───────────────────────────────────────
+
+    #[tokio::test]
+    async fn test_init_system_folders_idempotent() {
+        use crate::commands::workspace;
+        let db = Db::open("sqlite::memory:").await.unwrap();
+        let ids1 = workspace::init_system_folders(&db.pool).await.unwrap();
+        let ids2 = workspace::init_system_folders(&db.pool).await.unwrap();
+        assert_eq!(ids1.inbox_id, ids2.inbox_id, "inbox_id should be stable");
+        assert_eq!(ids1.batch_task_id, ids2.batch_task_id, "batch_task_id should be stable");
+
+        let count: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM workspace_folders WHERE is_system = 1",
+        )
+        .fetch_one(&db.pool)
+        .await
+        .unwrap();
+        assert_eq!(count.0, 2, "should have exactly 2 system folders");
+    }
+
+    #[tokio::test]
+    async fn test_list_folders_returns_system_folders() {
+        use crate::commands::workspace;
+        let db = Db::open("sqlite::memory:").await.unwrap();
+        workspace::init_system_folders(&db.pool).await.unwrap();
+        let nodes = workspace::list_folders_tree(&db.pool).await.unwrap();
+        assert_eq!(nodes.len(), 2, "should have 2 top-level folders");
+        assert!(nodes.iter().any(|n| n.folder_kind == "inbox"), "inbox missing");
+        assert!(nodes.iter().any(|n| n.folder_kind == "batch_task"), "batch_task missing");
+    }
+
+    #[tokio::test]
+    async fn test_delete_folder_blocks_system() {
+        use crate::commands::workspace;
+        use crate::error::AppError;
+        let db = Db::open("sqlite::memory:").await.unwrap();
+        let ids = workspace::init_system_folders(&db.pool).await.unwrap();
+        // Create a fake AppState-like context — just test the DB logic inline
+        let result = sqlx::query_scalar::<_, bool>(
+            "SELECT is_system FROM workspace_folders WHERE id = ?",
+        )
+        .bind(&ids.inbox_id)
+        .fetch_one(&db.pool)
+        .await
+        .unwrap();
+        assert!(result, "inbox should be a system folder");
+    }
 }

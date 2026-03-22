@@ -8,7 +8,7 @@ pub mod audio;
 pub mod transcription;
 pub mod llm;
 
-use commands::{settings, theme, models as model_cmds, audio as audio_cmds, transcription as transcription_cmds, workspace as workspace_cmds, llm as llm_cmds};
+use commands::{settings, theme, models as model_cmds, audio as audio_cmds, transcription as transcription_cmds, workspace as workspace_cmds, llm as llm_cmds, subtitle as subtitle_cmds};
 use tauri::Manager;
 use tauri_specta::{collect_commands, Builder};
 use crate::llm::{
@@ -47,6 +47,14 @@ fn specta_builder() -> Builder {
             workspace_cmds::ensure_document_for_recording,
             workspace_cmds::update_document_asset,
             workspace_cmds::delete_recording,
+            workspace_cmds::ensure_system_folders,
+            workspace_cmds::list_folders_with_documents,
+            workspace_cmds::create_folder,
+            workspace_cmds::rename_folder,
+            workspace_cmds::delete_folder,
+            workspace_cmds::move_document_to_folder,
+            workspace_cmds::rename_document,
+            workspace_cmds::delete_document,
             llm_cmds::submit_llm_task,
             llm_cmds::cancel_llm_task,
             llm_cmds::get_llm_engine_status,
@@ -331,6 +339,15 @@ pub fn run() {
                 download_errors,
                 prompt_templates,
                 llm_engine_status,
+            });
+
+            // Init system folders (inbox + batch_task) idempotently
+            let app_handle_folders = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                let state = app_handle_folders.state::<crate::state::AppState>();
+                if let Err(e) = workspace_cmds::init_system_folders(&state.db.pool).await {
+                    log::error!("Failed to init system folders: {e}");
+                }
             });
 
             // Try to load engines if models already downloaded.
