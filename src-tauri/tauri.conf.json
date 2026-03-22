@@ -23,7 +23,11 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["$APPDATA/**", "$HOME/**"]
+      }
     }
   },
   "bundle": {
@@ -35,6 +39,15 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "macOS": {
+      "frameworks": [
+        "Frameworks/libllama.dylib",
+        "Frameworks/libggml.dylib",
+        "Frameworks/libggml-base.dylib",
+        "Frameworks/libggml-cpu.dylib",
+        "Frameworks/libggml-metal.dylib"
+      ]
+    }
   }
 }
