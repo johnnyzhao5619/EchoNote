@@ -11,8 +11,8 @@ use crate::transcription::engine::WhisperEngine;
 use crate::commands::transcription::{RecordingMode, RecordingStatus, SegmentPayload};
 
 // ── 双缓冲 + 异步推理参数 ────────────────────────────────────────
-/// 800ms 无新帧 → 触发推理（句子边界，参考 WhisperLive 中文实践）
-const PAUSE_FLUSH_MS: u64 = 800;
+/// 500ms 无新帧 → 触发推理（句子边界，参考 WhisperLive 中文实践）
+const PAUSE_FLUSH_MS: u64 = 500;
 /// 最小推理长度 0.5s（shorter-whisper min_speech）
 const MIN_INFER_SAMPLES: usize = 8_000;
 /// 安全上限 25s（Whisper 30s 硬限以下留 5s 缓冲）
@@ -187,8 +187,8 @@ impl TranscriptionWorker {
                 Err(mpsc::TryRecvError::Disconnected) => break,
             }
 
-            // ── Step 4: 50ms sleep ─────────────────────────────────────
-            tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+            // ── Step 4: 10ms sleep ─────────────────────────────────────
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
         }
     }
 }
@@ -339,7 +339,7 @@ mod tests {
     #[test]
     fn test_pause_flush_constants() {
         // 验证常量符合设计规格
-        assert_eq!(super::PAUSE_FLUSH_MS, 800);
+        assert_eq!(super::PAUSE_FLUSH_MS, 500);
         assert_eq!(super::MIN_INFER_SAMPLES, 8_000);
         assert_eq!(super::MAX_ACCUM_SAMPLES, 16_000 * 25);
     }
