@@ -1,9 +1,12 @@
 // src/components/workspace/EditableAsset.tsx
-// Collapsible, editable section for one text asset with debounced autosave.
+// Editable section for one text asset: Preview ↔ Edit toggle + debounced autosave.
+// Preview renders Markdown via react-markdown/remark-gfm.
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { commands } from "@/lib/bindings";
-import { ChevronDown, ChevronRight, Check, Loader2 } from "lucide-react";
+import { Check, Loader2, Eye, Pencil } from "lucide-react";
 
 interface EditableAssetProps {
   documentId: string;
@@ -23,20 +26,27 @@ export function EditableAsset({
   initialContent,
   onSaved,
 }: EditableAssetProps) {
-  const [open, setOpen] = useState(true);
+  const [editing, setEditing] = useState(false);
   const [content, setContent] = useState(initialContent);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedRef = useRef(initialContent);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Keep content in sync if parent reloads (e.g., AI task completes)
   useEffect(() => {
-    // Only update if user hasn't made local changes
     if (content === lastSavedRef.current) {
       setContent(initialContent);
       lastSavedRef.current = initialContent;
     }
   }, [initialContent]);
+
+  // Auto-focus textarea when entering edit mode
+  useEffect(() => {
+    if (editing) {
+      textareaRef.current?.focus();
+    }
+  }, [editing]);
 
   const save = useCallback(
     async (text: string) => {
@@ -59,13 +69,19 @@ export function EditableAsset({
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const text = e.target.value;
     setContent(text);
-
-    // Debounce: save 1.5s after user stops typing
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => save(text), 1500);
   };
 
-  // Clear timer on unmount
+  const handleBlur = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    save(content);
+    setEditing(false);
+  };
+
   useEffect(() => {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -73,50 +89,74 @@ export function EditableAsset({
   }, []);
 
   return (
-    <section className="flex flex-col gap-2">
+    <section className="flex flex-col gap-1.5">
       {/* Section header */}
       <div className="flex items-center justify-between">
-        <button
-          className="flex items-center gap-1.5 text-xs font-semibold text-text-secondary uppercase tracking-wide hover:text-text-primary transition-colors"
-          onClick={() => setOpen((v) => !v)}
-        >
-          {open ? (
-            <ChevronDown className="w-3.5 h-3.5" />
-          ) : (
-            <ChevronRight className="w-3.5 h-3.5" />
-          )}
+        <span className="text-xs font-semibold text-text-secondary uppercase tracking-wide">
           {label}
-        </button>
+        </span>
 
-        {/* Save indicator */}
-        {saveState === "saving" && (
-          <span className="flex items-center gap-1 text-xs text-text-muted">
-            <Loader2 className="w-3 h-3 animate-spin" />
-            保存中…
-          </span>
-        )}
-        {saveState === "saved" && (
-          <span className="flex items-center gap-1 text-xs text-status-success">
-            <Check className="w-3 h-3" />
-            已保存
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {saveState === "saving" && (
+            <span className="flex items-center gap-1 text-xs text-text-muted">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              保存中…
+            </span>
+          )}
+          {saveState === "saved" && (
+            <span className="flex items-center gap-1 text-xs text-status-success">
+              <Check className="w-3 h-3" />
+              已保存
+            </span>
+          )}
+
+          {/* Preview / Edit toggle */}
+          <button
+            onClick={() => setEditing((v) => !v)}
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors"
+            title={editing ? "预览" : "编辑"}
+          >
+            {editing ? <Eye className="w-3 h-3" /> : <Pencil className="w-3 h-3" />}
+            {editing ? "预览" : "编辑"}
+          </button>
+        </div>
       </div>
 
-      {/* Editable textarea */}
-      {open && (
+      {/* Edit mode: textarea */}
+      {editing ? (
         <textarea
+          ref={textareaRef}
           value={content}
           onChange={handleChange}
+          onBlur={handleBlur}
           className={[
-            "w-full min-h-[120px] text-sm text-text-primary leading-relaxed",
-            "rounded-md bg-bg-secondary border border-border-default p-3",
-            "resize-y focus:outline-none focus:ring-1 focus:ring-accent-primary",
+            "w-full min-h-[160px] text-sm text-text-primary leading-relaxed",
+            "rounded-md bg-bg-secondary border border-accent-primary p-3",
+            "resize-y focus:outline-none",
             "placeholder:text-text-muted font-mono",
           ].join(" ")}
           placeholder={`在此输入${label}…`}
           spellCheck={false}
         />
+      ) : (
+        // Preview mode: Markdown rendered, click to edit
+        <div
+          onClick={() => setEditing(true)}
+          className={[
+            "w-full min-h-[80px] rounded-md border border-border-default p-3",
+            "cursor-text hover:border-border-strong transition-colors",
+            "prose prose-sm prose-invert max-w-none",
+            "text-text-primary text-sm leading-relaxed",
+          ].join(" ")}
+        >
+          {content.trim() ? (
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {content}
+            </ReactMarkdown>
+          ) : (
+            <span className="text-text-muted">{`在此输入${label}…`}</span>
+          )}
+        </div>
       )}
     </section>
   );
