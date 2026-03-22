@@ -20,7 +20,6 @@ const MOCK_APP_CONFIG = {
   default_language: null,
   default_target_language: "en",
   vad_threshold: 0.02,
-  audio_chunk_ms: 500,
   auto_llm_on_stop: false,
   default_llm_task: "summary",
 };
@@ -44,14 +43,16 @@ describe("M1 Integration: Shell + Router + Theme", () => {
     });
   });
 
-  it("default route redirects to /recording and shows placeholder", async () => {
+  it("default route redirects to /recording and shows recording page", async () => {
     renderApp("/");
-    await screen.findByText(/coming in m2/i);
+    await screen.findByRole("button", { name: /start recording/i });
   });
 
-  it("navigating to /workspace shows workspace placeholder", async () => {
+  it("navigating to /workspace shows workspace page", async () => {
+    const { invoke } = await import("@tauri-apps/api/core");
+    vi.mocked(invoke).mockResolvedValueOnce([]);
     renderApp("/workspace");
-    await screen.findByText(/coming in m4/i);
+    await screen.findByText(/no recordings yet/i);
   });
 
   it("navigating to /settings shows settings form", async () => {

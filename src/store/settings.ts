@@ -15,9 +15,9 @@ export interface AppConfig {
   default_language: string | null
   default_target_language: string
   vad_threshold: number
-  audio_chunk_ms: number
   auto_llm_on_stop: boolean
   default_llm_task: string
+  model_mirror: string
 }
 
 // PartialAppConfig: every field is optional (undefined = do not update)
@@ -49,9 +49,9 @@ const DEFAULT_CONFIG: AppConfig = {
   default_language: null,
   default_target_language: 'en',
   vad_threshold: 0.02,
-  audio_chunk_ms: 500,
   auto_llm_on_stop: false,
   default_llm_task: 'summary',
+  model_mirror: '',
 }
 
 export const useSettingsStore = create<SettingsStore>((set) => ({

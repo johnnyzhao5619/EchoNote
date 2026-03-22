@@ -9,7 +9,6 @@ const DEFAULT_CONFIG: RealtimeConfig = {
   language: null,
   mode: 'transcribe_only',
   vad_threshold: 0.02,
-  chunk_duration_ms: 500,
 }
 
 function formatDuration(ms: number): string {
