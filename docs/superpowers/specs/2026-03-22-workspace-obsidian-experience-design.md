@@ -788,7 +788,7 @@ pub async fn get_segments_with_translations(
 #[tauri::command]
 #[specta::specta]
 pub async fn update_segment_timing(
-    segment_id: String,
+    segment_id: i64,    // INTEGER AUTOINCREMENT — matches transcription_segments.id
     start_ms: i64,
     end_ms: i64,
     state: State<'_, AppState>,
@@ -804,7 +804,7 @@ pub async fn update_segment_timing(
 #[tauri::command]
 #[specta::specta]
 pub async fn update_segment_translation(
-    segment_id: String,
+    segment_id: i64,    // INTEGER AUTOINCREMENT — matches transcription_segments.id
     language: String,
     text: String,
     state: State<'_, AppState>,
@@ -948,7 +948,7 @@ interface SubtitleEditorProps {
 ```ts
 const [segments, setSegments] = useState<SegmentRow[]>([]);
 const [language, setLanguage] = useState<string | null>(null);  // null = 仅原文
-const [currentSegmentId, setCurrentSegmentId] = useState<string | null>(null);
+const [currentSegmentId, setCurrentSegmentId] = useState<number | null>(null);  // i64 → number
 const audioRef = useRef<HTMLAudioElement>(null);
 ```
 
