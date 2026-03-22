@@ -57,6 +57,7 @@ pub fn build_variant(
         size_display: format_size(cfg.size_bytes),
         is_downloaded,
         is_active: false, // 调用方根据 AppConfig 设置
+        sha256_valid: !cfg.sha256.starts_with("FILL_IN") && cfg.sha256.len() == 64,
     }
 }
 

@@ -16,8 +16,7 @@ function renderWithRouter(initialPath: string) {
 describe("routing", () => {
   it("redirects / to /recording", async () => {
     renderWithRouter("/");
-    // 等待路由 redirect 完成，检查页面占位内容
-    await screen.findByText(/coming in m2/i);
+    await screen.findByRole("button", { name: /start recording/i });
   });
 
   it("renders transcription page at /transcription", async () => {

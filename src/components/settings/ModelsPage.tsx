@@ -27,6 +27,7 @@ export function ModelsPage() {
   const {
     variants,
     downloads,
+    lastError,
     loadVariants,
     startDownload,
     cancelDownload,
@@ -46,6 +47,12 @@ export function ModelsPage() {
       <h1 className="text-xl font-semibold text-text-primary">
         {t('models.page_title')}
       </h1>
+
+      {lastError && (
+        <p className="rounded bg-status-error/10 px-3 py-2 text-sm text-status-error">
+          下载失败：{lastError}
+        </p>
+      )}
 
       <ModelGroup
         title={t('models.group_whisper')}
@@ -186,7 +193,9 @@ function ModelRow({
             <Button
               size="sm"
               variant="outline"
-              onClick={() => onDownload(v.variant_id)}
+              disabled={!v.sha256_valid}
+              title={!v.sha256_valid ? '该模型 SHA256 尚未配置，暂不可下载' : undefined}
+              onClick={() => v.sha256_valid && onDownload(v.variant_id)}
             >
               {t('models.action_download')}
             </Button>

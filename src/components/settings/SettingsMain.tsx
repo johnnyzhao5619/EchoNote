@@ -100,21 +100,27 @@ export function SettingsMain() {
         </FormRow>
 
         <FormRow label="VAD Threshold">
-          <div className="flex items-center gap-3">
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.01}
-              value={config.vad_threshold}
-              onChange={(e) =>
-                updateConfig({ vad_threshold: parseFloat(e.target.value) })
-              }
-              className="flex-1"
-            />
-            <span className="w-12 text-right text-sm text-text-secondary">
-              {config.vad_threshold.toFixed(2)}
-            </span>
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-3">
+              <input
+                type="range"
+                min={0.001}
+                max={0.1}
+                step={0.001}
+                value={Math.min(config.vad_threshold, 0.1)}
+                onChange={(e) =>
+                  updateConfig({ vad_threshold: parseFloat(e.target.value) })
+                }
+                className="flex-1"
+              />
+              <span className="w-14 text-right text-sm text-text-secondary font-mono">
+                {config.vad_threshold.toFixed(3)}
+              </span>
+            </div>
+            <p className="text-xs text-text-muted">
+              Lower = more sensitive. iPhone/external mics often need 0.005–0.020.
+              Check terminal for actual RMS values.
+            </p>
           </div>
         </FormRow>
 
@@ -156,6 +162,27 @@ export function SettingsMain() {
                        text-sm text-text-primary focus:outline-none focus:border-accent"
           />
         </FormRow>
+      </section>
+
+      {/* ── Models ── */}
+      <section className="space-y-4">
+        <h2 className="text-sm font-medium uppercase tracking-wide text-text-muted">
+          Models
+        </h2>
+
+        <FormRow label="Download Mirror">
+          <Select
+            value={config.model_mirror ?? ''}
+            options={[
+              { value: '',          label: 'Default (huggingface.co)' },
+              { value: 'hf-mirror', label: 'hf-mirror.com (China)' },
+            ]}
+            onChange={(v) => updateConfig({ model_mirror: v })}
+          />
+        </FormRow>
+        <p className="text-xs text-text-muted -mt-2 ml-56">
+          Switch mirror if huggingface.co is inaccessible in your region.
+        </p>
       </section>
 
       {/* ── Storage ── */}

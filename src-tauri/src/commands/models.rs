@@ -101,10 +101,11 @@ pub async fn set_active_model(
 
     let (model_type, _) = parse_variant_id(&variant_id)
         .ok_or_else(|| AppError::Model(format!("无效 variant_id: {variant_id}")))?;
+    let model_type = model_type.to_string();
 
     let serialized = {
         let mut config = state.config.write().await;
-        match model_type {
+        match model_type.as_str() {
             "whisper" => config.active_whisper_model = variant_id,
             "llm" => config.active_llm_model = variant_id,
             _ => return Err(AppError::Model(format!("未知 model_type: {model_type}"))),
@@ -118,6 +119,11 @@ pub async fn set_active_model(
         .save_setting("app_config", &serialized)
         .await
         .map_err(|e| AppError::Storage(e.to_string()))?;
+
+    // 切换 whisper 模型后立即热加载引擎，无需重启
+    if model_type.as_str() == "whisper" {
+        state.try_load_whisper().await;
+    }
 
     Ok(())
 }

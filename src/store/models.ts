@@ -1,9 +1,8 @@
 // src/store/models.ts
 
 import { create } from 'zustand'
-import { listen } from '@tauri-apps/api/event'
 import { invoke } from '@tauri-apps/api/core'
-import type { ModelVariant, DownloadProgressPayload } from '../lib/bindings'
+import type { ModelVariant } from '../lib/bindings'
 
 interface DownloadState {
   downloadedBytes: number
@@ -17,6 +16,7 @@ interface ModelsStore {
   downloads: Record<string, DownloadState> // variant_id → progress
   requiredMissing: string[]                 // from models:required event
   isRequiredDialogOpen: boolean
+  lastError: string | null                  // most recent download error
 
   // Actions
   loadVariants: () => Promise<void>
@@ -35,6 +35,7 @@ export const useModelsStore = create<ModelsStore>((set, get) => ({
   downloads: {},
   requiredMissing: [],
   isRequiredDialogOpen: false,
+  lastError: null,
 
   loadVariants: async () => {
     try {
@@ -46,10 +47,23 @@ export const useModelsStore = create<ModelsStore>((set, get) => ({
   },
 
   startDownload: async (variantId) => {
+    // 乐观更新：立即显示进度条（0 bytes），让用户知道下载已触发
+    set((s) => ({
+      downloads: {
+        ...s.downloads,
+        [variantId]: { downloadedBytes: 0, totalBytes: null, speedBps: 0, etaSecs: null },
+      },
+    }))
     try {
       await invoke('download_model', { variantId })
     } catch (e) {
       console.error('[models] startDownload error:', e)
+      // 清除乐观状态
+      set((s) => {
+        const d = { ...s.downloads }
+        delete d[variantId]
+        return { downloads: d }
+      })
     }
   },
 
@@ -89,59 +103,34 @@ export const useModelsStore = create<ModelsStore>((set, get) => ({
   dismissRequiredDialog: () => set({ isRequiredDialogOpen: false }),
 
   _setupListeners: () => {
-    const unlisteners: Promise<() => void>[] = []
+    // Tauri 事件系统在 macOS 开发模式下不可靠，改用轮询方案。
+    // 当有下载进行中时，每 2 秒刷新一次变体列表以检测下载完成状态。
+    const pollTimer = setInterval(async () => {
+      const { downloads } = get()
+      if (Object.keys(downloads).length === 0) return
 
-    // models:required → open onboarding dialog
-    unlisteners.push(
-      listen<{ missing: string[] }>('models:required', (e) => {
-        set({ requiredMissing: e.payload.missing, isRequiredDialogOpen: true })
-      })
-    )
-
-    // models:progress → update download progress
-    unlisteners.push(
-      listen<DownloadProgressPayload>('models:progress', (e) => {
-        const p = e.payload
-        set((s) => ({
-          downloads: {
-            ...s.downloads,
-            [p.variant_id]: {
-              downloadedBytes: p.downloaded_bytes,
-              totalBytes: p.total_bytes ?? null,
-              speedBps: p.speed_bps,
-              etaSecs: p.eta_secs ?? null,
-            },
-          },
-        }))
-      })
-    )
-
-    // models:downloaded → refresh list, clear progress
-    unlisteners.push(
-      listen<{ variant_id: string }>('models:downloaded', (e) => {
-        set((s) => {
-          const d = { ...s.downloads }
-          delete d[e.payload.variant_id]
-          return { downloads: d }
-        })
-        get().loadVariants()
-      })
-    )
-
-    // models:error → clear progress
-    unlisteners.push(
-      listen<{ variant_id: string; error: string }>('models:error', (e) => {
-        console.error('[models] download error:', e.payload.error)
-        set((s) => {
-          const d = { ...s.downloads }
-          delete d[e.payload.variant_id]
-          return { downloads: d }
-        })
-      })
-    )
+      try {
+        const freshVariants = await invoke<ModelVariant[]>('list_model_variants')
+        const newDownloads = { ...get().downloads }
+        let anyCompleted = false
+        for (const v of freshVariants) {
+          if (newDownloads[v.variant_id] !== undefined && v.is_downloaded) {
+            delete newDownloads[v.variant_id]
+            anyCompleted = true
+          }
+        }
+        if (anyCompleted) {
+          set({ variants: freshVariants, downloads: newDownloads })
+        } else {
+          set({ variants: freshVariants })
+        }
+      } catch (e) {
+        console.error('[models] poll error:', e)
+      }
+    }, 2000)
 
     return () => {
-      unlisteners.forEach((p) => p.then((fn) => fn()))
+      clearInterval(pollTimer)
     }
   },
 }))

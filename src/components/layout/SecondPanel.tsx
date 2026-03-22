@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useEffect } from "react";
+import { useRef, useState, useCallback, useEffect, Children } from "react";
 import { cn } from "@/lib/utils";
 
 interface SecondPanelProps {
@@ -21,8 +21,14 @@ export function SecondPanel({
   maxWidth = 480,
   collapsible = true,
 }: SecondPanelProps) {
+  const hasContent = Children.count(children) > 0;
   const [width, setWidth] = useState(defaultWidth);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(!hasContent);
+
+  // Auto-collapse / expand when content is injected or removed
+  useEffect(() => {
+    setIsCollapsed(!hasContent);
+  }, [hasContent]);
   const isDragging = useRef(false);
   const startX = useRef(0);
   const startWidth = useRef(0);

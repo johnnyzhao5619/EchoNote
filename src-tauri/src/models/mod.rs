@@ -58,6 +58,8 @@ pub struct ModelVariant {
     pub is_downloaded: bool,
     /// 当前已加载（激活）的模型
     pub is_active: bool,
+    /// SHA256 是否已配置（false = 占位符，禁止下载）
+    pub sha256_valid: bool,
 }
 
 // ── 内部 channel 消息 ─────────────────────────────────────────

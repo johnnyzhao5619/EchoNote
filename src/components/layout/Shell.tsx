@@ -2,6 +2,7 @@ import { ActivityBar } from "./ActivityBar";
 import { SecondPanel } from "./SecondPanel";
 import { TopBar } from "./TopBar";
 import { StatusBar } from "./StatusBar";
+import { useShellStore } from "@/store/shell";
 
 interface ShellProps {
   children: React.ReactNode;
@@ -25,6 +26,7 @@ interface ShellProps {
  * MainContent = 路由出口（flex-1，占满剩余空间）
  */
 export function Shell({ children }: ShellProps) {
+  const secondPanelContent = useShellStore((s) => s.secondPanelContent);
   return (
     <div className="flex h-screen overflow-hidden bg-bg-primary text-text-primary">
       {/* 左侧活动栏（固定宽度） */}
@@ -37,9 +39,9 @@ export function Shell({ children }: ShellProps) {
 
         {/* 中部内容区（SecondPanel + MainContent 并排） */}
         <div className="flex flex-1 min-h-0 overflow-hidden">
-          {/* 可调宽二级面板（内容由各路由的 panel slot 填充，M1 为空） */}
+          {/* 可调宽二级面板（内容由各路由通过 useShellStore 注入） */}
           <SecondPanel>
-            {/* TODO(M2+): 各功能页通过 route context 注入 panel 内容 */}
+            {secondPanelContent}
           </SecondPanel>
 
           {/* 主内容区：路由出口 */}

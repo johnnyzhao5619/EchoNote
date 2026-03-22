@@ -235,7 +235,7 @@ export type AppConfig = {
  */
 locale: string; 
 /**
- * Active theme id. Default: "tokyo-night"
+ * Active theme display name. Default: "Tokyo Night"
  */
 active_theme: string; 
 /**
@@ -274,15 +274,15 @@ default_target_language: string;
 /**
  * VAD energy threshold (0.0–1.0). Default: 0.02
  */
-vad_threshold: number;
+vad_threshold: number; 
 /**
  * Automatically trigger AI processing after recording stops. Default: false
  */
-auto_llm_on_stop: boolean;
+auto_llm_on_stop: boolean; 
 /**
  * Last microphone device ID used. None = not yet set (use system default). Default: None
  */
-last_used_device_id: string | null;
+last_used_device_id: string | null; 
 /**
  * Default LLM task type. Values: "summary" | "meeting_brief". Default: "summary"
  */
@@ -328,7 +328,7 @@ sha256_valid: boolean }
  * `skip_serializing_if = "Option::is_none"` ensures that undefined fields
  * from the frontend are absent from the serialized JSON.
  */
-export type PartialAppConfig = { locale?: string | null; active_theme?: string | null; active_whisper_model?: string | null; active_llm_model?: string | null; llm_context_size?: number | null; vault_path?: string | null; recordings_path?: string | null; default_recording_mode?: string | null;
+export type PartialAppConfig = { locale?: string | null; active_theme?: string | null; active_whisper_model?: string | null; active_llm_model?: string | null; llm_context_size?: number | null; vault_path?: string | null; recordings_path?: string | null; default_recording_mode?: string | null; 
 /**
  * `Some(None)` clears the language (auto-detect); `Some(Some("zh"))` sets it.
  */

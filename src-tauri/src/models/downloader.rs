@@ -17,6 +17,29 @@ use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
 use tokio::sync::mpsc;
 
+// ── 镜像 URL 替换 ─────────────────────────────────────────────
+
+/// 根据用户配置的镜像设置替换下载 URL 中的域名。
+/// - `""` / `"default"` → 不替换（使用 models.toml 中的原始 URL）
+/// - `"hf-mirror"` → 将 `huggingface.co` 替换为 `hf-mirror.com`
+/// - 其他字符串 → 视为自定义 base URL，替换 `https://huggingface.co`
+pub fn apply_mirror(url: &str, mirror: &str) -> String {
+    let mirror = mirror.trim();
+    if mirror.is_empty() || mirror == "default" {
+        return url.to_string();
+    }
+    let replacement = match mirror {
+        "hf-mirror" => "https://hf-mirror.com",
+        other => other,
+    };
+    // 仅对 huggingface.co URL 执行替换
+    if url.contains("huggingface.co") {
+        url.replacen("https://huggingface.co", replacement, 1)
+    } else {
+        url.to_string()
+    }
+}
+
 // ── 滑动窗口速度计算 ──────────────────────────────────────────
 
 /// (时间点, 该时间点新写入的字节数)
@@ -103,7 +126,12 @@ pub async fn download_to_file(
     if resume_offset > 0 {
         req = req.header("Range", format!("bytes={}-", resume_offset));
     }
-    let resp = req.send().await.map_err(|e| AppError::Model(e.to_string()))?;
+    eprintln!("[download] sending request to {url} (resume_offset={resume_offset})");
+    let resp = req.send().await.map_err(|e| {
+        eprintln!("[download] request failed: {e}");
+        AppError::Model(e.to_string())
+    })?;
+    eprintln!("[download] HTTP {}", resp.status());
     if !resp.status().is_success() && resp.status().as_u16() != 206 {
         return Err(AppError::Model(format!(
             "HTTP {} for {}",
@@ -177,7 +205,7 @@ pub async fn run_download_worker(
     state: Arc<AppState>,
 ) {
     let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(30)) // 建连超时
+        .connect_timeout(Duration::from_secs(30)) // 仅连接超时；下载大文件不设总超时
         .build()
         .expect("reqwest client build failed");
 
@@ -200,6 +228,7 @@ pub async fn run_download_worker(
                 let cancel_flags_clone = Arc::clone(&cancel_flags);
                 let vid = variant_id.clone();
 
+                let state_for_reload = Arc::clone(&state);
                 tokio::spawn(async move {
                     let result = do_download(
                         &client_clone,
@@ -221,6 +250,12 @@ pub async fn run_download_worker(
                                     serde_json::json!({ "variant_id": vid }),
                                 )
                                 .ok();
+
+                            // 下载完成后立即热加载 whisper 引擎（若为 whisper 模型）
+                            use crate::models::registry::parse_variant_id;
+                            if parse_variant_id(&vid).map(|(t, _)| t == "whisper").unwrap_or(false) {
+                                state_for_reload.try_load_whisper().await;
+                            }
                         }
                         Err(e) => {
                             app_clone
@@ -254,6 +289,8 @@ async fn do_download(
 ) -> Result<(), AppError> {
     use super::registry::{model_file_path, parse_variant_id};
 
+    eprintln!("[download] starting: {variant_id}");
+
     let (model_type, variant_name) = parse_variant_id(variant_id)
         .ok_or_else(|| AppError::Model(format!("无效 variant_id: {variant_id}")))?;
 
@@ -264,6 +301,13 @@ async fn do_download(
     }
     .ok_or_else(|| AppError::Model(format!("未找到模型配置: {variant_id}")))?;
 
+    // 拒绝下载 SHA256 占位符的模型（防止下载完成后必然校验失败）
+    if cfg.sha256.starts_with("FILL_IN") || cfg.sha256.len() != 64 {
+        return Err(AppError::Model(format!(
+            "模型 {variant_id} 的 SHA256 尚未配置，请联系开发者。"
+        )));
+    }
+
     let model_dir = std::path::Path::new(&config.vault_path)
         .parent()
         .unwrap_or(std::path::Path::new(&config.vault_path))
@@ -272,7 +316,10 @@ async fn do_download(
     let dest = model_file_path(&model_dir, model_type, variant_name, &cfg.url);
     let expected_size = cfg.size_bytes;
     let expected_sha256 = cfg.sha256.clone();
-    let url = cfg.url.clone();
+    let url = apply_mirror(&cfg.url, &config.model_mirror);
+
+    eprintln!("[download] url={url}");
+    eprintln!("[download] dest={}", dest.display());
 
     let mut speed_window = SpeedWindow::new();
     let mut last_progress = Instant::now();

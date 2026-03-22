@@ -12,6 +12,7 @@ const config: Config = {
         bg: {
           primary:   "var(--color-bg-primary)",
           secondary: "var(--color-bg-secondary)",
+          tertiary:  "var(--color-bg-tertiary)",
           sidebar:   "var(--color-bg-sidebar)",
           input:     "var(--color-bg-input)",
           hover:     "var(--color-bg-hover)",

@@ -1,10 +1,19 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { SettingsMain } from "@/components/settings/SettingsMain";
+import { useEffect } from "react";
+import { createFileRoute, Outlet } from "@tanstack/react-router";
+import { SettingsPanel } from "@/components/settings/SettingsPanel";
+import { useShellStore } from "@/store/shell";
 
 export const Route = createFileRoute("/settings")({
-  component: SettingsPage,
+  component: SettingsLayout,
 });
 
-function SettingsPage() {
-  return <SettingsMain />;
+function SettingsLayout() {
+  const setSecondPanelContent = useShellStore((s) => s.setSecondPanelContent);
+
+  useEffect(() => {
+    setSecondPanelContent(<SettingsPanel />);
+    return () => setSecondPanelContent(null);
+  }, [setSecondPanelContent]);
+
+  return <Outlet />;
 }

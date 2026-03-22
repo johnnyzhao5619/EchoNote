@@ -1,6 +1,7 @@
 # resources/models.toml
-# ⚠️  SHA256 标记为 FILL_IN_BEFORE_RELEASE 的字段必须在发布前用
-#     sha256sum <file> 命令填写真实值，否则下载校验将始终失败。
+# 下载地址默认使用 huggingface.co，可在 Settings → General → Model Mirror 切换镜像源。
+# SHA256 值可通过 `sha256sum <file>` 命令验证。
+# ⚠️  标记为 FILL_IN_BEFORE_RELEASE 的字段必须在发布前填写真实值，否则下载将被拒绝。
 
 [whisper]
 default_variant = "base"
@@ -8,19 +9,19 @@ default_variant = "base"
 [whisper.variants.tiny]
 url         = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin"
 sha256      = "be07e048e1e599ad46341c8d2a135645097a538221678b7acdd1b1919c6e1b21"
-size_bytes  = 75161336
+size_bytes  = 77691713
 description = "最小模型，速度最快，精度较低"
 
 [whisper.variants.base]
 url         = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin"
 sha256      = "60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe"
-size_bytes  = 142068640
+size_bytes  = 147951465
 description = "推荐入门模型，速度与精度平衡"
 
 [whisper.variants.small]
 url         = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin"
 sha256      = "1be3a9b2063867b937e64e2ec7483364a79917e157fa98c5d94b5c1fffea987b"
-size_bytes  = 466013312
+size_bytes  = 487601967
 description = "精度更高，需要约 1GB RAM"
 
 [whisper.variants.medium]
