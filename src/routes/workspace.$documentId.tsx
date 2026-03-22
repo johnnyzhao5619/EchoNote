@@ -120,6 +120,7 @@ function DocumentPage() {
         {recording && recording.file_path && (
           <div className="mt-3">
             <AudioPlayer
+              key={recording.file_path}
               filePath={recording.file_path}
               durationMs={recording.duration_ms}
             />
