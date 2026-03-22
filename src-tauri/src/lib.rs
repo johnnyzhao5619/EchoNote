@@ -59,6 +59,11 @@ fn specta_builder() -> Builder {
             llm_cmds::cancel_llm_task,
             llm_cmds::get_llm_engine_status,
             llm_cmds::list_document_llm_tasks,
+            subtitle_cmds::get_segments_with_translations,
+            subtitle_cmds::update_segment_timing,
+            subtitle_cmds::update_segment_translation,
+            subtitle_cmds::align_translation_to_segments,
+            subtitle_cmds::export_subtitle,
         ])
 }
 

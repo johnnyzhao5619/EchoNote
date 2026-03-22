@@ -314,6 +314,110 @@ async listDocumentLlmTasks(documentId: string) : Promise<Result<LlmTaskRow[], Ap
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async ensureSystemFolders() : Promise<Result<SystemFolderIds, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("ensure_system_folders") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async listFoldersWithDocuments() : Promise<Result<FolderNode[], AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_folders_with_documents") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async createFolder(parentId: string | null, name: string) : Promise<Result<string, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("create_folder", { parentId, name }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async renameFolder(folderId: string, name: string) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("rename_folder", { folderId, name }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async deleteFolder(folderId: string) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("delete_folder", { folderId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async moveDocumentToFolder(documentId: string, folderId: string) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("move_document_to_folder", { documentId, folderId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async renameDocument(documentId: string, title: string) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("rename_document", { documentId, title }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async deleteDocument(documentId: string) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("delete_document", { documentId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getSegmentsWithTranslations(recordingId: string, language: string | null) : Promise<Result<SegmentRow[], AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_segments_with_translations", { recordingId, language }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async updateSegmentTiming(segmentId: number, startMs: number, endMs: number) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("update_segment_timing", { segmentId, startMs, endMs }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async updateSegmentTranslation(segmentId: number, language: string, text: string) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("update_segment_translation", { segmentId, language, text }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async alignTranslationToSegments(documentId: string, language: string) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("align_translation_to_segments", { documentId, language }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async exportSubtitle(recordingId: string, format: SubtitleFormat, language: SubtitleLanguage) : Promise<Result<string, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("export_subtitle", { recordingId, format, language }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -326,6 +430,13 @@ async listDocumentLlmTasks(documentId: string) : Promise<Result<LlmTaskRow[], Ap
 
 
 /** user-defined types **/
+
+export type SystemFolderIds = { inbox_id: string; batch_task_id: string }
+export type DocumentSummary = { id: string; title: string; source_type: string; recording_id: string | null; created_at: number }
+export type FolderNode = { id: string; name: string; folder_kind: string; is_system: boolean; children: FolderNode[]; documents: DocumentSummary[] }
+export type SegmentRow = { id: number; recording_id: string; start_ms: number; end_ms: number; text: string; translated_text: string | null }
+export type SubtitleFormat = "srt" | "vtt" | "lrc"
+export type SubtitleLanguage = { type: "original" } | { type: "translation"; data: string }
 
 /**
  * Full application configuration. Stored as a single JSON blob
