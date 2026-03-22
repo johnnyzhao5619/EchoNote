@@ -10,8 +10,8 @@ const LEVEL_EMIT_INTERVAL: Duration = Duration::from_millis(100);
 const CONTEXT_CHUNKS: usize = 2; // 约 1s（500ms chunk × 2）
 
 // ── 自适应 VAD 阈值参数 ─────────────────────────────────────────
-/// 噪底估计滑动窗口大小（静音帧数）
-const NOISE_FLOOR_WINDOW: usize = 50;
+/// 噪底估计滑动窗口大小（静音帧数）25 × 100ms = 2.5s 冷启动
+const NOISE_FLOOR_WINDOW: usize = 25;
 /// 语音阈值 = 噪底 × NOISE_FLOOR_MULTIPLIER
 const NOISE_FLOOR_MULTIPLIER: f32 = 4.0;
 /// 自适应阈值下界（防止极安静环境过灵敏）
@@ -64,7 +64,7 @@ impl VadFilter {
         }
         let mut sorted: Vec<f32> = self.rms_history.iter().copied().collect();
         sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-        // P25：index 12（= 50 × 0.25 = 12.5，向下取整）
+        // P25：index 6（= 25 × 0.25 = 6.25，向下取整）
         let p25 = sorted[NOISE_FLOOR_WINDOW / 4];
         self.adaptive_threshold = (p25 * self.base_multiplier).clamp(ADAPTIVE_MIN, ADAPTIVE_MAX);
     }
@@ -201,7 +201,7 @@ mod tests {
 
     #[test]
     fn test_adaptive_threshold_cold_start_uses_initial() {
-        // 冷启动期（< 50 静音帧）adaptive_threshold 保持初始值不变
+        // 冷启动期（< 25 静音帧）adaptive_threshold 保持初始值不变
         let mut vad = VadFilter::new(0.008, |_| {});
         for _ in 0..10 {
             vad.process(vec![0.003f32; 1600]); // rms=0.003 < 0.008 → 静音
@@ -281,7 +281,8 @@ mod tests {
         for _ in 0..30 {
             vad.process(vec![0.005f32; 1600]);
         }
-        assert_eq!(vad.rms_history.len(), 30);
+        assert_eq!(vad.rms_history.len(), NOISE_FLOOR_WINDOW,
+            "after {} frames fed, history should be capped at NOISE_FLOOR_WINDOW={}", 30, NOISE_FLOOR_WINDOW);
 
         for _ in 0..30 {
             vad.process(vec![0.005f32; 1600]);
