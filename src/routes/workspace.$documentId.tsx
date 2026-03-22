@@ -64,8 +64,10 @@ function DocumentPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [alsoDeleteDoc, setAlsoDeleteDoc] = useState(true);
 
-  // EditableAsset refs (keyed by role) for insert-at-cursor (used in Task 5)
+  // EditableAsset refs (keyed by role) for insert-at-cursor
   const assetRefs = useRef<Map<string, EditableAssetHandle>>(new Map());
+  // Track which asset is currently in edit mode (for insert-at-cursor target)
+  const lastFocusedRoleRef = useRef<string | null>(null);
 
   const folderName = findFolderName(folderTree, documentId);
 
@@ -184,7 +186,13 @@ function DocumentPage() {
           />
 
           {/* AI panel trigger */}
-          <AiPanel documentId={documentId} />
+          <AiPanel
+            documentId={documentId}
+            onInsertAtCursor={(text) => {
+              const role = lastFocusedRoleRef.current ?? assets[0]?.role;
+              if (role) assetRefs.current.get(role)?.insertAtCursor(text);
+            }}
+          />
 
           {/* Delete */}
           <button
@@ -248,6 +256,9 @@ function DocumentPage() {
                   label={meta.label}
                   initialContent={asset.content}
                   onSaved={loadData}
+                  onFocusChange={(focused) => {
+                    if (focused) lastFocusedRoleRef.current = asset.role;
+                  }}
                 />
               </div>
             );

@@ -14,12 +14,15 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { commands } from "@/lib/bindings";
 import { ChevronDown, ChevronRight, Check, Loader2, Pencil } from "lucide-react";
+import { AiInlineToolbar } from "./AiInlineToolbar";
 
 // ── Public handle ─────────────────────────────────────────────────────────────
 
 export interface EditableAssetHandle {
   /** Programmatically enter edit mode and focus the textarea. */
   focus: () => void;
+  /** Insert text at the current cursor/selection position in the textarea. */
+  insertAtCursor: (text: string) => void;
 }
 
 // ── Props ─────────────────────────────────────────────────────────────────────
@@ -31,6 +34,8 @@ interface EditableAssetProps {
   initialContent: string;
   /** Called after successful save so parent can refresh if needed */
   onSaved?: () => void;
+  /** Called when the component enters or leaves edit mode */
+  onFocusChange?: (editing: boolean) => void;
 }
 
 type SaveState = "idle" | "saving" | "saved";
@@ -38,7 +43,7 @@ type SaveState = "idle" | "saving" | "saved";
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export const EditableAsset = forwardRef<EditableAssetHandle, EditableAssetProps>(
-  function EditableAsset({ documentId, role, label, initialContent, onSaved }, ref) {
+  function EditableAsset({ documentId, role, label, initialContent, onSaved, onFocusChange }, ref) {
     const [open, setOpen] = useState(true);
     const [editing, setEditing] = useState(false);
     const [content, setContent] = useState(initialContent);
@@ -48,12 +53,37 @@ export const EditableAsset = forwardRef<EditableAssetHandle, EditableAssetProps>
     const lastSavedRef = useRef(initialContent);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-    // Expose focus() to parent
+    // Expose focus() and insertAtCursor() to parent
     useImperativeHandle(ref, () => ({
       focus: () => {
         setOpen(true);
         setEditing(true);
-        // textarea will auto-focus via autoFocus or useEffect below
+        onFocusChange?.(true);
+      },
+      insertAtCursor: (text: string) => {
+        const el = textareaRef.current;
+        if (!el) return;
+        setOpen(true);
+        setEditing(true);
+        onFocusChange?.(true);
+        // Use rAF to ensure textarea is mounted before inserting
+        requestAnimationFrame(() => {
+          const ta = textareaRef.current;
+          if (!ta) return;
+          const start = ta.selectionStart;
+          const end = ta.selectionEnd;
+          ta.setRangeText(text, start, end, "end");
+          // Trigger React onChange path
+          const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+            window.HTMLTextAreaElement.prototype,
+            "value"
+          )?.set;
+          nativeInputValueSetter?.call(ta, ta.value);
+          ta.dispatchEvent(new Event("input", { bubbles: true }));
+          setContent(ta.value);
+          if (timerRef.current) clearTimeout(timerRef.current);
+          timerRef.current = setTimeout(() => save(ta.value), 1500);
+        });
       },
     }));
 
@@ -102,6 +132,7 @@ export const EditableAsset = forwardRef<EditableAssetHandle, EditableAssetProps>
 
     const exitEdit = () => {
       setEditing(false);
+      onFocusChange?.(false);
       // Flush pending debounce immediately on blur
       if (timerRef.current) {
         clearTimeout(timerRef.current);
@@ -158,7 +189,7 @@ export const EditableAsset = forwardRef<EditableAssetHandle, EditableAssetProps>
             {/* Edit toggle (only when open) */}
             {open && !editing && (
               <button
-                onClick={() => setEditing(true)}
+                onClick={() => { setEditing(true); onFocusChange?.(true); }}
                 className="flex items-center justify-center w-5 h-5 rounded hover:bg-bg-tertiary text-text-muted"
                 title="编辑"
               >
@@ -172,28 +203,31 @@ export const EditableAsset = forwardRef<EditableAssetHandle, EditableAssetProps>
         {open && (
           <>
             {editing ? (
-              /* Edit mode — raw textarea */
-              <textarea
-                ref={textareaRef}
-                value={content}
-                onChange={handleChange}
-                onBlur={exitEdit}
-                onKeyDown={handleKeyDown}
-                className={[
-                  "w-full min-h-[160px] text-sm text-text-primary leading-relaxed",
-                  "rounded-md bg-bg-secondary border border-accent-primary p-3",
-                  "resize-y focus:outline-none font-mono",
-                ].join(" ")}
-                placeholder={`在此输入${label}…`}
-                spellCheck={false}
-              />
+              /* Edit mode — raw textarea + inline toolbar */
+              <>
+                <AiInlineToolbar textareaRef={textareaRef} />
+                <textarea
+                  ref={textareaRef}
+                  value={content}
+                  onChange={handleChange}
+                  onBlur={exitEdit}
+                  onKeyDown={handleKeyDown}
+                  className={[
+                    "w-full min-h-[160px] text-sm text-text-primary leading-relaxed",
+                    "rounded-md bg-bg-secondary border border-accent-primary p-3",
+                    "resize-y focus:outline-none font-mono",
+                  ].join(" ")}
+                  placeholder={`在此输入${label}…`}
+                  spellCheck={false}
+                />
+              </>
             ) : (
               /* Preview mode — rendered Markdown */
               <div
                 role="button"
                 tabIndex={0}
-                onClick={() => setEditing(true)}
-                onKeyDown={(e) => e.key === "Enter" && setEditing(true)}
+                onClick={() => { setEditing(true); onFocusChange?.(true); }}
+                onKeyDown={(e) => e.key === "Enter" && (setEditing(true), onFocusChange?.(true))}
                 className={[
                   "w-full min-h-[80px] text-sm text-text-primary leading-relaxed",
                   "rounded-md bg-bg-secondary border border-border-default p-3 cursor-text",
