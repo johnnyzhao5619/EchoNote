@@ -20,7 +20,7 @@
 
 - All 6 `RecordingPanel` settings (microphone, language, mode, target language, VAD threshold, auto-process) restore correctly on every app launch
 - Microphone restores to the last-used device when available; falls back to system default otherwise
-- Steady-state transcription latency reduced from ~1.8s to ~1.2s
+- Steady-state transcription latency reduced from ~1.8s to ~1.4s (−440ms)
 - First-segment visible delay reduced from ~7s to ~4s (VAD cold-start calibration halved)
 - Dead `audio_chunk_ms` / `chunk_duration_ms` fields removed from API and config
 
@@ -36,11 +36,15 @@ No new files. No DB schema changes. No new Tauri commands.
 App launch
   → RecordingPanel mounts
   → getConfig() + loadDevices() called in parallel
-  → setVadThreshold, setLanguage, setMode, setTargetLang, setAutoProcess, setSavedDeviceId
-  → hasMountedRef.current = true
-  → devices available: restore savedDeviceId → prefer last-used device, fall back to default
-  → User changes setting → useEffect → updateConfig(partial) → persisted to DB
+  → getConfig() resolves → set language, mode, targetLang, vadThreshold, autoProcess, savedDeviceId
+  → initialized = true (React state → triggers re-render)
+  → devices available + initialized = true → restore savedDeviceId or fall back to default
+  → User changes setting → useEffect(deps=[initialized, ...fields]) → updateConfig(partial) → DB
 ```
+
+The `initialized` boolean state (not a ref) correctly handles the race between `getConfig()` and `loadDevices()`:
+- If devices load before config: `initialized = false`, save-back suppressed; when config arrives and sets `initialized = true`, all save-back effects re-evaluate and fire once.
+- If config loads before devices: `initialized = true` before device ID is set; when device restoration sets `deviceId`, save-back fires with `initialized = true`. ✓
 
 ### Latency Reduction (Parameter Changes Only)
 
@@ -75,10 +79,24 @@ last_used_device_id: None,
 pub last_used_device_id: Option<String>,
 
 // In apply_partial:
-if let Some(v) = partial.last_used_device_id { config.last_used_device_id = v; }
+// PartialAppConfig.last_used_device_id is Option<String> (singly-wrapped, no clearing needed)
+if let Some(v) = partial.last_used_device_id { config.last_used_device_id = Some(v); }
 ```
 
-**Remove** `audio_chunk_ms` from `AppConfig`, `PartialAppConfig`, `apply_partial`, and `AppConfig::default()`. Update the schema test that references this field.
+Note: `last_used_device_id` uses singly-wrapped `Option<String>` in `PartialAppConfig` (unlike `default_language` which uses doubly-wrapped `Option<Option<String>>` to allow clearing). Device ID only needs set-or-ignore semantics; it is never actively cleared. Therefore `apply_partial` must wrap the value: `config.last_used_device_id = Some(v)`, not `= v`.
+
+**Remove** `audio_chunk_ms` from `AppConfig`, `PartialAppConfig`, `apply_partial`, and `AppConfig::default()`. Also remove from the schema unit tests (`test_app_config_default_serialization` accesses `vad_threshold` not `audio_chunk_ms`, so no change there; but any test fixture that includes `audio_chunk_ms: 500` must be updated).
+
+**Bindings regeneration**: `src/lib/bindings.ts` is auto-regenerated at `cargo build` / `cargo tauri dev`. After this change:
+- `AppConfig` gains `last_used_device_id: string | null`
+- `AppConfig` loses `audio_chunk_ms`
+- `PartialAppConfig` gains `last_used_device_id?: string | null`
+- `PartialAppConfig` loses `audio_chunk_ms`
+- `RealtimeConfig` loses `chunk_duration_ms`
+
+Run `cargo build` (or trigger dev build) before running `npm run typecheck` to ensure the TypeScript types are up to date.
+
+**Note on `default_language` typing**: `PartialAppConfig.default_language` in Rust is `Option<Option<String>>` (doubly-wrapped to allow clearing). tauri-specta flattens this to `default_language?: string | null` in TypeScript. The `null` value from TypeScript deserializes as `Some(None)` in Rust, correctly clearing the language to auto-detect. The TypeScript code `default_language: language === 'auto' ? null : language` is correct and safe under this flattening. The `@ts-nocheck` header on `bindings.ts` prevents type-checker complaints.
 
 ### 1.2 Backend — `src-tauri/src/commands/transcription.rs`
 
@@ -86,33 +104,32 @@ if let Some(v) = partial.last_used_device_id { config.last_used_device_id = v; }
 
 ### 1.3 Frontend — `src/components/recording/RecordingPanel.tsx`
 
-**Mount effect** — read all 6 settings from AppConfig:
+**New state and mount effect** — read all 6 settings from AppConfig. Use `initialized` boolean state (not a `useRef`) so save-back effects correctly re-evaluate when config arrives regardless of whether devices have already loaded.
 
 ```tsx
-const hasMountedRef = useRef(false)
+const [initialized, setInitialized] = useState(false)
 const [savedDeviceId, setSavedDeviceId] = useState<string | null>(null)
 
 useEffect(() => {
   commands.getConfig().then((r) => {
     if (r.status === 'ok' && r.data) {
       const cfg = r.data
-      if (cfg.vad_threshold != null) setVadThreshold(Math.min(cfg.vad_threshold, 0.015))
-      if (cfg.default_language)      setLanguage(cfg.default_language)
-      if (cfg.default_recording_mode) setMode(cfg.default_recording_mode as typeof mode)
-      if (cfg.default_target_language) setTargetLang(cfg.default_target_language)
+      if (cfg.vad_threshold != null)    setVadThreshold(Math.min(cfg.vad_threshold, 0.015))
+      if (cfg.default_language)         setLanguage(cfg.default_language)
+      if (cfg.default_recording_mode)   setMode(cfg.default_recording_mode as typeof mode)
+      if (cfg.default_target_language)  setTargetLang(cfg.default_target_language)
       if (cfg.auto_llm_on_stop != null) setAutoProcess(cfg.auto_llm_on_stop)
       setSavedDeviceId(cfg.last_used_device_id ?? null)
-      hasMountedRef.current = true
+      setInitialized(true)   // must be last — triggers save-back effects on next render
     }
   })
   loadDevices()
 }, [loadDevices])
 ```
 
-**Device restoration** — handles race between config load and device enumeration:
+**Device restoration** — `savedDeviceId` is state so the effect re-runs if config arrives after devices:
 
 ```tsx
-// Replace existing device effect with:
 useEffect(() => {
   if (!devices.length) return
   const preferred = savedDeviceId ? devices.find(d => d.id === savedDeviceId) : null
@@ -121,15 +138,14 @@ useEffect(() => {
 }, [devices, savedDeviceId])
 ```
 
-- `savedDeviceId` is state (not a ref), so the effect re-runs if config arrives after devices
-- If the last-used device is no longer available (unplugged, Continuity Camera disconnected), falls back to system default automatically
+- If last-used device is unavailable (unplugged, Continuity Camera gone), falls back to system default silently.
 
-**Save-back effects** — persist changes to AppConfig:
+**Save-back effects** — `initialized` is included in deps so effects re-evaluate when config loads:
 
 ```tsx
-// All logical settings — fires when any of these 5 values change
+// All logical settings
 useEffect(() => {
-  if (!hasMountedRef.current) return
+  if (!initialized) return
   commands.updateConfig({
     default_language: language === 'auto' ? null : language,
     default_recording_mode: mode,
@@ -137,17 +153,17 @@ useEffect(() => {
     vad_threshold: vadThreshold,
     auto_llm_on_stop: autoProcess,
   })
-}, [language, mode, targetLang, vadThreshold, autoProcess])
+}, [initialized, language, mode, targetLang, vadThreshold, autoProcess])
 
-// Device ID — separate effect to avoid unnecessary writes when device list is loading
+// Device ID — separate effect; only saves when non-empty
 useEffect(() => {
-  if (!hasMountedRef.current || !deviceId) return
+  if (!initialized || !deviceId) return
   commands.updateConfig({ last_used_device_id: deviceId })
-}, [deviceId])
+}, [initialized, deviceId])
 ```
 
-- `hasMountedRef.current` is `false` on the initial render with default values, preventing the first effect from overwriting the stored config with defaults
-- Slider `vadThreshold` only fires on pointer-up (shadcn behavior), so writes are infrequent
+- When `initialized` becomes `true`, both effects fire once with the just-loaded config values. This is a redundant write (saves the same values that were just read) but is harmless and ensures the DB always reflects the clamped vad_threshold.
+- `initialized` in deps handles the race: if devices loaded before config, `deviceId` is set but `initialized` is still false → save suppressed. When config arrives and `initialized` becomes `true` → both effects fire with correct values including the restored `deviceId`. ✓
 
 ### 1.4 Frontend Cleanup
 
@@ -186,7 +202,15 @@ const PAUSE_FLUSH_MS: u64 = 800;
 
 // After:
 const PAUSE_FLUSH_MS: u64 = 500;   // saves 300ms per sentence
-// tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;  // saves ~40ms
+// tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;  // saves ~20ms avg
+```
+
+Also update the unit test `test_pause_flush_constants` in `pipeline.rs`:
+```rust
+// Before:
+assert_eq!(super::PAUSE_FLUSH_MS, 800);
+// After:
+assert_eq!(super::PAUSE_FLUSH_MS, 500);
 ```
 
 **Rationale**: 500ms matches the lower bound of natural inter-sentence pauses in Chinese speech. Research (WhisperLive, Deepgram) shows <300ms is needed to split at word level; 500ms is safe for sentence-level segmentation.
@@ -201,7 +225,11 @@ const NOISE_FLOOR_WINDOW: usize = 50;  // 50 × 100ms = 5s calibration
 const NOISE_FLOOR_WINDOW: usize = 25;  // 25 × 100ms = 2.5s calibration
 ```
 
-**Rationale**: P25 over 25 silence frames is statistically sufficient for a stable noise floor estimate in a typical office environment. Halving the window reduces the first-segment visible delay by ~2.5s at the cost of marginally less smoothing.
+With `NOISE_FLOOR_WINDOW = 25`, the P25 index is `25 / 4 = 6` (integer division), representing the 24th percentile of the sorted 25-element window — close enough to P25 for practical noise floor estimation. The `clamp(min=0.003, max=0.040)` guard remains unchanged.
+
+The existing test `test_adaptive_threshold_converges_after_50_silence_frames` feeds 50 frames and still passes since 50 > 25 (convergence happens at frame 25). `test_adaptive_threshold_cold_start_uses_initial` feeds 10 frames, still within the cold-start range for both 25 and 50, so it also passes unchanged.
+
+**Rationale**: P25 over 25 silence frames is statistically sufficient for a stable noise floor estimate in a typical office environment. Halving the window reduces the first-segment visible delay by ~2.5s.
 
 ### 2.3 Frontend Poll Frequency — `src/store/recording.ts`
 
@@ -218,11 +246,13 @@ if (tickCount % 2 === 0 && currentSession) {
 | Source | Before | After | Δ |
 |--------|--------|-------|---|
 | Pause trigger | 800ms | 500ms | −300ms |
-| Loop check granularity | 50ms | 10ms | −40ms |
-| Frontend poll | 300ms | 200ms | −100ms |
+| Loop check granularity (avg) | ~25ms | ~5ms | −20ms |
+| Frontend poll (max) | 300ms | 200ms | −100ms |
 | VAD cold-start (first segment only) | 5s | 2.5s | −2.5s |
 | Whisper inference | ~400ms | ~400ms | 0 |
-| **Steady-state total** | **~1.8s** | **~1.2s** | **−600ms** |
+| **Steady-state total** | **~1.8s** | **~1.4s** | **−440ms** |
+
+Note: Loop granularity improvement is expressed as average wait time (50ms max → 10ms max means ~25ms avg → ~5ms avg = −20ms average reduction).
 
 ---
 
@@ -232,9 +262,10 @@ if (tickCount % 2 === 0 && currentSession) {
 |----------|----------|
 | `updateConfig` fails (DB error) | Log to console, no UI disruption — setting reverts on next launch |
 | Last-used device not found in device list | Fall back to system default silently |
-| `getConfig` fails on mount | Component uses hardcoded defaults (same as before) |
+| `getConfig` fails on mount | Component uses hardcoded defaults (same as before); `initialized` remains false, save-back never fires |
 | PAUSE_FLUSH_MS=500ms splits a sentence | Audio accumulates into next segment; Whisper context window handles cross-segment continuity |
 | NOISE_FLOOR_WINDOW=25 inaccurate in noisy env | `clamp(max=0.040)` prevents over-filtering; 25-frame P25 still better than fixed threshold |
+| `loadDevices` completes before `getConfig` | Device set to system default; when config arrives, `savedDeviceId` state change re-triggers restoration to last-used device |
 
 ---
 
@@ -242,25 +273,26 @@ if (tickCount % 2 === 0 && currentSession) {
 
 | File | Change Type | Summary |
 |------|-------------|---------|
-| `src-tauri/src/config/schema.rs` | Modify | Add `last_used_device_id`; remove `audio_chunk_ms` |
+| `src-tauri/src/config/schema.rs` | Modify | Add `last_used_device_id`; remove `audio_chunk_ms`; update apply_partial |
 | `src-tauri/src/commands/transcription.rs` | Modify | Remove `chunk_duration_ms` from `RealtimeConfig` |
-| `src-tauri/src/transcription/pipeline.rs` | Modify | PAUSE_FLUSH_MS=500, loop sleep=10ms |
+| `src-tauri/src/transcription/pipeline.rs` | Modify | PAUSE_FLUSH_MS=500, loop sleep=10ms, update test assertion |
 | `src-tauri/src/audio/vad.rs` | Modify | NOISE_FLOOR_WINDOW=25 |
 | `src/store/recording.ts` | Modify | tickCount % 2 |
-| `src/components/recording/RecordingPanel.tsx` | Modify | Full read+save for all 6 settings |
+| `src/components/recording/RecordingPanel.tsx` | Modify | Replace hasMountedRef with initialized state; full read+save for all 6 settings |
 | `src/components/recording/RecordingMain.tsx` | Modify | Remove chunk_duration_ms from DEFAULT_CONFIG |
 | `src/routes/recording.tsx` | Modify | Remove chunk_duration_ms from buildConfig |
 | `src/store/settings.ts` | Modify | Remove audio_chunk_ms field and default |
 | `src/components/layout/__tests__/integration.test.tsx` | Modify | Remove audio_chunk_ms from test fixture |
 
-No new files. No DB schema changes. `src/lib/bindings.ts` regenerated automatically at debug build.
+No new files. No DB schema changes. `src/lib/bindings.ts` regenerated automatically at debug build — must regenerate before running `npm run typecheck`.
 
 ---
 
 ## Testing Plan
 
 1. **Settings persistence** — Start app, set language=zh, mode=transcribe_only, specific microphone; close and reopen → verify all 6 settings restore. Unplug the saved microphone → verify fallback to system default.
-2. **Dead code removal** — `cargo check` passes; `npm run typecheck` passes; all existing tests pass.
-3. **Latency measurement** — Record 5s of Chinese speech, pause 1s. Measure time from pause end to text appearance. Target: <1.5s.
-4. **VAD calibration** — Start recording immediately after clicking Start; verify first segment appears within 3s (not 6s).
-5. **Regression: pause detection** — Speak continuously for 30s without pause; verify 25s safety flush still triggers correctly.
+2. **Race condition** — Simulate slow `getConfig` (add log delay): verify device restores correctly when devices load first.
+3. **Dead code removal** — `cargo check` passes; `npm run typecheck` passes (after regenerating bindings); all existing tests pass.
+4. **Latency measurement** — Record 5s of Chinese speech, pause 1s. Measure time from pause end to text appearance. Target: <1.5s.
+5. **VAD calibration** — Start recording immediately after clicking Start; verify first segment appears within 3s (not 6s).
+6. **Regression: pause detection** — Speak continuously for 30s without pause; verify 25s safety flush still triggers correctly.
