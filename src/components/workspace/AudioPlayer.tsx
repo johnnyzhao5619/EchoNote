@@ -18,6 +18,8 @@ export function AudioPlayer({ filePath, durationMs }: AudioPlayerProps) {
   const [src, setSrc] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
+  // Use actual audio metadata duration; fall back to stored durationMs
+  const [audioDuration, setAudioDuration] = useState(durationMs / 1000);
   const [error, setError] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
 
@@ -30,7 +32,7 @@ export function AudioPlayer({ filePath, durationMs }: AudioPlayerProps) {
       .catch(() => setError(true));
   }, [filePath]);
 
-  const totalSec = durationMs / 1000;
+  const totalSec = audioDuration;
 
   const togglePlay = () => {
     const audio = audioRef.current;
@@ -73,6 +75,10 @@ export function AudioPlayer({ filePath, durationMs }: AudioPlayerProps) {
         onTimeUpdate={() =>
           setCurrentTime(audioRef.current?.currentTime ?? 0)
         }
+        onLoadedMetadata={() => {
+          const d = audioRef.current?.duration;
+          if (d && isFinite(d)) setAudioDuration(d);
+        }}
         onError={() => setError(true)}
         preload="metadata"
       />
