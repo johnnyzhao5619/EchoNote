@@ -20,7 +20,7 @@
 
 - All 6 `RecordingPanel` settings (microphone, language, mode, target language, VAD threshold, auto-process) restore correctly on every app launch
 - Microphone restores to the last-used device when available; falls back to system default otherwise
-- Steady-state transcription latency reduced from ~1.8s to ~1.4s (−440ms)
+- Steady-state transcription latency reduced from ~1.8s to ~1.4s (−420ms)
 - First-segment visible delay reduced from ~7s to ~4s (VAD cold-start calibration halved)
 - Dead `audio_chunk_ms` / `chunk_duration_ms` fields removed from API and config
 
@@ -227,7 +227,20 @@ const NOISE_FLOOR_WINDOW: usize = 25;  // 25 × 100ms = 2.5s calibration
 
 With `NOISE_FLOOR_WINDOW = 25`, the P25 index is `25 / 4 = 6` (integer division), representing the 24th percentile of the sorted 25-element window — close enough to P25 for practical noise floor estimation. The `clamp(min=0.003, max=0.040)` guard remains unchanged.
 
-The existing test `test_adaptive_threshold_converges_after_50_silence_frames` feeds 50 frames and still passes since 50 > 25 (convergence happens at frame 25). `test_adaptive_threshold_cold_start_uses_initial` feeds 10 frames, still within the cold-start range for both 25 and 50, so it also passes unchanged.
+Also update the inline comment in `update_noise_floor()` from:
+```rust
+// P25：index 12（= 50 × 0.25 = 12.5，向下取整）
+let p25 = sorted[NOISE_FLOOR_WINDOW / 4];
+```
+to:
+```rust
+// P25：index 6（= 25 × 0.25 = 6.25，向下取整）
+let p25 = sorted[NOISE_FLOOR_WINDOW / 4];
+```
+
+Also update the comment in `test_adaptive_threshold_cold_start_uses_initial` from `"冷启动期（< 50 静音帧）"` to `"冷启动期（< 25 静音帧）"`.
+
+The existing test `test_adaptive_threshold_converges_after_50_silence_frames` feeds 50 frames and still passes: convergence happens at frame 25; frames 26–50 slide the window with identical rms=0.005 values, so the P25 result stays at 0.005 × 4.0 = 0.020 throughout. `test_adaptive_threshold_cold_start_uses_initial` feeds 10 frames, still within the cold-start range for NOISE_FLOOR_WINDOW=25, so it also passes unchanged.
 
 **Rationale**: P25 over 25 silence frames is statistically sufficient for a stable noise floor estimate in a typical office environment. Halving the window reduces the first-segment visible delay by ~2.5s.
 
@@ -250,9 +263,9 @@ if (tickCount % 2 === 0 && currentSession) {
 | Frontend poll (max) | 300ms | 200ms | −100ms |
 | VAD cold-start (first segment only) | 5s | 2.5s | −2.5s |
 | Whisper inference | ~400ms | ~400ms | 0 |
-| **Steady-state total** | **~1.8s** | **~1.4s** | **−440ms** |
+| **Steady-state total** | **~1.8s** | **~1.4s** | **−420ms** |
 
-Note: Loop granularity improvement is expressed as average wait time (50ms max → 10ms max means ~25ms avg → ~5ms avg = −20ms average reduction).
+Note: Loop granularity improvement is expressed as average wait time (50ms max → 10ms max means ~25ms avg → ~5ms avg = −20ms average reduction). Total = 300 + 20 + 100 = 420ms.
 
 ---
 
