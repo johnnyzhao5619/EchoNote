@@ -8,7 +8,7 @@ pub mod audio;
 pub mod transcription;
 pub mod llm;
 
-use commands::{settings, theme, models as model_cmds, audio as audio_cmds, transcription as transcription_cmds, workspace as workspace_cmds};
+use commands::{settings, theme, models as model_cmds, audio as audio_cmds, transcription as transcription_cmds, workspace as workspace_cmds, llm as llm_cmds};
 use tauri::Manager;
 use tauri_specta::{collect_commands, Builder};
 
@@ -36,6 +36,10 @@ fn specta_builder() -> Builder {
             transcription_cmds::get_realtime_segments,
             transcription_cmds::get_recording_status,
             workspace_cmds::list_recordings,
+            llm_cmds::submit_llm_task,
+            llm_cmds::cancel_llm_task,
+            llm_cmds::get_llm_engine_status,
+            llm_cmds::list_document_llm_tasks,
         ])
 }
 
