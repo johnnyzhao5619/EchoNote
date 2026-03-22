@@ -50,9 +50,12 @@ describe("M1 Integration: Shell + Router + Theme", () => {
 
   it("navigating to /workspace shows workspace page", async () => {
     const { invoke } = await import("@tauri-apps/api/core");
-    vi.mocked(invoke).mockResolvedValueOnce([]);
+    // listFoldersWithDocuments returns empty tree; ensureSystemFolders returns system ids
+    vi.mocked(invoke)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce({ inbox_id: "inbox-1", batch_task_id: "batch-1" });
     renderApp("/workspace");
-    await screen.findByText(/no recordings yet/i);
+    await screen.findByText(/工作区/);
   });
 
   it("navigating to /settings shows settings form", async () => {
