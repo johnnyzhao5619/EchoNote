@@ -124,8 +124,23 @@ pub async fn set_active_model(
     if model_type.as_str() == "whisper" {
         state.try_load_whisper().await;
     }
+    // 切换 LLM 模型后立即热加载引擎，无需重启
+    if model_type.as_str() == "llm" {
+        state.try_load_llm().await;
+    }
 
     Ok(())
+}
+
+/// Poll and consume one download error (pop-once semantics). Frontend calls every 2s during download.
+/// Returns Some(error_message) if error exists, None if not.
+#[tauri::command]
+#[specta::specta]
+pub async fn get_download_error(
+    variant_id: String,
+    state: State<'_, AppState>,
+) -> Result<Option<String>, AppError> {
+    Ok(state.download_errors.remove(&variant_id).map(|(_, v)| v))
 }
 
 /// 启动时检测缺失模型（供 lib.rs 在窗口就绪后调用）

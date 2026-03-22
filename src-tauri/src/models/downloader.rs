@@ -251,19 +251,24 @@ pub async fn run_download_worker(
                                 )
                                 .ok();
 
-                            // 下载完成后立即热加载 whisper 引擎（若为 whisper 模型）
+                            // 下载完成后立即热加载对应引擎
                             use crate::models::registry::parse_variant_id;
-                            if parse_variant_id(&vid).map(|(t, _)| t == "whisper").unwrap_or(false) {
-                                state_for_reload.try_load_whisper().await;
+                            match parse_variant_id(&vid).map(|(t, _)| t) {
+                                Some("whisper") => { state_for_reload.try_load_whisper().await; }
+                                Some("llm") => { state_for_reload.try_load_llm().await; }
+                                _ => {}
                             }
                         }
                         Err(e) => {
+                            // Keep the event for any future listeners
                             app_clone
                                 .emit(
                                     "models:error",
                                     serde_json::json!({ "variant_id": vid, "error": e.to_string() }),
                                 )
                                 .ok();
+                            // Also store for poll-based retrieval
+                            state_for_reload.download_errors.insert(vid.clone(), e.to_string());
                         }
                     }
                 });

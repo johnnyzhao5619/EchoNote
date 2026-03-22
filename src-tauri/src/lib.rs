@@ -33,6 +33,7 @@ fn specta_builder() -> Builder {
             model_cmds::cancel_download,
             model_cmds::delete_model,
             model_cmds::set_active_model,
+            model_cmds::get_download_error,
             audio_cmds::list_audio_devices,
             transcription_cmds::start_realtime,
             transcription_cmds::pause_realtime,
@@ -116,6 +117,7 @@ pub fn run() {
                     },
                     llm_engine: std::sync::Arc::new(tokio::sync::Mutex::new(None)),
                     active_llm_cancels: std::sync::Arc::new(dashmap::DashMap::new()),
+                    download_errors: std::sync::Arc::new(dashmap::DashMap::new()),
                     prompt_templates: std::sync::Arc::new(PromptTemplates {
                         summary: crate::llm::tasks::TaskTemplate {
                             system: String::new(),
@@ -174,34 +176,6 @@ pub fn run() {
             let whisper_engine: std::sync::Arc<std::sync::Mutex<Option<crate::transcription::WhisperEngine>>> =
                 std::sync::Arc::new(std::sync::Mutex::new(None));
 
-            // Try to load whisper model if already downloaded
-            {
-                let cfg_guard = tauri::async_runtime::block_on(config.read());
-                let model_dir = std::path::Path::new(&cfg_guard.vault_path)
-                    .parent()
-                    .unwrap_or(std::path::Path::new(&cfg_guard.vault_path))
-                    .join("models");
-
-                if let Some((model_type, variant_name)) =
-                    crate::models::registry::parse_variant_id(&cfg_guard.active_whisper_model)
-                {
-                    if let Some(variant_cfg) = model_config.whisper.variants.get(variant_name) {
-                        let model_path = crate::models::registry::model_file_path(
-                            &model_dir, model_type, variant_name, &variant_cfg.url,
-                        );
-                        if model_path.exists() {
-                            match crate::transcription::WhisperEngine::new(&model_path) {
-                                Ok(engine) => {
-                                    *whisper_engine.lock().unwrap() = Some(engine);
-                                    log::info!("whisper engine loaded from {}", model_path.display());
-                                }
-                                Err(e) => log::warn!("whisper load failed: {e}"),
-                            }
-                        }
-                    }
-                }
-            }
-
             // Step M5: Load prompt templates
             let prompts_path = {
                 let resource_attempt = app.path()
@@ -231,6 +205,8 @@ pub fn run() {
                 std::sync::Arc::new(dashmap::DashMap::new());
             let llm_engine_status: std::sync::Arc<tokio::sync::Mutex<LlmEngineStatus>> =
                 std::sync::Arc::new(tokio::sync::Mutex::new(LlmEngineStatus::NotLoaded));
+            let download_errors: std::sync::Arc<dashmap::DashMap<String, String>> =
+                std::sync::Arc::new(dashmap::DashMap::new());
 
             // M4 shared state (Arc wrappers for sharing with worker)
             let segments_cache = std::sync::Arc::new(std::sync::Mutex::new(std::collections::HashMap::new()));
@@ -261,14 +237,12 @@ pub fn run() {
                 resampler_done_rx: std::sync::Arc::clone(&resampler_done_rx),
                 resampler_stop: std::sync::Arc::clone(&resampler_stop),
                 audio_level: std::sync::Arc::clone(&audio_level),
-                llm_tx: {
-                    let (tx, _) = tokio::sync::mpsc::channel(1);
-                    tx
-                },
-                llm_engine: std::sync::Arc::new(tokio::sync::Mutex::new(None)),
-                active_llm_cancels: std::sync::Arc::new(dashmap::DashMap::new()),
+                llm_tx: llm_tx.clone(),
+                llm_engine: std::sync::Arc::clone(&llm_engine),
+                active_llm_cancels: std::sync::Arc::clone(&active_llm_cancels),
+                download_errors: std::sync::Arc::clone(&download_errors),
                 prompt_templates: std::sync::Arc::clone(&prompt_templates),
-                llm_engine_status: std::sync::Arc::new(tokio::sync::Mutex::new(LlmEngineStatus::NotLoaded)),
+                llm_engine_status: std::sync::Arc::clone(&llm_engine_status),
             });
 
             // Spawn DownloadWorker
@@ -350,9 +324,20 @@ pub fn run() {
                 llm_tx,
                 llm_engine,
                 active_llm_cancels,
+                download_errors,
                 prompt_templates,
                 llm_engine_status,
             });
+
+            // Try to load engines if models already downloaded.
+            // Spawned after manage() so try_load_* can use proper Loading state and spawn_blocking.
+            let app_handle_for_init = app_handle.clone();
+            tauri::async_runtime::spawn(async move {
+                let state = app_handle_for_init.state::<crate::state::AppState>();
+                state.try_load_whisper().await;
+                state.try_load_llm().await;
+            });
+
             Ok(())
         })
         .invoke_handler(

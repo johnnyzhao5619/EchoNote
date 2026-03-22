@@ -69,6 +69,9 @@ pub struct AppState {
     /// 活跃任务取消标志表（task_id → AtomicBool）
     pub active_llm_cancels: Arc<DashMap<String, Arc<AtomicBool>>>,
 
+    /// Download errors keyed by variant_id. Worker inserts on error; get_download_error pops.
+    pub download_errors: Arc<DashMap<String, String>>,
+
     /// Prompt 模板（启动时一次性加载，只读）
     pub prompt_templates: Arc<PromptTemplates>,
 
@@ -115,6 +118,77 @@ impl AppState {
             }
             Err(e) => {
                 log::warn!("[whisper] spawn_blocking panicked: {e}");
+                false
+            }
+        }
+    }
+
+    /// 根据当前 AppConfig 尝试热加载 LlmEngine。
+    /// 调用时机：模型下载完成、切换激活模型、应用启动。
+    /// 返回 true = 加载成功；false = 文件不存在或加载失败。
+    pub async fn try_load_llm(&self) -> bool {
+        let (model_dir, active_model) = {
+            let cfg = self.config.read().await;
+            let model_dir = std::path::Path::new(&cfg.vault_path)
+                .parent()
+                .unwrap_or(std::path::Path::new(&cfg.vault_path))
+                .join("models");
+            (model_dir, cfg.active_llm_model.clone())
+        };
+
+        let Some((model_type, variant_name)) = parse_variant_id(&active_model) else {
+            return false;
+        };
+        let Some(variant_cfg) = self.model_config.llm.variants.get(variant_name) else {
+            return false;
+        };
+        let model_path = model_file_path(&model_dir, model_type, variant_name, &variant_cfg.url);
+        if !model_path.exists() {
+            log::debug!("[llm] model file not found: {}", model_path.display());
+            return false;
+        }
+
+        // Check-and-set Loading status under lock to prevent concurrent double-load.
+        {
+            let mut status = self.llm_engine_status.lock().await;
+            if matches!(*status, LlmEngineStatus::Loading { .. }) {
+                log::debug!("[llm] already loading, skipping duplicate load");
+                return false;
+            }
+            *status = LlmEngineStatus::Loading {
+                model_id: active_model.clone(),
+            };
+        }
+
+        let engine_arc = Arc::clone(&self.llm_engine);
+        let status_arc = Arc::clone(&self.llm_engine_status);
+        let model_id = active_model.clone();
+        let path = model_path;
+
+        match tokio::task::spawn_blocking(move || {
+            LlmEngine::new(&path, crate::llm::engine::ContextParams::default())
+        }).await {
+            Ok(Ok(engine)) => {
+                *engine_arc.lock().await = Some(Arc::new(engine));
+                *status_arc.lock().await = LlmEngineStatus::Ready {
+                    model_id,
+                    loaded_at: chrono::Utc::now().timestamp(),
+                };
+                log::info!("[llm] engine loaded: {active_model}");
+                true
+            }
+            Ok(Err(e)) => {
+                *status_arc.lock().await = LlmEngineStatus::Error {
+                    message: e.to_string(),
+                };
+                log::warn!("[llm] load failed: {e}");
+                false
+            }
+            Err(e) => {
+                *status_arc.lock().await = LlmEngineStatus::Error {
+                    message: format!("spawn_blocking panicked: {e}"),
+                };
+                log::warn!("[llm] spawn_blocking panicked: {e}");
                 false
             }
         }
