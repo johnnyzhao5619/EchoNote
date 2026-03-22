@@ -237,6 +237,41 @@ async getDocumentAssets(documentId: string) : Promise<Result<DocumentAsset[], Ap
 }
 },
 /**
+ * 按需为录音创建 workspace_document（幂等）。
+ * 若已存在则直接返回 document_id；否则创建新的 document + transcript asset（从分段拼接）。
+ */
+async ensureDocumentForRecording(recordingId: string) : Promise<Result<string, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("ensure_document_for_recording", { recordingId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * UPSERT 一条 text asset，同时将内容写入本地 .md 文件（vault_path/notes/{title}/{role}.md）。
+ */
+async updateDocumentAsset(documentId: string, role: string, content: string) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("update_document_asset", { documentId, role, content }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 删除录音。also_delete_document=true 时同时删除关联的 workspace_document（级联删除 assets）。
+ * 同时删除磁盘上的 WAV 文件（失败不报错）。
+ */
+async deleteRecording(recordingId: string, alsoDeleteDocument: boolean) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("delete_recording", { recordingId, alsoDeleteDocument }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * 提交 LLM 任务，立即返回 task_id
  */
 async submitLlmTask(request: LlmTaskRequest) : Promise<Result<string, AppError>> {
@@ -416,11 +451,11 @@ export type RealtimeConfig = { device_id: string | null; language: string | null
 /**
  * 单条录音摘要（用于 Workspace 列表）
  */
-export type RecordingItem = { id: string; title: string; file_path: string; duration_ms: number; language: string; created_at: number;
+export type RecordingItem = { id: string; title: string; file_path: string; duration_ms: number; language: string; created_at: number; 
 /**
  * 转写全文拼接（来自 workspace_text_assets.content），无则空串
  */
-transcript: string;
+transcript: string; 
 /**
  * workspace_documents.id for this recording (None if not yet indexed)
  */
