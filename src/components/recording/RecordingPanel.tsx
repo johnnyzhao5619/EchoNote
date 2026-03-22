@@ -41,27 +41,51 @@ export function RecordingPanel({ onConfigChange }: RecordingPanelProps) {
   const [targetLang, setTargetLang] = useState<string>('en')
   const [vadThreshold, setVadThreshold] = useState<number>(0.008)
   const [autoProcess, setAutoProcess] = useState<boolean>(false)
+  const [initialized, setInitialized] = useState(false)
+  const [savedDeviceId, setSavedDeviceId] = useState<string | null>(null)
 
   // Load defaults from AppConfig on mount
   useEffect(() => {
     commands.getConfig().then((r) => {
       if (r.status === 'ok' && r.data) {
         const cfg = r.data
-        // 将保存的阈值 clamp 到合理范围：iPhone 麦克风 RMS 通常 0.003–0.04，
-        // 阈值超过 0.05 基本会过滤掉所有语音
-        // iPhone Continuity Camera 麦克风 RMS 通常 0.001–0.030，阈值超过 0.020 会过滤所有语音
-        if (cfg.vad_threshold != null) setVadThreshold(Math.min(cfg.vad_threshold, 0.015))
-        if (cfg.default_language) setLanguage(cfg.default_language)
+        if (cfg.vad_threshold != null)    setVadThreshold(Math.min(cfg.vad_threshold, 0.015))
+        if (cfg.default_language)         setLanguage(cfg.default_language)
+        if (cfg.default_recording_mode)   setMode(cfg.default_recording_mode as typeof mode)
+        if (cfg.default_target_language)  setTargetLang(cfg.default_target_language)
         if (cfg.auto_llm_on_stop != null) setAutoProcess(cfg.auto_llm_on_stop)
+        setSavedDeviceId(cfg.last_used_device_id ?? null)
+        setInitialized(true)   // must be last — triggers save-back effects on next render
       }
     })
     loadDevices()
   }, [loadDevices])
 
+  // Device restoration — re-runs if savedDeviceId arrives after devices
   useEffect(() => {
-    const defaultDevice = devices.find((d) => d.is_default)
-    if (defaultDevice && !deviceId) setDeviceId(defaultDevice.id)
-  }, [devices, deviceId])
+    if (!devices.length) return
+    const preferred = savedDeviceId ? devices.find(d => d.id === savedDeviceId) : null
+    const target = preferred ?? devices.find(d => d.is_default)
+    if (target) setDeviceId(target.id)
+  }, [devices, savedDeviceId])
+
+  // Save all logical settings back to config
+  useEffect(() => {
+    if (!initialized) return
+    commands.updateConfig({
+      default_language: language === 'auto' ? null : language,
+      default_recording_mode: mode,
+      default_target_language: targetLang,
+      vad_threshold: vadThreshold,
+      auto_llm_on_stop: autoProcess,
+    })
+  }, [initialized, language, mode, targetLang, vadThreshold, autoProcess])
+
+  // Save device ID — separate effect; only saves when non-empty
+  useEffect(() => {
+    if (!initialized || !deviceId) return
+    commands.updateConfig({ last_used_device_id: deviceId })
+  }, [initialized, deviceId])
 
   useEffect(() => {
     onConfigChange?.({ deviceId, language, mode, targetLang, vadThreshold, autoProcess })
