@@ -104,6 +104,11 @@ pub struct FolderNode {
 }
 ```
 
+> **specta 递归类型注意事项：** specta v2 对 `Vec<FolderNode>` 递归结构支持有限，可能需要用 `Box<Vec<FolderNode>>` 或在编译时加 `#[specta(inline)]`。若 `cargo check` 报类型导出错误，备选方案是扁平化返回：返回 `Vec<FlatFolder>` + `Vec<DocumentSummary>`，由前端代码组装树，手工在 `bindings.ts` 中添加 `FolderNode` 类型。优先尝试递归结构，遇到问题再扁平化。
+
+```rust
+```
+
 ### 1.3 新增命令
 
 **`ensure_system_folders`**
@@ -194,11 +199,16 @@ pub async fn move_document_to_folder(
 操作步骤：
 1. 更新 DB `workspace_documents.folder_id = folder_id`
 2. 若 `vault_path` 已在 settings 中配置：
-   - 读取 `workspace_text_assets` 中该 document 的 `file_path`
-   - 计算新路径：`{vault_path}/{folder_path}/{document_title}.md`
-   - 用 `std::fs::rename` 移动文件
-   - 更新 `workspace_text_assets.file_path`
+   - 查询目标文件夹名称，向上递归遍历 `parent_id` 链，拼接路径（`sanitize_filename` 每段）
+   - 例：文件夹层级 `工作会议 > Q1` → `folder_path = "工作会议/Q1"`
+   - 遍历 `workspace_text_assets`，对每条记录：
+     - 计算新路径：`{vault_path}/notes/{folder_path}/{document_title}/{role}.md`
+     - 用 `tokio::fs::rename` 移动文件；目标目录若不存在先 `create_dir_all`
+     - 若目标路径已有同名文件，追加 `_{uuid_suffix}` 避免覆盖
+     - 更新 `workspace_text_assets.file_path`
 3. 若 vault 未配置，仅更新 DB
+
+> `rename_document` 有同样的文件重命名逻辑：新路径 = `{vault_path}/notes/{folder_path}/{new_title}/{role}.md`，冲突时加后缀。
 
 **`rename_document`**
 
@@ -215,12 +225,34 @@ pub async fn rename_document(
 - 更新 `workspace_documents.title`
 - 若 vault 已配置，重命名磁盘上的 `.md` 文件并更新 `file_path`
 
+**`delete_document`**
+
+```rust
+#[tauri::command]
+#[specta::specta]
+pub async fn delete_document(
+    document_id: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), AppError>
+```
+
+- 查询 `workspace_text_assets.file_path`，若 vault 已配置则删除磁盘上的 `.md` 文件（失败不报错）
+- 删除 `workspace_documents` 记录（DB CASCADE 会自动删除 `workspace_text_assets`）
+- **注意：** 此命令只删文档，不删录音。若需同时删录音，使用现有的 `delete_recording(also_delete_document=true)`
+
 ### 1.4 修改现有命令
 
 **`ensure_document_for_recording`**（`commands/workspace.rs`）
 
-- 创建新 document 时，查询 `inbox_id`（通过 `ensure_system_folders` 或直接查 DB）
-- 设置 `folder_id = inbox_id`
+- 在函数内部先调用 `ensure_system_folders_inner(&pool).await?` 获取 `inbox_id`（提取为内部非 command 函数复用）
+- 修改现有 INSERT 语句，加入 `folder_id` 列：
+
+```sql
+INSERT INTO workspace_documents
+  (id, title, source_type, recording_id, folder_id, created_at, updated_at)
+VALUES (?, ?, 'recording', ?, ?, ?, ?)
+-- 对应绑定：&doc_id, &title, &recording_id, &inbox_id, created_at, now
+```
 
 **`create_batch_task_document`**（若存在）
 
@@ -228,26 +260,33 @@ pub async fn rename_document(
 
 ### 1.5 注册到 `lib.rs`
 
-在 `tauri::Builder` 的 `invoke_handler` 中添加：
+在 `collect_commands![]` 宏中添加（与现有命令格式一致）：
 
 ```rust
-ensure_system_folders,
-list_folders_with_documents,
-create_folder,
-rename_folder,
-delete_folder,
-move_document_to_folder,
-rename_document,
+workspace_cmds::ensure_system_folders,
+workspace_cmds::list_folders_with_documents,
+workspace_cmds::create_folder,
+workspace_cmds::rename_folder,
+workspace_cmds::delete_folder,
+workspace_cmds::move_document_to_folder,
+workspace_cmds::rename_document,
+workspace_cmds::delete_document,
 ```
 
-在 `setup` hook 中调用：
+在 `app.manage(state)` 之后，用 spawn async task 初始化系统文件夹（与现有引擎加载模式一致）：
 
 ```rust
-app.state::<AppState>()
-    .db
-    .ensure_system_folders()
-    .await?;
+// 在 app.manage() 之后
+let app_handle = app.handle().clone();
+tauri::async_runtime::spawn(async move {
+    let state = app_handle.state::<AppState>();
+    if let Err(e) = workspace_cmds::init_system_folders(&state.db.pool).await {
+        log::error!("Failed to init system folders: {e}");
+    }
+});
 ```
+
+其中 `init_system_folders` 是从 `ensure_system_folders` 提取的内部函数（`pub(crate) async fn init_system_folders(pool: &SqlitePool) -> Result<SystemFolderIds, AppError>`），不是 command 本身。
 
 ---
 
@@ -332,9 +371,16 @@ WorkspaceFileTree
 - 分隔线：系统文件夹与用户文件夹之间 `<hr className="my-2 border-border" />`
 - 选中文档：`bg-accent/20 text-accent`
 
-**依赖：**
-- `@radix-ui/react-context-menu`（若已安装则复用，否则安装）
-- Zustand store
+**新增 npm 依赖（Task 2-5 合计，统一在 Task 2 开始前安装）：**
+
+```bash
+npm install react-markdown remark-gfm @radix-ui/react-context-menu textarea-caret
+npm install --save-dev @types/textarea-caret
+```
+
+- `react-markdown` + `remark-gfm`：Markdown 渲染（Task 3）
+- `@radix-ui/react-context-menu`：右键菜单（Task 2）
+- `textarea-caret`：计算 textarea 内光标/选区的像素位置（Task 5）
 
 ### 2.3 侧边栏集成
 
@@ -596,17 +642,32 @@ interface AiInlineToolbarProps {
 }
 ```
 
-**获取选区位置：**
+**获取选区位置（`textarea` 专用，不能用 `window.getSelection()`）：**
+
+`textarea` 内容不在 DOM 树中，`window.getSelection()` 对其无效。使用 `textarea-caret` 库计算光标像素位置：
 
 ```ts
-const getSelectionRect = () => {
-  const selection = window.getSelection();
-  if (!selection || selection.rangeCount === 0) return null;
-  return selection.getRangeAt(0).getBoundingClientRect();
+import getCaretCoordinates from 'textarea-caret';
+
+const getToolbarPosition = (el: HTMLTextAreaElement) => {
+  const { selectionStart, selectionEnd } = el;
+  if (selectionStart === selectionEnd) return null;   // 无选区
+
+  // 取选区起始位置作为工具条定位点
+  const caret = getCaretCoordinates(el, selectionStart);
+  const rect = el.getBoundingClientRect();
+
+  return {
+    top: rect.top + caret.top - el.scrollTop - 36, // 工具条高度 36px，显示在上方
+    left: rect.left + caret.left,
+  };
 };
 ```
 
-注意：`textarea` 内的选区不直接支持 `window.getSelection()`，需通过在 textarea 上创建隐藏 mirror div 或使用 `getBoundingClientRect` + caret position 库（如 `textarea-caret`）计算位置。
+边界情况处理：
+- 选区靠近顶部（`top < 0`）时，工具条改为显示在选区下方（`top + caret.height + 4`）
+- 选区靠近右侧时，`left` 需 clamp 到视口宽度内
+- `textarea` 滚动时需重新计算（`el.scrollTop` 已在公式中减去）
 
 ### 5.3 AiTaskBar.tsx 兼容处理
 
@@ -618,11 +679,13 @@ const getSelectionRect = () => {
 
 | Task | 内容 | 前置依赖 |
 |------|------|---------|
-| Task 1 | 后端：系统文件夹 + CRUD 命令 + `list_folders_with_documents` + 修改 `ensure_document_for_recording` | 无 |
+| Task 1 | 后端：系统文件夹 + CRUD 命令（含 `delete_document`）+ `list_folders_with_documents` + 修改 `ensure_document_for_recording` | 无 |
 | Task 2 | 前端：`WorkspaceFileTree` 重写（文件夹树 + 右键菜单）| Task 1（需要后端命令） |
-| Task 3 | 前端：`EditableAsset` Markdown 双模式（安装 `react-markdown`）| 无（可并行） |
+| Task 3 | 前端：`EditableAsset` Markdown 双模式（安装 `react-markdown`）| 无（**可与 Task 2 并行**） |
 | Task 4 | 前端：文档页布局重构（Obsidian 风格头部、内联标题编辑）| Task 1（需要 `rename_document`）、Task 3 |
 | Task 5 | 前端：`AiPanel` + `AiInlineToolbar` | Task 3（需要 `insertAtCursor` ref）、Task 4（头部按钮） |
+
+**并行建议：** Task 1 完成后，Task 2 和 Task 3 可同时开发，互不依赖。
 
 ---
 
