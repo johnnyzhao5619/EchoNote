@@ -1,28 +1,20 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState, useCallback } from "react";
-import { listen } from "@tauri-apps/api/event";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { commands } from "@/lib/bindings";
 import type { RecordingItem } from "@/lib/bindings";
+import { formatDuration, formatDate } from "@/lib/format";
 import { FileText, Mic, Clock } from "lucide-react";
 
 export const Route = createFileRoute("/workspace")({
   component: WorkspacePage,
 });
 
-function formatDuration(ms: number): string {
-  const totalSec = Math.floor(ms / 1000);
-  const m = Math.floor(totalSec / 60);
-  const s = totalSec % 60;
-  return `${m}:${String(s).padStart(2, "0")}`;
-}
-
-function formatDate(ms: number): string {
-  return new Date(ms).toLocaleString();
-}
-
-function RecordingCard({ item }: { item: RecordingItem }) {
+function RecordingCard({ item, onClick }: { item: RecordingItem; onClick: () => void }) {
   return (
-    <div className="flex flex-col gap-2 p-4 rounded-lg border border-border-default bg-bg-secondary hover:bg-bg-tertiary transition-colors cursor-pointer">
+    <div
+      className="flex flex-col gap-2 p-4 rounded-lg border border-border-default bg-bg-secondary hover:bg-bg-tertiary transition-colors cursor-pointer"
+      onClick={onClick}
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <Mic className="w-4 h-4 shrink-0 text-accent-primary" />
@@ -51,13 +43,16 @@ function RecordingCard({ item }: { item: RecordingItem }) {
 }
 
 function WorkspacePage() {
+  const navigate = useNavigate();
   const [recordings, setRecordings] = useState<RecordingItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const prevCountRef = useRef(0);
 
   const load = useCallback(async () => {
     const result = await commands.listRecordings();
     if (result.status === "ok") {
       setRecordings(result.data);
+      prevCountRef.current = result.data.length;
     }
     setLoading(false);
   }, []);
@@ -66,17 +61,24 @@ function WorkspacePage() {
     load();
   }, [load]);
 
-  // 录音结束后自动刷新列表
+  // Poll for new recordings (replaces unreliable Tauri event listener)
   useEffect(() => {
-    const unlisten = listen("transcription:status", (e: any) => {
-      if (e.payload?.status === "stopped") {
-        load();
+    const timer = setInterval(async () => {
+      const result = await commands.listRecordings();
+      if (result.status === "ok" && result.data.length !== prevCountRef.current) {
+        setRecordings(result.data);
+        prevCountRef.current = result.data.length;
       }
-    });
-    return () => {
-      unlisten.then((fn) => fn());
-    };
-  }, [load]);
+    }, 3000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const handleCardClick = (item: RecordingItem) => {
+    if (item.document_id) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (navigate as any)({ to: "/workspace/$documentId", params: { documentId: item.document_id } });
+    }
+  };
 
   if (loading) {
     return (
@@ -101,7 +103,11 @@ function WorkspacePage() {
         Recordings ({recordings.length})
       </h2>
       {recordings.map((item) => (
-        <RecordingCard key={item.id} item={item} />
+        <RecordingCard
+          key={item.id}
+          item={item}
+          onClick={() => handleCardClick(item)}
+        />
       ))}
     </div>
   );
