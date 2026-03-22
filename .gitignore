@@ -300,3 +300,4 @@ Icon
 Thumbs.db?
 Desktop.ini?
 src-tauri/Frameworks/
+.worktrees/
