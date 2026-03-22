@@ -15,8 +15,11 @@ import { AiPanel } from "@/components/workspace/AiPanel";
 import { AudioPlayer } from "@/components/workspace/AudioPlayer";
 import { EditableAsset } from "@/components/workspace/EditableAsset";
 import type { EditableAssetHandle } from "@/components/workspace/EditableAsset";
+import { SubtitleEditor } from "@/components/workspace/SubtitleEditor";
 import { useWorkspaceStore } from "@/store/workspace";
-import { Mic, Clock, FileText, Trash2 } from "lucide-react";
+import { Mic, Clock, FileText, Trash2, FileType2, Captions } from "lucide-react";
+
+type DocMode = "document" | "subtitle";
 
 export const Route = createFileRoute("/workspace/$documentId")({
   component: DocumentPage,
@@ -52,6 +55,7 @@ function DocumentPage() {
   const navigate = useNavigate();
   const { folderTree, renameDocument: storeRename } = useWorkspaceStore();
 
+  const [mode, setMode] = useState<DocMode>("document");
   const [assets, setAssets] = useState<DocumentAsset[]>([]);
   const [recording, setRecording] = useState<RecordingItem | null>(null);
   const [loading, setLoading] = useState(true);
@@ -185,6 +189,38 @@ function DocumentPage() {
             ].join(" ")}
           />
 
+          {/* Mode switcher (only when recording has a file) */}
+          {recording?.file_path && (
+            <div className="flex items-center rounded border border-border-default overflow-hidden">
+              <button
+                onClick={() => setMode("document")}
+                className={[
+                  "flex items-center gap-1 px-2 py-1 text-xs transition-colors",
+                  mode === "document"
+                    ? "bg-accent-primary/15 text-accent-primary"
+                    : "text-text-muted hover:bg-bg-tertiary",
+                ].join(" ")}
+                title="文档模式"
+              >
+                <FileType2 className="w-3 h-3" />
+                文档
+              </button>
+              <button
+                onClick={() => setMode("subtitle")}
+                className={[
+                  "flex items-center gap-1 px-2 py-1 text-xs transition-colors border-l border-border-default",
+                  mode === "subtitle"
+                    ? "bg-accent-primary/15 text-accent-primary"
+                    : "text-text-muted hover:bg-bg-tertiary",
+                ].join(" ")}
+                title="字幕模式"
+              >
+                <Captions className="w-3 h-3" />
+                字幕
+              </button>
+            </div>
+          )}
+
           {/* AI panel trigger */}
           <AiPanel
             documentId={documentId}
@@ -224,8 +260,8 @@ function DocumentPage() {
           )}
         </div>
 
-        {/* Compact audio player */}
-        {recording?.file_path && (
+        {/* Compact audio player — hidden in subtitle mode (SubtitleEditor has its own) */}
+        {recording?.file_path && mode === "document" && (
           <AudioPlayer
             key={recording.file_path}
             filePath={recording.file_path}
@@ -234,7 +270,17 @@ function DocumentPage() {
         )}
       </div>
 
-      {/* ── Content sections ──────────────────────────────────────── */}
+      {/* ── Subtitle mode ────────────────────────────────────────── */}
+      {mode === "subtitle" && recording?.file_path && (
+        <SubtitleEditor
+          recordingId={recording.id}
+          filePath={recording.file_path}
+          durationMs={recording.duration_ms}
+        />
+      )}
+
+      {/* ── Document mode content sections ─────────────────────── */}
+      {mode === "document" && (
       <div className="flex-1 px-6 py-4 flex flex-col overflow-y-auto">
         {assets.length === 0 ? (
           <p className="text-sm text-text-muted">
@@ -265,6 +311,7 @@ function DocumentPage() {
           })
         )}
       </div>
+      )}
 
       {/* ── Delete confirmation ──────────────────────────────────── */}
       {showDeleteConfirm && recording && (
