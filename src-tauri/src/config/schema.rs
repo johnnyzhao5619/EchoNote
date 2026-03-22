@@ -40,14 +40,20 @@ pub struct AppConfig {
     /// VAD energy threshold (0.0–1.0). Default: 0.02
     pub vad_threshold: f32,
 
-    /// Audio chunk duration sent to whisper (ms). Default: 500
-    pub audio_chunk_ms: u32,
-
     /// Automatically trigger AI processing after recording stops. Default: false
     pub auto_llm_on_stop: bool,
 
+    /// Last microphone device ID used. None = not yet set (use system default). Default: None
+    pub last_used_device_id: Option<String>,
+
     /// Default LLM task type. Values: "summary" | "meeting_brief". Default: "summary"
     pub default_llm_task: String,
+
+    /// Model download mirror.
+    /// "" / "default" = use URLs as-is from models.toml (huggingface.co)
+    /// "hf-mirror"    = replace huggingface.co with hf-mirror.com (China-friendly)
+    /// Custom URL     = replace huggingface.co with this base URL
+    pub model_mirror: String,
 }
 
 impl Default for AppConfig {
@@ -63,10 +69,11 @@ impl Default for AppConfig {
             default_recording_mode:  "transcribe_only".to_string(),
             default_language:        None,
             default_target_language: "en".to_string(),
-            vad_threshold:           0.02,
-            audio_chunk_ms:          500,
+            vad_threshold:           0.010, // iPhone Continuity Camera RMS 通常 0.005–0.030
             auto_llm_on_stop:        false,
+            last_used_device_id:     None,
             default_llm_task:        "summary".to_string(),
+            model_mirror:            String::new(), // default: use URLs as-is
         }
     }
 }
@@ -114,13 +121,16 @@ pub struct PartialAppConfig {
     pub vad_threshold: Option<f32>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub audio_chunk_ms: Option<u32>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub auto_llm_on_stop: Option<bool>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_used_device_id: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub default_llm_task: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model_mirror: Option<String>,
 }
 
 /// Apply a `PartialAppConfig` onto a mutable `AppConfig`.
@@ -137,9 +147,10 @@ pub fn apply_partial(config: &mut AppConfig, partial: PartialAppConfig) {
     if let Some(v) = partial.default_language        { config.default_language        = v; }
     if let Some(v) = partial.default_target_language { config.default_target_language = v; }
     if let Some(v) = partial.vad_threshold           { config.vad_threshold           = v; }
-    if let Some(v) = partial.audio_chunk_ms          { config.audio_chunk_ms          = v; }
     if let Some(v) = partial.auto_llm_on_stop        { config.auto_llm_on_stop        = v; }
+    if let Some(v) = partial.last_used_device_id     { config.last_used_device_id     = Some(v); }
     if let Some(v) = partial.default_llm_task        { config.default_llm_task        = v; }
+    if let Some(v) = partial.model_mirror            { config.model_mirror            = v; }
 }
 
 #[cfg(test)]
@@ -171,11 +182,11 @@ mod tests {
         assert_eq!(cfg.active_theme, "tokyo-night");
     }
 
-    /// Default vad_threshold must be 0.02.
+    /// Default vad_threshold must be 0.010 (iPhone-friendly).
     #[test]
     fn test_default_vad_threshold() {
         let cfg = AppConfig::default();
-        assert!((cfg.vad_threshold - 0.02).abs() < f32::EPSILON);
+        assert!((cfg.vad_threshold - 0.010).abs() < f32::EPSILON);
     }
 
     /// PartialAppConfig with only `locale` set must not affect other fields.
@@ -190,7 +201,7 @@ mod tests {
         assert_eq!(cfg.locale, "en_US");
         // Other fields remain at default
         assert_eq!(cfg.active_theme, "tokyo-night");
-        assert!((cfg.vad_threshold - 0.02).abs() < f32::EPSILON);
+        assert!((cfg.vad_threshold - 0.010).abs() < f32::EPSILON);
     }
 
     /// PartialAppConfig with `default_language = Some(None)` must clear the field.
