@@ -86,7 +86,8 @@ pub fn finalize_task_output(task_type: &LlmTaskType, raw_text: &str) -> Result<S
 }
 
 fn finalize_summary(raw_text: &str) -> Result<StructuredTaskOutput, AppError> {
-    let parsed: SummaryJson = serde_json::from_str(raw_text)
+    let json_text = extract_json_object(raw_text).unwrap_or(raw_text);
+    let parsed: SummaryJson = serde_json::from_str(json_text)
         .map_err(|e| AppError::Llm(format!("parse summary json: {e}")))?;
     let summary = require_non_empty("summary.summary", &parsed.summary)?;
     let key_points = sanitize_list("summary.key_points", parsed.key_points)?;
@@ -99,7 +100,8 @@ fn finalize_summary(raw_text: &str) -> Result<StructuredTaskOutput, AppError> {
 }
 
 fn finalize_meeting_brief(raw_text: &str) -> Result<StructuredTaskOutput, AppError> {
-    let parsed: MeetingBriefJson = serde_json::from_str(raw_text)
+    let json_text = extract_json_object(raw_text).unwrap_or(raw_text);
+    let parsed: MeetingBriefJson = serde_json::from_str(json_text)
         .map_err(|e| AppError::Llm(format!("parse meeting brief json: {e}")))?;
     let summary = require_non_empty("meeting_brief.summary", &parsed.summary)?;
     let decisions = sanitize_list("meeting_brief.decisions", parsed.decisions)?;
@@ -126,7 +128,8 @@ fn finalize_meeting_brief(raw_text: &str) -> Result<StructuredTaskOutput, AppErr
 }
 
 fn finalize_translation(raw_text: &str) -> Result<StructuredTaskOutput, AppError> {
-    let parsed: TranslationJson = serde_json::from_str(raw_text)
+    let json_text = extract_json_object(raw_text).unwrap_or(raw_text);
+    let parsed: TranslationJson = serde_json::from_str(json_text)
         .map_err(|e| AppError::Llm(format!("parse translation json: {e}")))?;
     let translated_text = require_non_empty("translation.translated_text", &parsed.translated_text)?;
     Ok(StructuredTaskOutput {
@@ -134,6 +137,16 @@ fn finalize_translation(raw_text: &str) -> Result<StructuredTaskOutput, AppError
         asset_role: "translation".to_string(),
         assets_to_write: vec![("translation".to_string(), translated_text)],
     })
+}
+
+fn extract_json_object(input: &str) -> Option<&str> {
+    let start = input.find('{')?;
+    let end = input.rfind('}')?;
+    if start < end {
+        Some(&input[start..=end])
+    } else {
+        None
+    }
 }
 
 fn require_non_empty(field_name: &str, value: &str) -> Result<String, AppError> {
@@ -245,5 +258,36 @@ mod tests {
         let spec = structured_prompt_spec(&LlmTaskType::Summary, "Base prompt").unwrap();
         assert!(spec.grammar.is_none());
         assert!(spec.user_prompt.contains("Return valid JSON only"));
+    }
+
+    #[test]
+    fn test_extract_json_object_with_trailing_chars() {
+        let raw = r#"Here is your summary:
+```json
+{
+    "summary": "This is a summary.",
+    "key_points": []
+}
+```
+Hope it helps!
+"#;
+        let extracted = extract_json_object(raw).unwrap();
+        assert_eq!(
+            extracted,
+            "{\n    \"summary\": \"This is a summary.\",\n    \"key_points\": []\n}"
+        );
+    }
+
+    #[test]
+    fn test_finalize_summary_with_trailing_chars() {
+        let raw = r#"```json
+{"summary":"讨论了课程内容规划。","key_points":["细化章节"]}
+```"#;
+        let output = finalize_task_output(
+            &LlmTaskType::Summary,
+            raw,
+        ).unwrap();
+        assert!(output.result_text.contains("## Summary"));
+        assert!(output.result_text.contains("讨论了课程内容规划。"));
     }
 }

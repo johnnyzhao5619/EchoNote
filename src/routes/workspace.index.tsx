@@ -10,7 +10,7 @@ export const Route = createFileRoute("/workspace/")({
 
 function WorkspaceIndex() {
   return (
-    <div className="flex flex-col h-full items-center justify-center gap-3 text-text-muted select-none">
+    <div className="flex flex-col h-full bg-bg-primary items-center justify-center gap-3 text-text-muted select-none">
       <Mic className="w-12 h-12 opacity-15" />
       <div className="text-center">
         <p className="text-sm font-medium">从左侧选择录音</p>

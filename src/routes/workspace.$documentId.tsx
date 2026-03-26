@@ -1,16 +1,13 @@
 // src/routes/workspace.$documentId.tsx
 // Document detail page.
 // Layout:
-//   Header:   icon + title + delete
-//   Meta:     date · duration
-//   Audio:    compact player
-//   Toolbar:  AI task bar
-//   ──────────────────────────────
-//   Primary:  transcript / document_text — full Obsidian-style edit/preview
-//   AI panel: 摘要 | 会议纪要 | 翻译  tabs  (only shown when AI content exists)
+//   Unified scrolling Notion-like page.
+//   Top: Huge Title, Meta, Audio Player, AI Actions
+//   Tabs (optional, only if AI contents exist)
+//   Content: max-w-3xl centered
 
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { commands } from "@/lib/bindings";
 import type { DocumentAsset, RecordingItem } from "@/lib/bindings";
@@ -18,7 +15,7 @@ import { formatDuration, formatDate } from "@/lib/format";
 import { AiTaskBar } from "@/components/workspace/AiTaskBar";
 import { AudioPlayer } from "@/components/workspace/AudioPlayer";
 import { EditableAsset } from "@/components/workspace/EditableAsset";
-import { Mic, Clock, Trash2 } from "lucide-react";
+import { Clock, Trash2, CalendarDays } from "lucide-react";
 
 export const Route = createFileRoute("/workspace/$documentId")({
   component: DocumentPage,
@@ -26,21 +23,20 @@ export const Route = createFileRoute("/workspace/$documentId")({
 
 // ── Asset grouping ─────────────────────────────────────────────────────────
 
-const PRIMARY_ROLES = new Set(["transcript", "document_text"]);
-
-const AI_TABS = [
+const VIEW_TABS = [
+  { id: "primary",     label: "文档",    roles: ["document_text", "transcript"] },
   { id: "summary",     label: "摘要",    roles: ["summary"] },
   { id: "meeting",     label: "会议纪要", roles: ["meeting_brief", "decisions", "action_items", "next_steps"] },
   { id: "translation", label: "翻译",    roles: ["translation"] },
 ] as const;
 
-type AiTabId = (typeof AI_TABS)[number]["id"];
+type TabId = (typeof VIEW_TABS)[number]["id"];
 
 // ── Role display metadata ──────────────────────────────────────────────────
 
 const ROLE_META: Record<string, { label: string; order: number }> = {
-  transcript:    { label: "转写原文",  order: 0 },
-  document_text: { label: "文档正文",  order: 1 },
+  document_text: { label: "文档正文",  order: 0 },
+  transcript:    { label: "转写原文",  order: 1 },
   summary:       { label: "摘要",      order: 2 },
   meeting_brief: { label: "会议纪要",  order: 3 },
   translation:   { label: "翻译",      order: 4 },
@@ -59,7 +55,8 @@ function DocumentPage() {
   const [loading, setLoading] = useState(true);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [alsoDeleteDoc, setAlsoDeleteDoc] = useState(true);
-  const [activeAiTab, setActiveAiTab] = useState<AiTabId | null>(null);
+  const [activeTab, setActiveTab] = useState<TabId>("primary");
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const sortAssets = useCallback((raw: DocumentAsset[]) =>
     [...raw].sort((a, b) => {
@@ -92,129 +89,118 @@ function DocumentPage() {
     return () => clearInterval(timer);
   }, [documentId, sortAssets]);
 
+  // Reset scroll on document change
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = 0;
+    }
+  }, [documentId]);
+
   // ── Derived groupings ────────────────────────────────────────────────────
 
-  const primaryAssets = assets.filter((a) => PRIMARY_ROLES.has(a.role));
-  const aiAssets = assets.filter((a) => !PRIMARY_ROLES.has(a.role));
-
-  const visibleTabs = AI_TABS.filter((tab) =>
-    tab.roles.some((role) => aiAssets.some((a) => a.role === role))
+  const visibleTabs = VIEW_TABS.filter((tab) =>
+    tab.roles.some((role) => assets.some((a) => a.role === role))
   );
 
-  // Auto-select first available tab when AI content arrives
+  // Auto-fallback for tabs
   useEffect(() => {
-    if (visibleTabs.length > 0 && !activeAiTab) {
-      setActiveAiTab(visibleTabs[0].id);
+    if (visibleTabs.length > 0 && !visibleTabs.some((t) => t.id === activeTab)) {
+      setActiveTab(visibleTabs[0].id);
+    } else if (visibleTabs.length === 0 && activeTab !== "primary") {
+      setActiveTab("primary");
     }
-    if (activeAiTab && !visibleTabs.some((t) => t.id === activeAiTab) && visibleTabs.length > 0) {
-      setActiveAiTab(visibleTabs[0].id);
-    }
-  }, [visibleTabs.length, activeAiTab]);
+  }, [visibleTabs, activeTab]);
 
-  const activeTabDef = AI_TABS.find((t) => t.id === activeAiTab);
-  const activeTabAssets = activeTabDef
-    ? activeTabDef.roles.flatMap((role) => aiAssets.filter((a) => a.role === role))
-    : [];
+  const activeTabDef = VIEW_TABS.find((t) => t.id === activeTab) || VIEW_TABS[0];
+  const activeAssets = activeTabDef.roles.flatMap((role) => assets.filter((a) => a.role === role));
 
   // ── Render ────────────────────────────────────────────────────────────────
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center text-text-muted text-sm">
+      <div className="flex h-full items-center justify-center text-text-muted text-sm border-none bg-bg-primary">
         加载中…
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* ── Header ─────────────────────────────────────────────────── */}
-      <div className="shrink-0 px-6 py-4 border-b border-border-default space-y-2">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <Mic className="w-4 h-4 shrink-0 text-accent-primary" />
-            <h1 className="text-base font-semibold text-text-primary truncate">
-              {recording?.title ?? "文档"}
+    <div ref={scrollRef} className="flex flex-col h-full overflow-y-auto bg-bg-primary scroll-smooth">
+      <div className="mx-auto w-full max-w-4xl px-8 py-12 md:py-16 flex flex-col gap-6 font-sans">
+        
+        {/* ── Header ─────────────────────────────────────────────────── */}
+        <div className="group relative flex flex-col gap-4">
+          <div className="flex items-start justify-between">
+            <h1 className="text-3xl md:text-4xl font-extrabold text-text-primary leading-tight tracking-tight break-words pr-8">
+              {recording?.title ?? "无标题文档"}
             </h1>
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="shrink-0 p-2 rounded-md text-text-muted opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-status-error hover:bg-status-error/10 transition-all absolute top-1 right-0"
+              title="删除录音"
+            >
+              <Trash2 className="w-5 h-5" />
+            </button>
           </div>
-          <button
-            onClick={() => setShowDeleteConfirm(true)}
-            className="shrink-0 p-1.5 rounded text-text-muted hover:text-status-error hover:bg-status-error/10 transition-colors"
-            title="删除录音"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-        </div>
 
-        {recording && (
-          <div className="flex items-center gap-3 text-xs text-text-muted">
-            <span>{formatDate(recording.created_at)}</span>
-            <span className="flex items-center gap-1">
-              <Clock className="w-3 h-3" />
-              {formatDuration(recording.duration_ms)}
-            </span>
-          </div>
-        )}
-
-        {recording?.file_path && (
-          <AudioPlayer key={recording.file_path} filePath={recording.file_path} durationMs={recording.duration_ms} />
-        )}
-
-        <AiTaskBar documentId={documentId} />
-      </div>
-
-      {/* ── Body ───────────────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-
-        {/* Primary: transcript / document_text */}
-        <div className="flex-1 overflow-y-auto min-h-0 px-6 py-4 space-y-4">
-          {primaryAssets.length === 0 ? (
-            <p className="text-sm text-text-muted">
-              暂无内容。录音结束后转写内容会自动显示，或点击上方 AI 工具生成摘要。
-            </p>
-          ) : (
-            primaryAssets.map((asset) => {
-              const meta = ROLE_META[asset.role] ?? { label: asset.role, order: 99 };
-              return (
-                <EditableAsset
-                  key={asset.id}
-                  documentId={documentId}
-                  role={asset.role}
-                  label={meta.label}
-                  initialContent={asset.content}
-                  onSaved={loadData}
-                />
-              );
-            })
+          {recording && (
+            <div className="flex items-center gap-4 text-sm font-medium text-text-muted/70">
+              <span className="flex items-center gap-1.5 focus:outline-none select-none">
+                <CalendarDays className="w-4 h-4 opacity-60" />
+                {formatDate(recording.created_at)}
+              </span>
+              <span className="flex items-center gap-1.5 select-none">
+                <Clock className="w-4 h-4 opacity-60" />
+                {formatDuration(recording.duration_ms)}
+              </span>
+            </div>
           )}
         </div>
 
-        {/* AI tabs panel — only shown when AI content exists */}
-        {visibleTabs.length > 0 && (
-          <div className="shrink-0 flex flex-col border-t border-border-default" style={{ maxHeight: "45%" }}>
+        {recording?.file_path && (
+          <div className="bg-bg-secondary/30 rounded-lg p-2 self-start w-full transition-colors hover:bg-bg-secondary/60">
+            <AudioPlayer key={recording.file_path} filePath={recording.file_path} durationMs={recording.duration_ms} />
+          </div>
+        )}
 
-            {/* Tab bar */}
-            <div className="shrink-0 flex items-center border-b border-border-default bg-bg-secondary px-2">
+        <div className="mt-4 pb-2 border-b border-border-default/50">
+          <AiTaskBar documentId={documentId} />
+        </div>
+
+        {/* ── Body ───────────────────────────────────────────────────── */}
+        <div className="mt-2 text-base md:text-lg leading-relaxed text-text-primary">
+          {/* Tabs */}
+          {visibleTabs.length > 1 && (
+            <div className="flex items-center gap-6 border-b border-border-default mb-8 select-none">
               {visibleTabs.map((tab) => (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveAiTab(tab.id)}
+                  onClick={() => setActiveTab(tab.id)}
                   className={[
-                    "px-3 py-2 text-xs font-medium transition-colors border-b-2 -mb-px",
-                    activeAiTab === tab.id
-                      ? "border-accent-primary text-accent-primary"
-                      : "border-transparent text-text-muted hover:text-text-primary",
+                    "py-2 font-medium transition-all text-sm tracking-wide -mb-px",
+                    activeTab === tab.id
+                      ? "border-b-2 border-text-primary text-text-primary"
+                      : "border-b-2 border-transparent text-text-muted hover:text-text-primary",
                   ].join(" ")}
                 >
                   {tab.label}
                 </button>
               ))}
             </div>
+          )}
 
-            {/* Tab content */}
-            <div className="flex-1 overflow-y-auto min-h-0 px-6 py-3 space-y-4">
-              {activeTabAssets.map((asset) => {
+          {/* Asset List */}
+          <div className="flex flex-col gap-10 min-h-[300px]">
+            {activeAssets.length === 0 ? (
+              activeTab === "primary" ? (
+                <p className="text-sm text-text-muted/60 italic py-4 select-none">
+                  录音结束或转写完成后，该区域将显示文本。点击上方按钮生成摘要。
+                </p>
+              ) : null
+            ) : (
+              activeAssets.map((asset) => {
                 const meta = ROLE_META[asset.role] ?? { label: asset.role, order: 99 };
+                // If it's the primary tab, we might show the label only if both text and transcript exist
                 return (
                   <EditableAsset
                     key={asset.id}
@@ -225,38 +211,39 @@ function DocumentPage() {
                     onSaved={loadData}
                   />
                 );
-              })}
-            </div>
+              })
+            )}
           </div>
-        )}
+        </div>
+
       </div>
 
       {/* ── Delete confirmation ─────────────────────────────────────── */}
       {showDeleteConfirm && recording && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-bg-primary border border-border-default rounded-lg shadow-xl p-6 max-w-sm w-full mx-4">
-            <h2 className="text-base font-semibold text-text-primary mb-2">删除录音</h2>
-            <p className="text-sm text-text-secondary mb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-bg-primary border border-border-default rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4 shadow-black/20">
+            <h2 className="text-lg font-semibold text-text-primary mb-3">删除录音</h2>
+            <p className="text-sm text-text-secondary mb-5 leading-relaxed">
               「{recording.title}」将被永久删除，音频文件也会从磁盘移除。
             </p>
-            <label className="flex items-center gap-2 mb-5 cursor-pointer">
+            <label className="flex items-center gap-2 mb-6 cursor-pointer group select-none">
               <input
                 type="checkbox"
                 checked={alsoDeleteDoc}
                 onChange={(e) => setAlsoDeleteDoc(e.target.checked)}
-                className="rounded"
+                className="rounded border-border focus:ring-accent-primary"
               />
-              <span className="text-sm text-text-primary">同时删除工作台文档（转写、摘要等内容）</span>
+              <span className="text-sm text-text-primary group-hover:text-accent-primary transition-colors">同时删除文档资料（原文、摘要等）</span>
             </label>
             {!alsoDeleteDoc && (
-              <p className="text-xs text-text-muted mb-4 -mt-3 ml-6">
-                保留后仍可在工作台查看，但无法回放音频。
+              <p className="text-xs text-text-muted/70 mb-5 -mt-3 ml-6 select-none">
+                保留后仍可在工作台查看文本记录，但无法回放音频。
               </p>
             )}
             <div className="flex gap-3 justify-end">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
-                className="px-4 py-2 text-sm rounded-md border border-border-default text-text-primary hover:bg-bg-secondary transition-colors"
+                className="px-4 py-2 text-sm font-medium rounded-lg border border-border-default text-text-primary hover:bg-bg-secondary transition-colors"
               >
                 取消
               </button>
@@ -266,9 +253,9 @@ function DocumentPage() {
                   if (result.status === "ok") navigate({ to: "/workspace" });
                   setShowDeleteConfirm(false);
                 }}
-                className="px-4 py-2 text-sm rounded-md bg-status-error text-white hover:opacity-90 transition-opacity"
+                className="px-4 py-2 text-sm font-medium rounded-lg bg-status-error text-white hover:bg-red-600 transition-colors shadow-sm"
               >
-                删除
+                永久删除
               </button>
             </div>
           </div>

@@ -74,10 +74,10 @@ export function WorkspaceFileTree() {
               onClick={() => handleClick(item)}
               disabled={isLoading}
               className={[
-                "w-full text-left px-3 py-2 transition-colors flex flex-col gap-0.5 min-w-0",
+                "w-full text-left px-3 py-2 transition-colors flex flex-col gap-0.5 min-w-0 rounded-md my-0.5",
                 isActive
-                  ? "bg-accent-primary/15 text-accent-primary"
-                  : "text-text-primary hover:bg-bg-tertiary",
+                  ? "bg-bg-secondary text-text-primary font-medium shadow-sm ring-1 ring-border-default/30"
+                  : "text-text-secondary hover:bg-bg-tertiary hover:text-text-primary",
                 isLoading && "opacity-60 cursor-wait",
               ]
                 .filter(Boolean)

@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Loader2, X, FileText, Users, Languages } from "lucide-react";
 import { commands } from "@/lib/bindings";
 import { useLlmStore } from "@/store/llm";
-import { StreamingText } from "@/components/ui/StreamingText";
 
 interface AiTaskBarProps {
   documentId: string;
@@ -118,26 +117,13 @@ export function AiTaskBar({
             AI 处理中…
           </span>
         )}
-      </div>
 
-      {/* 流式输出区域 */}
-      {activeTask && activeTask.tokens.length > 0 && (
-        <div className="rounded-md border border-border bg-bg-secondary p-3">
-          <StreamingText
-            tokens={activeTask.tokens}
-            isFinished={
-              activeTask.status === "done" ||
-              activeTask.status === "failed" ||
-              activeTask.status === "cancelled"
-            }
-          />
-          {activeTask.status === "failed" && activeTask.errorMsg && (
-            <p className="mt-2 text-xs text-status-error">
-              错误：{activeTask.errorMsg}
-            </p>
-          )}
-        </div>
-      )}
+        {activeTask?.status === "failed" && activeTask.errorMsg && (
+          <span className="flex items-center gap-1.5 text-xs text-status-error ml-auto">
+            错误：{activeTask.errorMsg}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
