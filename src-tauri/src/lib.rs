@@ -33,7 +33,6 @@ fn specta_builder() -> Builder {
             model_cmds::cancel_download,
             model_cmds::delete_model,
             model_cmds::set_active_model,
-            model_cmds::get_download_error,
             audio_cmds::list_audio_devices,
             transcription_cmds::start_realtime,
             transcription_cmds::pause_realtime,
@@ -141,9 +140,6 @@ pub fn run() {
                 std::sync::Arc::new(dashmap::DashMap::new());
             let llm_engine_status: std::sync::Arc<tokio::sync::Mutex<LlmEngineStatus>> =
                 std::sync::Arc::new(tokio::sync::Mutex::new(LlmEngineStatus::NotLoaded));
-            let download_errors: std::sync::Arc<dashmap::DashMap<String, String>> =
-                std::sync::Arc::new(dashmap::DashMap::new());
-
             // M4 shared state (Arc wrappers for sharing with worker)
             let segments_cache = std::sync::Arc::new(std::sync::Mutex::new(std::collections::HashMap::new()));
             let pcm_cache = std::sync::Arc::new(std::sync::Mutex::new(std::collections::HashMap::new()));
@@ -177,7 +173,6 @@ pub fn run() {
                 llm_tx: llm_tx.clone(),
                 llm_engine: std::sync::Arc::clone(&llm_engine),
                 active_llm_cancels: std::sync::Arc::clone(&active_llm_cancels),
-                download_errors: std::sync::Arc::clone(&download_errors),
                 prompt_templates: std::sync::Arc::clone(&prompt_templates),
                 llm_engine_status: std::sync::Arc::clone(&llm_engine_status),
             });
@@ -258,7 +253,6 @@ pub fn run() {
                 llm_tx,
                 llm_engine,
                 active_llm_cancels,
-                download_errors,
                 prompt_templates,
                 llm_engine_status,
             });

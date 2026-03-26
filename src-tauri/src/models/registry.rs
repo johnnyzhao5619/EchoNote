@@ -46,7 +46,7 @@ pub fn build_variant(
 ) -> ModelVariant {
     let variant_id = format!("{}/{}", model_type, variant_name);
     let file_path = model_file_path(model_dir, model_type, variant_name, &cfg.url);
-    let is_downloaded = file_path.exists();
+    let is_downloaded = file_matches_size(&file_path, cfg.size_bytes);
 
     ModelVariant {
         variant_id,
@@ -99,7 +99,7 @@ pub fn check_required_models(
     if let Some((model_type, variant_name)) = parse_variant_id(active_whisper) {
         if let Some(cfg) = models.whisper.variants.get(variant_name) {
             let path = model_file_path(model_dir, model_type, variant_name, &cfg.url);
-            if !path.exists() {
+            if !file_matches_size(&path, cfg.size_bytes) {
                 missing.push(active_whisper.to_string());
             }
         } else {
@@ -111,7 +111,7 @@ pub fn check_required_models(
     if let Some((model_type, variant_name)) = parse_variant_id(active_llm) {
         if let Some(cfg) = models.llm.variants.get(variant_name) {
             let path = model_file_path(model_dir, model_type, variant_name, &cfg.url);
-            if !path.exists() {
+            if !file_matches_size(&path, cfg.size_bytes) {
                 missing.push(active_llm.to_string());
             }
         } else {
@@ -207,6 +207,24 @@ description = "test llm"
     }
 
     #[test]
+    fn build_variant_size_mismatch_is_not_downloaded() {
+        let models = load_models_toml(minimal_toml()).unwrap();
+        let dir = tempdir().unwrap();
+        let whisper_dir = dir.path().join("whisper");
+        fs::create_dir_all(&whisper_dir).unwrap();
+        fs::write(whisper_dir.join("base.bin"), vec![0u8; 5]).unwrap();
+
+        let variant = build_variant(
+            "whisper",
+            "base",
+            models.whisper.variants.get("base").unwrap(),
+            dir.path(),
+        );
+
+        assert!(!variant.is_downloaded);
+    }
+
+    #[test]
     fn check_required_models_missing() {
         let models = load_models_toml(minimal_toml()).unwrap();
         let dir = tempdir().unwrap();
@@ -238,6 +256,39 @@ description = "test llm"
             "llm/qwen2.5-3b-q4",
         );
         assert!(missing.is_empty());
+    }
+
+    #[test]
+    fn check_required_models_size_mismatch_is_missing() {
+        let models = load_models_toml(minimal_toml()).unwrap();
+        let dir = tempdir().unwrap();
+
+        let whisper_dir = dir.path().join("whisper");
+        fs::create_dir_all(&whisper_dir).unwrap();
+        fs::write(whisper_dir.join("base.bin"), vec![0u8; 5]).unwrap();
+
+        let llm_dir = dir.path().join("llm");
+        fs::create_dir_all(&llm_dir).unwrap();
+        fs::write(
+            llm_dir.join("qwen2.5-3b-instruct-q4_k_m.gguf"),
+            vec![0u8; 5],
+        )
+        .unwrap();
+
+        let missing = check_required_models(
+            &models,
+            dir.path(),
+            "whisper/base",
+            "llm/qwen2.5-3b-q4",
+        );
+
+        assert_eq!(
+            missing,
+            vec![
+                "whisper/base".to_string(),
+                "llm/qwen2.5-3b-q4".to_string(),
+            ]
+        );
     }
 
     #[test]

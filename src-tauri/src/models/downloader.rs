@@ -106,6 +106,26 @@ pub async fn download_to_file(
     expected_sha256: &str,
     mut progress_cb: impl FnMut(u64),
 ) -> Result<(), AppError> {
+    download_to_file_inner(
+        client,
+        url,
+        dest,
+        expected_sha256,
+        &mut progress_cb,
+        || false,
+    )
+    .await
+}
+
+async fn download_to_file_inner(
+    client: &reqwest::Client,
+    url: &str,
+    dest: &Path,
+    expected_sha256: &str,
+    progress_cb: &mut impl FnMut(u64),
+    should_cancel: impl Fn() -> bool,
+) -> Result<(), AppError> {
+    const FLUSH_BYTES: usize = 128 * 1024;
     let tmp = tmp_file_path(dest);
 
     // 创建目标目录
@@ -152,16 +172,24 @@ pub async fn download_to_file(
     let mut stream = resp.bytes_stream();
 
     while let Some(chunk) = stream.next().await {
+        if should_cancel() {
+            return Err(AppError::Cancelled);
+        }
+
         let chunk = chunk.map_err(|e| AppError::Model(e.to_string()))?;
         buf.extend_from_slice(&chunk);
 
         // 每积累 128 KB 刷一次盘
-        if buf.len() >= 128 * 1024 {
+        while buf.len() >= FLUSH_BYTES {
+            let remainder = buf.split_off(FLUSH_BYTES);
             file.write_all(&buf)
                 .map_err(|e| AppError::Io(e.to_string()))?;
             downloaded += buf.len() as u64;
             progress_cb(downloaded);
-            buf.clear();
+            if should_cancel() {
+                return Err(AppError::Cancelled);
+            }
+            buf = remainder;
         }
     }
     // 刷写剩余不足 128 KB 的尾部数据
@@ -170,8 +198,15 @@ pub async fn download_to_file(
             .map_err(|e| AppError::Io(e.to_string()))?;
         downloaded += buf.len() as u64;
         progress_cb(downloaded);
+        if should_cancel() {
+            return Err(AppError::Cancelled);
+        }
     }
     drop(file);
+
+    if should_cancel() {
+        return Err(AppError::Cancelled);
+    }
 
     // SHA256 校验
     let computed = compute_sha256(&tmp)?;
@@ -261,16 +296,14 @@ pub async fn run_download_worker(
                                 _ => {}
                             }
                         }
+                        Err(AppError::Cancelled) => {}
                         Err(e) => {
-                            // Keep the event for any future listeners
                             app_clone
                                 .emit(
                                     "models:error",
                                     serde_json::json!({ "variant_id": vid, "error": e.to_string() }),
                                 )
                                 .ok();
-                            // Also store for poll-based retrieval
-                            state_for_reload.download_errors.insert(vid.clone(), e.to_string());
                         }
                     }
                 });
@@ -330,9 +363,11 @@ async fn do_download(
     // 每 128 KB chunk 触发 progress callback
     let app_clone = app.clone();
     let vid = variant_id.to_string();
+    let cancelled_for_progress = Arc::clone(&cancelled);
+    let cancelled_for_check = Arc::clone(&cancelled);
 
-    let progress_cb = move |downloaded: u64| {
-        if cancelled.load(Ordering::Relaxed) {
+    let mut progress_cb = move |downloaded: u64| {
+        if cancelled_for_progress.load(Ordering::Relaxed) {
             // 取消信号已标记，仅记录；实际中断由连接关闭实现
             return;
         }
@@ -364,7 +399,15 @@ async fn do_download(
         }
     };
 
-    download_to_file(client, &url, &dest, expected_size, &expected_sha256, progress_cb).await
+    download_to_file_inner(
+        client,
+        &url,
+        &dest,
+        &expected_sha256,
+        &mut progress_cb,
+        move || cancelled_for_check.load(Ordering::Relaxed),
+    )
+    .await
 }
 
 #[cfg(test)]
@@ -475,6 +518,45 @@ mod tests {
         assert!(dest.exists());
         let written = std::fs::read(&dest).unwrap();
         assert_eq!(written, full);
+    }
+
+    #[tokio::test]
+    async fn download_cancelled_keeps_tmp_and_does_not_create_final_file() {
+        let server = MockServer::start().await;
+        let body = vec![7u8; 1024 * 512];
+        let expected_sha256 = sha256_of(&body);
+        Mock::given(method("GET"))
+            .and(path("/model.bin"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(body.clone()))
+            .mount(&server)
+            .await;
+
+        let dir = tempdir().unwrap();
+        let dest = dir.path().join("model.bin");
+        let url = format!("{}/model.bin", server.uri());
+        let client = reqwest::Client::new();
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let cancel_for_cb = Arc::clone(&cancelled);
+
+        let mut progress_cb = move |_downloaded: u64| {
+            cancel_for_cb.store(true, Ordering::Relaxed);
+        };
+
+        let result = download_to_file_inner(
+            &client,
+            &url,
+            &dest,
+            &expected_sha256,
+            &mut progress_cb,
+            move || cancelled.load(Ordering::Relaxed),
+        )
+        .await;
+
+        assert!(matches!(result, Err(AppError::Cancelled)));
+        assert!(!dest.exists());
+        let tmp = super::super::registry::tmp_file_path(&dest);
+        assert!(tmp.exists());
+        assert!(std::fs::metadata(&tmp).unwrap().len() < body.len() as u64);
     }
 
     // 测试速度窗口：连续写入多个时间点，滑动窗口超过 5 秒的条目被丢弃

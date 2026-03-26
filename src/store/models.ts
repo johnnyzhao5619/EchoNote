@@ -1,8 +1,9 @@
 // src/store/models.ts
 
 import { create } from 'zustand'
+import { listen } from '@tauri-apps/api/event'
 import { commands } from '@/lib/bindings'
-import type { ModelVariant } from '@/lib/bindings'
+import type { DownloadProgressPayload, ModelVariant } from '@/lib/bindings'
 
 interface DownloadState {
   downloadedBytes: number
@@ -39,16 +40,7 @@ export const useModelsStore = create<ModelsStore>((set, get) => ({
   loadVariants: async () => {
     const result = await commands.listModelVariants()
     if (result.status === 'ok') {
-      const variants = result.data
-      // Detect missing active models (replaces unreliable models:required Tauri event)
-      const requiredMissing = variants
-        .filter((v) => v.is_active && !v.is_downloaded)
-        .map((v) => v.variant_id)
-      set({
-        variants,
-        requiredMissing,
-        isRequiredDialogOpen: requiredMissing.length > 0,
-      })
+      set({ variants: result.data })
     } else {
       console.error('[models] loadVariants error:', result.error)
     }
@@ -71,7 +63,6 @@ export const useModelsStore = create<ModelsStore>((set, get) => ({
         return { downloads: d, lastError: String(result.error) }
       })
     }
-    // Async download errors are caught by the polling loop via get_download_error
   },
 
   cancelDownload: async (variantId) => {
@@ -99,44 +90,62 @@ export const useModelsStore = create<ModelsStore>((set, get) => ({
   clearError: () => set({ lastError: null }),
 
   _setupListeners: () => {
-    // Tauri events unreliable on macOS dev — poll instead.
-    // When downloads are active: refresh variants + check for async errors every 2s.
-    const pollTimer = setInterval(async () => {
-      const { downloads } = get()
-      const inProgress = Object.keys(downloads)
-      if (inProgress.length === 0) return
+    const unlisteners: Promise<() => void>[] = []
 
-      // Refresh variant list to detect completion
-      const variantsResult = await commands.listModelVariants()
-      if (variantsResult.status !== 'ok') return
+    unlisteners.push(
+      listen<{ missing: string[] }>('models:required', (event) => {
+        set({
+          requiredMissing: event.payload.missing,
+          isRequiredDialogOpen: true,
+        })
+      }),
+    )
 
-      const freshVariants = variantsResult.data
-      const newDownloads = { ...get().downloads }
+    unlisteners.push(
+      listen<DownloadProgressPayload>('models:progress', (event) => {
+        const payload = event.payload
+        set((state) => ({
+          downloads: {
+            ...state.downloads,
+            [payload.variant_id]: {
+              downloadedBytes: payload.downloaded_bytes,
+              totalBytes: payload.total_bytes ?? null,
+              speedBps: payload.speed_bps,
+              etaSecs: payload.eta_secs ?? null,
+            },
+          },
+        }))
+      }),
+    )
 
-      for (const v of freshVariants) {
-        if (newDownloads[v.variant_id] !== undefined && v.is_downloaded) {
-          delete newDownloads[v.variant_id]
-        }
-      }
+    unlisteners.push(
+      listen<{ variant_id: string }>('models:downloaded', (event) => {
+        set((state) => {
+          const downloads = { ...state.downloads }
+          delete downloads[event.payload.variant_id]
+          return { downloads }
+        })
+        void get().loadVariants()
+      }),
+    )
 
-      // Check for async download errors (pop-once semantics)
-      let lastError: string | null = null
-      for (const variantId of inProgress) {
-        if (newDownloads[variantId] === undefined) continue // already completed above
-        const errResult = await commands.getDownloadError(variantId)
-        if (errResult.status === 'ok' && errResult.data) {
-          delete newDownloads[variantId]
-          lastError = errResult.data
-        }
-      }
+    unlisteners.push(
+      listen<{ variant_id: string; error: string }>('models:error', (event) => {
+        set((state) => {
+          const downloads = { ...state.downloads }
+          delete downloads[event.payload.variant_id]
+          return {
+            downloads,
+            lastError: event.payload.error,
+          }
+        })
+      }),
+    )
 
-      set({
-        variants: freshVariants,
-        downloads: newDownloads,
-        ...(lastError ? { lastError } : {}),
+    return () => {
+      unlisteners.forEach((promise) => {
+        void promise.then((dispose) => dispose())
       })
-    }, 2000)
-
-    return () => clearInterval(pollTimer)
+    }
   },
 }))

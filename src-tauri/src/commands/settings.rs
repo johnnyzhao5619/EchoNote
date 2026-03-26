@@ -117,7 +117,6 @@ mod tests {
             llm_tx: { let (tx, _) = tokio::sync::mpsc::channel(1); tx },
             llm_engine: std::sync::Arc::new(tokio::sync::Mutex::new(None)),
             active_llm_cancels: std::sync::Arc::new(dashmap::DashMap::new()),
-            download_errors: std::sync::Arc::new(dashmap::DashMap::new()),
             prompt_templates: std::sync::Arc::new(
                 crate::llm::tasks::PromptTemplates {
                     summary: crate::llm::tasks::TaskTemplate { system: String::new(), user: String::new(), max_tokens: 512 },

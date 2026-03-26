@@ -72,9 +72,6 @@ pub struct AppState {
     /// 活跃任务取消标志表（task_id → AtomicBool）
     pub active_llm_cancels: Arc<DashMap<String, Arc<AtomicBool>>>,
 
-    /// Download errors keyed by variant_id. Worker inserts on error; get_download_error pops.
-    pub download_errors: Arc<DashMap<String, String>>,
-
     /// Prompt 模板（启动时一次性加载，只读）
     pub prompt_templates: Arc<PromptTemplates>,
 

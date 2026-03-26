@@ -32,6 +32,9 @@ pub enum AppError {
 
     #[error("channel closed")]
     ChannelClosed,
+
+    #[error("cancelled")]
+    Cancelled,
 }
 
 impl AppError {
@@ -77,6 +80,12 @@ mod tests {
     fn test_app_error_display_channel_closed() {
         let err = AppError::ChannelClosed;
         assert_eq!(err.to_string(), "channel closed");
+    }
+
+    #[test]
+    fn test_app_error_display_cancelled() {
+        let err = AppError::Cancelled;
+        assert_eq!(err.to_string(), "cancelled");
     }
 
     #[test]

@@ -120,18 +120,6 @@ async setActiveModel(variantId: string) : Promise<Result<null, AppError>> {
 }
 },
 /**
- * Poll and consume one download error (pop-once semantics). Frontend calls every 2s during download.
- * Returns Some(error_message) if error exists, None if not.
- */
-async getDownloadError(variantId: string) : Promise<Result<string | null, AppError>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("get_download_error", { variantId }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-/**
  * 列出系统可用音频输入设备（前端设备下拉选择器数据源）
  */
 async listAudioDevices() : Promise<Result<AudioDevice[], AppError>> {
@@ -396,7 +384,7 @@ default_llm_task: string;
  * Custom URL     = replace huggingface.co with this base URL
  */
 model_mirror: string }
-export type AppError = { kind: "Audio"; message: string } | { kind: "Transcription"; message: string } | { kind: "Llm"; message: string } | { kind: "Storage"; message: string } | { kind: "Io"; message: string } | { kind: "Model"; message: string } | { kind: "Workspace"; message: string } | { kind: "NotFound"; message: string } | { kind: "Validation"; message: string } | { kind: "ChannelClosed" }
+export type AppError = { kind: "Audio"; message: string } | { kind: "Transcription"; message: string } | { kind: "Llm"; message: string } | { kind: "Storage"; message: string } | { kind: "Io"; message: string } | { kind: "Model"; message: string } | { kind: "Workspace"; message: string } | { kind: "NotFound"; message: string } | { kind: "Validation"; message: string } | { kind: "ChannelClosed" } | { kind: "Cancelled" }
 export type AudioDevice = { id: string; name: string; is_default: boolean; sample_rate: number; channels: number }
 /**
  * Single document text asset (transcript, summary, meeting_brief, etc.)
