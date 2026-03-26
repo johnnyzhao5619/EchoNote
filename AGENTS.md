@@ -236,8 +236,8 @@ M11 跨平台 CI/CD（所有功能完成后）
 你是 EchoNote v3.0.0 的实施工程师。
 
 项目仓库：/Users/weijiazhao/Dev/EchoNote（当前在 v3 分支）
-规格文档：docs/superpowers/specs/2026-03-20-echonote-v3-tauri-rewrite-design.md
-实施计划：docs/superpowers/plans/（M1-M11 共 11 份）
+规格文档：docs/archive/superpowers/specs/2026-03-20-echonote-v3-tauri-rewrite-design.md
+实施计划：docs/archive/superpowers/plans/（M1-M11 共 11 份）
 架构上下文：AGENTS.md（本文件）
 
 执行原则：
@@ -257,7 +257,7 @@ M11 跨平台 CI/CD（所有功能完成后）
 ```
 请使用 superpowers:executing-plans 技能执行以下计划：
 
-计划文件：docs/superpowers/plans/2026-03-20-m1-scaffold-theme-layout.md
+计划文件：docs/archive/superpowers/plans/2026-03-20-m1-scaffold-theme-layout.md
 
 目标：在项目根目录 /Users/weijiazhao/Dev/EchoNote 内初始化 Tauri 2.x + React 18
 项目骨架，建立三层主题系统（CSS Variables），应用壳层布局（ActivityBar /
@@ -277,7 +277,7 @@ M1 完成标准：
 ```
 请使用 superpowers:executing-plans 技能执行以下计划：
 
-计划文件：docs/superpowers/plans/2026-03-20-m2-database-settings.md
+计划文件：docs/archive/superpowers/plans/2026-03-20-m2-database-settings.md
 
 前置条件：M1 已完成，npm run tauri dev 可正常启动。
 
@@ -297,7 +297,7 @@ M2 完成标准：
 ```
 请使用 superpowers:executing-plans 技能执行以下计划：
 
-计划文件：docs/superpowers/plans/2026-03-20-m3-model-manager.md
+计划文件：docs/archive/superpowers/plans/2026-03-20-m3-model-manager.md
 
 前置条件：M1、M2 已完成。
 
@@ -320,7 +320,7 @@ M3 完成标准：
 ```
 请使用 superpowers:executing-plans 技能执行以下计划：
 
-计划文件：docs/superpowers/plans/2026-03-20-m4-audio-transcription.md
+计划文件：docs/archive/superpowers/plans/2026-03-20-m4-audio-transcription.md
 
 前置条件：M1、M2、M3 已完成，whisper 模型已下载至 APP_DATA/models/。
 
@@ -344,7 +344,7 @@ M4 完成标准：
 ```
 请使用 superpowers:executing-plans 技能执行以下计划：
 
-计划文件：docs/superpowers/plans/2026-03-20-m5-llm-engine.md
+计划文件：docs/archive/superpowers/plans/2026-03-20-m5-llm-engine.md
 
 前置条件：M1、M2、M3 已完成，LLM 模型已下载。M4 可同步进行。
 
@@ -368,7 +368,7 @@ M5 完成标准：
 ```
 请使用 superpowers:executing-plans 技能执行以下计划：
 
-计划文件：docs/superpowers/plans/2026-03-20-m6-workspace.md
+计划文件：docs/archive/superpowers/plans/2026-03-20-m6-workspace.md
 
 前置条件：M1、M2 已完成。M5 建议先完成（AI 任务栏依赖 LLM）。
 
@@ -392,7 +392,7 @@ M6 完成标准：
 ```
 请使用 superpowers:executing-plans 技能执行以下计划：
 
-计划文件：docs/superpowers/plans/2026-03-20-m7-batch-transcription.md
+计划文件：docs/archive/superpowers/plans/2026-03-20-m7-batch-transcription.md
 
 前置条件：M1、M2、M4 已完成。
 
@@ -415,7 +415,7 @@ M7 完成标准：
 ```
 请使用 superpowers:executing-plans 技能执行以下计划：
 
-计划文件：docs/superpowers/plans/2026-03-20-m8-timeline.md
+计划文件：docs/archive/superpowers/plans/2026-03-20-m8-timeline.md
 
 前置条件：M1、M2 已完成。M6 建议完成（事件可关联文档）。
 
@@ -437,7 +437,7 @@ M8 完成标准：
 ```
 请使用 superpowers:executing-plans 技能执行以下计划：
 
-计划文件：docs/superpowers/plans/2026-03-20-m9-i18n.md
+计划文件：docs/archive/superpowers/plans/2026-03-20-m9-i18n.md
 
 前置条件：M1 已完成。建议在 M6-M8 完成后执行（确保所有 UI 字符串已确定）。
 
@@ -463,7 +463,7 @@ M9 完成标准：
 ```
 请使用 superpowers:executing-plans 技能执行以下计划：
 
-计划文件：docs/superpowers/plans/2026-03-20-m10-theme-editor.md
+计划文件：docs/archive/superpowers/plans/2026-03-20-m10-theme-editor.md
 
 前置条件：M1（基础主题系统）、M2（app_settings 存储）已完成。
 
@@ -489,7 +489,7 @@ M10 完成标准：
 ```
 请使用 superpowers:executing-plans 技能执行以下计划：
 
-计划文件：docs/superpowers/plans/2026-03-20-m11-cicd.md
+计划文件：docs/archive/superpowers/plans/2026-03-20-m11-cicd.md
 
 前置条件：M1-M10 全部完成，代码可在三平台构建。
 
@@ -516,8 +516,8 @@ M11 完成标准：
 | `resources/themes/theme_outline.json` | v2 主题 token 契约，供 M10 参考 | 只读参考 |
 | `resources/icons/` | 应用图标（现有 .icns / .ico / .png）| M11 直接使用 |
 | `echonote-landing/` | 官网落地页（独立 Vue 项目）| 独立维护，不受 v3 影响 |
-| `docs/superpowers/specs/` | v3 架构规格文档 | 权威来源 |
-| `docs/superpowers/plans/` | M1-M11 实施计划 | 执行依据 |
+| `docs/archive/superpowers/specs/` | v3 架构规格文档 | 权威来源 |
+| `docs/archive/superpowers/plans/` | M1-M11 实施计划 | 执行依据 |
 
 ---
 
@@ -527,7 +527,7 @@ M11 完成标准：
 必须在同一变更中同步更新：
 
 1. **`AGENTS.md`**：更新"目录结构""架构核心不变量""Tauri Event 命名约定"。
-2. **`docs/superpowers/specs/`**：若影响架构设计，更新规格文档。
+2. **`docs/archive/superpowers/specs/`**：若影响架构设计，更新规格文档。
 3. **`src/lib/bindings.ts`**：tauri-specta 重新生成（`cargo test` 会触发）。
 4. **`CHANGELOG.md`**：记录破坏性变更。
 

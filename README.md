@@ -58,7 +58,7 @@ Everything runs on your machine. No subscriptions. No data leaves your device.
 See [`AGENTS.md`](AGENTS.md) for the full architecture, design decisions, and
 milestone-by-milestone execution guide (M1–M11).
 
-Implementation plans are in [`docs/superpowers/plans/`](docs/superpowers/plans/).
+Archived plans and specs are in [`docs/archive/superpowers/`](docs/archive/superpowers/).
 
 ## Running Locally
 
