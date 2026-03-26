@@ -10,7 +10,7 @@ import { routeTree } from "../../../routeTree.gen";
 // Default AppConfig returned by the mocked invoke in settings tests
 const MOCK_APP_CONFIG = {
   locale: "zh_CN",
-  active_theme: "tokyo-night",
+  active_theme: "Tokyo Night",
   active_whisper_model: "whisper/base",
   active_llm_model: "llm/qwen2.5-3b-q4",
   llm_context_size: 4096,
@@ -22,6 +22,8 @@ const MOCK_APP_CONFIG = {
   vad_threshold: 0.02,
   auto_llm_on_stop: false,
   default_llm_task: "summary",
+  last_used_device_id: null,
+  model_mirror: "",
 };
 
 function renderApp(initialPath = "/recording") {

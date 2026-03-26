@@ -3,11 +3,11 @@ use std::str::FromStr;
 use crate::error::AppError;
 
 /// Thin wrapper around an `SqlitePool` with migrations applied at open time.
-pub struct Db {
+pub struct Database {
     pub pool: SqlitePool,
 }
 
-impl Db {
+impl Database {
     /// Open (or create) an SQLite database at `url`, enable WAL mode,
     /// and run all pending sqlx migrations.
     ///
@@ -55,6 +55,19 @@ impl Db {
         .map_err(|e| AppError::Storage(e.to_string()))?;
         Ok(())
     }
+
+    /// Load a key-value setting from `app_settings`.
+    pub async fn load_setting(&self, key: &str) -> Result<Option<String>, AppError> {
+        let row: Option<(String,)> = sqlx::query_as(
+            "SELECT value FROM app_settings WHERE key = ?",
+        )
+        .bind(key)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| AppError::Storage(e.to_string()))?;
+
+        Ok(row.map(|(value,)| value))
+    }
 }
 
 #[cfg(test)]
@@ -64,7 +77,7 @@ mod tests {
     /// Pool must open successfully on an in-memory database.
     #[tokio::test]
     async fn test_init_pool_in_memory() {
-        let db = Db::open("sqlite::memory:").await
+        let db = Database::open("sqlite::memory:").await
             .expect("should open in-memory db");
         // Verify migrations ran: app_settings table must exist
         let row: (i64,) = sqlx::query_as(
@@ -79,7 +92,7 @@ mod tests {
     /// All tables from 0001_initial.sql must be present.
     #[tokio::test]
     async fn test_all_tables_created() {
-        let db = Db::open("sqlite::memory:").await.unwrap();
+        let db = Database::open("sqlite::memory:").await.unwrap();
         let expected = [
             "recordings",
             "transcription_segments",
@@ -105,7 +118,7 @@ mod tests {
     /// llm_tasks table from 0002_llm_tasks.sql must be present.
     #[tokio::test]
     async fn test_llm_tasks_table_created() {
-        let db = Db::open("sqlite::memory:").await.unwrap();
+        let db = Database::open("sqlite::memory:").await.unwrap();
         let row: (i64,) = sqlx::query_as(
             "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='llm_tasks'"
         )
@@ -118,7 +131,7 @@ mod tests {
     /// workspace_fts virtual table (FTS5) must be present.
     #[tokio::test]
     async fn test_fts5_virtual_table_created() {
-        let db = Db::open("sqlite::memory:").await.unwrap();
+        let db = Database::open("sqlite::memory:").await.unwrap();
         let row: (i64,) = sqlx::query_as(
             "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='workspace_fts'"
         )
@@ -131,7 +144,7 @@ mod tests {
     /// workspace_text_assets UNIQUE constraint must prevent duplicate (document_id, role).
     #[tokio::test]
     async fn test_asset_unique_constraint() {
-        let db = Db::open("sqlite::memory:").await.unwrap();
+        let db = Database::open("sqlite::memory:").await.unwrap();
         let now = 1_700_000_000_000_i64;
 
         // Insert a document to satisfy FK
@@ -171,7 +184,7 @@ mod tests {
     /// Trigger must sync content_text on workspace_documents after asset insert.
     #[tokio::test]
     async fn test_sync_trigger_on_asset_insert() {
-        let db = Db::open("sqlite::memory:").await.unwrap();
+        let db = Database::open("sqlite::memory:").await.unwrap();
         let now = 1_700_000_000_000_i64;
 
         sqlx::query(
@@ -203,7 +216,7 @@ mod tests {
     /// WAL mode must be active after pool initialization.
     #[tokio::test]
     async fn test_wal_mode_enabled() {
-        let db = Db::open("sqlite::memory:").await.unwrap();
+        let db = Database::open("sqlite::memory:").await.unwrap();
         // In-memory SQLite does not support WAL; this test verifies the PRAGMA
         // executes without error (WAL silently falls back to "memory" journal mode).
         let row: (String,) = sqlx::query_as("PRAGMA journal_mode")

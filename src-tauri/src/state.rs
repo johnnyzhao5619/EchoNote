@@ -1,14 +1,16 @@
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::AtomicBool;
 use tokio::sync::{Mutex as TokioMutex, RwLock, mpsc};
 use dashmap::DashMap;
 
 use crate::commands::transcription::SegmentPayload;
-use crate::config::AppConfig;
+use crate::config::{AppConfig, PartialAppConfig, apply_partial, default_models_path, normalized_app_config};
+use crate::error::AppError;
 use crate::models::{DownloadCommand, ModelsToml};
 use crate::models::registry::{model_file_path, parse_variant_id};
-use crate::storage::db::Db;
+use crate::storage::db::Database;
 use crate::transcription::engine::WhisperEngine;
 use crate::transcription::pipeline::TranscriptionCommand;
 use crate::llm::{
@@ -20,7 +22,8 @@ use crate::llm::{
 
 pub struct AppState {
     // M1–M3 fields
-    pub db: Arc<Db>,
+    pub app_data_dir: Arc<PathBuf>,
+    pub db: Arc<Database>,
     pub config: Arc<RwLock<AppConfig>>,
     pub model_config: Arc<ModelsToml>,
     pub download_tx: mpsc::Sender<DownloadCommand>,
@@ -80,17 +83,46 @@ pub struct AppState {
 }
 
 impl AppState {
+    pub fn models_dir(&self) -> PathBuf {
+        default_models_path(self.app_data_dir.as_ref())
+    }
+
+    pub fn default_config(&self) -> AppConfig {
+        normalized_app_config(AppConfig::default(), self.app_data_dir.as_ref())
+    }
+
+    pub fn normalize_config(&self, config: AppConfig) -> AppConfig {
+        normalized_app_config(config, self.app_data_dir.as_ref())
+    }
+
+    pub async fn persist_config(&self, config: AppConfig) -> Result<AppConfig, AppError> {
+        let normalized = self.normalize_config(config);
+        let serialized = serde_json::to_string(&normalized)
+            .map_err(|e| AppError::Storage(format!("serialize config: {e}")))?;
+
+        self.db.save_setting("app_config", &serialized).await?;
+
+        let mut guard = self.config.write().await;
+        *guard = normalized.clone();
+        Ok(normalized)
+    }
+
+    pub async fn update_config(&self, partial: PartialAppConfig) -> Result<AppConfig, AppError> {
+        let mut next = {
+            let guard = self.config.read().await;
+            guard.clone()
+        };
+        apply_partial(&mut next, partial);
+        self.persist_config(next).await
+    }
+
     /// 根据当前 AppConfig 尝试热加载 WhisperEngine。
     /// 调用时机：模型下载完成、切换激活模型。
     /// 返回 true = 加载成功；false = 文件不存在或加载失败。
     pub async fn try_load_whisper(&self) -> bool {
         let (model_dir, active_model) = {
             let cfg = self.config.read().await;
-            let model_dir = std::path::Path::new(&cfg.vault_path)
-                .parent()
-                .unwrap_or(std::path::Path::new(&cfg.vault_path))
-                .join("models");
-            (model_dir, cfg.active_whisper_model.clone())
+            (self.models_dir(), cfg.active_whisper_model.clone())
         };
 
         let Some((model_type, variant_name)) = parse_variant_id(&active_model) else {
@@ -129,11 +161,7 @@ impl AppState {
     pub async fn try_load_llm(&self) -> bool {
         let (model_dir, active_model) = {
             let cfg = self.config.read().await;
-            let model_dir = std::path::Path::new(&cfg.vault_path)
-                .parent()
-                .unwrap_or(std::path::Path::new(&cfg.vault_path))
-                .join("models");
-            (model_dir, cfg.active_llm_model.clone())
+            (self.models_dir(), cfg.active_llm_model.clone())
         };
 
         let Some((model_type, variant_name)) = parse_variant_id(&active_model) else {

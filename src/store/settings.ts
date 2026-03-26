@@ -1,57 +1,14 @@
 import { create } from 'zustand'
-import { invoke } from '@tauri-apps/api/core'
-
-// Mirror of Rust AppConfig — keep in sync with config/schema.rs
-// In the final project this will be imported from src/lib/bindings.ts (tauri-specta generated).
-export interface AppConfig {
-  locale: string
-  active_theme: string
-  active_whisper_model: string
-  active_llm_model: string
-  llm_context_size: number
-  vault_path: string
-  recordings_path: string
-  default_recording_mode: string
-  default_language: string | null
-  default_target_language: string
-  vad_threshold: number
-  auto_llm_on_stop: boolean
-  default_llm_task: string
-  model_mirror: string
-}
-
-// PartialAppConfig: every field is optional (undefined = do not update)
-export type PartialAppConfig = {
-  [K in keyof AppConfig]?: AppConfig[K] | undefined
-}
+import { commands, type AppConfig, type AppError, type PartialAppConfig } from '../lib/bindings'
 
 interface SettingsStore {
   config: AppConfig | null
   isLoading: boolean
   error: string | null
   translations: Record<string, unknown>
-
-  // Actions
   loadConfig: () => Promise<void>
   updateConfig: (partial: PartialAppConfig) => Promise<void>
   resetConfig: () => Promise<void>
-}
-
-const DEFAULT_CONFIG: AppConfig = {
-  locale: 'zh_CN',
-  active_theme: 'tokyo-night',
-  active_whisper_model: 'whisper/base',
-  active_llm_model: 'llm/qwen2.5-3b-q4',
-  llm_context_size: 4096,
-  vault_path: '',
-  recordings_path: '',
-  default_recording_mode: 'transcribe_only',
-  default_language: null,
-  default_target_language: 'en',
-  vad_threshold: 0.02,
-  auto_llm_on_stop: false,
-  default_llm_task: 'summary',
-  model_mirror: '',
 }
 
 export const useSettingsStore = create<SettingsStore>((set) => ({
@@ -62,44 +19,57 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
 
   loadConfig: async () => {
     set({ isLoading: true, error: null })
-    try {
-      const config = await invoke<AppConfig>('get_config')
-      set({ config, isLoading: false })
-    } catch (e) {
-      set({ error: String(e), isLoading: false, config: DEFAULT_CONFIG })
+    const result = await commands.getConfig()
+    if (result.status === 'ok') {
+      set({ config: result.data, isLoading: false })
+      return
     }
+
+    set({ error: formatAppError(result.error), isLoading: false })
   },
 
   updateConfig: async (partial: PartialAppConfig) => {
     set({ isLoading: true, error: null })
-    try {
-      await invoke<void>('update_config', { partial })
-      // Optimistically update local state
+    const cleaned = filterUndefined(partial)
+    const result = await commands.updateConfig(cleaned)
+
+    if (result.status === 'ok') {
       set((state) => ({
-        config: state.config ? { ...state.config, ...filterUndefined(partial) } : state.config,
+        config: state.config ? ({ ...state.config, ...cleaned } as AppConfig) : state.config,
         isLoading: false,
       }))
-    } catch (e) {
-      set({ error: String(e), isLoading: false })
-      throw e
+      return
     }
+
+    const error = formatAppError(result.error)
+    set({ error, isLoading: false })
+    throw new Error(error)
   },
 
   resetConfig: async () => {
     set({ isLoading: true, error: null })
-    try {
-      const config = await invoke<AppConfig>('reset_config')
-      set({ config, isLoading: false })
-    } catch (e) {
-      set({ error: String(e), isLoading: false })
-      throw e
+    const result = await commands.resetConfig()
+    if (result.status === 'ok') {
+      set({ config: result.data, isLoading: false })
+      return
     }
+
+    const error = formatAppError(result.error)
+    set({ error, isLoading: false })
+    throw new Error(error)
   },
 }))
 
-/** Remove keys with `undefined` values before sending to Tauri. */
 function filterUndefined<T extends object>(obj: T): Partial<T> {
   return Object.fromEntries(
-    Object.entries(obj).filter(([, v]) => v !== undefined)
+    Object.entries(obj).filter(([, value]) => value !== undefined),
   ) as Partial<T>
+}
+
+function formatAppError(error: AppError): string {
+  if ('message' in error) {
+    return error.message
+  }
+
+  return error.kind
 }

@@ -34,14 +34,29 @@ export function SettingsMain() {
     )
   }
 
-  if (!config) return null
+  if (!config) {
+    return (
+      <div className="mx-auto max-w-2xl space-y-4 p-6">
+        <h1 className="text-lg font-semibold text-text-primary">General Settings</h1>
+        <p className="rounded bg-status-error/10 px-3 py-2 text-sm text-status-error">
+          {error ?? 'Failed to load settings.'}
+        </p>
+        <button
+          onClick={() => void loadConfig()}
+          className="rounded border border-border px-3 py-1.5 text-sm text-text-secondary transition-colors hover:border-accent hover:text-text-primary"
+        >
+          Retry
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="mx-auto max-w-2xl space-y-8 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-text-primary">General Settings</h1>
         <button
-          onClick={() => resetConfig()}
+          onClick={() => void resetConfig()}
           className="rounded border border-border px-3 py-1.5 text-sm text-text-secondary
                      hover:border-status-error hover:text-status-error transition-colors"
         >
@@ -65,7 +80,7 @@ export function SettingsMain() {
           <Select
             value={config.locale}
             options={LOCALES}
-            onChange={(v) => updateConfig({ locale: v })}
+            onChange={(v) => void updateConfig({ locale: v })}
           />
         </FormRow>
       </section>
@@ -80,7 +95,7 @@ export function SettingsMain() {
           <Select
             value={config.default_recording_mode}
             options={RECORDING_MODES}
-            onChange={(v) => updateConfig({ default_recording_mode: v })}
+            onChange={(v) => void updateConfig({ default_recording_mode: v })}
           />
         </FormRow>
 
@@ -90,7 +105,7 @@ export function SettingsMain() {
             placeholder="auto"
             value={config.default_language ?? ''}
             onChange={(e) =>
-              updateConfig({
+              void updateConfig({
                 default_language: e.target.value === '' ? null : e.target.value,
               })
             }
@@ -109,7 +124,7 @@ export function SettingsMain() {
                 step={0.001}
                 value={Math.min(config.vad_threshold, 0.1)}
                 onChange={(e) =>
-                  updateConfig({ vad_threshold: parseFloat(e.target.value) })
+                  void updateConfig({ vad_threshold: parseFloat(e.target.value) })
                 }
                 className="flex-1"
               />
@@ -128,7 +143,7 @@ export function SettingsMain() {
           <input
             type="checkbox"
             checked={config.auto_llm_on_stop}
-            onChange={(e) => updateConfig({ auto_llm_on_stop: e.target.checked })}
+            onChange={(e) => void updateConfig({ auto_llm_on_stop: e.target.checked })}
             className="h-4 w-4 rounded border-border accent-accent"
           />
         </FormRow>
@@ -144,7 +159,7 @@ export function SettingsMain() {
           <Select
             value={config.default_llm_task}
             options={LLM_TASKS}
-            onChange={(v) => updateConfig({ default_llm_task: v })}
+            onChange={(v) => void updateConfig({ default_llm_task: v })}
           />
         </FormRow>
 
@@ -156,7 +171,7 @@ export function SettingsMain() {
             step={512}
             value={config.llm_context_size}
             onChange={(e) =>
-              updateConfig({ llm_context_size: parseInt(e.target.value, 10) })
+              void updateConfig({ llm_context_size: parseInt(e.target.value, 10) })
             }
             className="w-full rounded border border-border bg-bg-input px-3 py-1.5
                        text-sm text-text-primary focus:outline-none focus:border-accent"
@@ -177,7 +192,7 @@ export function SettingsMain() {
               { value: '',          label: 'Default (huggingface.co)' },
               { value: 'hf-mirror', label: 'hf-mirror.com (China)' },
             ]}
-            onChange={(v) => updateConfig({ model_mirror: v })}
+            onChange={(v) => void updateConfig({ model_mirror: v })}
           />
         </FormRow>
         <p className="text-xs text-text-muted -mt-2 ml-56">
@@ -195,7 +210,7 @@ export function SettingsMain() {
           <input
             type="text"
             value={config.vault_path}
-            onChange={(e) => updateConfig({ vault_path: e.target.value })}
+            onChange={(e) => void updateConfig({ vault_path: e.target.value })}
             className="w-full rounded border border-border bg-bg-input px-3 py-1.5
                        text-sm text-text-primary focus:outline-none focus:border-accent"
           />
@@ -205,7 +220,7 @@ export function SettingsMain() {
           <input
             type="text"
             value={config.recordings_path}
-            onChange={(e) => updateConfig({ recordings_path: e.target.value })}
+            onChange={(e) => void updateConfig({ recordings_path: e.target.value })}
             className="w-full rounded border border-border bg-bg-input px-3 py-1.5
                        text-sm text-text-primary focus:outline-none focus:border-accent"
           />

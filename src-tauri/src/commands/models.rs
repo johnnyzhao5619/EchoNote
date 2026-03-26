@@ -6,13 +6,6 @@ use crate::models::{DownloadCommand, ModelVariant};
 use crate::state::AppState;
 use tauri::State;
 
-fn model_dir_from_vault(vault_path: &str) -> std::path::PathBuf {
-    std::path::Path::new(vault_path)
-        .parent()
-        .unwrap_or(std::path::Path::new(vault_path))
-        .join("models")
-}
-
 /// 列出所有模型变体及其下载/激活状态
 #[tauri::command]
 #[specta::specta]
@@ -20,7 +13,7 @@ pub async fn list_model_variants(
     state: State<'_, AppState>,
 ) -> Result<Vec<ModelVariant>, AppError> {
     let config = state.config.read().await;
-    let model_dir = model_dir_from_vault(&config.vault_path);
+    let model_dir = state.models_dir();
 
     Ok(list_all_variants(
         &state.model_config,
@@ -70,8 +63,7 @@ pub async fn delete_model(
     let (model_type, variant_name) = parse_variant_id(&variant_id)
         .ok_or_else(|| AppError::Model(format!("无效 variant_id: {variant_id}")))?;
 
-    let config = state.config.read().await;
-    let model_dir = model_dir_from_vault(&config.vault_path);
+    let model_dir = state.models_dir();
 
     let cfg = match model_type {
         "whisper" => state.model_config.whisper.variants.get(variant_name),
@@ -103,22 +95,19 @@ pub async fn set_active_model(
         .ok_or_else(|| AppError::Model(format!("无效 variant_id: {variant_id}")))?;
     let model_type = model_type.to_string();
 
-    let serialized = {
-        let mut config = state.config.write().await;
-        match model_type.as_str() {
-            "whisper" => config.active_whisper_model = variant_id,
-            "llm" => config.active_llm_model = variant_id,
-            _ => return Err(AppError::Model(format!("未知 model_type: {model_type}"))),
-        }
-        serde_json::to_string(&*config)
-            .map_err(|e| AppError::Storage(e.to_string()))?
+    let partial = match model_type.as_str() {
+        "whisper" => crate::config::PartialAppConfig {
+            active_whisper_model: Some(variant_id),
+            ..Default::default()
+        },
+        "llm" => crate::config::PartialAppConfig {
+            active_llm_model: Some(variant_id),
+            ..Default::default()
+        },
+        _ => return Err(AppError::Model(format!("未知 model_type: {model_type}"))),
     };
 
-    state
-        .db
-        .save_setting("app_config", &serialized)
-        .await
-        .map_err(|e| AppError::Storage(e.to_string()))?;
+    state.update_config(partial).await?;
 
     // 切换 whisper 模型后立即热加载引擎，无需重启
     if model_type.as_str() == "whisper" {
@@ -147,7 +136,7 @@ pub async fn get_download_error(
 #[allow(dead_code)]
 pub async fn missing_required_models(state: &AppState) -> Vec<String> {
     let config = state.config.read().await;
-    let model_dir = model_dir_from_vault(&config.vault_path);
+    let model_dir = state.models_dir();
     check_required_models(
         &state.model_config,
         &model_dir,

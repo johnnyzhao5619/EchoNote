@@ -77,93 +77,25 @@ pub fn run() {
             let app_data_dir = app.path().app_data_dir()
                 .expect("APP_DATA dir not resolvable");
             std::fs::create_dir_all(&app_data_dir)?;
+            let app_data_dir = std::sync::Arc::new(app_data_dir);
 
             let db_path = app_data_dir.join("echonote.db");
             let db_url = format!("sqlite://{}?mode=rwc", db_path.display());
 
             // Step 1+2: open DB and run migrations (blocking inside setup)
             let db = tauri::async_runtime::block_on(
-                crate::storage::db::Db::open(&db_url)
+                crate::storage::db::Database::open(&db_url)
             ).expect("DB initialization failed");
             let db = std::sync::Arc::new(db);
 
             // Step 3: load AppConfig from DB (or default)
-            let config = {
-                let tmp_state = crate::state::AppState {
-                    db: std::sync::Arc::clone(&db),
-                    config: std::sync::Arc::new(tokio::sync::RwLock::new(
-                        crate::config::AppConfig::default(),
-                    )),
-                    model_config: std::sync::Arc::new(
-                        crate::models::registry::load_models_toml(
-                            include_str!("../../resources/models.toml")
-                        ).expect("models.toml 解析失败")
-                    ),
-                    download_tx: {
-                        let (tx, _rx) = tokio::sync::mpsc::channel(1);
-                        tx
-                    },
-                    transcription_tx: {
-                        let (tx, _rx) = std::sync::mpsc::sync_channel(1);
-                        tx
-                    },
-                    whisper_engine: std::sync::Arc::new(std::sync::Mutex::new(None)),
-                    capture_stop_tx: std::sync::Arc::new(std::sync::Mutex::new(None)),
-                    segments_cache: std::sync::Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
-                    pcm_cache: std::sync::Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
-                    current_session_id: std::sync::Arc::new(tokio::sync::Mutex::new(None)),
-                    resampler_done_rx: std::sync::Arc::new(tokio::sync::Mutex::new(None)),
-                    resampler_stop: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
-                    audio_level: std::sync::Arc::new(std::sync::atomic::AtomicU32::new(0)),
-                    llm_tx: {
-                        let (tx, _) = tokio::sync::mpsc::channel(1);
-                        tx
-                    },
-                    llm_engine: std::sync::Arc::new(tokio::sync::Mutex::new(None)),
-                    active_llm_cancels: std::sync::Arc::new(dashmap::DashMap::new()),
-                    download_errors: std::sync::Arc::new(dashmap::DashMap::new()),
-                    prompt_templates: std::sync::Arc::new(PromptTemplates {
-                        summary: crate::llm::tasks::TaskTemplate {
-                            system: String::new(),
-                            user: String::new(),
-                            max_tokens: 256,
-                        },
-                        meeting_brief: crate::llm::tasks::TaskTemplate {
-                            system: String::new(),
-                            user: String::new(),
-                            max_tokens: 1024,
-                        },
-                        translation: crate::llm::tasks::TaskTemplate {
-                            system: String::new(),
-                            user: String::new(),
-                            max_tokens: 2048,
-                        },
-                        qa: crate::llm::tasks::TaskTemplate {
-                            system: String::new(),
-                            user: String::new(),
-                            max_tokens: 512,
-                        },
-                    }),
-                    llm_engine_status: std::sync::Arc::new(tokio::sync::Mutex::new(LlmEngineStatus::NotLoaded)),
-                };
-                let loaded = tauri::async_runtime::block_on(
-                    crate::commands::settings::load_config_from_db(&tmp_state)
-                ).unwrap_or_default();
-
-                // Fill in runtime-derived paths if still empty
-                let mut cfg = loaded;
-                if cfg.vault_path.is_empty() {
-                    cfg.vault_path = app_data_dir.join("vault")
-                        .to_string_lossy()
-                        .to_string();
-                }
-                if cfg.recordings_path.is_empty() {
-                    cfg.recordings_path = app_data_dir.join("recordings")
-                        .to_string_lossy()
-                        .to_string();
-                }
-                std::sync::Arc::new(tokio::sync::RwLock::new(cfg))
-            };
+            let loaded_config = tauri::async_runtime::block_on(
+                crate::commands::settings::load_config_from_db(&db, app_data_dir.as_ref())
+            ).unwrap_or_else(|_| crate::config::normalized_app_config(
+                crate::config::AppConfig::default(),
+                app_data_dir.as_ref(),
+            ));
+            let config = std::sync::Arc::new(tokio::sync::RwLock::new(loaded_config));
 
             // Step 4: load models.toml
             let model_config = std::sync::Arc::new(
@@ -228,6 +160,7 @@ pub fn run() {
 
             // Build the AppState that Tauri manages
             let state_for_download = std::sync::Arc::new(crate::state::AppState {
+                app_data_dir: std::sync::Arc::clone(&app_data_dir),
                 db: std::sync::Arc::clone(&db),
                 config: std::sync::Arc::clone(&config),
                 model_config: std::sync::Arc::clone(&model_config),
@@ -284,13 +217,9 @@ pub fn run() {
             // Step 7: startup missing-model detection
             let missing = {
                 let cfg_guard = tauri::async_runtime::block_on(config.read());
-                let model_dir = std::path::Path::new(&cfg_guard.vault_path)
-                    .parent()
-                    .unwrap_or(std::path::Path::new(&cfg_guard.vault_path))
-                    .join("models");
                 crate::models::registry::check_required_models(
                     &model_config,
-                    &model_dir,
+                    &state_for_download.models_dir(),
                     &cfg_guard.active_whisper_model,
                     &cfg_guard.active_llm_model,
                 )
@@ -312,6 +241,7 @@ pub fn run() {
 
             // Register managed state
             app.manage(crate::state::AppState {
+                app_data_dir,
                 db,
                 config,
                 model_config,

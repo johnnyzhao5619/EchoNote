@@ -1,8 +1,9 @@
 use tauri::State;
 use crate::{
-    config::{AppConfig, PartialAppConfig, apply_partial},
+    config::{AppConfig, PartialAppConfig, normalized_app_config},
     error::AppError,
     state::AppState,
+    storage::db::Database,
 };
 
 const CONFIG_KEY: &str = "app_config";
@@ -20,75 +21,26 @@ pub(crate) async fn update_config_inner(
     state: &AppState,
     partial: PartialAppConfig,
 ) -> Result<(), AppError> {
-    // 1. Apply partial update to in-memory config
-    let updated = {
-        let mut cfg = state.config.write().await;
-        apply_partial(&mut cfg, partial);
-        cfg.clone()
-    };
-
-    // 2. Persist serialized config to app_settings table
-    let json = serde_json::to_string(&updated)
-        .map_err(|e| AppError::Storage(format!("serialize config: {e}")))?;
-    let now = chrono_or_system_ms();
-
-    sqlx::query(
-        "INSERT INTO app_settings (key, value, updated_at)
-         VALUES (?, ?, ?)
-         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at"
-    )
-    .bind(CONFIG_KEY)
-    .bind(&json)
-    .bind(now)
-    .execute(&state.db.pool)
-    .await?;
-
+    state.update_config(partial).await?;
     Ok(())
 }
 
 pub(crate) async fn reset_config_inner(state: &AppState) -> Result<AppConfig, AppError> {
-    let default_cfg = AppConfig::default();
-
-    // Overwrite in-memory state
-    {
-        let mut cfg = state.config.write().await;
-        *cfg = default_cfg.clone();
-    }
-
-    // Persist reset config
-    let json = serde_json::to_string(&default_cfg)
-        .map_err(|e| AppError::Storage(format!("serialize default config: {e}")))?;
-    let now = chrono_or_system_ms();
-
-    sqlx::query(
-        "INSERT INTO app_settings (key, value, updated_at)
-         VALUES (?, ?, ?)
-         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at"
-    )
-    .bind(CONFIG_KEY)
-    .bind(&json)
-    .bind(now)
-    .execute(&state.db.pool)
-    .await?;
-
-    Ok(default_cfg)
+    state.persist_config(state.default_config()).await
 }
 
 /// Load AppConfig from `app_settings` DB on startup.
 /// Returns `AppConfig::default()` if no row exists yet.
-pub async fn load_config_from_db(state: &AppState) -> Result<AppConfig, AppError> {
-    let row: Option<(String,)> = sqlx::query_as(
-        "SELECT value FROM app_settings WHERE key = ?"
-    )
-    .bind(CONFIG_KEY)
-    .fetch_optional(&state.db.pool)
-    .await?;
-
-    match row {
-        None => Ok(AppConfig::default()),
-        Some((json,)) => {
-            serde_json::from_str(&json)
-                .map_err(|e| AppError::Storage(format!("parse config: {e}")))
+pub async fn load_config_from_db(
+    db: &Database,
+    app_data_dir: &std::path::Path,
+) -> Result<AppConfig, AppError> {
+    match db.load_setting(CONFIG_KEY).await? {
+        None => Ok(normalized_app_config(AppConfig::default(), app_data_dir)),
+        Some(json) => {
+            let parsed: AppConfig = serde_json::from_str(&json)
+                .map_err(|e| AppError::Storage(format!("parse config: {e}")))?;
+            Ok(normalized_app_config(parsed, app_data_dir))
         }
     }
 }
@@ -118,20 +70,10 @@ pub async fn reset_config(state: State<'_, AppState>) -> Result<AppConfig, AppEr
     reset_config_inner(&state).await
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Helper: current Unix timestamp in milliseconds (no external crate dependency)
-// ──────────────────────────────────────────────────────────────────────────────
-fn chrono_or_system_ms() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis() as i64
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{config::AppConfig, storage::db::Db};
+    use crate::{config::AppConfig, storage::db::Database};
     use std::sync::Arc;
     use tokio::sync::RwLock;
 
@@ -139,8 +81,12 @@ mod tests {
         use crate::models::{DownloadCommand, ModelsToml};
         use tokio::sync::mpsc;
 
-        let db = Arc::new(Db::open("sqlite::memory:").await.unwrap());
-        let config = Arc::new(RwLock::new(AppConfig::default()));
+        let app_data_dir = Arc::new(std::path::PathBuf::from("/tmp/echonote-settings-tests"));
+        let db = Arc::new(Database::open("sqlite::memory:").await.unwrap());
+        let config = Arc::new(RwLock::new(normalized_app_config(
+            AppConfig::default(),
+            app_data_dir.as_ref(),
+        )));
         let model_config = Arc::new(ModelsToml {
             whisper: crate::models::ModelGroup {
                 default_variant: "base".to_string(),
@@ -154,6 +100,7 @@ mod tests {
         let (download_tx, _rx) = mpsc::channel::<DownloadCommand>(1);
         let (transcription_tx, _trx) = std::sync::mpsc::sync_channel(1);
         AppState {
+            app_data_dir,
             db,
             config,
             model_config,
@@ -190,6 +137,8 @@ mod tests {
         let cfg = get_config_inner(&state).await.unwrap();
         assert_eq!(cfg.locale, "zh_CN");
         assert_eq!(cfg.active_theme, "Tokyo Night");
+        assert_eq!(cfg.vault_path, "/tmp/echonote-settings-tests/vault");
+        assert_eq!(cfg.recordings_path, "/tmp/echonote-settings-tests/recordings");
     }
 
     /// update_config_inner must persist a locale change to the DB and update in-memory state.
@@ -236,6 +185,8 @@ mod tests {
         // In-memory state must be restored
         let in_mem = state.config.read().await;
         assert_eq!(in_mem.locale, "zh_CN");
+        assert_eq!(in_mem.vault_path, "/tmp/echonote-settings-tests/vault");
+        assert_eq!(in_mem.recordings_path, "/tmp/echonote-settings-tests/recordings");
     }
 
     /// Two successive update_config calls must accumulate changes correctly.
@@ -266,7 +217,7 @@ mod tests {
         let state = make_state().await;
 
         // 1. First load should return defaults (no row in DB yet)
-        let loaded = load_config_from_db(&state).await.unwrap();
+        let loaded = load_config_from_db(&state.db, state.app_data_dir.as_ref()).await.unwrap();
         assert_eq!(loaded.locale, "zh_CN");
 
         // 2. Update locale
@@ -278,13 +229,54 @@ mod tests {
         update_config_inner(&state, partial).await.unwrap();
 
         // 3. Re-load from DB should reflect changes
-        let reloaded = load_config_from_db(&state).await.unwrap();
+        let reloaded = load_config_from_db(&state.db, state.app_data_dir.as_ref()).await.unwrap();
         assert_eq!(reloaded.locale, "fr_FR");
         assert!((reloaded.vad_threshold - 0.05).abs() < 1e-5);
 
         // 4. Reset should restore defaults
         reset_config_inner(&state).await.unwrap();
-        let after_reset = load_config_from_db(&state).await.unwrap();
+        let after_reset = load_config_from_db(&state.db, state.app_data_dir.as_ref()).await.unwrap();
         assert_eq!(after_reset.locale, "zh_CN");
+        assert_eq!(after_reset.vault_path, "/tmp/echonote-settings-tests/vault");
+        assert_eq!(after_reset.recordings_path, "/tmp/echonote-settings-tests/recordings");
+    }
+
+    #[tokio::test]
+    async fn test_update_config_keeps_memory_unchanged_when_db_write_fails() {
+        let state = make_state().await;
+        state.db.pool.close().await;
+
+        let result = update_config_inner(
+            &state,
+            crate::config::PartialAppConfig {
+                locale: Some("en_US".to_string()),
+                ..Default::default()
+            },
+        )
+        .await;
+
+        assert!(result.is_err());
+        let cfg = state.config.read().await;
+        assert_eq!(cfg.locale, "zh_CN");
+    }
+
+    #[tokio::test]
+    async fn test_load_config_from_db_normalizes_runtime_paths() {
+        let state = make_state().await;
+
+        let persisted = AppConfig {
+            vault_path: String::new(),
+            recordings_path: String::new(),
+            ..AppConfig::default()
+        };
+        state
+            .db
+            .save_setting(CONFIG_KEY, &serde_json::to_string(&persisted).unwrap())
+            .await
+            .unwrap();
+
+        let loaded = load_config_from_db(&state.db, state.app_data_dir.as_ref()).await.unwrap();
+        assert_eq!(loaded.vault_path, "/tmp/echonote-settings-tests/vault");
+        assert_eq!(loaded.recordings_path, "/tmp/echonote-settings-tests/recordings");
     }
 }

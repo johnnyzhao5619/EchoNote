@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use specta::Type;
+use std::path::{Path, PathBuf};
 
 /// Full application configuration. Stored as a single JSON blob
 /// in `app_settings` under the key `"app_config"`.
@@ -76,6 +77,34 @@ impl Default for AppConfig {
             model_mirror:            String::new(), // default: use URLs as-is
         }
     }
+}
+
+pub fn default_vault_path(app_data_dir: &Path) -> PathBuf {
+    app_data_dir.join("vault")
+}
+
+pub fn default_recordings_path(app_data_dir: &Path) -> PathBuf {
+    app_data_dir.join("recordings")
+}
+
+pub fn default_models_path(app_data_dir: &Path) -> PathBuf {
+    app_data_dir.join("models")
+}
+
+pub fn normalized_app_config(mut config: AppConfig, app_data_dir: &Path) -> AppConfig {
+    if config.vault_path.trim().is_empty() {
+        config.vault_path = default_vault_path(app_data_dir)
+            .to_string_lossy()
+            .into_owned();
+    }
+
+    if config.recordings_path.trim().is_empty() {
+        config.recordings_path = default_recordings_path(app_data_dir)
+            .to_string_lossy()
+            .into_owned();
+    }
+
+    config
 }
 
 /// Partial update payload. Every field is `Option<T>`.
@@ -241,5 +270,16 @@ mod tests {
         let json = serde_json::to_string(&partial).unwrap();
         assert!(json.contains("\"locale\""), "locale should be present");
         assert!(!json.contains("\"active_theme\""), "None fields should be absent");
+    }
+
+    #[test]
+    fn test_normalized_app_config_fills_runtime_paths() {
+        let cfg = normalized_app_config(
+            AppConfig::default(),
+            Path::new("/tmp/echonote-app-data"),
+        );
+
+        assert_eq!(cfg.vault_path, "/tmp/echonote-app-data/vault");
+        assert_eq!(cfg.recordings_path, "/tmp/echonote-app-data/recordings");
     }
 }

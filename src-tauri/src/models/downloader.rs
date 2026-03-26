@@ -222,6 +222,7 @@ pub async fn run_download_worker(
                 // 从 AppState 克隆所需数据，避免跨 await 持锁
                 let model_config = Arc::clone(&state.model_config);
                 let config = state.config.read().await.clone();
+                let model_dir = state.models_dir();
                 let app_clone = app.clone();
                 let client_clone = client.clone();
                 let cancel_clone = Arc::clone(&cancelled);
@@ -234,6 +235,7 @@ pub async fn run_download_worker(
                         &client_clone,
                         &model_config,
                         &config,
+                        &model_dir,
                         &vid,
                         &app_clone,
                         cancel_clone,
@@ -288,6 +290,7 @@ async fn do_download(
     client: &reqwest::Client,
     model_config: &ModelsToml,
     config: &crate::config::schema::AppConfig,
+    model_dir: &Path,
     variant_id: &str,
     app: &AppHandle,
     cancelled: Arc<AtomicBool>,
@@ -313,12 +316,7 @@ async fn do_download(
         )));
     }
 
-    let model_dir = std::path::Path::new(&config.vault_path)
-        .parent()
-        .unwrap_or(std::path::Path::new(&config.vault_path))
-        .join("models");
-
-    let dest = model_file_path(&model_dir, model_type, variant_name, &cfg.url);
+    let dest = model_file_path(model_dir, model_type, variant_name, &cfg.url);
     let expected_size = cfg.size_bytes;
     let expected_sha256 = cfg.sha256.clone();
     let url = apply_mirror(&cfg.url, &config.model_mirror);
