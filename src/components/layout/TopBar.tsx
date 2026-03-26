@@ -23,8 +23,6 @@ export function TopBar() {
       style={{ height: "var(--top-bar-height)" }}
     >
       <span className="text-sm font-medium text-text-primary">{title}</span>
-      {/* TODO(M2): 录音状态指示灯 */}
-      {/* TODO(M2): 面包屑导航 */}
     </div>
   );
 }
