@@ -11,7 +11,7 @@ use llama_cpp_2::{
     context::params::LlamaContextParams,
     llama_backend::LlamaBackend,
     llama_batch::LlamaBatch,
-    model::{params::LlamaModelParams, AddBos, LlamaModel, Special},
+    model::{params::LlamaModelParams, AddBos, LlamaModel},
     sampling::LlamaSampler,
 };
 
@@ -116,6 +116,7 @@ impl LlmEngine {
 
         let mut result = String::new();
         let mut n_cur = n_prompt as i32;
+        let mut decoder = encoding_rs::UTF_8.new_decoder();
 
         loop {
             if n_cur >= n_prompt as i32 + max_tokens as i32 {
@@ -132,7 +133,7 @@ impl LlmEngine {
 
             let piece = self
                 .inner_model
-                .token_to_str(new_token, Special::Tokenize)
+                .token_to_piece(new_token, &mut decoder, true, None)
                 .map_err(|e| AppError::Llm(format!("token to str: {e}")))?;
 
             result.push_str(&piece);

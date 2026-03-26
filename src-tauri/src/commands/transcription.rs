@@ -196,7 +196,7 @@ pub async fn start_realtime(
             match raw_rx.recv_timeout(std::time::Duration::from_millis(20)) {
                 Ok(chunk) => {
                     chunks_received += 1;
-                    if chunks_received == 1 || chunks_received % 100 == 0 {
+                    if chunks_received == 1 || chunks_received.is_multiple_of(100) {
                         eprintln!("[pipeline] chunks received: {chunks_received}");
                     }
                     process_chunk!(chunk);

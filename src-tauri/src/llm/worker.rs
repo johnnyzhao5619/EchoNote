@@ -41,6 +41,14 @@ pub enum LlmTaskMessage {
 
 pub struct LlmWorker;
 
+struct SubmitContext {
+    app: AppHandle,
+    engine_state: Arc<tokio::sync::Mutex<Option<Arc<LlmEngine>>>>,
+    templates: Arc<PromptTemplates>,
+    active_cancels: Arc<DashMap<String, Arc<AtomicBool>>>,
+    pool: SqlitePool,
+}
+
 impl LlmWorker {
     pub async fn run(
         mut rx: mpsc::Receiver<LlmTaskMessage>,
@@ -69,11 +77,13 @@ impl LlmWorker {
                         task_id,
                         request,
                         assets,
-                        app.clone(),
-                        Arc::clone(&engine_state),
-                        Arc::clone(&templates),
-                        Arc::clone(&active_cancels),
-                        pool.clone(),
+                        SubmitContext {
+                            app: app.clone(),
+                            engine_state: Arc::clone(&engine_state),
+                            templates: Arc::clone(&templates),
+                            active_cancels: Arc::clone(&active_cancels),
+                            pool: pool.clone(),
+                        },
                     )
                     .await;
                 }
@@ -85,11 +95,7 @@ impl LlmWorker {
         task_id: String,
         request: LlmTaskRequest,
         assets: Vec<(String, String)>,
-        app: AppHandle,
-        engine_state: Arc<tokio::sync::Mutex<Option<Arc<LlmEngine>>>>,
-        templates: Arc<PromptTemplates>,
-        active_cancels: Arc<DashMap<String, Arc<AtomicBool>>>,
-        pool: SqlitePool,
+        ctx: SubmitContext,
     ) {
         let now_ms = chrono::Utc::now().timestamp_millis();
 
@@ -98,17 +104,17 @@ impl LlmWorker {
             "UPDATE llm_tasks SET status = 'running' WHERE id = ?",
         )
         .bind(&task_id)
-        .execute(&pool)
+        .execute(&ctx.pool)
         .await;
 
         // ② 短暂加锁，clone Arc<LlmEngine>，立即释放锁
         let engine_arc: Option<Arc<LlmEngine>> = {
-            let guard = engine_state.lock().await;
-            guard.as_ref().map(|e| Arc::clone(e))
+            let guard = ctx.engine_state.lock().await;
+            guard.as_ref().map(Arc::clone)
         };
 
         let Some(engine) = engine_arc else {
-            let _ = app.emit("llm:error", LlmErrorPayload {
+            let _ = ctx.app.emit("llm:error", LlmErrorPayload {
                 task_id: task_id.clone(),
                 error: "LLM engine not loaded".to_string(),
             });
@@ -116,7 +122,7 @@ impl LlmWorker {
                 "UPDATE llm_tasks SET status = 'failed', error_msg = 'engine not loaded' WHERE id = ?",
             )
             .bind(&task_id)
-            .execute(&pool)
+            .execute(&ctx.pool)
             .await;
             return;
         };
@@ -130,28 +136,31 @@ impl LlmWorker {
         .to_string();
 
         // ④ 构建 prompt 变量表
-        let mut vars: HashMap<&str, &str> = HashMap::new();
-        vars.insert("text", &text);
-
-        let mut target_lang_owned = String::new();
-        let mut question_owned = String::new();
-        match &request.task_type {
+        let prompt_result = match &request.task_type {
             LlmTaskType::Translation { target_language } => {
-                target_lang_owned = target_language.clone();
-                vars.insert("target_language", &target_lang_owned);
+                let target_language_owned = target_language.clone();
+                let mut vars: HashMap<&str, &str> = HashMap::new();
+                vars.insert("text", &text);
+                vars.insert("target_language", &target_language_owned);
+                build_prompt(&ctx.templates, &request.task_type, &vars)
             }
             LlmTaskType::Qa { question } => {
-                question_owned = question.clone();
+                let question_owned = question.clone();
+                let mut vars: HashMap<&str, &str> = HashMap::new();
+                vars.insert("text", &text);
                 vars.insert("context", &text);
                 vars.insert("question", &question_owned);
+                build_prompt(&ctx.templates, &request.task_type, &vars)
             }
-            _ => {}
-        }
+            _ => {
+                let mut vars: HashMap<&str, &str> = HashMap::new();
+                vars.insert("text", &text);
+                build_prompt(&ctx.templates, &request.task_type, &vars)
+            }
+        };
 
-        let Ok((system, user, max_tokens)) =
-            build_prompt(&templates, &request.task_type, &vars)
-        else {
-            let _ = app.emit("llm:error", LlmErrorPayload {
+        let Ok((system, user, max_tokens)) = prompt_result else {
+            let _ = ctx.app.emit("llm:error", LlmErrorPayload {
                 task_id: task_id.clone(),
                 error: "failed to build prompt".to_string(),
             });
@@ -160,11 +169,11 @@ impl LlmWorker {
 
         // ⑤ 创建 AtomicBool 取消标志，注册到 DashMap
         let cancelled = Arc::new(AtomicBool::new(false));
-        active_cancels.insert(task_id.clone(), Arc::clone(&cancelled));
+        ctx.active_cancels.insert(task_id.clone(), Arc::clone(&cancelled));
 
         // ⑥ 创建 token 桥接
         let (token_sender, _bridge_handle) =
-            make_token_bridge(app.clone(), task_id.clone());
+            make_token_bridge(ctx.app.clone(), task_id.clone());
 
         // ⑦ spawn_blocking 运行同步推理
         let cancelled_clone = Arc::clone(&cancelled);
@@ -184,13 +193,13 @@ impl LlmWorker {
         .await;
 
         // ⑧ 清理取消标志
-        active_cancels.remove(&task_id);
+        ctx.active_cancels.remove(&task_id);
 
         // ⑨ 处理结果
         match result {
             Err(join_err) => {
                 let msg = format!("spawn_blocking panic: {join_err}");
-                let _ = app.emit("llm:error", LlmErrorPayload {
+                let _ = ctx.app.emit("llm:error", LlmErrorPayload {
                     task_id: task_id.clone(),
                     error: msg.clone(),
                 });
@@ -200,13 +209,13 @@ impl LlmWorker {
                 .bind(&msg)
                 .bind(now_ms)
                 .bind(&task_id)
-                .execute(&pool)
+                .execute(&ctx.pool)
                 .await;
             }
 
             Ok(Err(app_err)) => {
                 let msg = app_err.to_string();
-                let _ = app.emit("llm:error", LlmErrorPayload {
+                let _ = ctx.app.emit("llm:error", LlmErrorPayload {
                     task_id: task_id.clone(),
                     error: msg.clone(),
                 });
@@ -216,7 +225,7 @@ impl LlmWorker {
                 .bind(&msg)
                 .bind(now_ms)
                 .bind(&task_id)
-                .execute(&pool)
+                .execute(&ctx.pool)
                 .await;
             }
 
@@ -227,7 +236,7 @@ impl LlmWorker {
                     )
                     .bind(now_ms)
                     .bind(&task_id)
-                    .execute(&pool)
+                    .execute(&ctx.pool)
                     .await;
                     return;
                 }
@@ -259,7 +268,7 @@ impl LlmWorker {
                     .bind(content)
                     .bind(now_ms)
                     .bind(now_ms)
-                    .execute(&pool)
+                    .execute(&ctx.pool)
                     .await;
                 }
 
@@ -269,10 +278,10 @@ impl LlmWorker {
                 .bind(&result_text)
                 .bind(now_ms)
                 .bind(&task_id)
-                .execute(&pool)
+                .execute(&ctx.pool)
                 .await;
 
-                let _ = app.emit("llm:done", LlmTaskResult {
+                let _ = ctx.app.emit("llm:done", LlmTaskResult {
                     task_id: task_id.clone(),
                     document_id,
                     task_type: request.task_type,

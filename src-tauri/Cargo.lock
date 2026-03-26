@@ -1024,6 +1024,7 @@ dependencies = [
  "chrono",
  "cpal",
  "dashmap",
+ "encoding_rs",
  "env_logger",
  "futures-util",
  "hex",

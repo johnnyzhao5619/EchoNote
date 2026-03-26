@@ -7,6 +7,17 @@ use tauri::State;
 use crate::error::AppError;
 use crate::state::AppState;
 
+type RecordingRow = (
+    String,
+    String,
+    String,
+    i64,
+    String,
+    i64,
+    Option<String>,
+    Option<String>,
+);
+
 /// 单条录音摘要（用于 Workspace 列表）
 #[derive(Debug, Serialize, Deserialize, Clone, Type)]
 pub struct RecordingItem {
@@ -28,19 +39,18 @@ pub struct RecordingItem {
 pub async fn list_recordings(
     state: State<'_, AppState>,
 ) -> Result<Vec<RecordingItem>, AppError> {
-    let rows: Vec<(String, String, String, i64, String, i64, Option<String>, Option<String>)> =
-        sqlx::query_as(
-            "SELECT r.id, r.title, r.file_path, r.duration_ms, r.language, r.created_at,
-                    wta.content,
-                    wd.id as document_id
-             FROM recordings r
-             LEFT JOIN workspace_documents wd ON wd.recording_id = r.id
-             LEFT JOIN workspace_text_assets wta
-               ON wta.document_id = wd.id AND wta.role = 'transcript'
-             ORDER BY r.created_at DESC",
-        )
-        .fetch_all(&state.db.pool)
-        .await?;
+    let rows: Vec<RecordingRow> = sqlx::query_as(
+        "SELECT r.id, r.title, r.file_path, r.duration_ms, r.language, r.created_at,
+                wta.content,
+                wd.id as document_id
+         FROM recordings r
+         LEFT JOIN workspace_documents wd ON wd.recording_id = r.id
+         LEFT JOIN workspace_text_assets wta
+           ON wta.document_id = wd.id AND wta.role = 'transcript'
+         ORDER BY r.created_at DESC",
+    )
+    .fetch_all(&state.db.pool)
+    .await?;
 
     Ok(rows
         .into_iter()

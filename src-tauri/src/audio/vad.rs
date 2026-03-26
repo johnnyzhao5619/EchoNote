@@ -83,7 +83,7 @@ impl VadFilter {
         };
 
         // 诊断日志：前 10 帧 + 每 50 帧打印一次
-        if self.chunk_count <= 10 || self.chunk_count % 50 == 0 {
+        if self.chunk_count <= 10 || self.chunk_count.is_multiple_of(50) {
             let verdict = if rms >= effective { "VOICE" } else { "silent" };
             let phase = if self.rms_history.len() < NOISE_FLOOR_WINDOW { "cold" } else { "adapted" };
             let noise_floor = if self.rms_history.len() >= 4 {
