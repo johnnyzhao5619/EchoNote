@@ -60,6 +60,20 @@ milestone-by-milestone execution guide (M1–M11).
 
 Implementation plans are in [`docs/superpowers/plans/`](docs/superpowers/plans/).
 
+## Running Locally
+
+1. **Prerequisites**: [Node.js](https://nodejs.org/), [Rust/Cargo](https://rustup.rs/), and Xcode Command Line Tools (on macOS).
+2. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+3. **Run in development mode**:
+   ```bash
+   npm run tauri dev
+   ```
+
+Note: On first run, it will compile the Rust backend, which may take several minutes. Once finished, the EchoNote window will appear automatically.
+
 ---
 
 ## License
