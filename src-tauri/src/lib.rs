@@ -143,7 +143,7 @@ pub fn run() {
             // M4 shared state (Arc wrappers for sharing with worker)
             let segments_cache = std::sync::Arc::new(std::sync::Mutex::new(std::collections::HashMap::new()));
             let pcm_cache = std::sync::Arc::new(std::sync::Mutex::new(std::collections::HashMap::new()));
-            let current_session_id = std::sync::Arc::new(tokio::sync::Mutex::new(None));
+            let recording_meta = std::sync::Arc::new(std::sync::Mutex::new(None));
             let capture_stop_tx: std::sync::Arc<std::sync::Mutex<Option<std::sync::mpsc::SyncSender<()>>>> =
                 std::sync::Arc::new(std::sync::Mutex::new(None));
 
@@ -166,7 +166,7 @@ pub fn run() {
                 capture_stop_tx: std::sync::Arc::clone(&capture_stop_tx),
                 segments_cache: std::sync::Arc::clone(&segments_cache),
                 pcm_cache: std::sync::Arc::clone(&pcm_cache),
-                current_session_id: std::sync::Arc::clone(&current_session_id),
+                recording_meta: std::sync::Arc::clone(&recording_meta),
                 resampler_done_rx: std::sync::Arc::clone(&resampler_done_rx),
                 resampler_stop: std::sync::Arc::clone(&resampler_stop),
                 audio_level: std::sync::Arc::clone(&audio_level),
@@ -246,7 +246,7 @@ pub fn run() {
                 capture_stop_tx,
                 segments_cache,
                 pcm_cache,
-                current_session_id,
+                recording_meta,
                 resampler_done_rx,
                 resampler_stop,
                 audio_level,

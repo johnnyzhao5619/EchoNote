@@ -2,9 +2,11 @@
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 实现完整的实时音频录制管线：cpal 麦克风采集 → rubato 重采样 → VAD 静音检测 → whisper-rs 流式转写 → Tauri 事件推送，并在录音结束时自动保存 WAV 文件、写入数据库、创建 workspace 文档记录。
+**Goal:** 实现完整的实时音频录制管线：cpal 麦克风采集 → rubato 重采样 → VAD 静音检测 → whisper-rs 流式转写 → 前端实时更新，并在录音结束时自动保存 WAV 文件、写入数据库、创建 workspace 文档记录。
 
-**Architecture:** Rust 后端由 `audio/`（capture + resampler + vad）和 `transcription/`（engine + pipeline）两个子模块构成，通过 `std::sync::mpsc::SyncSender` 跨越 cpal 系统线程与 tokio 异步运行时；`AppState` 持有 `transcription_tx: SyncSender<TranscriptionCommand>` 和 `whisper_engine: Arc<Mutex<Option<WhisperEngine>>>`，commands 层只发消息、立即返回，所有推理在长驻 tokio task 内的 `spawn_blocking` 中执行；前端由 `useRecordingStore`（Zustand）、`RecordingPanel`（SecondPanel）、`RecordingMain`（MainContent）三部分组成，通过 `audio:level`、`transcription:segment`、`transcription:status` 三个 Tauri 事件驱动实时更新。
+**Architecture:** Rust 后端由 `audio/`（capture + resampler + vad）和 `transcription/`（engine + pipeline）两个子模块构成，通过 `std::sync::mpsc::SyncSender` 跨越 cpal 系统线程与 tokio 异步运行时；`AppState` 持有 `transcription_tx: SyncSender<TranscriptionCommand>` 和 `whisper_engine: Arc<Mutex<Option<WhisperEngine>>>`，commands 层不直接执行 whisper 推理，所有推理在长驻 tokio task 内的 `spawn_blocking` 中执行；前端由 `useRecordingStore`（Zustand）、`RecordingPanel`（SecondPanel）、`RecordingMain`（MainContent）三部分组成。当前录音域以 `get_audio_level`、`get_realtime_segments`、`get_recording_status` 轮询驱动实时更新；`audio:level`、`transcription:segment`、`transcription:status` 可保留为兼容/调试用 best-effort 事件，但不作为验收硬要求。
+
+> **Implementation note (2026-03-26):** 当前 Tauri 录音域事件在目标开发环境中不稳定。M4 的验收以“实时更新可用”为准，不强制要求必须由事件单独驱动；基于 `bindings.ts` 的轮询命令实现视为符合计划。
 
 **Tech Stack:** `cpal 0.15`、`rubato 0.15`、`whisper-rs 0.11`（features: coreml）、`hound`（WAV 写入）、`tokio`（spawn_blocking）、`tauri-specta v2`、React 18 + TypeScript + Zustand + shadcn/ui + Canvas API
 
@@ -368,7 +370,7 @@
 
 ---
 
-### Task 5: `audio/vad.rs` — RMS 能量阈值静音检测 + audio:level 事件
+### Task 5: `audio/vad.rs` — RMS 能量阈值静音检测 + 电平上报
 
 **Files:**
 - Create: `src-tauri/src/audio/vad.rs`
@@ -505,7 +507,7 @@
 
   > 注意：`VadFilter::process` 依赖真实 `AppHandle`（用于 emit），集成测试在 Task 12 的 pipeline mock 测试中覆盖；此处只测试纯计算逻辑（`rms`）。
 
-- [ ] **Commit:** `feat(audio): implement VAD filter with RMS threshold, context buffering, and audio:level emit`
+- [ ] **Commit:** `feat(audio): implement VAD filter with RMS threshold, context buffering, and level reporting`
 
 ---
 
@@ -1437,6 +1439,12 @@
 
 - [ ] **Step 14.1: 实现完整的 `useRecordingStore`**
 
+  > 当前录音域前端更新接受两种方式：
+  > 1. 首选：通过 `bindings.ts` 轮询 `get_audio_level`、`get_realtime_segments`、`get_recording_status`
+  > 2. 兼容：继续监听 `audio:level` / `transcription:*` 事件
+  >
+  > 只要实时电平、字幕、录音状态三者都能稳定更新，即视为满足本 Step。
+
   ```typescript
   // src/store/recording.ts
   import { create } from 'zustand'
@@ -1581,7 +1589,7 @@
   }))
   ```
 
-- [ ] **Commit:** `feat(store): implement useRecordingStore with Tauri event listeners`
+- [ ] **Commit:** `feat(store): implement useRecordingStore with polling-based realtime updates`
 
 ---
 
@@ -2017,7 +2025,7 @@
   手动检查：
   - `/recording` 页面：设备下拉正确列出系统麦克风
   - 点击 Start Recording：状态变为 recording，计时器开始
-  - 对麦克风说话：Canvas 波形有响应，实时字幕出现（需 whisper 模型已下载）
+  - 对麦克风说话：Canvas 波形有响应，实时字幕出现（事件或轮询均可；需 whisper 模型已下载）
   - 点击 Stop：WAV 文件出现在 `{APP_DATA}/recordings/`，DB 中有对应记录
 
 - [ ] **Commit:** `test: add audio pipeline unit tests and e2e integration test placeholder`

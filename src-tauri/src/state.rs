@@ -20,6 +20,13 @@ use crate::llm::{
     LlmEngineStatus,
 };
 
+#[derive(Debug, Clone)]
+pub struct RecordingSessionMeta {
+    pub session_id: String,
+    pub started_at_ms: i64,
+    pub is_paused: bool,
+}
+
 pub struct AppState {
     // M1–M3 fields
     pub app_data_dir: Arc<PathBuf>,
@@ -46,8 +53,8 @@ pub struct AppState {
     /// std Mutex：resampler std::thread 写，stop_realtime 读（不跨 await 持锁）
     pub pcm_cache: Arc<Mutex<HashMap<String, Vec<f32>>>>,
 
-    /// 当前录音会话 ID
-    pub current_session_id: Arc<TokioMutex<Option<String>>>,
+    /// 当前录音会话元数据：录音控制、轮询状态、resampler 闸门都以此为唯一真相
+    pub recording_meta: Arc<Mutex<Option<RecordingSessionMeta>>>,
 
     /// resampler 线程完成信号（stop_realtime 等待此信号后再发 Stop 给 pipeline）
     /// 用于解决停止竞态条件：确保所有 AudioChunk 发送完毕后再执行最终 flush
@@ -217,5 +224,77 @@ impl AppState {
                 false
             }
         }
+    }
+}
+
+#[cfg(test)]
+pub(crate) async fn make_test_state(app_data_dir: PathBuf) -> AppState {
+    use crate::config::{normalized_app_config, AppConfig};
+    use crate::models::{DownloadCommand, ModelsToml};
+    use crate::storage::db::Database;
+
+    let app_data_dir = Arc::new(app_data_dir);
+    let db = Arc::new(Database::open("sqlite::memory:").await.unwrap());
+    let config = Arc::new(RwLock::new(normalized_app_config(
+        AppConfig::default(),
+        app_data_dir.as_ref(),
+    )));
+    let model_config = Arc::new(ModelsToml {
+        whisper: crate::models::ModelGroup {
+            default_variant: "base".to_string(),
+            variants: HashMap::new(),
+        },
+        llm: crate::models::ModelGroup {
+            default_variant: "qwen2.5-3b-q4".to_string(),
+            variants: HashMap::new(),
+        },
+    });
+    let (download_tx, _rx) = mpsc::channel::<DownloadCommand>(1);
+    let (transcription_tx, _trx) = std::sync::mpsc::sync_channel(1);
+
+    AppState {
+        app_data_dir,
+        db,
+        config,
+        model_config,
+        download_tx,
+        transcription_tx,
+        whisper_engine: Arc::new(Mutex::new(None)),
+        capture_stop_tx: Arc::new(Mutex::new(None)),
+        segments_cache: Arc::new(Mutex::new(HashMap::new())),
+        pcm_cache: Arc::new(Mutex::new(HashMap::new())),
+        recording_meta: Arc::new(Mutex::new(None)),
+        resampler_done_rx: Arc::new(TokioMutex::new(None)),
+        resampler_stop: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        audio_level: Arc::new(std::sync::atomic::AtomicU32::new(0)),
+        llm_tx: {
+            let (tx, _) = mpsc::channel(1);
+            tx
+        },
+        llm_engine: Arc::new(TokioMutex::new(None)),
+        active_llm_cancels: Arc::new(DashMap::new()),
+        prompt_templates: Arc::new(crate::llm::tasks::PromptTemplates {
+            summary: crate::llm::tasks::TaskTemplate {
+                system: String::new(),
+                user: String::new(),
+                max_tokens: 512,
+            },
+            meeting_brief: crate::llm::tasks::TaskTemplate {
+                system: String::new(),
+                user: String::new(),
+                max_tokens: 1024,
+            },
+            translation: crate::llm::tasks::TaskTemplate {
+                system: String::new(),
+                user: String::new(),
+                max_tokens: 2048,
+            },
+            qa: crate::llm::tasks::TaskTemplate {
+                system: String::new(),
+                user: String::new(),
+                max_tokens: 512,
+            },
+        }),
+        llm_engine_status: Arc::new(TokioMutex::new(crate::llm::LlmEngineStatus::NotLoaded)),
     }
 }

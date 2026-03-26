@@ -54,18 +54,22 @@ impl AudioCaptureHandle {
     }
 }
 
-/// 查询设备的默认采样率和声道数（不创建 stream，可在主线程调用）
-pub fn get_device_config(device_id: Option<&str>) -> Result<(u32, usize), AppError> {
+fn resolve_input_device(device_id: Option<&str>) -> Result<cpal::Device, AppError> {
     let host = cpal::default_host();
-    let device = if let Some(id) = device_id {
+    if let Some(id) = device_id {
         host.input_devices()
             .map_err(|e| AppError::Audio(e.to_string()))?
             .find(|d| d.name().map(|n| n == id).unwrap_or(false))
-            .ok_or_else(|| AppError::Audio(format!("device not found: {id}")))?
+            .ok_or_else(|| AppError::Audio(format!("device not found: {id}")))
     } else {
         host.default_input_device()
-            .ok_or_else(|| AppError::Audio("no default input device".into()))?
-    };
+            .ok_or_else(|| AppError::Audio("no default input device".into()))
+    }
+}
+
+/// 查询设备的默认采样率和声道数（不创建 stream，可在主线程调用）
+pub fn get_device_config(device_id: Option<&str>) -> Result<(u32, usize), AppError> {
+    let device = resolve_input_device(device_id)?;
     let config = device
         .default_input_config()
         .map_err(|e| AppError::Audio(e.to_string()))?;
@@ -79,16 +83,7 @@ pub fn start_capture(
     device_id: Option<&str>,
     tx: SyncSender<Vec<f32>>,
 ) -> Result<AudioCaptureHandle, AppError> {
-    let host = cpal::default_host();
-    let device = if let Some(id) = device_id {
-        host.input_devices()
-            .map_err(|e| AppError::Audio(e.to_string()))?
-            .find(|d| d.name().map(|n| n == id).unwrap_or(false))
-            .ok_or_else(|| AppError::Audio(format!("device not found: {id}")))?
-    } else {
-        host.default_input_device()
-            .ok_or_else(|| AppError::Audio("no default input device".into()))?
-    };
+    let device = resolve_input_device(device_id)?;
 
     let config = device
         .default_input_config()

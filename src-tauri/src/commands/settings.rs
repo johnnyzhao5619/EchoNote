@@ -73,60 +73,9 @@ pub async fn reset_config(state: State<'_, AppState>) -> Result<AppConfig, AppEr
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{config::AppConfig, storage::db::Database};
-    use std::sync::Arc;
-    use tokio::sync::RwLock;
 
     async fn make_state() -> AppState {
-        use crate::models::{DownloadCommand, ModelsToml};
-        use tokio::sync::mpsc;
-
-        let app_data_dir = Arc::new(std::path::PathBuf::from("/tmp/echonote-settings-tests"));
-        let db = Arc::new(Database::open("sqlite::memory:").await.unwrap());
-        let config = Arc::new(RwLock::new(normalized_app_config(
-            AppConfig::default(),
-            app_data_dir.as_ref(),
-        )));
-        let model_config = Arc::new(ModelsToml {
-            whisper: crate::models::ModelGroup {
-                default_variant: "base".to_string(),
-                variants: std::collections::HashMap::new(),
-            },
-            llm: crate::models::ModelGroup {
-                default_variant: "qwen2.5-3b-q4".to_string(),
-                variants: std::collections::HashMap::new(),
-            },
-        });
-        let (download_tx, _rx) = mpsc::channel::<DownloadCommand>(1);
-        let (transcription_tx, _trx) = std::sync::mpsc::sync_channel(1);
-        AppState {
-            app_data_dir,
-            db,
-            config,
-            model_config,
-            download_tx,
-            transcription_tx,
-            whisper_engine: std::sync::Arc::new(std::sync::Mutex::new(None)),
-            capture_stop_tx: std::sync::Arc::new(std::sync::Mutex::new(None)),
-            segments_cache: std::sync::Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
-            pcm_cache: std::sync::Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
-            current_session_id: std::sync::Arc::new(tokio::sync::Mutex::new(None)),
-            resampler_done_rx: std::sync::Arc::new(tokio::sync::Mutex::new(None)),
-            resampler_stop: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
-            audio_level: std::sync::Arc::new(std::sync::atomic::AtomicU32::new(0)),
-            llm_tx: { let (tx, _) = tokio::sync::mpsc::channel(1); tx },
-            llm_engine: std::sync::Arc::new(tokio::sync::Mutex::new(None)),
-            active_llm_cancels: std::sync::Arc::new(dashmap::DashMap::new()),
-            prompt_templates: std::sync::Arc::new(
-                crate::llm::tasks::PromptTemplates {
-                    summary: crate::llm::tasks::TaskTemplate { system: String::new(), user: String::new(), max_tokens: 512 },
-                    meeting_brief: crate::llm::tasks::TaskTemplate { system: String::new(), user: String::new(), max_tokens: 1024 },
-                    translation: crate::llm::tasks::TaskTemplate { system: String::new(), user: String::new(), max_tokens: 2048 },
-                    qa: crate::llm::tasks::TaskTemplate { system: String::new(), user: String::new(), max_tokens: 512 },
-                }
-            ),
-            llm_engine_status: std::sync::Arc::new(tokio::sync::Mutex::new(crate::llm::LlmEngineStatus::NotLoaded)),
-        }
+        crate::state::make_test_state(std::path::PathBuf::from("/tmp/echonote-settings-tests")).await
     }
 
     /// get_config_inner must return the current AppConfig.

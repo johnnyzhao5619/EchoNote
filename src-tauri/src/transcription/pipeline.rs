@@ -119,7 +119,7 @@ impl TranscriptionWorker {
                                 started_at: chrono::Utc::now().timestamp_millis(),
                             });
                     }
-                    TranscriptionCommand::Stop { session_id: sid, done_tx } => {
+                    TranscriptionCommand::Stop { session_id: _sid, done_tx } => {
                         // 1. 等待进行中的推理完成（最多 30s）
                         if inference_in_flight {
                             match tokio::time::timeout(
@@ -150,11 +150,6 @@ impl TranscriptionWorker {
                         // 3. 重置状态，通知调用方
                         session_id = None;
                         paused = false;
-                        let _ = app.emit("transcription:status",
-                            RecordingStatus::Stopped {
-                                session_id: sid.clone(),
-                                recording_id: sid,
-                            });
                         let _ = done_tx.send(());
                     }
                     _ => {} // AudioChunk while paused → discard

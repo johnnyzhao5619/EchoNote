@@ -39,25 +39,27 @@ export function RecordingPanel({ onConfigChange }: RecordingPanelProps) {
   const [language, setLanguage] = useState<string>('auto')
   const [mode, setMode] = useState<'record_only' | 'transcribe_only' | 'transcribe_and_translate'>('transcribe_only')
   const [targetLang, setTargetLang] = useState<string>('en')
-  const [vadThreshold, setVadThreshold] = useState<number>(0.008)
+  const [vadThreshold, setVadThreshold] = useState<number>(0.01)
   const [autoProcess, setAutoProcess] = useState<boolean>(false)
   const [initialized, setInitialized] = useState(false)
   const [savedDeviceId, setSavedDeviceId] = useState<string | null>(null)
 
   // Load defaults from AppConfig on mount
   useEffect(() => {
-    commands.getConfig().then((r) => {
-      if (r.status === 'ok' && r.data) {
+    commands.getConfig()
+      .then((r) => {
+        if (r.status !== 'ok' || !r.data) return
         const cfg = r.data
-        if (cfg.vad_threshold != null)    setVadThreshold(Math.min(cfg.vad_threshold, 0.015))
+        if (cfg.vad_threshold != null)    setVadThreshold(cfg.vad_threshold)
         if (cfg.default_language)         setLanguage(cfg.default_language)
         if (cfg.default_recording_mode)   setMode(cfg.default_recording_mode as typeof mode)
         if (cfg.default_target_language)  setTargetLang(cfg.default_target_language)
         if (cfg.auto_llm_on_stop != null) setAutoProcess(cfg.auto_llm_on_stop)
         setSavedDeviceId(cfg.last_used_device_id ?? null)
-        setInitialized(true)   // must be last — triggers save-back effects on next render
-      }
-    })
+      })
+      .finally(() => {
+        setInitialized(true)
+      })
     loadDevices()
   }, [loadDevices])
 
@@ -88,8 +90,9 @@ export function RecordingPanel({ onConfigChange }: RecordingPanelProps) {
   }, [initialized, deviceId])
 
   useEffect(() => {
+    if (!initialized) return
     onConfigChange?.({ deviceId, language, mode, targetLang, vadThreshold, autoProcess })
-  }, [deviceId, language, mode, targetLang, vadThreshold, autoProcess, onConfigChange])
+  }, [initialized, deviceId, language, mode, targetLang, vadThreshold, autoProcess, onConfigChange])
 
   return (
     <div className="flex flex-col gap-4 p-4 overflow-y-auto h-full">

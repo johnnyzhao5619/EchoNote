@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Recording UI now treats `get_audio_level`, `get_realtime_segments`, and `get_recording_status` as the canonical realtime update path.
+- `audio:level` and `transcription:*` remain best-effort compatibility/debug events instead of the sole source of truth for the recording page.
+
 ## [3.0.0] - TBD
 
 ### Added

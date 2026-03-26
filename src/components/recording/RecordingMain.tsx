@@ -4,13 +4,6 @@ import { Mic, Pause, Square } from 'lucide-react'
 import { useRecordingStore } from '@/store/recording'
 import type { RealtimeConfig } from '@/lib/bindings'
 
-const DEFAULT_CONFIG: RealtimeConfig = {
-  device_id: null,
-  language: null,
-  mode: 'transcribe_only',
-  vad_threshold: 0.02,
-}
-
 function formatDuration(ms: number): string {
   const totalSec = Math.floor(ms / 1000)
   const h = Math.floor(totalSec / 3600)
@@ -121,9 +114,10 @@ export function RecordingMain({ config }: RecordingMainProps) {
   }, [segments])
 
   const handleStart = useCallback(async () => {
+    if (!config) return
     setError(null)
     try {
-      await start(config ?? DEFAULT_CONFIG)
+      await start(config)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
@@ -150,14 +144,14 @@ export function RecordingMain({ config }: RecordingMainProps) {
           {error}
         </div>
       )}
-      {/* 控制区 */}
-      <div className="flex items-center gap-4">
-        {status === 'idle' && (
-          <Button onClick={handleStart} className="gap-2">
-            <Mic className="w-4 h-4" />
-            Start Recording
-          </Button>
-        )}
+        {/* 控制区 */}
+        <div className="flex items-center gap-4">
+          {status === 'idle' && (
+          <Button onClick={handleStart} className="gap-2" disabled={!config}>
+              <Mic className="w-4 h-4" />
+              {config ? 'Start Recording' : 'Loading Controls...'}
+            </Button>
+          )}
         {status === 'recording' && (
           <>
             <Button variant="outline" onClick={() => pause()} className="gap-2">

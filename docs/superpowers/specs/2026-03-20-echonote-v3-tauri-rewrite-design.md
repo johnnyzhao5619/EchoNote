@@ -85,8 +85,8 @@ VAD 静音检测 (audio/vad.rs)  — 过滤静音帧
   ▼  tokio::mpsc::Sender<AudioChunk>
 TranscriptionWorker（长驻后台 tokio task）
   │  whisper-rs 推理（非阻塞）
-  ├──► emit("transcription:segment", SegmentPayload) → React 实时字幕
-  └──► sqlx 持久化 segments
+  ├──► 写入 segments_cache / best-effort emit("transcription:segment", SegmentPayload)
+  └──► 前端通过 bindings 命令轮询读取实时字幕
          │
          ▼ 转写完成
      LlmWorker（长驻后台 tokio task）
@@ -245,14 +245,19 @@ cpal 原始 PCM（interleaved, 任意Hz, 任意ch）
 
 ### 4.2 后台推理调度（防止 GUI 阻塞）
 
-**原则**：Tauri command 函数只发消息，立即返回；所有推理在独立 tokio task 中运行。
+**原则**：Tauri command 函数不执行 whisper/llama 推理；所有推理在独立 tokio task 中运行。
+
+**录音域前端更新约束（2026-03-26）**：
+- 当前 macOS Tauri 开发/运行环境下，`audio:level` 与 `transcription:*` 事件到 WebView 不足够可靠
+- 录音页面以 `get_audio_level`、`get_realtime_segments`、`get_recording_status` 三个 specta 命令轮询为主
+- 录音相关 Tauri 事件可保留为兼容/调试通道，但不是正确性的唯一来源
 
 **架构**：
 
 ```
 lib.rs 应用启动
   ├── tokio::spawn → TranscriptionWorker::run()  [长驻]
-  │     loop { recv AudioChunk → whisper 推理 → emit event }
+  │     loop { recv AudioChunk → whisper 推理 → 写实时缓存 / best-effort emit event }
   ├── tokio::spawn → LlmWorker::run()            [长驻]
   │     loop { recv LlmTask → llama 推理(流式) → emit token events }
   └── tokio::spawn → ModelManager::run()         [长驻]
@@ -293,14 +298,22 @@ pub async fn start_realtime(state: tauri::State<'_, AppState>) -> Result<(), App
 
 | 事件名 | Payload | 触发方 | 消费方 |
 |--------|---------|--------|--------|
-| `transcription:segment` | `SegmentPayload` | TranscriptionWorker | 录音页实时字幕 |
-| `transcription:done` | `RecordingId` | TranscriptionWorker | 录音页完成状态 |
+| `transcription:segment` | `SegmentPayload` | TranscriptionWorker | 兼容/调试用途，非录音页唯一数据源 |
+| `transcription:done` | `RecordingId` | TranscriptionWorker | 兼容/调试用途 |
 | `llm:token` | `TokenPayload { task_id, token }` | LlmWorker | 流式文本显示 |
 | `llm:done` | `TaskId` | LlmWorker | 任务完成标记 |
 | `models:required` | `MissingModels[]` | ModelManager | 下载引导弹窗 |
 | `models:progress` | `DownloadProgress` | ModelManager | 进度条 |
 | `models:downloaded` | `ModelId` | ModelManager | 下载完成通知 |
-| `audio:level` | `f32` (0.0-1.0) | AudioCapture | StatusBar 音频电平 |
+| `audio:level` | `f32` (0.0-1.0) | AudioCapture | 兼容/调试用途，录音页以轮询为主 |
+
+**录音域轮询命令**：
+
+| 命令 | 返回值 | 用途 |
+|------|--------|------|
+| `get_audio_level` | `f32` | 录音页/StatusBar 轮询当前 RMS 电平 |
+| `get_realtime_segments` | `SegmentPayload[]` | 录音页轮询当前会话已确认字幕 |
+| `get_recording_status` | `RecordingStatus` | 录音页恢复/同步当前录音状态 |
 
 ---
 
