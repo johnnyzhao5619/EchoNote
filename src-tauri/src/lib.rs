@@ -136,8 +136,9 @@ pub fn run() {
 
             let llm_engine: std::sync::Arc<tokio::sync::Mutex<Option<std::sync::Arc<LlmEngine>>>> =
                 std::sync::Arc::new(tokio::sync::Mutex::new(None));
-            let active_llm_cancels: std::sync::Arc<dashmap::DashMap<String, std::sync::Arc<std::sync::atomic::AtomicBool>>> =
+            let llm_task_controls: std::sync::Arc<dashmap::DashMap<String, std::sync::Arc<crate::llm::worker::LlmTaskControl>>> =
                 std::sync::Arc::new(dashmap::DashMap::new());
+            let llm_generation_permit = std::sync::Arc::new(tokio::sync::Semaphore::new(1));
             let llm_engine_status: std::sync::Arc<tokio::sync::Mutex<LlmEngineStatus>> =
                 std::sync::Arc::new(tokio::sync::Mutex::new(LlmEngineStatus::NotLoaded));
             // M4 shared state (Arc wrappers for sharing with worker)
@@ -172,7 +173,8 @@ pub fn run() {
                 audio_level: std::sync::Arc::clone(&audio_level),
                 llm_tx: llm_tx.clone(),
                 llm_engine: std::sync::Arc::clone(&llm_engine),
-                active_llm_cancels: std::sync::Arc::clone(&active_llm_cancels),
+                llm_task_controls: std::sync::Arc::clone(&llm_task_controls),
+                llm_generation_permit: std::sync::Arc::clone(&llm_generation_permit),
                 prompt_templates: std::sync::Arc::clone(&prompt_templates),
                 llm_engine_status: std::sync::Arc::clone(&llm_engine_status),
             });
@@ -199,13 +201,15 @@ pub fn run() {
             let llm_pool = db.pool.clone();
             let llm_engine_clone = std::sync::Arc::clone(&llm_engine);
             let llm_templates_clone = std::sync::Arc::clone(&prompt_templates);
-            let llm_cancels_clone = std::sync::Arc::clone(&active_llm_cancels);
+            let llm_controls_clone = std::sync::Arc::clone(&llm_task_controls);
+            let llm_generation_permit_clone = std::sync::Arc::clone(&llm_generation_permit);
             tauri::async_runtime::spawn(LlmWorker::run(
                 llm_rx,
                 llm_app_handle,
                 llm_engine_clone,
                 llm_templates_clone,
-                llm_cancels_clone,
+                llm_controls_clone,
+                llm_generation_permit_clone,
                 llm_pool,
             ));
 
@@ -252,7 +256,8 @@ pub fn run() {
                 audio_level,
                 llm_tx,
                 llm_engine,
-                active_llm_cancels,
+                llm_task_controls,
+                llm_generation_permit,
                 prompt_templates,
                 llm_engine_status,
             });

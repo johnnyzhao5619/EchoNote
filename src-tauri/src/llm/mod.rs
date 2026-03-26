@@ -1,13 +1,14 @@
 // src-tauri/src/llm/mod.rs
 
+pub mod contracts;
 pub mod engine;
 pub mod streaming;
 pub mod tasks;
 pub mod worker;
 
-pub use engine::LlmEngine;
+pub use engine::{GenerationProfile, LlmEngine};
 pub use tasks::{PromptTemplates, LlmTaskType, LlmTaskRequest, build_prompt, get_best_text};
-pub use worker::{LlmWorker, LlmTaskMessage};
+pub use worker::{LlmTaskControl, LlmWorker, LlmTaskMessage};
 
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -55,5 +56,13 @@ pub struct LlmTaskRow {
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct LlmErrorPayload {
     pub task_id: String,
+    pub kind: LlmErrorKind,
     pub error: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum LlmErrorKind {
+    Failed,
+    Cancelled,
 }

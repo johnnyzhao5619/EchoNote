@@ -1,13 +1,15 @@
 // src-tauri/src/commands/llm.rs
 
-use tauri::State;
+use std::sync::Arc;
+
+use tauri::{AppHandle, Emitter, State};
 use uuid::Uuid;
 
 use crate::{
     error::AppError,
     llm::{
-        LlmEngineStatus, LlmTaskRequest, LlmTaskRow,
-        worker::LlmTaskMessage,
+        LlmEngineStatus, LlmErrorKind, LlmErrorPayload, LlmTaskControl, LlmTaskRequest, LlmTaskRow,
+        worker::{LlmTaskMessage, LlmWorker},
     },
     state::AppState,
 };
@@ -57,16 +59,32 @@ pub async fn submit_llm_task(
         })
         .collect();
 
-    // Send to LlmWorker channel
+    let control = Arc::new(LlmTaskControl::new());
     state
+        .llm_task_controls
+        .insert(task_id.clone(), Arc::clone(&control));
+
+    // Send to LlmWorker channel
+    let send_result = state
         .llm_tx
         .send(LlmTaskMessage::Submit {
             task_id: task_id.clone(),
             request,
             assets,
         })
-        .await
-        .map_err(|_| AppError::ChannelClosed)?;
+        .await;
+
+    if send_result.is_err() {
+        state.llm_task_controls.remove(&task_id);
+        let _ = sqlx::query(
+            "UPDATE llm_tasks SET status = 'failed', error_msg = 'llm worker unavailable', completed_at = ? WHERE id = ?",
+        )
+        .bind(chrono::Utc::now().timestamp_millis())
+        .bind(&task_id)
+        .execute(&state.db.pool)
+        .await;
+        return Err(AppError::ChannelClosed);
+    }
 
     Ok(task_id)
 }
@@ -76,13 +94,46 @@ pub async fn submit_llm_task(
 #[specta::specta]
 pub async fn cancel_llm_task(
     task_id: String,
+    app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), AppError> {
-    state
-        .llm_tx
-        .send(LlmTaskMessage::Cancel { task_id })
-        .await
-        .map_err(|_| AppError::ChannelClosed)
+    if let Some(control_ref) = state.llm_task_controls.get(&task_id) {
+        let control = Arc::clone(control_ref.value());
+        drop(control_ref);
+
+        control.cancel();
+
+        if !control.generation_started() {
+            LlmWorker::emit_cancelled_terminal(&task_id, &control, &app, &state.db.pool).await;
+            state.llm_task_controls.remove(&task_id);
+        }
+
+        return Ok(());
+    }
+
+    let now_ms = chrono::Utc::now().timestamp_millis();
+    let result = sqlx::query(
+        "UPDATE llm_tasks SET status = 'cancelled', error_msg = 'cancelled', completed_at = ? WHERE id = ? AND status IN ('pending', 'running')",
+    )
+    .bind(now_ms)
+    .bind(&task_id)
+    .execute(&state.db.pool)
+    .await
+    .map_err(|e| AppError::Storage(e.to_string()))?;
+
+    if result.rows_affected() > 0 {
+        app.emit(
+            "llm:error",
+            LlmErrorPayload {
+                task_id,
+                kind: LlmErrorKind::Cancelled,
+                error: "cancelled".to_string(),
+            },
+        )
+        .map_err(|e| AppError::Llm(format!("emit llm:error: {e}")))?;
+    }
+
+    Ok(())
 }
 
 /// 查询 LLM 引擎状态

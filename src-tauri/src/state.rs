@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use std::sync::atomic::AtomicBool;
-use tokio::sync::{Mutex as TokioMutex, RwLock, mpsc};
+use tokio::sync::{Mutex as TokioMutex, RwLock, Semaphore, mpsc};
 use dashmap::DashMap;
 
 use crate::commands::transcription::SegmentPayload;
@@ -16,7 +15,7 @@ use crate::transcription::pipeline::TranscriptionCommand;
 use crate::llm::{
     engine::LlmEngine,
     tasks::PromptTemplates,
-    worker::LlmTaskMessage,
+    worker::{LlmTaskControl, LlmTaskMessage},
     LlmEngineStatus,
 };
 
@@ -76,8 +75,11 @@ pub struct AppState {
     /// LLM 引擎实例（Option：模型未加载时为 None）
     pub llm_engine: Arc<TokioMutex<Option<Arc<LlmEngine>>>>,
 
-    /// 活跃任务取消标志表（task_id → AtomicBool）
-    pub active_llm_cancels: Arc<DashMap<String, Arc<AtomicBool>>>,
+    /// LLM 任务控制表（task_id → 控制对象）
+    pub llm_task_controls: Arc<DashMap<String, Arc<LlmTaskControl>>>,
+
+    /// 单 permit 串行化真正的 LLM 推理，避免多任务并发占满内存
+    pub llm_generation_permit: Arc<Semaphore>,
 
     /// Prompt 模板（启动时一次性加载，只读）
     pub prompt_templates: Arc<PromptTemplates>,
@@ -163,9 +165,9 @@ impl AppState {
     /// 调用时机：模型下载完成、切换激活模型、应用启动。
     /// 返回 true = 加载成功；false = 文件不存在或加载失败。
     pub async fn try_load_llm(&self) -> bool {
-        let (model_dir, active_model) = {
+        let (model_dir, active_model, llm_context_size) = {
             let cfg = self.config.read().await;
-            (self.models_dir(), cfg.active_llm_model.clone())
+            (self.models_dir(), cfg.active_llm_model.clone(), cfg.llm_context_size)
         };
 
         let Some((model_type, variant_name)) = parse_variant_id(&active_model) else {
@@ -198,7 +200,13 @@ impl AppState {
         let path = model_path;
 
         match tokio::task::spawn_blocking(move || {
-            LlmEngine::new(&path, crate::llm::engine::ContextParams::default())
+            LlmEngine::new(
+                &path,
+                crate::llm::engine::ContextParams {
+                    ctx_size: llm_context_size,
+                    ..crate::llm::engine::ContextParams::default()
+                },
+            )
         }).await {
             Ok(Ok(engine)) => {
                 *engine_arc.lock().await = Some(Arc::new(engine));
@@ -272,7 +280,8 @@ pub(crate) async fn make_test_state(app_data_dir: PathBuf) -> AppState {
             tx
         },
         llm_engine: Arc::new(TokioMutex::new(None)),
-        active_llm_cancels: Arc::new(DashMap::new()),
+        llm_task_controls: Arc::new(DashMap::new()),
+        llm_generation_permit: Arc::new(Semaphore::new(1)),
         prompt_templates: Arc::new(crate::llm::tasks::PromptTemplates {
             summary: crate::llm::tasks::TaskTemplate {
                 system: String::new(),

@@ -389,19 +389,12 @@ max_tokens = 512
 
 [meeting_brief]
 system = "You are a meeting assistant. Extract structured information from transcripts."
-user   = """Create a structured meeting brief with these sections:
-## Summary
-## Decisions
-## Action Items
-## Next Steps
-
-Transcript:
-{text}"""
+user   = "Read the transcript carefully and follow the output contract exactly.\n\n{text}"
 max_tokens = 1024
 
 [translation]
 system = "You are a professional translator."
-user   = "Translate the following text to {target_language}. Output only the translation.\n\n{text}"
+user   = "Translate the following text to {target_language}. Follow the output contract exactly.\n\n{text}"
 max_tokens = 2048
 
 [qa]
@@ -478,7 +471,7 @@ list_document_llm_tasks(document_id: String) -> Result<Vec<LlmTaskRow>, AppError
 |--------|---------|---------|
 | `llm:token` | `TokenPayload` | 每个推理 token |
 | `llm:done` | `LlmTaskResult` | 任务完成（含最终结果和 asset_id） |
-| `llm:error` | `{ task_id: String, error: String }` | 任务失败 |
+| `llm:error` | `{ task_id: String, kind: "failed" \| "cancelled", error: String }` | 任务失败或取消的终态 |
 | `llm:status` | `LlmEngineStatus` | 引擎状态变更（加载/就绪/错误） |
 
 ### 3.5 实现细节
@@ -491,7 +484,7 @@ pub struct LlmEngine {
 }
 
 impl LlmEngine {
-    pub fn new(model_path: &Path, ctx_size: u32) -> Result<Self, AppError>
+    pub fn new(model_path: &Path, ctx_params: ContextParams) -> Result<Self, AppError>
 
     // 同步阻塞，必须在 spawn_blocking 内调用
     // token_cb 每生成一个 token 就调用一次，返回 false 停止生成
@@ -499,63 +492,38 @@ impl LlmEngine {
         &self,
         system_prompt: &str,
         user_prompt: &str,
-        max_tokens: u32,
+        profile: &GenerationProfile,
         token_cb: impl Fn(String) -> bool,
     ) -> Result<String, AppError>
 }
 ```
 
-**llm/tasks.rs**
+**llm/tasks.rs + llm/contracts.rs**
 - 从 `resources/prompts/tasks.toml` 加载模板（应用启动时一次性读取，存入 `AppState`）
 - 根据 `LlmTaskType` 填充模板变量（`{text}`, `{target_language}`, `{question}`）
 - 文本来源优先级：`transcript` > `document_text`（按 `TEXT_ASSET_ROLE_PRIORITY` 排序）
+- `summary` / `meeting_brief` / `translation` 统一通过 `llm/contracts.rs` 的 JSON-only 提示合同、解析、校验、渲染逻辑收口
+- 当前默认 Qwen2.5-3B 模型在 llama.cpp grammar sampler 下会触发原生崩溃，因此 v3.0.0 采用“提示词约束 + Rust 严格后置校验”，暂不启用 native grammar constrained decoding
+- 结构化结果校验失败时：任务标记为 `failed`，发 `llm:error(kind = "failed")`，不写入坏 asset
 - 生成完成后：更新 `llm_tasks.status = 'done'`，并在 `workspace_text_assets` 插入结果
 
 **LlmWorker 内部结构（spawn_blocking 协调）**
 
-`LlmWorker::run()` 是 `tokio::spawn` 的 async loop，每次收到任务后必须通过 `spawn_blocking` 调用同步阻塞的 `generate()`，token 回调通过 `tokio::sync::mpsc` 桥接到 async emit：
+`LlmWorker::run()` 是 `tokio::spawn` 的 async loop。每次收到 `Submit` 后启动独立 async task，但真正的 `generate()` 仍通过单 permit `Semaphore` 串行化；取消不再依赖 FIFO channel 顺序。
 
 ```rust
-// llm/worker.rs（骨架）
 async fn run(rx: mpsc::Receiver<LlmTaskMessage>, app: AppHandle, state: Arc<AppState>) {
     while let Some(msg) = rx.recv().await {
-        // 1. 克隆引擎 Arc（外层锁短暂获取后立即释放）
-        let engine_arc = {
-            let guard = state.llm_engine.lock().await;
-            guard.as_ref().map(|e| Arc::clone(&e.inner_model))
-        };
-        let Some(model) = engine_arc else {
-            app.emit("llm:error", ...).ok();
-            continue;
-        };
-
-        // 2. 用 AtomicBool 实现可取消
-        let cancelled = Arc::new(AtomicBool::new(false));
-        state.active_llm_cancels.insert(msg.task_id.clone(), Arc::clone(&cancelled));
-
-        // 3. token 桥接：同步 callback → tokio channel → async emit
-        let (token_tx, mut token_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
-        let app_clone = app.clone();
-        let task_id = msg.task_id.clone();
-        tokio::spawn(async move {
-            while let Some(token) = token_rx.recv().await {
-                app_clone.emit("llm:token", TokenPayload { task_id: task_id.clone(), token }).ok();
-            }
-        });
-
-        // 4. spawn_blocking 执行同步推理
-        let result = tokio::task::spawn_blocking(move || {
-            engine_arc_inner.generate(system, user, max_tokens, |token| {
-                if cancelled.load(Ordering::Relaxed) { return false; }
-                token_tx.send(token).ok();  // 同步 send，不 block
-                true
-            })
-        }).await;
-
-        // 5. 处理结果，emit done/error
+        tokio::spawn(handle_submit(msg, app.clone(), state.clone()));
     }
 }
 ```
+
+关键点：
+- `submit_llm_task` 写入 DB 后立即在 `AppState.llm_task_controls` 注册 `LlmTaskControl`
+- `cancel_llm_task` 直接命中控制表，不再发送 `Cancel` 消息排队
+- 任务在“等待 permit 前 / 获取 permit 后 / token 回调中 / 落库前”四个节点检查取消标志
+- 取消必须发终态 `llm:error(kind = "cancelled")`；`llm:done` 只用于真正成功完成
 
 ### 3.6 会议纪要特殊处理
 
@@ -565,41 +533,24 @@ async fn run(rx: mpsc::Receiver<LlmTaskMessage>, app: AppHandle, state: Arc<AppS
 - `action_items`
 - `next_steps`
 
-Rust 端用正则提取各 `## Section` 内容，写入 4 条 `workspace_text_assets` 记录。
+Rust 端不再依赖 section 正则做成功路径解析，而是要求模型输出固定 JSON：
 
-解析逻辑（`llm/tasks.rs::parse_meeting_brief`）：
-
-**重要**：Rust `regex` crate 中 `\w` 默认只匹配 ASCII，对中文 section 标题（如 `## 总结`）会静默失败。必须使用 `.+?` 匹配任意 Unicode 字符：
-
-```rust
-fn parse_meeting_brief(text: &str) -> MeetingBriefSections {
-    // 使用 regex crate，pattern 匹配 Unicode（.+? 默认不跨行，结合 (?s) flag）
-    // 不使用 \w，改用 .+? 匹配 section 标题（支持中英文）
-    let re = Regex::new(r"(?m)^##\s*(.+?)\s*$\n([\s\S]*?)(?=^##|\z)").unwrap();
-
-    let mut sections = MeetingBriefSections::default();
-    for cap in re.captures_iter(text) {
-        let title = cap[1].to_lowercase();
-        let content = cap[2].trim().to_string();
-        // 同时匹配英文和中文 section 标题
-        if title.contains("summary") || title.contains("摘要") || title.contains("总结") {
-            sections.summary = Some(content);
-        } else if title.contains("decision") || title.contains("决策") || title.contains("决定") {
-            sections.decisions = Some(content);
-        } else if title.contains("action") || title.contains("行动") || title.contains("任务") {
-            sections.action_items = Some(content);
-        } else if title.contains("next") || title.contains("下一步") || title.contains("后续") {
-            sections.next_steps = Some(content);
-        }
-    }
-
-    // Fallback：若所有 section 均解析失败（正则完全不匹配），将全文保存为 meeting_brief role
-    if sections.summary.is_none() && sections.decisions.is_none() {
-        sections.full_text_fallback = Some(text.to_string());
-    }
-    sections
+```json
+{
+  "summary": "...",
+  "decisions": ["..."],
+  "action_items": ["..."],
+  "next_steps": ["..."]
 }
 ```
+
+`llm/contracts.rs` 负责：
+- 为 `meeting_brief` 注入 JSON-only 输出约束
+- 校验四个字段非空且类型正确
+- 渲染稳定 Markdown
+- 拆分写入 `summary` / `decisions` / `action_items` / `next_steps`
+
+若 JSON 解析失败、字段为空或缺 section，则任务直接 `failed`，不再把坏格式原文作为 `meeting_brief` 成功结果落库
 
 ---
 

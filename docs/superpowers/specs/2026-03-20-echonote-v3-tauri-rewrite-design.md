@@ -92,7 +92,8 @@ TranscriptionWorker（长驻后台 tokio task）
      LlmWorker（长驻后台 tokio task）
          │  llama-cpp-2 推理（流式 token 回调）
          ├──► emit("llm:token", TokenPayload)  → React 逐字显示
-         └──► emit("llm:done", task_id)
+         ├──► emit("llm:done", LlmTaskResult)   → 成功终态
+         └──► emit("llm:error", LlmErrorPayload { kind, error }) → 失败/取消终态
               sqlx 持久化 llm_tasks 结果
 ```
 
@@ -301,7 +302,8 @@ pub async fn start_realtime(state: tauri::State<'_, AppState>) -> Result<(), App
 | `transcription:segment` | `SegmentPayload` | TranscriptionWorker | 兼容/调试用途，非录音页唯一数据源 |
 | `transcription:done` | `RecordingId` | TranscriptionWorker | 兼容/调试用途 |
 | `llm:token` | `TokenPayload { task_id, token }` | LlmWorker | 流式文本显示 |
-| `llm:done` | `TaskId` | LlmWorker | 任务完成标记 |
+| `llm:done` | `LlmTaskResult` | LlmWorker | 成功终态与结果落库通知 |
+| `llm:error` | `LlmErrorPayload { task_id, kind, error }` | LlmWorker | 失败或取消终态 |
 | `models:required` | `MissingModels[]` | ModelManager | 下载引导弹窗 |
 | `models:progress` | `DownloadProgress` | ModelManager | 进度条 |
 | `models:downloaded` | `ModelId` | ModelManager | 下载完成通知 |

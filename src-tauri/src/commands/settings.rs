@@ -21,7 +21,17 @@ pub(crate) async fn update_config_inner(
     state: &AppState,
     partial: PartialAppConfig,
 ) -> Result<(), AppError> {
+    let reload_whisper = partial.active_whisper_model.is_some();
+    let reload_llm = partial.active_llm_model.is_some() || partial.llm_context_size.is_some();
     state.update_config(partial).await?;
+
+    if reload_whisper {
+        state.try_load_whisper().await;
+    }
+    if reload_llm {
+        state.try_load_llm().await;
+    }
+
     Ok(())
 }
 

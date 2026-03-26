@@ -22,6 +22,7 @@ interface LlmTaskResult {
 
 interface LlmErrorPayload {
   task_id: string;
+  kind: "failed" | "cancelled";
   error: string;
 }
 
@@ -43,7 +44,7 @@ export function useLlmStream() {
       cleanups.push(unDone);
 
       const unError = await listen<LlmErrorPayload>("llm:error", (event) => {
-        if (event.payload.error.toLowerCase().startsWith("cancelled")) {
+        if (event.payload.kind === "cancelled") {
           setCancelled(event.payload.task_id);
         } else {
           setError(event.payload.task_id, event.payload.error);

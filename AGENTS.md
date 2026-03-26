@@ -192,6 +192,7 @@ echonote/
    - 录音域当前以前端轮询命令为主：`get_audio_level`、`get_realtime_segments`、`get_recording_status`
    - `transcription:segment`、`transcription:status`、`audio:level` 仅作为兼容/调试用的 best-effort 事件，不作为录音页正确性的唯一依据
    - `llm:token`、`llm:done`、`llm:error`
+   - `llm:error` payload 必须带结构化 `kind: "failed" | "cancelled"`，前端禁止依赖错误文本做取消判定
    - `models:required`、`models:progress`、`models:downloaded`、`models:error`
    - `batch:progress`、`batch:done`、`batch:error`
    - `locale:changed`、`theme:changed`
@@ -203,9 +204,9 @@ echonote/
 | 问题 | 决策 | 原因 |
 |------|------|------|
 | LLM 流式输出 | unbounded_channel + spawn_blocking | llama-cpp-2 同步 API，需桥接 tokio |
-| 任务取消 | `DashMap<String, Arc<AtomicBool>>` | 多任务并发取消，无锁竞争 |
+| 任务取消 | `DashMap<String, Arc<LlmTaskControl>>` + `Semaphore(1)` | 取消标志与终态发射集中管理，排队任务可在启动前取消，推理仍保持单任务串行 |
 | 批量转写 | `VecDeque` 串行执行 | 避免多模型并发占用内存 |
-| 会议纪要解析 | Unicode `.+?` 正则（非 `\w`） | 支持中英文 section 标题 |
+| 会议纪要输出 | 结构化 JSON 合同 + Rust 端校验/渲染 | 避免本地模型重复输出和 section 漂移，坏结果不落库 |
 | ffmpeg 转码 | tauri-plugin-shell 调用系统 ffmpeg | 避免 GPL 绑定，用户自行安装 |
 | 主题存储 | `app_settings` KV 表（JSON） | 统一持久化入口，无额外文件 |
 | i18n 加载 | 前端按命名空间懒加载 | 避免首屏加载全部翻译 |

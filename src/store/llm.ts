@@ -20,6 +20,28 @@ export interface LlmTaskState {
   errorMsg: string | null;
 }
 
+function createPlaceholderTask(taskId: string): LlmTaskState {
+  return {
+    taskId,
+    documentId: "",
+    status: "pending",
+    tokens: [],
+    resultText: null,
+    errorMsg: null,
+  };
+}
+
+function updateTask(
+  tasks: Map<string, LlmTaskState>,
+  taskId: string,
+  updater: (task: LlmTaskState) => LlmTaskState,
+): Map<string, LlmTaskState> {
+  const next = new Map(tasks);
+  const current = next.get(taskId) ?? createPlaceholderTask(taskId);
+  next.set(taskId, updater(current));
+  return next;
+}
+
 interface LlmStore {
   tasks: Map<string, LlmTaskState>;
 
@@ -37,56 +59,56 @@ export const useLlmStore = create<LlmStore>((set, get) => ({
 
   initTask: (taskId, documentId) =>
     set((s) => {
-      const next = new Map(s.tasks);
-      next.set(taskId, {
-        taskId,
-        documentId,
-        status: "pending",
-        tokens: [],
-        resultText: null,
-        errorMsg: null,
-      });
-      return { tasks: next };
+      return {
+        tasks: updateTask(s.tasks, taskId, (task) => ({
+          ...task,
+          documentId,
+        })),
+      };
     }),
 
   appendToken: (taskId, token) =>
     set((s) => {
-      const task = s.tasks.get(taskId);
-      if (!task) return s;
-      const next = new Map(s.tasks);
-      next.set(taskId, {
-        ...task,
-        status: "running",
-        tokens: [...task.tokens, token],
-      });
-      return { tasks: next };
+      return {
+        tasks: updateTask(s.tasks, taskId, (task) => ({
+          ...task,
+          status: "running",
+          tokens: [...task.tokens, token],
+        })),
+      };
     }),
 
   setDone: (taskId, resultText) =>
     set((s) => {
-      const task = s.tasks.get(taskId);
-      if (!task) return s;
-      const next = new Map(s.tasks);
-      next.set(taskId, { ...task, status: "done", resultText });
-      return { tasks: next };
+      return {
+        tasks: updateTask(s.tasks, taskId, (task) => ({
+          ...task,
+          status: "done",
+          resultText,
+          errorMsg: null,
+        })),
+      };
     }),
 
   setError: (taskId, error) =>
     set((s) => {
-      const task = s.tasks.get(taskId);
-      if (!task) return s;
-      const next = new Map(s.tasks);
-      next.set(taskId, { ...task, status: "failed", errorMsg: error });
-      return { tasks: next };
+      return {
+        tasks: updateTask(s.tasks, taskId, (task) => ({
+          ...task,
+          status: "failed",
+          errorMsg: error,
+        })),
+      };
     }),
 
   setCancelled: (taskId) =>
     set((s) => {
-      const task = s.tasks.get(taskId);
-      if (!task) return s;
-      const next = new Map(s.tasks);
-      next.set(taskId, { ...task, status: "cancelled" });
-      return { tasks: next };
+      return {
+        tasks: updateTask(s.tasks, taskId, (task) => ({
+          ...task,
+          status: "cancelled",
+        })),
+      };
     }),
 
   getDocumentTasks: (documentId) => {

@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Recording UI now treats `get_audio_level`, `get_realtime_segments`, and `get_recording_status` as the canonical realtime update path.
 - `audio:level` and `transcription:*` remain best-effort compatibility/debug events instead of the sole source of truth for the recording page.
+- LLM task cancellation no longer depends on worker FIFO order; queued tasks can be cancelled before generation starts.
+- `llm:error` now carries structured `kind: "failed" | "cancelled"` metadata instead of requiring frontend string matching.
+- Summary, meeting brief, and translation tasks now use structured JSON output contracts with Rust-side validation/rendering to suppress repetition and format drift.
+- Disabled native llama.cpp grammar constrained decoding for structured tasks on the shipped Qwen2.5-3B model because it can abort inside `llama-grammar.cpp`; structured tasks now fail gracefully through Rust-side JSON validation instead of crashing the app.
 
 ## [3.0.0] - TBD
 
