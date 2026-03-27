@@ -141,6 +141,32 @@ mod tests {
         assert_eq!(row.0, 1, "workspace_fts FTS5 virtual table should exist");
     }
 
+    /// 0003 migration should add FTS maintenance triggers for workspace_fts.
+    #[tokio::test]
+    async fn test_workspace_fts_triggers_created() {
+        let db = Database::open("sqlite::memory:").await.unwrap();
+
+        let rows: Vec<(String,)> = sqlx::query_as(
+            "SELECT name FROM sqlite_master
+             WHERE type = 'trigger' AND name IN ('fts_docs_insert', 'fts_docs_update', 'fts_docs_delete')
+             ORDER BY name",
+        )
+        .fetch_all(&db.pool)
+        .await
+        .unwrap();
+
+        let names: Vec<String> = rows.into_iter().map(|(name,)| name).collect();
+        assert_eq!(
+            names,
+            vec![
+                "fts_docs_delete".to_string(),
+                "fts_docs_insert".to_string(),
+                "fts_docs_update".to_string(),
+            ],
+            "workspace_fts maintenance triggers should exist after migrations"
+        );
+    }
+
     /// workspace_text_assets UNIQUE constraint must prevent duplicate (document_id, role).
     #[tokio::test]
     async fn test_asset_unique_constraint() {
