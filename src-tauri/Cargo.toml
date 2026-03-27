@@ -4,6 +4,7 @@ version = "3.0.0"
 description = "EchoNote - AI-powered meeting recorder and transcriber"
 authors = ["EchoNote Team"]
 edition = "2021"
+default-run = "echonote"
 
 [lib]
 name = "echonote_lib"
