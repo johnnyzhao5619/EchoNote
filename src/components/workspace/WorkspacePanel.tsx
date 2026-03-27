@@ -12,11 +12,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { buildWorkspaceFolderRoute } from "@/lib/workspace-routes";
-import {
-  getFolderAncestorIds,
-  getRootFolderIds,
-  useWorkspaceStore,
-} from "@/store/workspace";
+import { getFolderAncestorIds, getRootFolderIds } from "@/lib/workspace-tree";
+import { useWorkspaceStore } from "@/store/workspace";
 
 import { FolderTreeNode } from "./FolderTreeNode";
 import { SearchBar } from "./SearchBar";
@@ -76,7 +73,7 @@ export function WorkspacePanel() {
     setExpandedFolderIds((current) => {
       return mergeExpandedFolderIds(current, getFolderAncestorIds(folders, currentFolderId));
     });
-  }, [folders, currentFolderId, expandedFolderIds]);
+  }, [folders, currentFolderId]);
 
   const handleConfirm = async () => {
     if (!dialog || !inputValue.trim()) {
@@ -99,7 +96,7 @@ export function WorkspacePanel() {
         <SearchBar />
       </div>
 
-      <div className="flex-1 overflow-y-auto py-1" role="tree" aria-label="Workspace folders">
+      <ul className="flex-1 overflow-y-auto py-1">
         {folders.map((node) => (
           <FolderTreeNode
             key={node.id}
@@ -132,7 +129,7 @@ export function WorkspacePanel() {
             onDelete={(id) => void deleteFolder(id)}
           />
         ))}
-      </div>
+      </ul>
 
       <div className="border-t border-border p-2">
         <Button

@@ -40,6 +40,10 @@ vi.mock("@/store/workspace", async (importOriginal) => {
   };
 });
 
+import {
+  getFolderAncestorIds,
+  getRootFolderIds,
+} from "@/lib/workspace-tree";
 import { WorkspacePanel } from "../WorkspacePanel";
 
 function createWorkspaceState(currentFolderId: string | null = null) {
@@ -110,14 +114,16 @@ describe("WorkspacePanel", () => {
   it("renders folder tree and create action", async () => {
     render(<WorkspacePanel />);
 
-    expect(await screen.findByText("Workspace")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Workspace" })).toBeInTheDocument();
+    expect(screen.queryByRole("tree")).not.toBeInTheDocument();
+    expect(screen.queryByRole("treeitem")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /新建文件夹/i })).toBeInTheDocument();
   });
 
   it("navigates to folder route when selecting a folder", async () => {
     render(<WorkspacePanel />);
 
-    fireEvent.click(await screen.findByText("Project A"));
+    fireEvent.click(await screen.findByRole("button", { name: "Project A" }));
 
     expect(mockNavigate).toHaveBeenCalledWith({
       to: "/workspace/$folderId",
@@ -125,53 +131,54 @@ describe("WorkspacePanel", () => {
     });
   });
 
-  it("keeps expansion and selection as separate actions while preserving tree depth", async () => {
+  it("keeps expansion and selection as separate actions without tree widget roles", async () => {
     render(<WorkspacePanel />);
 
-    const rootToggle = await screen.findByRole("button", { name: /Workspace/i });
+    const rootToggle = await screen.findByRole("button", { name: "折叠 Workspace" });
     expect(rootToggle).toHaveAttribute("aria-expanded", "true");
 
-    const childNode = screen.getByRole("treeitem", { name: /Project A/i });
-    expect(childNode).toHaveAttribute("aria-level", "2");
-
     fireEvent.click(screen.getByRole("button", { name: /展开 Project A/i }));
+    expect(mockNavigate).not.toHaveBeenCalled();
 
-    const grandchildNode = await screen.findByRole("treeitem", { name: /Research/i });
-    expect(grandchildNode).toHaveAttribute("aria-level", "3");
-    expect(screen.getByRole("button", { name: /Project A/i })).toHaveAttribute(
-      "aria-expanded",
-      "true",
-    );
+    const grandchildSelect = await screen.findByRole("button", { name: "Research" });
+    expect(grandchildSelect).not.toHaveAttribute("aria-current");
 
-    fireEvent.click(screen.getByRole("treeitem", { name: /Research/i }));
-
+    fireEvent.click(screen.getByRole("button", { name: "Project A" }));
     expect(mockNavigate).toHaveBeenCalledWith({
       to: "/workspace/$folderId",
-      params: { folderId: "folder-grandchild" },
+      params: { folderId: "folder-child" },
     });
-    expect(screen.getByRole("button", { name: /Project A/i })).toHaveAttribute(
+
+    expect(screen.getByRole("button", { name: "折叠 Project A" })).toHaveAttribute(
       "aria-expanded",
       "true",
     );
   });
 
-  it("auto-expands ancestors for the selected route folder and highlights it", async () => {
+  it("keeps manual collapse collapsed after route auto-expands the ancestor chain", async () => {
     workspaceState.currentFolderId = "folder-grandchild";
 
-    const { rerender } = render(<WorkspacePanel />);
-    rerender(<WorkspacePanel />);
+    render(<WorkspacePanel />);
 
-    expect(await screen.findByRole("treeitem", { name: /Research/i })).toHaveAttribute(
-      "aria-selected",
-      "true",
+    expect(await screen.findByRole("button", { name: "Research" })).toHaveAttribute(
+      "aria-current",
+      "page",
     );
-    expect(screen.getByRole("button", { name: /Workspace/i })).toHaveAttribute(
+
+    fireEvent.click(screen.getByRole("button", { name: /折叠 Project A/i }));
+
+    expect(await screen.findByRole("button", { name: /展开 Project A/i })).toHaveAttribute(
       "aria-expanded",
-      "true",
+      "false",
     );
-    expect(screen.getByRole("button", { name: /Project A/i })).toHaveAttribute(
-      "aria-expanded",
-      "true",
-    );
+    expect(screen.queryByRole("button", { name: "Research" })).not.toBeInTheDocument();
+  });
+
+  it("reuses workspace tree helpers from the lower-level utility module", () => {
+    expect(getRootFolderIds(workspaceState.folders)).toEqual(["folder-root"]);
+    expect(getFolderAncestorIds(workspaceState.folders, "folder-grandchild")).toEqual([
+      "folder-root",
+      "folder-child",
+    ]);
   });
 });
