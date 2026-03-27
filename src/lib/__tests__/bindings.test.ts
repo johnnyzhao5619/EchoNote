@@ -34,4 +34,15 @@ describe("bindings smoke test", () => {
     expect(typeof bindings.commands.cancelBatchJob).toBe("function");
     expect(typeof bindings.commands.clearCompletedJobs).toBe("function");
   });
+
+  it("exports timeline M8 commands", async () => {
+    const bindings = await import("../bindings");
+    expect(typeof bindings.commands.createTimelineEvent).toBe("function");
+    expect(typeof bindings.commands.updateTimelineEvent).toBe("function");
+    expect(typeof bindings.commands.deleteTimelineEvent).toBe("function");
+    expect(typeof bindings.commands.listTimelineEvents).toBe("function");
+    expect(typeof bindings.commands.searchTimelineEvents).toBe("function");
+    expect(typeof bindings.commands.linkEventToRecording).toBe("function");
+    expect(typeof bindings.commands.linkEventToDocument).toBe("function");
+  });
 });

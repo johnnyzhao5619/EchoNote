@@ -49,6 +49,8 @@ pub fn run() {
             let workspace_manager = std::sync::Arc::new(crate::workspace::manager::WorkspaceManager::new(
                 db.pool.clone(),
             ));
+            let timeline_for_download = crate::timeline::manager::TimelineManager::new(db.pool.clone());
+            let timeline = crate::timeline::manager::TimelineManager::new(db.pool.clone());
 
             // Step 3: load AppConfig from DB (or default)
             let loaded_config = tauri::async_runtime::block_on(
@@ -125,6 +127,7 @@ pub fn run() {
                 app_data_dir: std::sync::Arc::clone(&app_data_dir),
                 db: std::sync::Arc::clone(&db),
                 workspace_manager: std::sync::Arc::clone(&workspace_manager),
+                timeline: timeline_for_download,
                 config: std::sync::Arc::clone(&config),
                 model_config: std::sync::Arc::clone(&model_config),
                 download_tx: download_tx.clone(),
@@ -221,6 +224,7 @@ pub fn run() {
                 app_data_dir,
                 db,
                 workspace_manager,
+                timeline,
                 config,
                 model_config,
                 download_tx,
