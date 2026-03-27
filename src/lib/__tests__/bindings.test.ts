@@ -16,4 +16,13 @@ describe("bindings smoke test", () => {
     const bindings = await import("../bindings");
     expect(typeof bindings.commands.listBuiltinThemes).toBe("function");
   });
+
+  it("exports workspace M6 commands", async () => {
+    const bindings = await import("../bindings");
+    expect(typeof bindings.commands.listFolderTree).toBe("function");
+    expect(typeof bindings.commands.createFolder).toBe("function");
+    expect(typeof bindings.commands.searchWorkspace).toBe("function");
+    expect(typeof bindings.commands.exportDocument).toBe("function");
+    expect(typeof bindings.commands.importFileToWorkspace).toBe("function");
+  });
 });

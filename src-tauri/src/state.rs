@@ -12,6 +12,7 @@ use crate::models::registry::{model_file_path, parse_variant_id};
 use crate::storage::db::Database;
 use crate::transcription::engine::WhisperEngine;
 use crate::transcription::pipeline::TranscriptionCommand;
+use crate::workspace::manager::WorkspaceManager;
 use crate::llm::{
     engine::LlmEngine,
     tasks::PromptTemplates,
@@ -30,6 +31,7 @@ pub struct AppState {
     // M1–M3 fields
     pub app_data_dir: Arc<PathBuf>,
     pub db: Arc<Database>,
+    pub workspace_manager: Arc<WorkspaceManager>,
     pub config: Arc<RwLock<AppConfig>>,
     pub model_config: Arc<ModelsToml>,
     pub download_tx: mpsc::Sender<DownloadCommand>,
@@ -243,6 +245,7 @@ pub(crate) async fn make_test_state(app_data_dir: PathBuf) -> AppState {
 
     let app_data_dir = Arc::new(app_data_dir);
     let db = Arc::new(Database::open("sqlite::memory:").await.unwrap());
+    let workspace_manager = Arc::new(WorkspaceManager::new(db.pool.clone()));
     let config = Arc::new(RwLock::new(normalized_app_config(
         AppConfig::default(),
         app_data_dir.as_ref(),
@@ -263,6 +266,7 @@ pub(crate) async fn make_test_state(app_data_dir: PathBuf) -> AppState {
     AppState {
         app_data_dir,
         db,
+        workspace_manager,
         config,
         model_config,
         download_tx,
@@ -305,5 +309,19 @@ pub(crate) async fn make_test_state(app_data_dir: PathBuf) -> AppState {
             },
         }),
         llm_engine_status: Arc::new(TokioMutex::new(crate::llm::LlmEngineStatus::NotLoaded)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::make_test_state;
+
+    #[tokio::test]
+    async fn test_make_test_state_initializes_workspace_manager() {
+        let tmp = tempfile::tempdir().unwrap();
+        let state = make_test_state(tmp.path().to_path_buf()).await;
+
+        let folders = state.workspace_manager.list_folders().await.unwrap();
+        assert!(folders.is_empty());
     }
 }
