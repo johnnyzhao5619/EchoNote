@@ -91,7 +91,6 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   createDocument: async (title, folderId, content = "") => {
     const summary = unwrapResult(await commands.createDocument(title, folderId ?? null, content));
     set((state) => ({ documents: [summary, ...state.documents] }));
-    await get().openDocument(summary.id);
     return summary.id;
   },
 

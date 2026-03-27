@@ -57,6 +57,36 @@ describe("useWorkspaceStore", () => {
     expect(useWorkspaceStore.getState().documents).toHaveLength(1);
   });
 
+  it("createDocument updates the list and returns the new document id without opening it", async () => {
+    const openDocumentSpy = vi.spyOn(useWorkspaceStore.getState(), "openDocument");
+    const resultDoc = {
+      id: "doc-new",
+      title: "New Note",
+      folder_id: "folder-1",
+      source_type: "note",
+      has_transcript: false,
+      has_summary: false,
+      has_meeting_brief: false,
+      recording_id: null,
+      created_at: 1,
+      updated_at: 1,
+    };
+
+    mockCommands.createDocument.mockResolvedValue({
+      status: "ok",
+      data: resultDoc,
+    });
+
+    await act(async () => {
+      const createdId = await useWorkspaceStore.getState().createDocument("New Note", "folder-1");
+      expect(createdId).toBe("doc-new");
+    });
+
+    expect(mockCommands.createDocument).toHaveBeenCalledWith("New Note", "folder-1", "");
+    expect(useWorkspaceStore.getState().documents[0]).toMatchObject(resultDoc);
+    expect(openDocumentSpy).not.toHaveBeenCalled();
+  });
+
   it("search stores async search results", async () => {
     mockCommands.searchWorkspace.mockResolvedValue({
       status: "ok",
