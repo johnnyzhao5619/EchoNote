@@ -675,11 +675,9 @@ pub async fn add_files_to_batch(
 #[tauri::command]
 #[specta::specta]
 pub async fn get_batch_queue(
-    _state: State<'_, AppState>,
+    state: State<'_, AppState>,
 ) -> Result<Vec<BatchJobView>, AppError> {
-    Err(AppError::Validation(
-        "batch queue not wired yet".to_string(),
-    ))
+    Ok(state.batch_queue.get_all_jobs().await)
 }
 
 #[tauri::command]
