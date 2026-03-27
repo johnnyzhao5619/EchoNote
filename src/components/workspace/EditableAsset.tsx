@@ -194,7 +194,18 @@ export function EditableAsset({
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
             </div>
           ) : (
-            <div className="flex min-h-[80px] items-center justify-center rounded-lg border border-dashed border-border/40 bg-bg-secondary/20 px-4 py-6 text-sm italic text-text-muted/50">
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => setEditing(true)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  setEditing(true);
+                }
+              }}
+              className="flex min-h-[80px] items-center justify-center rounded-lg border border-dashed border-border/40 bg-bg-secondary/20 px-4 py-6 text-sm italic text-text-muted/50 outline-none transition-colors hover:border-border/60 hover:text-text-muted focus:border-accent/60"
+            >
               {emptyStateText ?? (label ? `暂无${label}` : "点击开始编写...")}
             </div>
           )}

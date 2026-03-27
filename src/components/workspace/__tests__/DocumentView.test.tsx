@@ -24,23 +24,23 @@ describe("DocumentView", () => {
     mockUpdateDocument.mockReset();
   });
 
-  it("renders editable sections for non-note documents instead of read-only tabs", () => {
+  it("renders note documents with document_text as the primary editable body", () => {
     render(
       <DocumentView
         doc={{
           id: "doc-1",
           title: "Weekly Sync",
           folder_id: null,
-          source_type: "recording",
+          source_type: "note",
           recording_id: null,
           created_at: 1,
           updated_at: 2,
           assets: [
             {
               id: "a1",
-              role: "transcript",
+              role: "document_text",
               language: null,
-              content: "Hello world",
+              content: "Note body",
               updated_at: 2,
             },
             {
@@ -57,9 +57,10 @@ describe("DocumentView", () => {
 
     expect(screen.getByRole("button", { name: /导出/i })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: /标题/i })).toHaveValue("Weekly Sync");
-    expect(screen.getByText("转写原文")).toBeInTheDocument();
+    expect(screen.getByText("正文")).toBeInTheDocument();
     expect(screen.getByText("AI 摘要")).toBeInTheDocument();
-    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+    expect(screen.getByText("Note body")).toBeInTheDocument();
+    expect(screen.queryByText("转写原文")).not.toBeInTheDocument();
   });
 
   it("submits the edited title on blur", async () => {
@@ -87,23 +88,23 @@ describe("DocumentView", () => {
     });
   });
 
-  it("opens note documents in an editable body flow instead of a read-only empty state", () => {
-    const { container } = render(
+  it("renders imported documents with document_text as the editable body asset", () => {
+    render(
       <DocumentView
         doc={{
           id: "doc-2",
           title: "Draft Note",
           folder_id: null,
-          source_type: "note",
+          source_type: "import",
           recording_id: null,
           created_at: 1,
           updated_at: 2,
           assets: [
             {
-              id: "a1",
-              role: "document_text",
-              language: null,
-              content: "Start writing here",
+              id: "a2",
+              role: "translation",
+              language: "en",
+              content: "Imported translation",
               updated_at: 2,
             },
           ],
@@ -114,11 +115,59 @@ describe("DocumentView", () => {
     expect(screen.getByRole("button", { name: /导出/i })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: /标题/i })).toHaveValue("Draft Note");
     expect(screen.getByRole("button", { name: /编辑正文/i })).toBeInTheDocument();
-    expect(screen.queryByText("此文档暂无内容")).not.toBeInTheDocument();
-    expect(container.querySelector("pre")).not.toBeInTheDocument();
+    expect(screen.getByText("正文")).toBeInTheDocument();
+    expect(screen.getByText("翻译")).toBeInTheDocument();
+    expect(screen.getByText("点击开始编写")).toBeInTheDocument();
+    expect(screen.getByText("Imported translation")).toBeInTheDocument();
   });
 
-  it("shows the main note body as an editable prompt when document_text is empty", async () => {
+  it("renders recording documents with transcript first and AI assets on the same detail page", () => {
+    render(
+      <DocumentView
+        doc={{
+          id: "doc-4",
+          title: "Recording",
+          folder_id: null,
+          source_type: "recording",
+          recording_id: null,
+          created_at: 1,
+          updated_at: 2,
+          assets: [
+            {
+              id: "a2",
+              role: "summary",
+              language: null,
+              content: "Summary",
+              updated_at: 2,
+            },
+            {
+              id: "a3",
+              role: "meeting_brief",
+              language: null,
+              content: "Brief",
+              updated_at: 2,
+            },
+            {
+              id: "a4",
+              role: "translation",
+              language: "en",
+              content: "Translated body",
+              updated_at: 2,
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByText("转写原文")).toBeInTheDocument();
+    expect(screen.getByText("AI 摘要")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /编辑纪要/i })).toBeInTheDocument();
+    expect(screen.getByText("翻译")).toBeInTheDocument();
+    expect(screen.getByText("点击开始编写")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /生成摘要/i })).toBeInTheDocument();
+  });
+
+  it("shows an actionable empty body state when a document has no editable assets", async () => {
     const user = userEvent.setup();
 
     render(
@@ -131,19 +180,12 @@ describe("DocumentView", () => {
           recording_id: null,
           created_at: 1,
           updated_at: 2,
-          assets: [
-            {
-              id: "a1",
-              role: "document_text",
-              language: null,
-              content: "",
-              updated_at: 2,
-            },
-          ],
+          assets: [],
         }}
       />,
     );
 
+    expect(screen.getByRole("button", { name: /编辑正文/i })).toBeInTheDocument();
     expect(screen.getByText("点击开始编写")).toBeInTheDocument();
 
     await user.click(screen.getByText("点击开始编写"));

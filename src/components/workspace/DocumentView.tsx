@@ -5,6 +5,7 @@ import { save } from "@tauri-apps/plugin-dialog";
 
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AiTaskBar } from "./AiTaskBar";
 import { EditableAsset } from "./EditableAsset";
 import { useWorkspaceStore } from "@/store/workspace";
 import type { DocumentDetail } from "@/lib/bindings";
@@ -22,6 +23,10 @@ const ASSET_META: Record<string, { label: string; actionLabel: string }> = {
 };
 
 const ASSET_ORDER = ["document_text", "transcript", "summary", "meeting_brief", "translation"] as const;
+
+function getPrimaryAssetRole(sourceType: string) {
+  return sourceType === "recording" ? "transcript" : "document_text";
+}
 
 export function DocumentView({ doc }: Props) {
   const { exportDocument, updateDocument } = useWorkspaceStore();
@@ -43,25 +48,17 @@ export function DocumentView({ doc }: Props) {
 
   const editableSections = useMemo(() => {
     const assetMap = new Map(doc.assets.map((asset) => [asset.role, asset]));
+    const primaryRole = getPrimaryAssetRole(doc.source_type);
+    const orderedRoles = [
+      primaryRole,
+      ...ASSET_ORDER.filter((role) => role !== primaryRole && !(role === "document_text" && primaryRole !== "document_text")),
+    ];
+
     const sections: Array<{ role: string; label: string; actionLabel: string; content: string }> = [];
 
-    if (doc.source_type === "note" || assetMap.has("document_text")) {
-      const asset = assetMap.get("document_text");
-      sections.push({
-        role: "document_text",
-        label: ASSET_META.document_text.label,
-        actionLabel: ASSET_META.document_text.actionLabel,
-        content: asset?.content ?? "",
-      });
-    }
-
-    for (const role of ASSET_ORDER) {
-      if (role === "document_text") {
-        continue;
-      }
-
+    for (const role of orderedRoles) {
       const asset = assetMap.get(role);
-      if (!asset) {
+      if (!asset && role !== primaryRole) {
         continue;
       }
 
@@ -70,7 +67,7 @@ export function DocumentView({ doc }: Props) {
         role,
         label: meta.label,
         actionLabel: meta.actionLabel,
-        content: asset.content,
+        content: asset?.content ?? "",
       });
     }
 
@@ -131,27 +128,25 @@ export function DocumentView({ doc }: Props) {
         </DropdownMenu>
       </div>
 
-      {editableSections.length === 0 ? (
-        <div className="flex flex-1 items-center justify-center text-sm text-text-muted">
-          此文档暂无内容
+      <div className="flex-1 overflow-y-auto p-4">
+        <div className="grid gap-4">
+          {editableSections.map((section) => (
+            <EditableAsset
+              key={section.role}
+              documentId={doc.id}
+              role={section.role}
+              label={section.label}
+              actionLabel={section.actionLabel}
+              initialContent={section.content}
+              emptyStateText={section.role === getPrimaryAssetRole(doc.source_type) ? "点击开始编写" : undefined}
+            />
+          ))}
+
+          {doc.source_type === "recording" && (
+            <AiTaskBar documentId={doc.id} className="border-t border-border/60 pt-4" />
+          )}
         </div>
-      ) : (
-        <div className="flex-1 overflow-y-auto p-4">
-          <div className="grid gap-4">
-            {editableSections.map((section) => (
-              <EditableAsset
-                key={section.role}
-                documentId={doc.id}
-                role={section.role}
-                label={section.label}
-                actionLabel={section.actionLabel}
-                initialContent={section.content}
-                emptyStateText={section.role === "document_text" ? "点击开始编写" : undefined}
-              />
-            ))}
-          </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 }

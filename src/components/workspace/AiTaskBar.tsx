@@ -6,11 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Loader2, X, FileText, Users, Languages } from "lucide-react";
 import { commands } from "@/lib/bindings";
 import { useLlmStore } from "@/store/llm";
+import { cn } from "@/lib/utils";
 
 interface AiTaskBarProps {
   documentId: string;
   /** 目标翻译语言，默认 "English" */
   targetLanguage?: string;
+  className?: string;
 }
 
 type TaskKind = "summary" | "meeting_brief" | "translation";
@@ -18,6 +20,7 @@ type TaskKind = "summary" | "meeting_brief" | "translation";
 export function AiTaskBar({
   documentId,
   targetLanguage = "English",
+  className,
 }: AiTaskBarProps) {
   const { tasks, initTask } = useLlmStore();
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
@@ -63,7 +66,7 @@ export function AiTaskBar({
   };
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className={cn("flex flex-col gap-3", className)}>
       {/* 操作按钮行 */}
       <div className="flex items-center gap-2 flex-wrap">
         <Button
