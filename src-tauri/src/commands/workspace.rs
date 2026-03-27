@@ -459,8 +459,7 @@ pub async fn import_file_to_workspace(
     let path = std::path::PathBuf::from(&file_path);
     let parsed = tokio::task::spawn_blocking(move || parser::parse_file(&path))
         .await
-        .map_err(AppError::io)?
-        .map_err(|error| AppError::Workspace(format!("workspace.import_failed: {error}")))?;
+        .map_err(AppError::io)??;
 
     let summary = state
         .workspace_manager
@@ -473,4 +472,41 @@ pub async fn import_file_to_workspace(
         .await?;
 
     Ok(summary)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::state::make_test_state;
+    use std::io::Write;
+
+    fn state_ref(state: &AppState) -> State<'_, AppState> {
+        unsafe { std::mem::transmute(state) }
+    }
+
+    #[tokio::test]
+    async fn import_file_to_workspace_preserves_parser_error_kind_and_message() {
+        let tmp_dir = tempfile::tempdir().unwrap();
+        let state = make_test_state(tmp_dir.path().to_path_buf()).await;
+        let mut file = tempfile::Builder::new()
+            .suffix(".xyz")
+            .tempfile()
+            .unwrap();
+        file.write_all(b"unsupported").unwrap();
+
+        let err = import_file_to_workspace(
+            state_ref(&state),
+            file.path().to_string_lossy().to_string(),
+            None,
+        )
+        .await
+        .unwrap_err();
+
+        match err {
+            AppError::Workspace(message) => {
+                assert_eq!(message, "unsupported file type: .xyz");
+            }
+            other => panic!("expected workspace error, got {other:?}"),
+        }
+    }
 }

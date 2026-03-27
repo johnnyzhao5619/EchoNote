@@ -141,7 +141,6 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
   importFile: async (filePath, folderId) => {
     const summary = unwrapResult(await commands.importFileToWorkspace(filePath, folderId ?? null));
-    await get().openDocument(summary.id);
     set((state) => ({
       documents: [summary, ...state.documents.filter((doc) => doc.id !== summary.id)],
     }));

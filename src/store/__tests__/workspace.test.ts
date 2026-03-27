@@ -87,7 +87,7 @@ describe("useWorkspaceStore", () => {
     expect(openDocumentSpy).not.toHaveBeenCalled();
   });
 
-  it("importFile prepends the new document, opens it, and returns route data", async () => {
+  it("importFile only updates the list and returns route data; route effect handles opening", async () => {
     const importedSummary = {
       id: "doc-imported",
       title: "Imported Draft",
@@ -134,9 +134,9 @@ describe("useWorkspaceStore", () => {
     });
 
     expect(mockCommands.importFileToWorkspace).toHaveBeenCalledWith("/tmp/Imported Draft.md", "folder-1");
-    expect(mockCommands.getDocument).toHaveBeenCalledWith("doc-imported");
     expect(useWorkspaceStore.getState().documents[0]).toMatchObject(importedSummary);
-    expect(useWorkspaceStore.getState().currentDoc).toMatchObject(importedDetail);
+    expect(mockCommands.getDocument).not.toHaveBeenCalled();
+    expect(useWorkspaceStore.getState().currentDoc).toBeNull();
   });
 
   it("search stores async search results", async () => {
