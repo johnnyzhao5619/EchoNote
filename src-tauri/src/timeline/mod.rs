@@ -22,20 +22,28 @@ pub struct CreateEventRequest {
     pub start_at: i64,
     pub end_at: i64,
     pub description: Option<String>,
-    pub tags: Vec<String>,
+    pub tags: Option<Vec<String>>,
     pub recording_id: Option<String>,
     pub document_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(tag = "kind", content = "value", rename_all = "snake_case")]
+pub enum NullableStringPatch {
+    Unchanged,
+    Set(String),
+    Clear,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct UpdateEventRequest {
-    pub title: String,
-    pub start_at: i64,
-    pub end_at: i64,
-    pub description: Option<String>,
-    pub tags: Vec<String>,
-    pub recording_id: Option<String>,
-    pub document_id: Option<String>,
+    pub title: Option<String>,
+    pub start_at: Option<i64>,
+    pub end_at: Option<i64>,
+    pub description: NullableStringPatch,
+    pub tags: Option<Vec<String>>,
+    pub recording_id: NullableStringPatch,
+    pub document_id: NullableStringPatch,
 }
 
 #[derive(Debug, Clone)]
@@ -111,5 +119,14 @@ mod tests {
 
         let event = TimelineEvent::from(row);
         assert!(event.tags.is_empty());
+    }
+
+    #[test]
+    fn nullable_string_patch_serializes_to_tagged_enum_shape() {
+        let clear = serde_json::to_value(super::NullableStringPatch::Clear).unwrap();
+        let set = serde_json::to_value(super::NullableStringPatch::Set("note".into())).unwrap();
+
+        assert_eq!(clear, serde_json::json!({ "kind": "clear" }));
+        assert_eq!(set, serde_json::json!({ "kind": "set", "value": "note" }));
     }
 }
