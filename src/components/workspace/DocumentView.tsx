@@ -24,16 +24,8 @@ const ASSET_META: Record<string, { label: string; actionLabel: string }> = {
 
 const ASSET_ORDER = ["document_text", "transcript", "summary", "meeting_brief", "translation"] as const;
 
-function getPrimaryAssetRole(sourceType: string, assetMap: Map<string, { content: string }>) {
-  if (assetMap.has("document_text")) {
-    return "document_text";
-  }
-
-  if (sourceType === "recording") {
-    return "transcript";
-  }
-
-  return "document_text";
+function getPrimaryAssetRole(sourceType: string) {
+  return sourceType === "recording" ? "transcript" : "document_text";
 }
 
 export function DocumentView({ doc }: Props) {
@@ -56,11 +48,8 @@ export function DocumentView({ doc }: Props) {
 
   const { editableSections, primaryRole, canRunAiTasks } = useMemo(() => {
     const assetMap = new Map(doc.assets.map((asset) => [asset.role, asset]));
-    const primaryRole = getPrimaryAssetRole(doc.source_type, assetMap);
-    const orderedRoles = [
-      primaryRole,
-      ...ASSET_ORDER.filter((role) => role !== primaryRole && !(role === "document_text" && primaryRole !== "document_text")),
-    ];
+    const primaryRole = getPrimaryAssetRole(doc.source_type);
+    const orderedRoles = [primaryRole, ...ASSET_ORDER.filter((role) => role !== primaryRole)];
 
     const sections: Array<{ role: string; label: string; actionLabel: string; content: string }> = [];
 

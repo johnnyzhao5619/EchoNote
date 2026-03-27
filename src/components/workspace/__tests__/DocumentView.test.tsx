@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 const mockExportDocument = vi.fn();
@@ -129,8 +129,8 @@ describe("DocumentView", () => {
     expect(screen.getByRole("button", { name: /生成摘要/i })).toBeInTheDocument();
   });
 
-  it("renders recording documents with document_text ahead of transcript when both exist", () => {
-    render(
+  it("renders recording documents with transcript as the primary body and keeps document_text editable on the same page", () => {
+    const { container } = render(
       <DocumentView
         doc={{
           id: "doc-4",
@@ -143,16 +143,16 @@ describe("DocumentView", () => {
           assets: [
             {
               id: "a1",
-              role: "document_text",
+              role: "transcript",
               language: null,
-              content: "Primary body",
+              content: "Transcript body",
               updated_at: 2,
             },
             {
               id: "a2",
-              role: "transcript",
+              role: "document_text",
               language: null,
-              content: "Transcript body",
+              content: "Primary body",
               updated_at: 2,
             },
             {
@@ -181,10 +181,11 @@ describe("DocumentView", () => {
       />,
     );
 
-    expect(screen.getByText("正文")).toBeInTheDocument();
-    expect(screen.getByText("Primary body")).toBeInTheDocument();
-    expect(screen.getByText("转写原文")).toBeInTheDocument();
-    expect(screen.getByText("Transcript body")).toBeInTheDocument();
+    const sections = container.querySelectorAll("section");
+    expect(within(sections[0]).getByText("转写原文")).toBeInTheDocument();
+    expect(within(sections[0]).getByText("Transcript body")).toBeInTheDocument();
+    expect(within(sections[1]).getByText("正文")).toBeInTheDocument();
+    expect(within(sections[1]).getByText("Primary body")).toBeInTheDocument();
     expect(screen.getByText("AI 摘要")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /编辑纪要/i })).toBeInTheDocument();
     expect(screen.getByText("翻译")).toBeInTheDocument();

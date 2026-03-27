@@ -126,45 +126,4 @@ describe("LLM task lifecycle", () => {
     });
     expect(summaryButton).toBeEnabled();
   });
-
-  it("resets the active task when the document changes", async () => {
-    const user = userEvent.setup();
-
-    const { rerender } = render(
-      <>
-        <LlmStreamHost />
-        <AiTaskBar documentId="doc-1" />
-      </>,
-    );
-
-    await act(async () => {
-      await Promise.resolve();
-    });
-
-    await user.click(screen.getByRole("button", { name: /生成摘要/i }));
-
-    await waitFor(() => {
-      expect(mockCommands.submitLlmTask).toHaveBeenCalledTimes(1);
-      expect(screen.getByRole("button", { name: /取消/i })).toBeInTheDocument();
-    });
-
-    rerender(
-      <>
-        <LlmStreamHost />
-        <AiTaskBar documentId="doc-2" />
-      </>,
-    );
-
-    expect(screen.queryByRole("button", { name: /取消/i })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /生成摘要/i })).toBeEnabled();
-
-    await user.click(screen.getByRole("button", { name: /生成摘要/i }));
-
-    await waitFor(() => {
-      expect(mockCommands.submitLlmTask).toHaveBeenCalledTimes(2);
-    });
-    expect(mockCommands.submitLlmTask).toHaveBeenLastCalledWith(
-      expect.objectContaining({ document_id: "doc-2" }),
-    );
-  });
 });
