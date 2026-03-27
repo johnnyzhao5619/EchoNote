@@ -158,4 +158,29 @@ mod tests {
         assert_eq!(ms_to_vtt_timestamp(0), "00:00:00.000");
         assert_eq!(ms_to_vtt_timestamp(1_500), "00:00:01.500");
     }
+
+    #[test]
+    fn test_ms_to_srt_timestamp_basic() {
+        assert_eq!(ms_to_srt_timestamp(0), "00:00:00,000");
+        assert_eq!(ms_to_srt_timestamp(1_500), "00:00:01,500");
+        let ms = (3600 + 23 * 60 + 45) * 1000 + 678;
+        assert_eq!(ms_to_srt_timestamp(ms), "01:23:45,678");
+    }
+
+    #[test]
+    fn test_ms_to_vtt_timestamp_uses_dot_separator() {
+        assert_eq!(ms_to_vtt_timestamp(0), "00:00:00.000");
+        assert_eq!(ms_to_vtt_timestamp(1_500), "00:00:01.500");
+        let ms = (3600 + 23 * 60 + 45) * 1000 + 678;
+        assert_eq!(ms_to_vtt_timestamp(ms), "01:23:45.678");
+    }
+
+    #[test]
+    fn test_srt_and_vtt_differ_only_in_separator() {
+        let ms = 90_061_234_i64;
+        let srt = ms_to_srt_timestamp(ms);
+        let vtt = ms_to_vtt_timestamp(ms);
+        assert!(srt.contains(',') && !srt.contains('.'));
+        assert!(vtt.contains('.') && !vtt.contains(','));
+    }
 }

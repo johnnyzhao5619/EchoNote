@@ -100,6 +100,7 @@ fn file_stem(path: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::parse_file;
+    use crate::error::AppError;
     use std::io::Write;
 
     fn write_temp_file(ext: &str, content: &str) -> tempfile::NamedTempFile {
@@ -114,5 +115,39 @@ mod tests {
         let parsed = parse_file(file.path()).unwrap();
         assert_eq!(parsed.text, "Hello, EchoNote!");
         assert_eq!(parsed.metadata["source"], "txt");
+    }
+
+    #[test]
+    fn test_parse_md_preserves_markdown() {
+        let markdown = "# Title\n\n**Bold** text and `code`.";
+        let file = write_temp_file(".md", markdown);
+        let parsed = parse_file(file.path()).unwrap();
+        assert_eq!(parsed.text, markdown);
+        assert_eq!(parsed.metadata["source"], "md");
+    }
+
+    #[test]
+    fn test_parse_unsupported_extension_returns_error() {
+        let file = write_temp_file(".xyz", "data");
+        let err = parse_file(file.path());
+        assert!(matches!(err, Err(AppError::Workspace(_))));
+    }
+
+    #[test]
+    #[ignore = "requires test PDF file"]
+    fn test_parse_pdf_extracts_text() {
+        let path = std::path::Path::new("tests/fixtures/sample.pdf");
+        let doc = parse_file(path).unwrap();
+        assert!(!doc.text.is_empty());
+        assert_eq!(doc.metadata["source"], "pdf");
+    }
+
+    #[test]
+    #[ignore = "requires test DOCX file"]
+    fn test_parse_docx_extracts_paragraphs() {
+        let path = std::path::Path::new("tests/fixtures/sample.docx");
+        let doc = parse_file(path).unwrap();
+        assert!(!doc.text.is_empty());
+        assert_eq!(doc.metadata["source"], "docx");
     }
 }

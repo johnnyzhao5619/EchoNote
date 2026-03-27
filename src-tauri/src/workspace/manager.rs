@@ -482,3 +482,89 @@ fn build_folder_tree(
 
     Ok(nodes)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    async fn setup_pool() -> SqlitePool {
+        let db = crate::storage::db::Database::open("sqlite::memory:")
+            .await
+            .unwrap();
+        db.pool
+    }
+
+    #[tokio::test]
+    async fn test_recursive_folder_delete_removes_child_documents() {
+        let pool = setup_pool().await;
+        let manager = WorkspaceManager::new(pool);
+
+        let parent = manager.create_folder("parent", None).await.unwrap();
+        let child = manager.create_folder("child", Some(&parent.id)).await.unwrap();
+        let doc = manager
+            .create_document("test doc", Some(&child.id), "note", None)
+            .await
+            .unwrap();
+
+        manager.delete_folder(&parent.id).await.unwrap();
+
+        let result = manager.get_document(&doc.id).await;
+        assert!(matches!(result, Err(AppError::NotFound(_))));
+
+        let child_folders = manager.list_folders().await.unwrap();
+        assert!(child_folders.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_system_folder_cannot_be_deleted() {
+        let pool = setup_pool().await;
+        let manager = WorkspaceManager::new(pool.clone());
+
+        sqlx::query(
+            "INSERT INTO workspace_folders (id, parent_id, name, folder_kind, is_system, created_at)
+             VALUES ('sys-1', NULL, 'Inbox', 'inbox', 1, 0)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let result = manager.delete_folder("sys-1").await;
+        assert!(matches!(result, Err(AppError::Validation(_))));
+    }
+
+    #[tokio::test]
+    async fn test_fts5_search_returns_correct_result() {
+        let pool = setup_pool().await;
+        let manager = WorkspaceManager::new(pool.clone());
+
+        let doc = manager
+            .create_document("Meeting Notes", None, "note", None)
+            .await
+            .unwrap();
+
+        manager
+            .upsert_text_asset(
+                &doc.id,
+                "document_text",
+                "The team decided to launch v3 next quarter",
+                None,
+            )
+            .await
+            .unwrap();
+
+        let results = manager.search_documents("launch v3").await.unwrap();
+        assert!(!results.is_empty());
+        assert_eq!(results[0].document_id, doc.id);
+        assert!(results[0].snippet.contains("launch") || results[0].snippet.contains("v3"));
+    }
+
+    #[tokio::test]
+    async fn test_duplicate_folder_name_rejected() {
+        let pool = setup_pool().await;
+        let manager = WorkspaceManager::new(pool);
+
+        manager.create_folder("Alpha", None).await.unwrap();
+        let err = manager.create_folder("Alpha", None).await;
+        assert!(matches!(err, Err(AppError::Validation(ref s)) if s.contains("duplicate_name")));
+    }
+}
