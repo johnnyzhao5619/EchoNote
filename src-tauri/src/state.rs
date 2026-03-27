@@ -266,6 +266,7 @@ pub(crate) async fn make_test_state(app_data_dir: PathBuf) -> AppState {
     });
     let (download_tx, _rx) = mpsc::channel::<DownloadCommand>(1);
     let (transcription_tx, _trx) = std::sync::mpsc::sync_channel(1);
+    let (batch_tx, _batch_rx) = mpsc::channel::<BatchCommand>(1);
 
     AppState {
         app_data_dir,
@@ -283,6 +284,7 @@ pub(crate) async fn make_test_state(app_data_dir: PathBuf) -> AppState {
         resampler_done_rx: Arc::new(TokioMutex::new(None)),
         resampler_stop: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         audio_level: Arc::new(std::sync::atomic::AtomicU32::new(0)),
+        batch_tx,
         llm_tx: {
             let (tx, _) = mpsc::channel(1);
             tx

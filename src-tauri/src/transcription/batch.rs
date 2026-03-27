@@ -86,7 +86,6 @@ impl BatchQueue {
             if let Some(handle) = active_job.as_mut() {
                 if receiver_closed {
                     let _ = handle.await;
-                    active_job = None;
                     break;
                 }
 

@@ -126,6 +126,8 @@ pub fn run() {
             let (transcription_tx, transcription_rx) = std::sync::mpsc::sync_channel::<crate::transcription::TranscriptionCommand>(128);
             let whisper_engine: std::sync::Arc<std::sync::Mutex<Option<crate::transcription::WhisperEngine>>> =
                 std::sync::Arc::new(std::sync::Mutex::new(None));
+            let (batch_tx, batch_rx) = tokio::sync::mpsc::channel::<crate::transcription::batch::BatchCommand>(64);
+            let batch_queue = std::sync::Arc::new(crate::transcription::batch::BatchQueue::new());
 
             // Step M5: Load prompt templates
             let prompts_path = {
@@ -188,6 +190,7 @@ pub fn run() {
                 resampler_done_rx: std::sync::Arc::clone(&resampler_done_rx),
                 resampler_stop: std::sync::Arc::clone(&resampler_stop),
                 audio_level: std::sync::Arc::clone(&audio_level),
+                batch_tx: batch_tx.clone(),
                 llm_tx: llm_tx.clone(),
                 llm_engine: std::sync::Arc::clone(&llm_engine),
                 llm_task_controls: std::sync::Arc::clone(&llm_task_controls),
@@ -212,6 +215,16 @@ pub fn run() {
                 std::sync::Arc::clone(&segments_cache),
             );
             tauri::async_runtime::spawn(worker.run());
+
+            let batch_app_handle = app_handle.clone();
+            let batch_db = std::sync::Arc::clone(&db);
+            let batch_engine = std::sync::Arc::clone(&whisper_engine);
+            let batch_queue_runner = std::sync::Arc::clone(&batch_queue);
+            tauri::async_runtime::spawn(async move {
+                batch_queue_runner
+                    .run(batch_rx, batch_app_handle, batch_db, batch_engine)
+                    .await;
+            });
 
             // Spawn LlmWorker
             let llm_app_handle = app_handle.clone();
@@ -272,6 +285,7 @@ pub fn run() {
                 resampler_done_rx,
                 resampler_stop,
                 audio_level,
+                batch_tx,
                 llm_tx,
                 llm_engine,
                 llm_task_controls,
