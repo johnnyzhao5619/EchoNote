@@ -24,7 +24,7 @@ interface WorkspaceState {
   deleteFolder: (id: string) => Promise<void>;
 
   openDocument: (id: string) => Promise<void>;
-  createDocument: (title: string, folderId?: string, content?: string) => Promise<void>;
+  createDocument: (title: string, folderId?: string, content?: string) => Promise<string>;
   updateDocument: (id: string, opts: { title?: string; role?: string; content?: string }) => Promise<void>;
   deleteDocument: (id: string) => Promise<void>;
 
@@ -92,6 +92,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const summary = unwrapResult(await commands.createDocument(title, folderId ?? null, content));
     set((state) => ({ documents: [summary, ...state.documents] }));
     await get().openDocument(summary.id);
+    return summary.id;
   },
 
   updateDocument: async (id, { title, role, content }) => {

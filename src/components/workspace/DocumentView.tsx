@@ -146,6 +146,7 @@ export function DocumentView({ doc }: Props) {
                 label={section.label}
                 actionLabel={section.actionLabel}
                 initialContent={section.content}
+                emptyStateText={section.role === "document_text" ? "点击开始编写" : undefined}
               />
             ))}
           </div>

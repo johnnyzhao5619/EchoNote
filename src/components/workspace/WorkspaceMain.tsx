@@ -53,7 +53,10 @@ export function WorkspaceMain() {
           size="sm"
           variant="ghost"
           className="gap-1"
-          onClick={() => void createDocument("新建文档", currentFolderId ?? undefined)}
+          onClick={async () => {
+            const documentId = await createDocument("新建文档", currentFolderId ?? undefined);
+            void navigate(buildWorkspaceDocumentRoute(documentId, currentFolderId ?? undefined));
+          }}
         >
           <FolderPlus size={14} /> 新建文档
         </Button>

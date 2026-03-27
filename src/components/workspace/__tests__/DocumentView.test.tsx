@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 const mockExportDocument = vi.fn();
 const mockUpdateDocument = vi.fn();
@@ -115,5 +116,40 @@ describe("DocumentView", () => {
     expect(screen.getByRole("button", { name: /编辑正文/i })).toBeInTheDocument();
     expect(screen.queryByText("此文档暂无内容")).not.toBeInTheDocument();
     expect(container.querySelector("pre")).not.toBeInTheDocument();
+  });
+
+  it("shows the main note body as an editable prompt when document_text is empty", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <DocumentView
+        doc={{
+          id: "doc-3",
+          title: "Blank Note",
+          folder_id: null,
+          source_type: "note",
+          recording_id: null,
+          created_at: 1,
+          updated_at: 2,
+          assets: [
+            {
+              id: "a1",
+              role: "document_text",
+              language: null,
+              content: "",
+              updated_at: 2,
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByText("点击开始编写")).toBeInTheDocument();
+
+    await user.click(screen.getByText("点击开始编写"));
+
+    expect(screen.getByRole("textbox", { name: /标题/i })).toHaveValue("Blank Note");
+    expect(screen.getByRole("button", { name: /完成/i })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("在此输入正文")).toHaveValue("");
   });
 });

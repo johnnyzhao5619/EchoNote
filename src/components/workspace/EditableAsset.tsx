@@ -12,6 +12,7 @@ interface EditableAssetProps {
   label?: string;
   actionLabel?: string;
   initialContent: string;
+  emptyStateText?: string;
   onSaved?: () => void;
 }
 
@@ -23,6 +24,7 @@ export function EditableAsset({
   label,
   actionLabel = "编辑",
   initialContent,
+  emptyStateText,
   onSaved,
 }: EditableAssetProps) {
   const [editing, setEditing] = useState(false);
@@ -193,7 +195,7 @@ export function EditableAsset({
             </div>
           ) : (
             <div className="flex min-h-[80px] items-center justify-center rounded-lg border border-dashed border-border/40 bg-bg-secondary/20 px-4 py-6 text-sm italic text-text-muted/50">
-              {label ? `暂无${label}` : "点击开始编写..."}
+              {emptyStateText ?? (label ? `暂无${label}` : "点击开始编写...")}
             </div>
           )}
         </div>

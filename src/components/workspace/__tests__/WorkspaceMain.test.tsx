@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 const mockNavigate = vi.fn();
 
@@ -28,7 +28,7 @@ vi.mock("@/store/workspace", () => ({
     currentFolderId: "folder-1",
     selectFolder: vi.fn(),
     openDocument: vi.fn(),
-    createDocument: vi.fn(),
+    createDocument: vi.fn().mockResolvedValue("doc-new"),
     importFile: vi.fn(),
   }),
 }));
@@ -52,6 +52,19 @@ describe("WorkspaceMain", () => {
     expect(mockNavigate).toHaveBeenCalledWith({
       to: "/workspace/$folderId/$docId",
       params: { folderId: "folder-1", docId: "doc-1" },
+    });
+  });
+
+  it("navigates to the new document detail after creating a document", async () => {
+    render(<WorkspaceMain />);
+
+    fireEvent.click(screen.getByRole("button", { name: /新建文档/i }));
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith({
+        to: "/workspace/$folderId/$docId",
+        params: { folderId: "folder-1", docId: "doc-new" },
+      });
     });
   });
 });
