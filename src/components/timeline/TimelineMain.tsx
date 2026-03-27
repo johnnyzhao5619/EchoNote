@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 
-import { format, isSameDay, isSameMonth } from "date-fns";
+import { format, isSameMonth } from "date-fns";
 
 import { daysInRange } from "@/lib/timeUtils";
 import {
