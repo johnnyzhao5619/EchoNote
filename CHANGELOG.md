@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `llm:error` now carries structured `kind: "failed" | "cancelled"` metadata instead of requiring frontend string matching.
 - Summary, meeting brief, and translation tasks now use structured JSON output contracts with Rust-side validation/rendering to suppress repetition and format drift.
 - Disabled native llama.cpp grammar constrained decoding for structured tasks on the shipped Qwen2.5-3B model because it can abort inside `llama-grammar.cpp`; structured tasks now fail gracefully through Rust-side JSON validation instead of crashing the app.
+- Workspace now uses an authoring-first document flow: new notes open directly into editable `document_text`, imported files open into the editor, the left sidebar behaves as a real tree navigator, and document detail is unified around editable assets instead of read-only tabs.
 
 ## [3.0.0] - TBD
 
