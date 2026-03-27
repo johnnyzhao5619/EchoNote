@@ -10,7 +10,8 @@ END;
 CREATE TRIGGER fts_docs_update
 AFTER UPDATE ON workspace_documents
 BEGIN
-    DELETE FROM workspace_fts WHERE rowid = OLD.rowid;
+    INSERT INTO workspace_fts(workspace_fts, rowid, title, content_text)
+    VALUES ('delete', OLD.rowid, OLD.title, OLD.content_text);
     INSERT INTO workspace_fts(rowid, title, content_text)
     VALUES (NEW.rowid, NEW.title, NEW.content_text);
 END;
@@ -18,5 +19,6 @@ END;
 CREATE TRIGGER fts_docs_delete
 AFTER DELETE ON workspace_documents
 BEGIN
-    DELETE FROM workspace_fts WHERE rowid = OLD.rowid;
+    INSERT INTO workspace_fts(workspace_fts, rowid, title, content_text)
+    VALUES ('delete', OLD.rowid, OLD.title, OLD.content_text);
 END;
