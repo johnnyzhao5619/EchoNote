@@ -54,7 +54,8 @@ describe("M1 Integration: Shell + Router + Theme", () => {
     const { invoke } = await import("@tauri-apps/api/core");
     vi.mocked(invoke).mockResolvedValueOnce([]);
     renderApp("/workspace");
-    await screen.findByText(/从左侧选择录音/i);
+    await screen.findByRole("button", { name: /新建文件夹/i });
+    expect(screen.getByText(/此文件夹为空/i)).toBeInTheDocument();
   });
 
   it("navigating to /settings shows settings form", async () => {
