@@ -1,14 +1,11 @@
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
-import { save } from "@tauri-apps/plugin-dialog";
-import { ChevronDown, Download } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
+import { ChevronDown, Download } from "lucide-react";
+import { save } from "@tauri-apps/plugin-dialog";
+
+import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { EditableAsset } from "./EditableAsset";
 import { useWorkspaceStore } from "@/store/workspace";
 import type { DocumentDetail } from "@/lib/bindings";
 
@@ -16,17 +13,23 @@ interface Props {
   doc: DocumentDetail;
 }
 
+const ASSET_META: Record<string, { label: string; actionLabel: string }> = {
+  document_text: { label: "正文", actionLabel: "编辑正文" },
+  transcript: { label: "转写原文", actionLabel: "编辑转写" },
+  summary: { label: "AI 摘要", actionLabel: "编辑摘要" },
+  meeting_brief: { label: "会议纪要", actionLabel: "编辑纪要" },
+  translation: { label: "翻译", actionLabel: "编辑翻译" },
+};
+
+const ASSET_ORDER = ["document_text", "transcript", "summary", "meeting_brief", "translation"] as const;
+
 export function DocumentView({ doc }: Props) {
-  const { exportDocument } = useWorkspaceStore();
-  const assetMap = Object.fromEntries(doc.assets.map((asset) => [asset.role, asset]));
-  const assetTabs = [
-    { role: "transcript", label: "转写原文" },
-    { role: "summary", label: "AI 摘要" },
-    { role: "meeting_brief", label: "会议纪要" },
-    { role: "translation", label: "翻译" },
-  ] as const;
-  const availableTabs = assetTabs.filter((tab) => assetMap[tab.role]);
-  const defaultTab = availableTabs[0]?.role ?? "transcript";
+  const { exportDocument, updateDocument } = useWorkspaceStore();
+  const [titleDraft, setTitleDraft] = useState(doc.title);
+
+  useEffect(() => {
+    setTitleDraft(doc.title);
+  }, [doc.id, doc.title]);
 
   const handleExport = async (format: "md" | "txt" | "srt" | "vtt") => {
     const path = await save({
@@ -38,12 +41,73 @@ export function DocumentView({ doc }: Props) {
     }
   };
 
+  const editableSections = useMemo(() => {
+    const assetMap = new Map(doc.assets.map((asset) => [asset.role, asset]));
+    const sections: Array<{ role: string; label: string; actionLabel: string; content: string }> = [];
+
+    if (doc.source_type === "note" || assetMap.has("document_text")) {
+      const asset = assetMap.get("document_text");
+      sections.push({
+        role: "document_text",
+        label: ASSET_META.document_text.label,
+        actionLabel: ASSET_META.document_text.actionLabel,
+        content: asset?.content ?? "",
+      });
+    }
+
+    for (const role of ASSET_ORDER) {
+      if (role === "document_text") {
+        continue;
+      }
+
+      const asset = assetMap.get(role);
+      if (!asset) {
+        continue;
+      }
+
+      const meta = ASSET_META[role];
+      sections.push({
+        role,
+        label: meta.label,
+        actionLabel: meta.actionLabel,
+        content: asset.content,
+      });
+    }
+
+    return sections;
+  }, [doc.assets, doc.source_type]);
+
+  const commitTitle = async () => {
+    const nextTitle = titleDraft.trim();
+    if (!nextTitle || nextTitle === doc.title) {
+      setTitleDraft(doc.title);
+      return;
+    }
+
+    try {
+      await updateDocument(doc.id, { title: nextTitle });
+    } catch (error) {
+      console.error("[DocumentView] title update failed:", error);
+      setTitleDraft(doc.title);
+    }
+  };
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-3 border-b border-border px-4 py-3">
-        <h2 className="flex-1 truncate text-sm font-semibold text-text-primary">
-          {doc.title}
-        </h2>
+        <input
+          aria-label="标题"
+          value={titleDraft}
+          onChange={(event) => setTitleDraft(event.target.value)}
+          onBlur={() => void commitTitle()}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              event.currentTarget.blur();
+            }
+          }}
+          className="flex-1 truncate border-none bg-transparent text-sm font-semibold text-text-primary outline-none"
+        />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button size="sm" variant="outline" className="gap-1">
@@ -67,35 +131,25 @@ export function DocumentView({ doc }: Props) {
         </DropdownMenu>
       </div>
 
-      {availableTabs.length === 0 ? (
+      {editableSections.length === 0 ? (
         <div className="flex flex-1 items-center justify-center text-sm text-text-muted">
           此文档暂无内容
         </div>
       ) : (
-        <Tabs defaultValue={defaultTab} className="flex min-h-0 flex-1 flex-col">
-          <TabsList className="h-auto justify-start gap-1 border-b border-border bg-transparent px-4 pt-2">
-            {availableTabs.map(({ role, label }) => (
-              <TabsTrigger
-                key={role}
-                value={role}
-                className="text-xs data-[state=active]:bg-accent-muted data-[state=active]:text-accent"
-              >
-                {label}
-              </TabsTrigger>
+        <div className="flex-1 overflow-y-auto p-4">
+          <div className="grid gap-4">
+            {editableSections.map((section) => (
+              <EditableAsset
+                key={section.role}
+                documentId={doc.id}
+                role={section.role}
+                label={section.label}
+                actionLabel={section.actionLabel}
+                initialContent={section.content}
+              />
             ))}
-          </TabsList>
-          {availableTabs.map(({ role }) => (
-            <TabsContent
-              key={role}
-              value={role}
-              className="mt-0 flex-1 overflow-y-auto p-4"
-            >
-              <pre className="whitespace-pre-wrap text-sm leading-relaxed font-sans text-text-primary">
-                {assetMap[role]?.content ?? ""}
-              </pre>
-            </TabsContent>
-          ))}
-        </Tabs>
+          </div>
+        </div>
       )}
     </div>
   );
