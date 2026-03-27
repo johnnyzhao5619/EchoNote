@@ -22,6 +22,7 @@ pub struct CreateEventRequest {
     pub start_at: i64,
     pub end_at: i64,
     pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub tags: Option<Vec<String>>,
     pub recording_id: Option<String>,
     pub document_id: Option<String>,
@@ -37,10 +38,14 @@ pub enum NullableStringPatch {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct UpdateEventRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub start_at: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub end_at: Option<i64>,
     pub description: NullableStringPatch,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub tags: Option<Vec<String>>,
     pub recording_id: NullableStringPatch,
     pub document_id: NullableStringPatch,
@@ -123,9 +128,11 @@ mod tests {
 
     #[test]
     fn nullable_string_patch_serializes_to_tagged_enum_shape() {
+        let unchanged = serde_json::to_value(super::NullableStringPatch::Unchanged).unwrap();
         let clear = serde_json::to_value(super::NullableStringPatch::Clear).unwrap();
         let set = serde_json::to_value(super::NullableStringPatch::Set("note".into())).unwrap();
 
+        assert_eq!(unchanged, serde_json::json!({ "kind": "unchanged" }));
         assert_eq!(clear, serde_json::json!({ "kind": "clear" }));
         assert_eq!(set, serde_json::json!({ "kind": "set", "value": "note" }));
     }
