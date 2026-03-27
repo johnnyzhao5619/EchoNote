@@ -360,6 +360,14 @@ pub async fn list_documents_in_folder(
 
 #[tauri::command]
 #[specta::specta]
+pub async fn list_all_documents(
+    state: State<'_, AppState>,
+) -> Result<Vec<DocumentSummary>, AppError> {
+    state.workspace_manager.list_all_documents().await
+}
+
+#[tauri::command]
+#[specta::specta]
 pub async fn get_document(
     state: State<'_, AppState>,
     id: String,

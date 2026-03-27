@@ -334,6 +334,14 @@ async listDocumentsInFolder(folderId: string | null) : Promise<Result<DocumentSu
     else return { status: "error", error: e  as any };
 }
 },
+async listAllDocuments() : Promise<Result<DocumentSummary[], AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_all_documents") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async getDocument(id: string) : Promise<Result<DocumentDetail, AppError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("get_document", { id }) };

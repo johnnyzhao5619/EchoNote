@@ -45,4 +45,9 @@ describe("bindings smoke test", () => {
     expect(typeof bindings.commands.linkEventToRecording).toBe("function");
     expect(typeof bindings.commands.linkEventToDocument).toBe("function");
   });
+
+  it("exports listAllDocuments for timeline link pickers", async () => {
+    const bindings = await import("../bindings");
+    expect(typeof bindings.commands.listAllDocuments).toBe("function");
+  });
 });

@@ -49,6 +49,7 @@ pub fn builder() -> Builder<tauri::Wry> {
         workspace_cmds::rename_folder,
         workspace_cmds::delete_folder,
         workspace_cmds::list_documents_in_folder,
+        workspace_cmds::list_all_documents,
         workspace_cmds::get_document,
         workspace_cmds::create_document,
         workspace_cmds::update_document,
