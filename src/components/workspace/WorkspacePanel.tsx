@@ -12,7 +12,11 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { buildWorkspaceFolderRoute } from "@/lib/workspace-routes";
-import { getFolderAncestorIds, getRootFolderIds } from "@/lib/workspace-tree";
+import {
+  getFolderAncestorIds,
+  getRootFolderIds,
+  getVisibleFolderIds,
+} from "@/lib/workspace-tree";
 import { useWorkspaceStore } from "@/store/workspace";
 
 import { FolderTreeNode } from "./FolderTreeNode";
@@ -48,7 +52,10 @@ export function WorkspacePanel() {
   >(null);
   const [inputValue, setInputValue] = useState("");
   const [expandedFolderIds, setExpandedFolderIds] = useState<Set<string>>(() => new Set());
+  const [activeTreeItemId, setActiveTreeItemId] = useState<string | null>(null);
   const initializedRootsRef = useRef(false);
+
+  const visibleFolderIds = getVisibleFolderIds(folders, expandedFolderIds);
 
   useEffect(() => {
     void loadFolderTree();
@@ -74,6 +81,39 @@ export function WorkspacePanel() {
       return mergeExpandedFolderIds(current, getFolderAncestorIds(folders, currentFolderId));
     });
   }, [folders, currentFolderId]);
+
+  useEffect(() => {
+    if (!currentFolderId) {
+      if (visibleFolderIds.length > 0 && activeTreeItemId == null) {
+        setActiveTreeItemId(visibleFolderIds[0]);
+      }
+      return;
+    }
+
+    setActiveTreeItemId(currentFolderId);
+  }, [currentFolderId, folders]);
+
+  useEffect(() => {
+    if (visibleFolderIds.length === 0) {
+      setActiveTreeItemId(null);
+      return;
+    }
+
+    if (currentFolderId && visibleFolderIds.includes(currentFolderId)) {
+      if (activeTreeItemId !== currentFolderId) {
+        setActiveTreeItemId(currentFolderId);
+      }
+      return;
+    }
+
+    if (activeTreeItemId && visibleFolderIds.includes(activeTreeItemId)) {
+      return;
+    }
+
+    if (activeTreeItemId == null) {
+      setActiveTreeItemId(visibleFolderIds[0] ?? null);
+    }
+  }, [activeTreeItemId, currentFolderId, expandedFolderIds, folders, visibleFolderIds]);
 
   const handleConfirm = async () => {
     if (!dialog || !inputValue.trim()) {
@@ -103,10 +143,14 @@ export function WorkspacePanel() {
             node={node}
             depth={0}
             selectedId={currentFolderId}
+            activeTreeItemId={activeTreeItemId}
+            visibleTreeItemIds={visibleFolderIds}
             expandedFolderIds={expandedFolderIds}
             onSelect={(id) => {
+              setActiveTreeItemId(id);
               void navigate(buildWorkspaceFolderRoute(id));
             }}
+            onActivateTreeItem={(id) => setActiveTreeItemId(id)}
             onToggleExpand={(id) => {
               setExpandedFolderIds((current) => {
                 const next = new Set(current);

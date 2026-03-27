@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import {
   RouterProvider,
   createMemoryHistory,
@@ -103,6 +103,16 @@ describe("workspace routing", () => {
       "aria-selected",
       "true",
     );
+    await waitFor(() => {
+      expect(screen.getByRole("treeitem", { name: "Project A" })).toHaveAttribute(
+        "tabindex",
+        "0",
+      );
+      expect(screen.getByRole("treeitem", { name: "Workspace" })).toHaveAttribute(
+        "tabindex",
+        "-1",
+      );
+    });
     expect(screen.getByRole("treeitem", { name: "Project A" })).toHaveAttribute(
       "aria-level",
       "2",

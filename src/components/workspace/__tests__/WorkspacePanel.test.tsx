@@ -135,6 +135,7 @@ describe("WorkspacePanel", () => {
 
     const rootTreeItem = await screen.findByRole("treeitem", { name: "Workspace" });
     expect(rootTreeItem).toHaveAttribute("tabindex", "0");
+    expect(screen.getByRole("treeitem", { name: "Project A" })).toHaveAttribute("tabindex", "-1");
 
     const rootToggle = screen.getByRole("button", { name: "折叠 Workspace" });
     expect(rootToggle).toHaveAttribute("aria-expanded", "true");
@@ -188,9 +189,25 @@ describe("WorkspacePanel", () => {
   it("supports keyboard selection and expansion on treeitems", async () => {
     render(<WorkspacePanel />);
 
-    const projectNode = await screen.findByRole("treeitem", { name: "Project A" });
-    projectNode.focus();
+    const rootNode = await screen.findByRole("treeitem", { name: "Workspace" });
+    rootNode.focus();
 
+    fireEvent.keyDown(rootNode, { key: "ArrowDown" });
+    expect(screen.getByRole("treeitem", { name: "Workspace" })).toHaveAttribute(
+      "tabindex",
+      "-1",
+    );
+    expect(screen.getByRole("treeitem", { name: "Project A" })).toHaveAttribute(
+      "tabindex",
+      "0",
+    );
+    expect(screen.getByRole("treeitem", { name: "Project A" })).toHaveFocus();
+
+    const projectNode = screen.getByRole("treeitem", { name: "Project A" });
+    fireEvent.keyDown(projectNode, { key: "ArrowUp" });
+    expect(screen.getByRole("treeitem", { name: "Workspace" })).toHaveFocus();
+
+    projectNode.focus();
     fireEvent.keyDown(projectNode, { key: "ArrowRight" });
     expect(screen.getByRole("button", { name: "折叠 Project A" })).toHaveAttribute(
       "aria-expanded",

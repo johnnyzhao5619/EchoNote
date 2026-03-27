@@ -1,4 +1,4 @@
-import { type KeyboardEvent } from "react";
+import { type KeyboardEvent, useEffect, useRef } from "react";
 import {
   ChevronRight,
   Folder,
@@ -21,8 +21,11 @@ interface Props {
   node: FolderNodeType;
   depth: number;
   selectedId: string | null;
+  activeTreeItemId: string | null;
+  visibleTreeItemIds: string[];
   expandedFolderIds: Set<string>;
   onSelect: (id: string) => void;
+  onActivateTreeItem: (id: string) => void;
   onToggleExpand: (id: string) => void;
   onCreateChild: (parentId: string) => void;
   onRename: (id: string, currentName: string) => void;
@@ -33,8 +36,11 @@ export function FolderTreeNode({
   node,
   depth,
   selectedId,
+  activeTreeItemId,
+  visibleTreeItemIds,
   expandedFolderIds,
   onSelect,
+  onActivateTreeItem,
   onToggleExpand,
   onCreateChild,
   onRename,
@@ -43,7 +49,17 @@ export function FolderTreeNode({
   const isSelected = node.id === selectedId;
   const hasChildren = node.children.length > 0;
   const isExpanded = expandedFolderIds.has(node.id);
+  const isActiveTreeItem = node.id === activeTreeItemId;
+  const treeItemRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isActiveTreeItem) {
+      treeItemRef.current?.focus();
+    }
+  }, [isActiveTreeItem]);
+
   const selectNode = () => {
+    onActivateTreeItem(node.id);
     onSelect(node.id);
   };
 
@@ -54,14 +70,31 @@ export function FolderTreeNode({
       return;
     }
 
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const currentIndex = visibleTreeItemIds.indexOf(node.id);
+      if (currentIndex === -1) {
+        return;
+      }
+
+      const nextIndex = event.key === "ArrowDown" ? currentIndex + 1 : currentIndex - 1;
+      const nextId = visibleTreeItemIds[nextIndex];
+      if (nextId) {
+        onActivateTreeItem(nextId);
+      }
+      return;
+    }
+
     if (event.key === "ArrowRight" && hasChildren && !isExpanded) {
       event.preventDefault();
+      onActivateTreeItem(node.id);
       onToggleExpand(node.id);
       return;
     }
 
     if (event.key === "ArrowLeft" && hasChildren && isExpanded) {
       event.preventDefault();
+      onActivateTreeItem(node.id);
       onToggleExpand(node.id);
     }
   };
@@ -81,11 +114,13 @@ export function FolderTreeNode({
               {hasChildren ? (
                 <button
                   type="button"
+                  tabIndex={-1}
                   className="flex shrink-0 items-center justify-center"
                   aria-label={`${isExpanded ? "折叠" : "展开"} ${node.name}`}
                   aria-expanded={isExpanded}
                   onClick={(event) => {
                     event.stopPropagation();
+                    onActivateTreeItem(node.id);
                     onToggleExpand(node.id);
                   }}
                 >
@@ -104,7 +139,8 @@ export function FolderTreeNode({
               )}
               <div
                 role="treeitem"
-                tabIndex={0}
+                ref={treeItemRef}
+                tabIndex={isActiveTreeItem ? 0 : -1}
                 aria-label={node.name}
                 aria-level={depth + 1}
                 aria-selected={isSelected}
@@ -112,6 +148,7 @@ export function FolderTreeNode({
                 className="flex min-w-0 flex-1 items-center rounded outline-none focus-visible:ring-1 focus-visible:ring-accent/60"
                 onClick={selectNode}
                 onKeyDown={handleKeyDown}
+                onFocus={() => onActivateTreeItem(node.id)}
               >
                 <span className="truncate">{node.name}</span>
               </div>
@@ -150,14 +187,17 @@ export function FolderTreeNode({
           {node.children.map((child) => (
             <FolderTreeNode
               key={child.id}
-              node={child}
-              depth={depth + 1}
-              selectedId={selectedId}
-              expandedFolderIds={expandedFolderIds}
-              onSelect={onSelect}
-              onToggleExpand={onToggleExpand}
-              onCreateChild={onCreateChild}
-              onRename={onRename}
+            node={child}
+            depth={depth + 1}
+            selectedId={selectedId}
+            activeTreeItemId={activeTreeItemId}
+            visibleTreeItemIds={visibleTreeItemIds}
+            expandedFolderIds={expandedFolderIds}
+            onSelect={onSelect}
+            onActivateTreeItem={onActivateTreeItem}
+            onToggleExpand={onToggleExpand}
+            onCreateChild={onCreateChild}
+            onRename={onRename}
               onDelete={onDelete}
             />
           ))}
