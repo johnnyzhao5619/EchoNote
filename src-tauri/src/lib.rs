@@ -47,6 +47,18 @@ fn specta_builder() -> Builder {
             workspace_cmds::ensure_document_for_recording,
             workspace_cmds::update_document_asset,
             workspace_cmds::delete_recording,
+            workspace_cmds::list_folder_tree,
+            workspace_cmds::create_folder,
+            workspace_cmds::rename_folder,
+            workspace_cmds::delete_folder,
+            workspace_cmds::list_documents_in_folder,
+            workspace_cmds::get_document,
+            workspace_cmds::create_document,
+            workspace_cmds::update_document,
+            workspace_cmds::delete_document,
+            workspace_cmds::search_workspace,
+            workspace_cmds::export_document,
+            workspace_cmds::import_file_to_workspace,
             llm_cmds::submit_llm_task,
             llm_cmds::cancel_llm_task,
             llm_cmds::get_llm_engine_status,
@@ -87,6 +99,9 @@ pub fn run() {
                 crate::storage::db::Database::open(&db_url)
             ).expect("DB initialization failed");
             let db = std::sync::Arc::new(db);
+            let workspace_manager = std::sync::Arc::new(crate::workspace::manager::WorkspaceManager::new(
+                db.pool.clone(),
+            ));
 
             // Step 3: load AppConfig from DB (or default)
             let loaded_config = tauri::async_runtime::block_on(
@@ -160,6 +175,7 @@ pub fn run() {
             let state_for_download = std::sync::Arc::new(crate::state::AppState {
                 app_data_dir: std::sync::Arc::clone(&app_data_dir),
                 db: std::sync::Arc::clone(&db),
+                workspace_manager: std::sync::Arc::clone(&workspace_manager),
                 config: std::sync::Arc::clone(&config),
                 model_config: std::sync::Arc::clone(&model_config),
                 download_tx: download_tx.clone(),
@@ -243,6 +259,7 @@ pub fn run() {
             app.manage(crate::state::AppState {
                 app_data_dir,
                 db,
+                workspace_manager,
                 config,
                 model_config,
                 download_tx,

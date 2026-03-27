@@ -6,6 +6,8 @@ use tauri::State;
 
 use crate::error::AppError;
 use crate::state::AppState;
+use crate::workspace::document::{DocumentDetail, DocumentSummary, FolderNode, SearchResult};
+use crate::workspace::{exporter, parser};
 
 type RecordingRow = (
     String,
@@ -304,4 +306,170 @@ pub async fn delete_recording(
     }
 
     Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn list_folder_tree(state: State<'_, AppState>) -> Result<Vec<FolderNode>, AppError> {
+    state.workspace_manager.list_folders().await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn create_folder(
+    state: State<'_, AppState>,
+    name: String,
+    parent_id: Option<String>,
+) -> Result<FolderNode, AppError> {
+    state
+        .workspace_manager
+        .create_folder(&name, parent_id.as_deref())
+        .await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn rename_folder(
+    state: State<'_, AppState>,
+    id: String,
+    name: String,
+) -> Result<(), AppError> {
+    state.workspace_manager.rename_folder(&id, &name).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn delete_folder(
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<(), AppError> {
+    state.workspace_manager.delete_folder(&id).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn list_documents_in_folder(
+    state: State<'_, AppState>,
+    folder_id: Option<String>,
+) -> Result<Vec<DocumentSummary>, AppError> {
+    state
+        .workspace_manager
+        .list_documents_in_folder(folder_id.as_deref())
+        .await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn get_document(
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<DocumentDetail, AppError> {
+    state.workspace_manager.get_document(&id).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn create_document(
+    state: State<'_, AppState>,
+    title: String,
+    folder_id: Option<String>,
+    content: String,
+) -> Result<DocumentSummary, AppError> {
+    let summary = state
+        .workspace_manager
+        .create_document(&title, folder_id.as_deref(), "note", None)
+        .await?;
+
+    if !content.is_empty() {
+        state
+            .workspace_manager
+            .upsert_text_asset(&summary.id, "document_text", &content, None)
+            .await?;
+    }
+
+    Ok(summary)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn update_document(
+    state: State<'_, AppState>,
+    id: String,
+    title: Option<String>,
+    role: Option<String>,
+    content: Option<String>,
+) -> Result<(), AppError> {
+    if let Some(title) = title {
+        state.workspace_manager.update_document_title(&id, &title).await?;
+    }
+
+    if let (Some(role), Some(content)) = (role, content) {
+        state
+            .workspace_manager
+            .upsert_text_asset(&id, &role, &content, None)
+            .await?;
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn delete_document(
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<(), AppError> {
+    state.workspace_manager.delete_document(&id).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn search_workspace(
+    state: State<'_, AppState>,
+    query: String,
+) -> Result<Vec<SearchResult>, AppError> {
+    state.workspace_manager.search_documents(&query).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn export_document(
+    state: State<'_, AppState>,
+    id: String,
+    format: String,
+    target_path: String,
+) -> Result<(), AppError> {
+    let path = std::path::Path::new(&target_path);
+    match format.as_str() {
+        "md" => exporter::export_as_markdown(&state.db.pool, &id, path).await,
+        "txt" => exporter::export_as_txt(&state.db.pool, &id, path).await,
+        "srt" => exporter::export_as_srt(&state.db.pool, &id, path).await,
+        "vtt" => exporter::export_as_vtt(&state.db.pool, &id, path).await,
+        _ => Err(AppError::Validation(format!("unknown export format: {format}"))),
+    }
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn import_file_to_workspace(
+    state: State<'_, AppState>,
+    file_path: String,
+    folder_id: Option<String>,
+) -> Result<DocumentSummary, AppError> {
+    let path = std::path::PathBuf::from(&file_path);
+    let parsed = tokio::task::spawn_blocking(move || parser::parse_file(&path))
+        .await
+        .map_err(AppError::io)??;
+
+    let summary = state
+        .workspace_manager
+        .create_document(&parsed.title, folder_id.as_deref(), "import", None)
+        .await?;
+
+    state
+        .workspace_manager
+        .upsert_text_asset(&summary.id, "document_text", &parsed.text, None)
+        .await?;
+
+    Ok(summary)
 }

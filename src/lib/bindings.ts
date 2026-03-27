@@ -259,6 +259,102 @@ async deleteRecording(recordingId: string, alsoDeleteDocument: boolean) : Promis
     else return { status: "error", error: e  as any };
 }
 },
+async listFolderTree() : Promise<Result<FolderNode[], AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_folder_tree") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async createFolder(name: string, parentId: string | null) : Promise<Result<FolderNode, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("create_folder", { name, parentId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async renameFolder(id: string, name: string) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("rename_folder", { id, name }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async deleteFolder(id: string) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("delete_folder", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async listDocumentsInFolder(folderId: string | null) : Promise<Result<DocumentSummary[], AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_documents_in_folder", { folderId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getDocument(id: string) : Promise<Result<DocumentDetail, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_document", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async createDocument(title: string, folderId: string | null, content: string) : Promise<Result<DocumentSummary, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("create_document", { title, folderId, content }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async updateDocument(id: string, title: string | null, role: string | null, content: string | null) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("update_document", { id, title, role, content }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async deleteDocument(id: string) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("delete_document", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async searchWorkspace(query: string) : Promise<Result<SearchResult[], AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("search_workspace", { query }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async exportDocument(id: string, format: string, targetPath: string) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("export_document", { id, format, targetPath }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async importFileToWorkspace(filePath: string, folderId: string | null) : Promise<Result<DocumentSummary, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("import_file_to_workspace", { filePath, folderId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 /**
  * 提交 LLM 任务，立即返回 task_id
  */
@@ -390,6 +486,18 @@ export type AudioDevice = { id: string; name: string; is_default: boolean; sampl
  * Single document text asset (transcript, summary, meeting_brief, etc.)
  */
 export type DocumentAsset = { id: string; document_id: string; role: string; content: string; created_at: number; updated_at: number }
+/**
+ * 文档详情（含所有 assets）
+ */
+export type DocumentDetail = { id: string; title: string; folder_id: string | null; source_type: string; recording_id: string | null; assets: TextAsset[]; created_at: number; updated_at: number }
+/**
+ * 文档摘要（列表视图）
+ */
+export type DocumentSummary = { id: string; title: string; folder_id: string | null; source_type: string; has_transcript: boolean; has_summary: boolean; has_meeting_brief: boolean; recording_id: string | null; created_at: number; updated_at: number }
+/**
+ * 文件夹树节点（递归）
+ */
+export type FolderNode = { id: string; name: string; parent_id: string | null; folder_kind: string; is_system: boolean; document_count: number; children: FolderNode[] }
 export type LlmEngineStatus = { status: "not_loaded" } | { status: "loading"; model_id: string } | { status: "ready"; model_id: string; loaded_at: number } | { status: "error"; message: string }
 export type LlmTaskRequest = { document_id: string; task_type: LlmTaskType; 
 /**
@@ -450,7 +558,15 @@ transcript: string;
 document_id: string | null }
 export type RecordingMode = "record_only" | "transcribe_only" | { transcribe_and_translate: { target_language: string } }
 export type RecordingStatus = { status: "idle" } | { status: "recording"; session_id: string; started_at: number } | { status: "paused"; session_id: string } | { status: "stopped"; session_id: string; recording_id: string }
+/**
+ * FTS5 搜索结果
+ */
+export type SearchResult = { document_id: string; title: string; snippet: string; rank: number; folder_id: string | null; updated_at: number }
 export type SegmentPayload = { id: number; recording_session_id: string; start_ms: number; end_ms: number; text: string; language: string; is_partial: boolean }
+/**
+ * 文本 Asset（IPC 传输用）
+ */
+export type TextAsset = { id: string; role: string; language: string | null; content: string; updated_at: number }
 /**
  * 主题描述符，仅含元信息（不含完整 token 数据，token 由前端直接读取 JSON 文件）
  */
