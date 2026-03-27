@@ -7,6 +7,7 @@ pub mod models;
 pub mod audio;
 pub mod transcription;
 pub mod llm;
+pub mod workspace;
 
 use commands::{settings, theme, models as model_cmds, audio as audio_cmds, transcription as transcription_cmds, workspace as workspace_cmds, llm as llm_cmds};
 use tauri::Manager;
