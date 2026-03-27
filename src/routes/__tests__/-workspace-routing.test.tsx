@@ -67,7 +67,8 @@ describe("workspace routing", () => {
   it("renders document route at /workspace/$folderId/$docId", async () => {
     renderApp("/workspace/folder-1/doc-1");
 
-    expect(await screen.findByText("Launch Notes")).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /转写原文/i })).toBeInTheDocument();
+    expect(await screen.findByRole("textbox", { name: /标题/i })).toHaveValue("Launch Notes");
+    expect(screen.getByRole("button", { name: /编辑正文/i })).toBeInTheDocument();
+    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
   });
 });

@@ -1,10 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+
+const mockExportDocument = vi.fn();
+const mockUpdateDocument = vi.fn();
 
 vi.mock("@/store/workspace", () => ({
   useWorkspaceStore: () => ({
-    exportDocument: vi.fn(),
-    updateDocument: vi.fn(),
+    exportDocument: mockExportDocument,
+    updateDocument: mockUpdateDocument,
   }),
 }));
 
@@ -15,6 +18,11 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 import { DocumentView } from "../DocumentView";
 
 describe("DocumentView", () => {
+  beforeEach(() => {
+    mockExportDocument.mockReset();
+    mockUpdateDocument.mockReset();
+  });
+
   it("renders editable sections for non-note documents instead of read-only tabs", () => {
     render(
       <DocumentView
@@ -51,6 +59,31 @@ describe("DocumentView", () => {
     expect(screen.getByText("转写原文")).toBeInTheDocument();
     expect(screen.getByText("AI 摘要")).toBeInTheDocument();
     expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+  });
+
+  it("submits the edited title on blur", async () => {
+    render(
+      <DocumentView
+        doc={{
+          id: "doc-2",
+          title: "Draft Note",
+          folder_id: null,
+          source_type: "note",
+          recording_id: null,
+          created_at: 1,
+          updated_at: 2,
+          assets: [],
+        }}
+      />,
+    );
+
+    const title = screen.getByRole("textbox", { name: /标题/i });
+    fireEvent.change(title, { target: { value: "Renamed Note" } });
+    fireEvent.blur(title);
+
+    await waitFor(() => {
+      expect(mockUpdateDocument).toHaveBeenCalledWith("doc-2", { title: "Renamed Note" });
+    });
   });
 
   it("opens note documents in an editable body flow instead of a read-only empty state", () => {

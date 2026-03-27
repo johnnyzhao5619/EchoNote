@@ -133,7 +133,25 @@ export function EditableAsset({
 
         <button
           type="button"
-          onClick={() => setEditing((value) => !value)}
+          onMouseDown={(event) => {
+            if (editing) {
+              event.preventDefault();
+            }
+          }}
+          onClick={() => {
+            if (editing) {
+              if (timerRef.current) {
+                clearTimeout(timerRef.current);
+                timerRef.current = null;
+              }
+
+              void save(content);
+              setEditing(false);
+              return;
+            }
+
+            setEditing(true);
+          }}
           className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-text-muted transition-colors hover:bg-bg-tertiary hover:text-text-primary"
           title={editing ? "退出编辑" : actionLabel}
         >
