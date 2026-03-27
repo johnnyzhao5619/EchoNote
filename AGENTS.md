@@ -88,6 +88,7 @@ echonote/
 │   └── src/
 │       ├── main.rs                 # Tauri 启动入口
 │       ├── lib.rs                  # 模块注册 + AppState 初始化
+│       ├── bindings.rs             # tauri-specta Builder + TypeScript 绑定导出
 │       ├── state.rs                # AppState（Arc 共享状态）
 │       ├── error.rs                # 统一错误类型（thiserror）
 │       ├── audio/                  # 音频采集 + 重采样 + VAD
@@ -99,7 +100,8 @@ echonote/
 │       ├── models/                 # 模型注册 + reqwest 下载器
 │       ├── config/                 # serde 配置结构体
 │       ├── i18n/                   # 运行时 JSON 翻译加载
-│       └── commands/               # Tauri IPC 命令（每模块一文件）
+│       ├── commands/               # Tauri IPC 命令（每模块一文件）
+│       └── bin/                    # 辅助二进制（如 bindings 导出）
 │
 ├── src/                            # React 前端
 │   ├── components/

@@ -202,6 +202,41 @@ async getRecordingStatus() : Promise<Result<RecordingStatus, AppError>> {
     else return { status: "error", error: e  as any };
 }
 },
+async checkFfmpegAvailable() : Promise<boolean> {
+    return await TAURI_INVOKE("check_ffmpeg_available");
+},
+async addFilesToBatch(paths: string[]) : Promise<Result<string[], AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("add_files_to_batch", { paths }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getBatchQueue() : Promise<Result<BatchJobView[], AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_batch_queue") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async cancelBatchJob(jobId: string) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cancel_batch_job", { jobId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async clearCompletedJobs() : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("clear_completed_jobs") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 /**
  * 列出所有录音，按创建时间倒序
  */
@@ -482,6 +517,8 @@ default_llm_task: string;
 model_mirror: string }
 export type AppError = { kind: "Audio"; message: string } | { kind: "Transcription"; message: string } | { kind: "Llm"; message: string } | { kind: "Storage"; message: string } | { kind: "Io"; message: string } | { kind: "Model"; message: string } | { kind: "Workspace"; message: string } | { kind: "NotFound"; message: string } | { kind: "Validation"; message: string } | { kind: "ChannelClosed" } | { kind: "Cancelled" }
 export type AudioDevice = { id: string; name: string; is_default: boolean; sample_rate: number; channels: number }
+export type BatchJobView = { job_id: string; file_name: string; language: string | null; status: BatchStatus; created_at: number }
+export type BatchStatus = { type: "Queued" } | { type: "Processing"; data: { progress: number } } | { type: "Done"; data: { recording_id: string; document_id: string } } | { type: "Failed"; data: { error: string } } | { type: "Cancelled" }
 /**
  * Single document text asset (transcript, summary, meeting_brief, etc.)
  */

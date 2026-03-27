@@ -25,4 +25,13 @@ describe("bindings smoke test", () => {
     expect(typeof bindings.commands.exportDocument).toBe("function");
     expect(typeof bindings.commands.importFileToWorkspace).toBe("function");
   });
+
+  it("exports batch transcription M7 commands", async () => {
+    const bindings = await import("../bindings");
+    expect(typeof bindings.commands.checkFfmpegAvailable).toBe("function");
+    expect(typeof bindings.commands.addFilesToBatch).toBe("function");
+    expect(typeof bindings.commands.getBatchQueue).toBe("function");
+    expect(typeof bindings.commands.cancelBatchJob).toBe("function");
+    expect(typeof bindings.commands.clearCompletedJobs).toBe("function");
+  });
 });

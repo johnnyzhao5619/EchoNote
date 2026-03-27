@@ -1,8 +1,11 @@
+#[path = "build_support.rs"]
+mod build_support;
+
 use std::path::PathBuf;
 
 fn main() {
     #[cfg(target_os = "macos")]
-    stage_llama_dylibs();
+    configure_macos_frameworks();
 
     tauri_build::build();
 
@@ -24,6 +27,23 @@ fn main() {
             .expect("could not derive target dir from OUT_DIR")
             .to_path_buf();
         println!("cargo:rustc-link-arg=-Wl,-rpath,{}", target_dir.display());
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn configure_macos_frameworks() {
+    let profile = std::env::var("PROFILE").unwrap_or_else(|_| "debug".to_string());
+    let explicit_skip = std::env::var("ECHONOTE_SKIP_TAURI_FRAMEWORKS")
+        .map(|value| matches!(value.as_str(), "1" | "true" | "TRUE" | "True"))
+        .unwrap_or(false);
+
+    if let Some(config_override) = build_support::tauri_config_override(&profile, explicit_skip) {
+        std::env::set_var("TAURI_CONFIG", config_override);
+        println!(
+            "cargo:warning=Skipping Tauri macOS framework copy for PROFILE={profile}"
+        );
+    } else {
+        stage_llama_dylibs();
     }
 }
 

@@ -42,10 +42,10 @@ llama-cpp-2   = { version = "0.1", features = ["dynamic-link"] }
 num_cpus      = "1"
 pdf-extract   = "0.7"
 docx-rs       = "0.4"
+tempfile      = "3"
 
 [dev-dependencies]
 wiremock = "0.6"
-tempfile = "3"
 
 [features]
 default = ["custom-protocol"]

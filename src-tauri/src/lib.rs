@@ -1,6 +1,7 @@
 mod commands;
 mod error;
 mod state;
+pub mod bindings;
 pub mod storage;
 pub mod config;
 pub mod models;
@@ -9,9 +10,7 @@ pub mod transcription;
 pub mod llm;
 pub mod workspace;
 
-use commands::{settings, theme, models as model_cmds, audio as audio_cmds, transcription as transcription_cmds, workspace as workspace_cmds, llm as llm_cmds};
 use tauri::Manager;
-use tauri_specta::{collect_commands, Builder};
 use crate::llm::{
     engine::LlmEngine,
     tasks::PromptTemplates,
@@ -19,63 +18,10 @@ use crate::llm::{
     LlmEngineStatus,
 };
 
-/// tauri-specta builder（构建时自动导出 bindings.ts）
-fn specta_builder() -> Builder {
-    Builder::<tauri::Wry>::new()
-        .commands(collect_commands![
-            theme::get_current_theme,
-            theme::set_current_theme,
-            theme::list_builtin_themes,
-            settings::get_config,
-            settings::update_config,
-            settings::reset_config,
-            model_cmds::list_model_variants,
-            model_cmds::download_model,
-            model_cmds::cancel_download,
-            model_cmds::delete_model,
-            model_cmds::set_active_model,
-            audio_cmds::list_audio_devices,
-            transcription_cmds::start_realtime,
-            transcription_cmds::pause_realtime,
-            transcription_cmds::resume_realtime,
-            transcription_cmds::stop_realtime,
-            transcription_cmds::get_audio_level,
-            transcription_cmds::get_realtime_segments,
-            transcription_cmds::get_recording_status,
-            workspace_cmds::list_recordings,
-            workspace_cmds::get_document_assets,
-            workspace_cmds::ensure_document_for_recording,
-            workspace_cmds::update_document_asset,
-            workspace_cmds::delete_recording,
-            workspace_cmds::list_folder_tree,
-            workspace_cmds::create_folder,
-            workspace_cmds::rename_folder,
-            workspace_cmds::delete_folder,
-            workspace_cmds::list_documents_in_folder,
-            workspace_cmds::get_document,
-            workspace_cmds::create_document,
-            workspace_cmds::update_document,
-            workspace_cmds::delete_document,
-            workspace_cmds::search_workspace,
-            workspace_cmds::export_document,
-            workspace_cmds::import_file_to_workspace,
-            llm_cmds::submit_llm_task,
-            llm_cmds::cancel_llm_task,
-            llm_cmds::get_llm_engine_status,
-            llm_cmds::list_document_llm_tasks,
-        ])
-}
-
 /// 仅在开发构建时重新生成 bindings.ts
 #[cfg(debug_assertions)]
 fn export_bindings() {
-    specta_builder()
-        .export(
-            &specta_typescript::Typescript::default()
-                .bigint(specta_typescript::BigIntExportBehavior::Number)
-                .header("// @ts-nocheck\n// Event payload types not in commands:\nexport type DownloadProgressPayload = { variant_id: string; downloaded_bytes: number; total_bytes: number | null; speed_bps: number; eta_secs: number | null }"),
-            "../src/lib/bindings.ts",
-        )
+    crate::bindings::export_typescript_bindings(std::path::Path::new("../src/lib/bindings.ts"))
         .expect("Failed to export TypeScript bindings");
 }
 
@@ -126,6 +72,8 @@ pub fn run() {
             let (transcription_tx, transcription_rx) = std::sync::mpsc::sync_channel::<crate::transcription::TranscriptionCommand>(128);
             let whisper_engine: std::sync::Arc<std::sync::Mutex<Option<crate::transcription::WhisperEngine>>> =
                 std::sync::Arc::new(std::sync::Mutex::new(None));
+            let (batch_tx, batch_rx) = tokio::sync::mpsc::channel::<crate::transcription::batch::BatchCommand>(64);
+            let batch_queue = std::sync::Arc::new(crate::transcription::batch::BatchQueue::new());
 
             // Step M5: Load prompt templates
             let prompts_path = {
@@ -188,6 +136,8 @@ pub fn run() {
                 resampler_done_rx: std::sync::Arc::clone(&resampler_done_rx),
                 resampler_stop: std::sync::Arc::clone(&resampler_stop),
                 audio_level: std::sync::Arc::clone(&audio_level),
+                batch_tx: batch_tx.clone(),
+                batch_queue: std::sync::Arc::clone(&batch_queue),
                 llm_tx: llm_tx.clone(),
                 llm_engine: std::sync::Arc::clone(&llm_engine),
                 llm_task_controls: std::sync::Arc::clone(&llm_task_controls),
@@ -212,6 +162,16 @@ pub fn run() {
                 std::sync::Arc::clone(&segments_cache),
             );
             tauri::async_runtime::spawn(worker.run());
+
+            let batch_app_handle = app_handle.clone();
+            let batch_db = std::sync::Arc::clone(&db);
+            let batch_engine = std::sync::Arc::clone(&whisper_engine);
+            let batch_queue_runner = std::sync::Arc::clone(&batch_queue);
+            tauri::async_runtime::spawn(async move {
+                batch_queue_runner
+                    .run(batch_rx, batch_app_handle, batch_db, batch_engine)
+                    .await;
+            });
 
             // Spawn LlmWorker
             let llm_app_handle = app_handle.clone();
@@ -272,6 +232,8 @@ pub fn run() {
                 resampler_done_rx,
                 resampler_stop,
                 audio_level,
+                batch_tx,
+                batch_queue,
                 llm_tx,
                 llm_engine,
                 llm_task_controls,
@@ -292,7 +254,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(
-            specta_builder().invoke_handler()
+            crate::bindings::builder().invoke_handler()
         )
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

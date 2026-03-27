@@ -50,16 +50,7 @@ impl AudioResampler {
         while self.input_buf.len() >= frame_stride {
             // 取出 chunk_size 帧的 interleaved 数据
             let chunk: Vec<f32> = self.input_buf.drain(..frame_stride).collect();
-
-            // 立体声/多声道 → 单声道（各声道平均）
-            let mono: Vec<f32> = (0..self.chunk_size)
-                .map(|i| {
-                    let sum: f32 = (0..self.channels)
-                        .map(|c| chunk[i * self.channels + c])
-                        .sum();
-                    sum / self.channels as f32
-                })
-                .collect();
+            let mono = downmix_interleaved_to_mono(&chunk, self.channels)?;
 
             // rubato 期望输入为 Vec<Vec<f32>>（每声道一个 Vec）
             let waves_in = vec![mono];
@@ -74,6 +65,83 @@ impl AudioResampler {
     }
 
     pub fn in_rate(&self) -> u32 { self.in_rate }
+}
+
+fn downmix_interleaved_to_mono(input: &[f32], channels: usize) -> Result<Vec<f32>, AppError> {
+    if channels == 0 {
+        return Err(AppError::Audio("channel count must be greater than 0".into()));
+    }
+    if input.len() % channels != 0 {
+        return Err(AppError::Audio("interleaved audio buffer has incomplete frame".into()));
+    }
+    if channels == 1 {
+        return Ok(input.to_vec());
+    }
+
+    let frames = input.len() / channels;
+    Ok((0..frames)
+        .map(|frame| {
+            let start = frame * channels;
+            let sum: f32 = input[start..start + channels].iter().copied().sum();
+            sum / channels as f32
+        })
+        .collect())
+}
+
+pub fn normalize_audio_for_whisper(
+    input: &[f32],
+    in_rate: u32,
+    channels: usize,
+) -> Result<Vec<f32>, AppError> {
+    let mono = downmix_interleaved_to_mono(input, channels)?;
+    if in_rate == OUT_RATE {
+        return Ok(mono);
+    }
+
+    let mut resampler = FftFixedIn::<f32>::new(
+        in_rate as usize,
+        OUT_RATE as usize,
+        OUTPUT_CHUNK,
+        2,
+        1,
+    )
+    .map_err(|e| AppError::Audio(format!("rubato init: {e}")))?;
+
+    let mut output = Vec::new();
+    let mut remaining = mono.as_slice();
+    let mut output_buffer = vec![vec![0.0f32; resampler.output_frames_max()]];
+
+    while remaining.len() >= resampler.input_frames_next() {
+        let frames = resampler.input_frames_next();
+        let chunk = [&remaining[..frames]];
+        let (consumed, produced) = resampler
+            .process_into_buffer(&chunk, &mut output_buffer, None)
+            .map_err(|e| AppError::Audio(format!("rubato process: {e}")))?;
+        output.extend_from_slice(&output_buffer[0][..produced]);
+        remaining = &remaining[consumed..];
+    }
+
+    if !remaining.is_empty() {
+        let partial = [remaining];
+        let (_consumed, produced) = resampler
+            .process_partial_into_buffer(Some(&partial), &mut output_buffer, None)
+            .map_err(|e| AppError::Audio(format!("rubato partial process: {e}")))?;
+        output.extend_from_slice(&output_buffer[0][..produced]);
+    }
+
+    let expected_frames =
+        ((mono.len() as u64 * OUT_RATE as u64) + (in_rate as u64 / 2)) / in_rate as u64;
+    let delay = resampler.output_delay();
+    if delay >= output.len() {
+        return Ok(Vec::new());
+    }
+
+    let trimmed = &output[delay..];
+    Ok(trimmed
+        .iter()
+        .take(expected_frames as usize)
+        .copied()
+        .collect())
 }
 
 #[cfg(test)]

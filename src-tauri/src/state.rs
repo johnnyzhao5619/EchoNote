@@ -10,6 +10,7 @@ use crate::error::AppError;
 use crate::models::{DownloadCommand, ModelsToml};
 use crate::models::registry::{model_file_path, parse_variant_id};
 use crate::storage::db::Database;
+use crate::transcription::batch::{BatchCommand, BatchQueue};
 use crate::transcription::engine::WhisperEngine;
 use crate::transcription::pipeline::TranscriptionCommand;
 use crate::workspace::manager::WorkspaceManager;
@@ -68,6 +69,12 @@ pub struct AppState {
     /// 最新音频 RMS 电平（f32 bits 存储于 AtomicU32）
     /// 由 VAD resampler 线程写入，get_audio_level 命令读出供前端轮询
     pub audio_level: Arc<std::sync::atomic::AtomicU32>,
+
+    /// M7: 批量转写队列命令发送端
+    pub batch_tx: mpsc::Sender<BatchCommand>,
+
+    /// M7: 批量转写队列共享状态，只读查询直接访问这里
+    pub batch_queue: Arc<BatchQueue>,
 
     // M5: LLM Worker fields
 
@@ -262,6 +269,8 @@ pub(crate) async fn make_test_state(app_data_dir: PathBuf) -> AppState {
     });
     let (download_tx, _rx) = mpsc::channel::<DownloadCommand>(1);
     let (transcription_tx, _trx) = std::sync::mpsc::sync_channel(1);
+    let (batch_tx, _batch_rx) = mpsc::channel::<BatchCommand>(1);
+    let batch_queue = Arc::new(BatchQueue::new());
 
     AppState {
         app_data_dir,
@@ -279,6 +288,8 @@ pub(crate) async fn make_test_state(app_data_dir: PathBuf) -> AppState {
         resampler_done_rx: Arc::new(TokioMutex::new(None)),
         resampler_stop: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         audio_level: Arc::new(std::sync::atomic::AtomicU32::new(0)),
+        batch_tx,
+        batch_queue,
         llm_tx: {
             let (tx, _) = mpsc::channel(1);
             tx
