@@ -16,7 +16,7 @@ function renderWithRouter(initialPath: string) {
 describe("routing", () => {
   it("redirects / to /recording", async () => {
     renderWithRouter("/");
-    await screen.findByRole("button", { name: /start recording/i });
+    await screen.findByRole("heading", { name: /input/i });
   });
 
   it("renders transcription page at /transcription", async () => {
