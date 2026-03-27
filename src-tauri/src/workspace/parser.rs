@@ -101,11 +101,75 @@ fn file_stem(path: &Path) -> String {
 mod tests {
     use super::parse_file;
     use crate::error::AppError;
+    use docx_rs::{Docx, Paragraph, Run};
+    use std::fs::File;
     use std::io::Write;
+    use tempfile::NamedTempFile;
 
-    fn write_temp_file(ext: &str, content: &str) -> tempfile::NamedTempFile {
+    fn write_temp_file(ext: &str, content: &str) -> NamedTempFile {
         let mut file = tempfile::Builder::new().suffix(ext).tempfile().unwrap();
         file.write_all(content.as_bytes()).unwrap();
+        file
+    }
+
+    fn write_temp_bytes(ext: &str, content: &[u8]) -> NamedTempFile {
+        let mut file = tempfile::Builder::new().suffix(ext).tempfile().unwrap();
+        file.write_all(content).unwrap();
+        file
+    }
+
+    fn build_pdf_fixture(text: &str) -> Vec<u8> {
+        let escaped = text
+            .replace('\\', "\\\\")
+            .replace('(', "\\(")
+            .replace(')', "\\)");
+        let stream = format!("BT /F1 18 Tf 72 720 Td ({escaped}) Tj ET");
+        let objects = [
+            "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n".to_string(),
+            "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n".to_string(),
+            "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>\nendobj\n".to_string(),
+            "4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n".to_string(),
+            format!(
+                "5 0 obj\n<< /Length {} >>\nstream\n{stream}\nendstream\nendobj\n",
+                stream.len()
+            ),
+        ];
+
+        let mut pdf = b"%PDF-1.4\n".to_vec();
+        let mut offsets = Vec::with_capacity(objects.len());
+
+        for object in &objects {
+            offsets.push(pdf.len());
+            pdf.extend_from_slice(object.as_bytes());
+        }
+
+        let xref_offset = pdf.len();
+        pdf.extend_from_slice(format!("xref\n0 {}\n", offsets.len() + 1).as_bytes());
+        pdf.extend_from_slice(b"0000000000 65535 f \n");
+        for offset in offsets {
+            pdf.extend_from_slice(format!("{offset:010} 00000 n \n").as_bytes());
+        }
+        pdf.extend_from_slice(
+            format!(
+                "trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{xref_offset}\n%%EOF\n",
+                objects.len() + 1
+            )
+            .as_bytes(),
+        );
+        pdf
+    }
+
+    fn write_pdf_fixture(text: &str) -> NamedTempFile {
+        write_temp_bytes(".pdf", &build_pdf_fixture(text))
+    }
+
+    fn write_docx_fixture(paragraphs: &[&str]) -> NamedTempFile {
+        let file = tempfile::Builder::new().suffix(".docx").tempfile().unwrap();
+        let writer = File::create(file.path()).unwrap();
+        let docx = paragraphs.iter().fold(Docx::new(), |doc, paragraph| {
+            doc.add_paragraph(Paragraph::new().add_run(Run::new().add_text(*paragraph)))
+        });
+        docx.build().pack(writer).unwrap();
         file
     }
 
@@ -134,20 +198,18 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "requires test PDF file"]
     fn test_parse_pdf_extracts_text() {
-        let path = std::path::Path::new("tests/fixtures/sample.pdf");
-        let doc = parse_file(path).unwrap();
-        assert!(!doc.text.is_empty());
+        let file = write_pdf_fixture("EchoNote PDF fixture");
+        let doc = parse_file(file.path()).unwrap();
+        assert!(doc.text.contains("EchoNote PDF fixture"));
         assert_eq!(doc.metadata["source"], "pdf");
     }
 
     #[test]
-    #[ignore = "requires test DOCX file"]
     fn test_parse_docx_extracts_paragraphs() {
-        let path = std::path::Path::new("tests/fixtures/sample.docx");
-        let doc = parse_file(path).unwrap();
-        assert!(!doc.text.is_empty());
+        let file = write_docx_fixture(&["EchoNote DOCX fixture", "Second paragraph"]);
+        let doc = parse_file(file.path()).unwrap();
+        assert_eq!(doc.text, "EchoNote DOCX fixture\nSecond paragraph");
         assert_eq!(doc.metadata["source"], "docx");
     }
 }

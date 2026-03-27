@@ -157,7 +157,7 @@ fn require_non_empty(field_name: &str, value: &str) -> Result<String, AppError> 
     Ok(trimmed.to_string())
 }
 
-fn sanitize_list(field_name: &str, values: Vec<String>) -> Result<Vec<String>, AppError> {
+fn sanitize_list(_field_name: &str, values: Vec<String>) -> Result<Vec<String>, AppError> {
     let mut cleaned = Vec::with_capacity(values.len());
     for value in values {
         let trimmed = value.trim();
