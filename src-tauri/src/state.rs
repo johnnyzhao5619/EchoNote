@@ -10,6 +10,7 @@ use crate::error::AppError;
 use crate::models::{DownloadCommand, ModelsToml};
 use crate::models::registry::{model_file_path, parse_variant_id};
 use crate::storage::db::Database;
+use crate::timeline::manager::TimelineManager;
 use crate::transcription::batch::{BatchCommand, BatchQueue};
 use crate::transcription::engine::WhisperEngine;
 use crate::transcription::pipeline::TranscriptionCommand;
@@ -33,6 +34,7 @@ pub struct AppState {
     pub app_data_dir: Arc<PathBuf>,
     pub db: Arc<Database>,
     pub workspace_manager: Arc<WorkspaceManager>,
+    pub timeline: TimelineManager,
     pub config: Arc<RwLock<AppConfig>>,
     pub model_config: Arc<ModelsToml>,
     pub download_tx: mpsc::Sender<DownloadCommand>,
@@ -253,6 +255,7 @@ pub(crate) async fn make_test_state(app_data_dir: PathBuf) -> AppState {
     let app_data_dir = Arc::new(app_data_dir);
     let db = Arc::new(Database::open("sqlite::memory:").await.unwrap());
     let workspace_manager = Arc::new(WorkspaceManager::new(db.pool.clone()));
+    let timeline = TimelineManager::new(db.pool.clone());
     let config = Arc::new(RwLock::new(normalized_app_config(
         AppConfig::default(),
         app_data_dir.as_ref(),
@@ -276,6 +279,7 @@ pub(crate) async fn make_test_state(app_data_dir: PathBuf) -> AppState {
         app_data_dir,
         db,
         workspace_manager,
+        timeline,
         config,
         model_config,
         download_tx,

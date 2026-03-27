@@ -865,36 +865,65 @@ pub struct CreateEventRequest {
     pub start_at: i64,
     pub end_at: i64,
     pub description: Option<String>,
-    pub tags: Vec<String>,
+    pub tags: Option<Vec<String>>,
+    pub recording_id: Option<String>,
+    pub document_id: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Type)]
+#[serde(tag = "kind", content = "value", rename_all = "snake_case")]
+pub enum NullableStringPatch {
+    Unchanged,
+    Set(String),
+    Clear,
+}
+
+#[derive(Serialize, Deserialize, Clone, Type)]
+pub struct UpdateEventRequest {
+    pub title: Option<String>,
+    pub start_at: Option<i64>,
+    pub end_at: Option<i64>,
+    pub description: NullableStringPatch,
+    pub tags: Option<Vec<String>>,
+    pub recording_id: NullableStringPatch,
+    pub document_id: NullableStringPatch,
 }
 ```
+
+- `timeline_events.tags` 在 SQLite 中以 JSON 字符串持久化，Rust 侧透明序列化/反序列化为 `Vec<String>`
+- 区间查询必须使用 overlap 语义：`end_at >= range_start AND start_at <= range_end`
 
 ### 5.3 Tauri Commands
 
 ```rust
-list_events(start_at: i64, end_at: i64) -> Result<Vec<TimelineEvent>, AppError>
-get_event(id: String) -> Result<TimelineEvent, AppError>
-create_event(req: CreateEventRequest) -> Result<TimelineEvent, AppError>
-update_event(id: String, req: CreateEventRequest) -> Result<(), AppError>
-delete_event(id: String) -> Result<(), AppError>
+create_timeline_event(req: CreateEventRequest) -> Result<TimelineEvent, AppError>
+update_timeline_event(id: String, req: UpdateEventRequest) -> Result<TimelineEvent, AppError>
+delete_timeline_event(id: String) -> Result<(), AppError>
+list_timeline_events(start_ms: i64, end_ms: i64) -> Result<Vec<TimelineEvent>, AppError>
+search_timeline_events(query: String) -> Result<Vec<TimelineEvent>, AppError>
+link_event_to_recording(event_id: String, recording_id: String) -> Result<(), AppError>
+link_event_to_document(event_id: String, document_id: String) -> Result<(), AppError>
+```
 
-// 将录音/文档关联到事件（关联后自动将文档移入 events/ 系统文件夹）
-link_recording_to_event(event_id: String, recording_id: String) -> Result<(), AppError>
-link_document_to_event(event_id: String, document_id: String) -> Result<(), AppError>
-unlink_from_event(event_id: String) -> Result<(), AppError>
+时间轴文档关联的下拉数据源来自：
+
+```rust
+list_all_documents() -> Result<Vec<DocumentSummary>, AppError>
 ```
 
 ### 5.4 React 组件职责
 
 **TimelinePanel（SecondPanel）**
-- 月历视图（点击日期 → 过滤该日事件）
-- 事件列表（按时间排序）
-- 新建事件按钮（打开弹窗表单）
+- 通过 `useShellStore` 注入到 `SecondPanel`
+- 月历视图（点击日期 → 打开创建事件入口并显示事件点）
+- 搜索输入、month/week/day 切换、上一段/下一段/今天导航
 
 **TimelineMain（MainContent）**
-- 日周月视图切换
-- 事件卡片（点击 → 弹出详情：标题/时间/描述/标签/关联录音链接）
-- 关联录音时可跳转到 Workspace 查看转写稿
+- 由 `/timeline` file route 直接渲染在主内容区
+- 月 / 周 / 日三视图
+- 月视图使用可点击日期网格并高亮有事件的日期
+- 周 / 日视图使用按时长比例定位的事件块，最小高度 `30px`
+- 点击空白区域打开 `EventModal` 创建事件，点击事件卡片进入编辑模式
 
 ---
 

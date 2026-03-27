@@ -334,6 +334,14 @@ async listDocumentsInFolder(folderId: string | null) : Promise<Result<DocumentSu
     else return { status: "error", error: e  as any };
 }
 },
+async listAllDocuments() : Promise<Result<DocumentSummary[], AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_all_documents") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async getDocument(id: string) : Promise<Result<DocumentDetail, AppError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("get_document", { id }) };
@@ -433,6 +441,62 @@ async listDocumentLlmTasks(documentId: string) : Promise<Result<LlmTaskRow[], Ap
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async createTimelineEvent(req: CreateEventRequest) : Promise<Result<TimelineEvent, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("create_timeline_event", { req }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async updateTimelineEvent(id: string, req: UpdateEventRequest) : Promise<Result<TimelineEvent, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("update_timeline_event", { id, req }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async deleteTimelineEvent(id: string) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("delete_timeline_event", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async listTimelineEvents(startMs: number, endMs: number) : Promise<Result<TimelineEvent[], AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_timeline_events", { startMs, endMs }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async searchTimelineEvents(query: string) : Promise<Result<TimelineEvent[], AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("search_timeline_events", { query }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async linkEventToRecording(eventId: string, recordingId: string) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("link_event_to_recording", { eventId, recordingId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async linkEventToDocument(eventId: string, documentId: string) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("link_event_to_document", { eventId, documentId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -519,6 +583,7 @@ export type AppError = { kind: "Audio"; message: string } | { kind: "Transcripti
 export type AudioDevice = { id: string; name: string; is_default: boolean; sample_rate: number; channels: number }
 export type BatchJobView = { job_id: string; file_name: string; language: string | null; status: BatchStatus; created_at: number }
 export type BatchStatus = { type: "Queued" } | { type: "Processing"; data: { progress: number } } | { type: "Done"; data: { recording_id: string; document_id: string } } | { type: "Failed"; data: { error: string } } | { type: "Cancelled" }
+export type CreateEventRequest = { title: string; start_at: number; end_at: number; description: string | null; tags?: string[] | null; recording_id: string | null; document_id: string | null }
 /**
  * Single document text asset (transcript, summary, meeting_brief, etc.)
  */
@@ -567,6 +632,7 @@ is_active: boolean;
  * SHA256 是否已配置（false = 占位符，禁止下载）
  */
 sha256_valid: boolean }
+export type NullableStringPatch = { kind: "unchanged" } | { kind: "set"; value: string } | { kind: "clear" }
 /**
  * Partial update payload. Every field is `Option<T>`.
  * `None` means "do not update this field".
@@ -608,6 +674,8 @@ export type TextAsset = { id: string; role: string; language: string | null; con
  * 主题描述符，仅含元信息（不含完整 token 数据，token 由前端直接读取 JSON 文件）
  */
 export type ThemeInfo = { name: string; type: string }
+export type TimelineEvent = { id: string; title: string; start_at: number; end_at: number; description: string | null; tags: string[]; recording_id: string | null; document_id: string | null; created_at: number }
+export type UpdateEventRequest = { title?: string | null; start_at?: number | null; end_at?: number | null; description: NullableStringPatch; tags?: string[] | null; recording_id: NullableStringPatch; document_id: NullableStringPatch }
 
 /** tauri-specta globals **/
 

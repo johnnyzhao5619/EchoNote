@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Batch transcription now normalizes imported WAV audio to Whisper's required 16kHz mono format before inference, matching the realtime audio pipeline.
 - Batch transcription file intake now uses Tauri native drag-drop window events instead of browser `File.path`, and surfaces user-visible validation errors for unsupported drops.
 - Specta command generation is now centralized in `src-tauri/src/bindings.rs` with a dedicated `export_bindings` binary so `src/lib/bindings.ts` stays in sync with Rust IPC additions.
+- Local timeline now ships with `TimelinePanel` + `TimelineMain`, file-route `useShellStore` injection, overlap-aware `create_timeline_event` / search / link commands, JSON tag storage, and `list_all_documents` as the document-link picker source.
 
 ## [3.0.0] - TBD
 

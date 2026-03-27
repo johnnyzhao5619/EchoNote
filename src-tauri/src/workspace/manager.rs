@@ -326,6 +326,36 @@ impl WorkspaceManager {
         Ok(docs)
     }
 
+    pub async fn list_all_documents(&self) -> Result<Vec<DocumentSummary>, AppError> {
+        let rows = sqlx::query_as::<_, WorkspaceDocumentRow>(
+            "SELECT id, folder_id, title, file_path, content_text, source_type, recording_id, created_at, updated_at
+             FROM workspace_documents
+             ORDER BY updated_at DESC, created_at DESC",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut docs = Vec::with_capacity(rows.len());
+        for doc in rows {
+            let (has_transcript, has_summary, has_meeting_brief) =
+                self.fetch_asset_flags(&doc.id).await?;
+            docs.push(DocumentSummary {
+                id: doc.id,
+                title: doc.title,
+                folder_id: doc.folder_id,
+                source_type: doc.source_type,
+                has_transcript,
+                has_summary,
+                has_meeting_brief,
+                recording_id: doc.recording_id,
+                created_at: doc.created_at,
+                updated_at: doc.updated_at,
+            });
+        }
+
+        Ok(docs)
+    }
+
     pub async fn search_documents(&self, query: &str) -> Result<Vec<SearchResult>, AppError> {
         if query.trim().is_empty() {
             return Ok(vec![]);

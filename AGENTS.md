@@ -199,6 +199,12 @@ echonote/
    - `batch:progress`、`batch:done`、`batch:error`
    - `locale:changed`、`theme:changed`
 
+10. **Timeline IPC 与路由集成约定**
+   - 后端时间轴命令组固定为：`create_timeline_event`、`update_timeline_event`、`delete_timeline_event`、`list_timeline_events`、`search_timeline_events`、`link_event_to_recording`、`link_event_to_document`
+   - 时间轴文档关联选择器必须使用 `list_all_documents` 作为全量文档数据源，不得在前端拼接跨文件夹列表
+   - `/timeline` 必须使用 TanStack file route，并通过 `useShellStore` 注入 `TimelinePanel` 到 `SecondPanel`
+   - 时间轴主内容区固定由 `TimelineMain` 渲染，不再使用手工 `router.tsx` 注册方式
+
 ---
 
 ## 关键设计决策速查

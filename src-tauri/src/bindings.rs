@@ -8,6 +8,7 @@ use crate::commands::{
     models as model_cmds,
     settings,
     theme,
+    timeline as timeline_cmds,
     transcription as transcription_cmds,
     workspace as workspace_cmds,
 };
@@ -48,6 +49,7 @@ pub fn builder() -> Builder<tauri::Wry> {
         workspace_cmds::rename_folder,
         workspace_cmds::delete_folder,
         workspace_cmds::list_documents_in_folder,
+        workspace_cmds::list_all_documents,
         workspace_cmds::get_document,
         workspace_cmds::create_document,
         workspace_cmds::update_document,
@@ -59,6 +61,13 @@ pub fn builder() -> Builder<tauri::Wry> {
         llm_cmds::cancel_llm_task,
         llm_cmds::get_llm_engine_status,
         llm_cmds::list_document_llm_tasks,
+        timeline_cmds::create_timeline_event,
+        timeline_cmds::update_timeline_event,
+        timeline_cmds::delete_timeline_event,
+        timeline_cmds::list_timeline_events,
+        timeline_cmds::search_timeline_events,
+        timeline_cmds::link_event_to_recording,
+        timeline_cmds::link_event_to_document,
     ])
 }
 
