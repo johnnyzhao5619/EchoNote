@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { buildWorkspaceFolderRoute } from "@/lib/workspace-routes";
 import {
   getFolderAncestorIds,
+  getNearestVisibleFolderId,
   getRootFolderIds,
   getVisibleFolderIds,
 } from "@/lib/workspace-tree";
@@ -110,9 +111,15 @@ export function WorkspacePanel() {
       return;
     }
 
-    if (activeTreeItemId == null) {
-      setActiveTreeItemId(visibleFolderIds[0] ?? null);
+    if (activeTreeItemId) {
+      setActiveTreeItemId(
+        getNearestVisibleFolderId(folders, activeTreeItemId, expandedFolderIds) ??
+          visibleFolderIds[0] ??
+          null,
+      );
+      return;
     }
+    setActiveTreeItemId(visibleFolderIds[0] ?? null);
   }, [activeTreeItemId, currentFolderId, expandedFolderIds, folders, visibleFolderIds]);
 
   const handleConfirm = async () => {

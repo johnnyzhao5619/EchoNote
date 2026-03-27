@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 const mockNavigate = vi.fn();
 
@@ -225,5 +225,42 @@ describe("WorkspacePanel", () => {
       to: "/workspace/$folderId",
       params: { folderId: "folder-child" },
     });
+  });
+
+  it("falls back to the nearest visible treeitem when the active branch disappears", async () => {
+    workspaceState = createWorkspaceState("folder-grandchild");
+
+    const { rerender } = render(<WorkspacePanel />);
+
+    expect(await screen.findByRole("treeitem", { name: "Research" })).toHaveAttribute(
+      "tabindex",
+      "0",
+    );
+
+    workspaceState.folders = [
+      {
+        ...workspaceState.folders[0],
+        children: [
+          {
+            ...workspaceState.folders[0].children[0],
+            children: [],
+          },
+        ],
+      },
+    ];
+
+    rerender(<WorkspacePanel />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("treeitem", { name: "Workspace" })).toHaveAttribute(
+        "tabindex",
+        "0",
+      );
+      expect(screen.getByRole("treeitem", { name: "Project A" })).toHaveAttribute(
+        "tabindex",
+        "-1",
+      );
+    });
+    expect(screen.queryByRole("treeitem", { name: "Research" })).not.toBeInTheDocument();
   });
 });
