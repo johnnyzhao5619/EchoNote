@@ -24,8 +24,16 @@ const ASSET_META: Record<string, { label: string; actionLabel: string }> = {
 
 const ASSET_ORDER = ["document_text", "transcript", "summary", "meeting_brief", "translation"] as const;
 
-function getPrimaryAssetRole(sourceType: string) {
-  return sourceType === "recording" ? "transcript" : "document_text";
+function getPrimaryAssetRole(sourceType: string, assetMap: Map<string, { content: string }>) {
+  if (assetMap.has("document_text")) {
+    return "document_text";
+  }
+
+  if (sourceType === "recording") {
+    return "transcript";
+  }
+
+  return "document_text";
 }
 
 export function DocumentView({ doc }: Props) {
@@ -46,9 +54,9 @@ export function DocumentView({ doc }: Props) {
     }
   };
 
-  const editableSections = useMemo(() => {
+  const { editableSections, primaryRole, canRunAiTasks } = useMemo(() => {
     const assetMap = new Map(doc.assets.map((asset) => [asset.role, asset]));
-    const primaryRole = getPrimaryAssetRole(doc.source_type);
+    const primaryRole = getPrimaryAssetRole(doc.source_type, assetMap);
     const orderedRoles = [
       primaryRole,
       ...ASSET_ORDER.filter((role) => role !== primaryRole && !(role === "document_text" && primaryRole !== "document_text")),
@@ -71,7 +79,11 @@ export function DocumentView({ doc }: Props) {
       });
     }
 
-    return sections;
+    return {
+      editableSections: sections,
+      primaryRole,
+      canRunAiTasks: assetMap.has("document_text") || assetMap.has("transcript"),
+    };
   }, [doc.assets, doc.source_type]);
 
   const commitTitle = async () => {
@@ -138,11 +150,11 @@ export function DocumentView({ doc }: Props) {
               label={section.label}
               actionLabel={section.actionLabel}
               initialContent={section.content}
-              emptyStateText={section.role === getPrimaryAssetRole(doc.source_type) ? "点击开始编写" : undefined}
+              emptyStateText={section.role === primaryRole ? "点击开始编写" : undefined}
             />
           ))}
 
-          {doc.source_type === "recording" && (
+          {canRunAiTasks && (
             <AiTaskBar documentId={doc.id} className="border-t border-border/60 pt-4" />
           )}
         </div>

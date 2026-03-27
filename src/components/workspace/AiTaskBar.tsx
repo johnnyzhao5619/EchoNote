@@ -1,7 +1,7 @@
 // src/components/workspace/AiTaskBar.tsx
 // AI 操作区：生成摘要、会议纪要、翻译三个按钮，含加载状态和取消按钮。
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2, X, FileText, Users, Languages } from "lucide-react";
 import { commands } from "@/lib/bindings";
@@ -24,6 +24,10 @@ export function AiTaskBar({
 }: AiTaskBarProps) {
   const { tasks, initTask } = useLlmStore();
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setActiveTaskId(null);
+  }, [documentId]);
 
   const activeTask = activeTaskId ? tasks.get(activeTaskId) : null;
   const isRunning =

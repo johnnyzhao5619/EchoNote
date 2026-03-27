@@ -101,6 +101,13 @@ describe("DocumentView", () => {
           updated_at: 2,
           assets: [
             {
+              id: "a1",
+              role: "document_text",
+              language: null,
+              content: "Imported body",
+              updated_at: 2,
+            },
+            {
               id: "a2",
               role: "translation",
               language: "en",
@@ -117,11 +124,12 @@ describe("DocumentView", () => {
     expect(screen.getByRole("button", { name: /编辑正文/i })).toBeInTheDocument();
     expect(screen.getByText("正文")).toBeInTheDocument();
     expect(screen.getByText("翻译")).toBeInTheDocument();
-    expect(screen.getByText("点击开始编写")).toBeInTheDocument();
+    expect(screen.getByText("Imported body")).toBeInTheDocument();
     expect(screen.getByText("Imported translation")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /生成摘要/i })).toBeInTheDocument();
   });
 
-  it("renders recording documents with transcript first and AI assets on the same detail page", () => {
+  it("renders recording documents with document_text ahead of transcript when both exist", () => {
     render(
       <DocumentView
         doc={{
@@ -134,21 +142,35 @@ describe("DocumentView", () => {
           updated_at: 2,
           assets: [
             {
+              id: "a1",
+              role: "document_text",
+              language: null,
+              content: "Primary body",
+              updated_at: 2,
+            },
+            {
               id: "a2",
+              role: "transcript",
+              language: null,
+              content: "Transcript body",
+              updated_at: 2,
+            },
+            {
+              id: "a3",
               role: "summary",
               language: null,
               content: "Summary",
               updated_at: 2,
             },
             {
-              id: "a3",
+              id: "a4",
               role: "meeting_brief",
               language: null,
               content: "Brief",
               updated_at: 2,
             },
             {
-              id: "a4",
+              id: "a5",
               role: "translation",
               language: "en",
               content: "Translated body",
@@ -159,11 +181,13 @@ describe("DocumentView", () => {
       />,
     );
 
+    expect(screen.getByText("正文")).toBeInTheDocument();
+    expect(screen.getByText("Primary body")).toBeInTheDocument();
     expect(screen.getByText("转写原文")).toBeInTheDocument();
+    expect(screen.getByText("Transcript body")).toBeInTheDocument();
     expect(screen.getByText("AI 摘要")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /编辑纪要/i })).toBeInTheDocument();
     expect(screen.getByText("翻译")).toBeInTheDocument();
-    expect(screen.getByText("点击开始编写")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /生成摘要/i })).toBeInTheDocument();
   });
 
