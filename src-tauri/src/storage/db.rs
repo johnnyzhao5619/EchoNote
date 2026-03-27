@@ -207,6 +207,24 @@ mod tests {
         assert!(result.is_err(), "duplicate (document_id, role) should violate UNIQUE constraint");
     }
 
+    #[tokio::test]
+    async fn test_workspace_text_assets_has_language_column() {
+        let db = Database::open("sqlite::memory:").await.unwrap();
+
+        let columns: Vec<(String,)> = sqlx::query_as(
+            "SELECT name FROM pragma_table_info('workspace_text_assets')",
+        )
+            .fetch_all(&db.pool)
+            .await
+            .unwrap();
+
+        let column_names: Vec<String> = columns.into_iter().map(|(name,)| name).collect();
+        assert!(
+            column_names.contains(&"language".to_string()),
+            "workspace_text_assets should contain a language column",
+        );
+    }
+
     /// Trigger must sync content_text on workspace_documents after asset insert.
     #[tokio::test]
     async fn test_sync_trigger_on_asset_insert() {

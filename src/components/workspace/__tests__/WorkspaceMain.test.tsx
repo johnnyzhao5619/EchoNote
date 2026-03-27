@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
+
+const mockNavigate = vi.fn();
 
 vi.mock("@tanstack/react-router", () => ({
+  useNavigate: () => mockNavigate,
   useParams: () => ({}),
 }));
 
@@ -39,5 +42,16 @@ describe("WorkspaceMain", () => {
     expect(screen.getByRole("button", { name: /新建文档/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /导入文件/i })).toBeInTheDocument();
     expect(screen.getByText("Launch Notes")).toBeInTheDocument();
+  });
+
+  it("navigates to document route when clicking a document card", () => {
+    render(<WorkspaceMain />);
+
+    fireEvent.click(screen.getByText("Launch Notes"));
+
+    expect(mockNavigate).toHaveBeenCalledWith({
+      to: "/workspace/$folderId/$docId",
+      params: { folderId: "folder-1", docId: "doc-1" },
+    });
   });
 });

@@ -1,14 +1,16 @@
 import { useEffect } from "react";
-import { useParams } from "@tanstack/react-router";
+import { useNavigate, useParams } from "@tanstack/react-router";
 import { FileText, FolderPlus, Import } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
 
 import { Button } from "@/components/ui/button";
+import { buildWorkspaceDocumentRoute } from "@/lib/workspace-routes";
 import { useWorkspaceStore } from "@/store/workspace";
 
 import { DocumentView } from "./DocumentView";
 
 export function WorkspaceMain() {
+  const navigate = useNavigate();
   const params = useParams({ strict: false }) as {
     folderId?: string;
     docId?: string;
@@ -28,10 +30,11 @@ export function WorkspaceMain() {
   const docId = params.docId ?? params.documentId;
 
   useEffect(() => {
-    if (folderId && folderId !== currentFolderId) {
-      void selectFolder(folderId);
+    const targetFolderId = folderId ?? null;
+    if (targetFolderId !== currentFolderId || (!docId && currentDoc)) {
+      void selectFolder(targetFolderId);
     }
-  }, [currentFolderId, folderId, selectFolder]);
+  }, [currentDoc, currentFolderId, docId, folderId, selectFolder]);
 
   useEffect(() => {
     if (docId) {
@@ -86,7 +89,7 @@ export function WorkspaceMain() {
               <div
                 key={doc.id}
                 className="cursor-pointer rounded border border-border p-3 hover:bg-bg-hover"
-                onClick={() => void openDocument(doc.id)}
+                onClick={() => void navigate(buildWorkspaceDocumentRoute(doc.id, currentFolderId))}
               >
                 <div className="truncate text-sm font-medium">{doc.title}</div>
                 <div className="mt-1 flex gap-2 text-xs text-text-muted">

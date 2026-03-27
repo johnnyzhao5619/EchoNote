@@ -17,9 +17,11 @@ import { Route as RecordingRouteImport } from './routes/recording'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WorkspaceIndexRouteImport } from './routes/workspace.index'
 import { Route as SettingsIndexRouteImport } from './routes/settings.index'
-import { Route as WorkspaceDocumentIdRouteImport } from './routes/workspace.$documentId'
+import { Route as WorkspaceFolderIdRouteImport } from './routes/workspace.$folderId'
 import { Route as SettingsThemeRouteImport } from './routes/settings.theme'
 import { Route as SettingsModelsRouteImport } from './routes/settings.models'
+import { Route as WorkspaceDocumentDocumentIdRouteImport } from './routes/workspace.document.$documentId'
+import { Route as WorkspaceFolderIdDocIdRouteImport } from './routes/workspace.$folderId.$docId'
 
 const WorkspaceRoute = WorkspaceRouteImport.update({
   id: '/workspace',
@@ -61,9 +63,9 @@ const SettingsIndexRoute = SettingsIndexRouteImport.update({
   path: '/',
   getParentRoute: () => SettingsRoute,
 } as any)
-const WorkspaceDocumentIdRoute = WorkspaceDocumentIdRouteImport.update({
-  id: '/$documentId',
-  path: '/$documentId',
+const WorkspaceFolderIdRoute = WorkspaceFolderIdRouteImport.update({
+  id: '/$folderId',
+  path: '/$folderId',
   getParentRoute: () => WorkspaceRoute,
 } as any)
 const SettingsThemeRoute = SettingsThemeRouteImport.update({
@@ -76,6 +78,17 @@ const SettingsModelsRoute = SettingsModelsRouteImport.update({
   path: '/models',
   getParentRoute: () => SettingsRoute,
 } as any)
+const WorkspaceDocumentDocumentIdRoute =
+  WorkspaceDocumentDocumentIdRouteImport.update({
+    id: '/document/$documentId',
+    path: '/document/$documentId',
+    getParentRoute: () => WorkspaceRoute,
+  } as any)
+const WorkspaceFolderIdDocIdRoute = WorkspaceFolderIdDocIdRouteImport.update({
+  id: '/$docId',
+  path: '/$docId',
+  getParentRoute: () => WorkspaceFolderIdRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -86,9 +99,11 @@ export interface FileRoutesByFullPath {
   '/workspace': typeof WorkspaceRouteWithChildren
   '/settings/models': typeof SettingsModelsRoute
   '/settings/theme': typeof SettingsThemeRoute
-  '/workspace/$documentId': typeof WorkspaceDocumentIdRoute
+  '/workspace/$folderId': typeof WorkspaceFolderIdRouteWithChildren
   '/settings/': typeof SettingsIndexRoute
   '/workspace/': typeof WorkspaceIndexRoute
+  '/workspace/$folderId/$docId': typeof WorkspaceFolderIdDocIdRoute
+  '/workspace/document/$documentId': typeof WorkspaceDocumentDocumentIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -97,9 +112,11 @@ export interface FileRoutesByTo {
   '/transcription': typeof TranscriptionRoute
   '/settings/models': typeof SettingsModelsRoute
   '/settings/theme': typeof SettingsThemeRoute
-  '/workspace/$documentId': typeof WorkspaceDocumentIdRoute
+  '/workspace/$folderId': typeof WorkspaceFolderIdRouteWithChildren
   '/settings': typeof SettingsIndexRoute
   '/workspace': typeof WorkspaceIndexRoute
+  '/workspace/$folderId/$docId': typeof WorkspaceFolderIdDocIdRoute
+  '/workspace/document/$documentId': typeof WorkspaceDocumentDocumentIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -111,9 +128,11 @@ export interface FileRoutesById {
   '/workspace': typeof WorkspaceRouteWithChildren
   '/settings/models': typeof SettingsModelsRoute
   '/settings/theme': typeof SettingsThemeRoute
-  '/workspace/$documentId': typeof WorkspaceDocumentIdRoute
+  '/workspace/$folderId': typeof WorkspaceFolderIdRouteWithChildren
   '/settings/': typeof SettingsIndexRoute
   '/workspace/': typeof WorkspaceIndexRoute
+  '/workspace/$folderId/$docId': typeof WorkspaceFolderIdDocIdRoute
+  '/workspace/document/$documentId': typeof WorkspaceDocumentDocumentIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -126,9 +145,11 @@ export interface FileRouteTypes {
     | '/workspace'
     | '/settings/models'
     | '/settings/theme'
-    | '/workspace/$documentId'
+    | '/workspace/$folderId'
     | '/settings/'
     | '/workspace/'
+    | '/workspace/$folderId/$docId'
+    | '/workspace/document/$documentId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -137,9 +158,11 @@ export interface FileRouteTypes {
     | '/transcription'
     | '/settings/models'
     | '/settings/theme'
-    | '/workspace/$documentId'
+    | '/workspace/$folderId'
     | '/settings'
     | '/workspace'
+    | '/workspace/$folderId/$docId'
+    | '/workspace/document/$documentId'
   id:
     | '__root__'
     | '/'
@@ -150,9 +173,11 @@ export interface FileRouteTypes {
     | '/workspace'
     | '/settings/models'
     | '/settings/theme'
-    | '/workspace/$documentId'
+    | '/workspace/$folderId'
     | '/settings/'
     | '/workspace/'
+    | '/workspace/$folderId/$docId'
+    | '/workspace/document/$documentId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -222,11 +247,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsIndexRouteImport
       parentRoute: typeof SettingsRoute
     }
-    '/workspace/$documentId': {
-      id: '/workspace/$documentId'
-      path: '/$documentId'
-      fullPath: '/workspace/$documentId'
-      preLoaderRoute: typeof WorkspaceDocumentIdRouteImport
+    '/workspace/$folderId': {
+      id: '/workspace/$folderId'
+      path: '/$folderId'
+      fullPath: '/workspace/$folderId'
+      preLoaderRoute: typeof WorkspaceFolderIdRouteImport
       parentRoute: typeof WorkspaceRoute
     }
     '/settings/theme': {
@@ -242,6 +267,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/settings/models'
       preLoaderRoute: typeof SettingsModelsRouteImport
       parentRoute: typeof SettingsRoute
+    }
+    '/workspace/document/$documentId': {
+      id: '/workspace/document/$documentId'
+      path: '/document/$documentId'
+      fullPath: '/workspace/document/$documentId'
+      preLoaderRoute: typeof WorkspaceDocumentDocumentIdRouteImport
+      parentRoute: typeof WorkspaceRoute
+    }
+    '/workspace/$folderId/$docId': {
+      id: '/workspace/$folderId/$docId'
+      path: '/$docId'
+      fullPath: '/workspace/$folderId/$docId'
+      preLoaderRoute: typeof WorkspaceFolderIdDocIdRouteImport
+      parentRoute: typeof WorkspaceFolderIdRoute
     }
   }
 }
@@ -262,14 +301,27 @@ const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
   SettingsRouteChildren,
 )
 
+interface WorkspaceFolderIdRouteChildren {
+  WorkspaceFolderIdDocIdRoute: typeof WorkspaceFolderIdDocIdRoute
+}
+
+const WorkspaceFolderIdRouteChildren: WorkspaceFolderIdRouteChildren = {
+  WorkspaceFolderIdDocIdRoute: WorkspaceFolderIdDocIdRoute,
+}
+
+const WorkspaceFolderIdRouteWithChildren =
+  WorkspaceFolderIdRoute._addFileChildren(WorkspaceFolderIdRouteChildren)
+
 interface WorkspaceRouteChildren {
-  WorkspaceDocumentIdRoute: typeof WorkspaceDocumentIdRoute
+  WorkspaceFolderIdRoute: typeof WorkspaceFolderIdRouteWithChildren
   WorkspaceIndexRoute: typeof WorkspaceIndexRoute
+  WorkspaceDocumentDocumentIdRoute: typeof WorkspaceDocumentDocumentIdRoute
 }
 
 const WorkspaceRouteChildren: WorkspaceRouteChildren = {
-  WorkspaceDocumentIdRoute: WorkspaceDocumentIdRoute,
+  WorkspaceFolderIdRoute: WorkspaceFolderIdRouteWithChildren,
   WorkspaceIndexRoute: WorkspaceIndexRoute,
+  WorkspaceDocumentDocumentIdRoute: WorkspaceDocumentDocumentIdRoute,
 }
 
 const WorkspaceRouteWithChildren = WorkspaceRoute._addFileChildren(

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -10,17 +11,18 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { buildWorkspaceFolderRoute } from "@/lib/workspace-routes";
 import { useWorkspaceStore } from "@/store/workspace";
 
 import { FolderTreeNode } from "./FolderTreeNode";
 import { SearchBar } from "./SearchBar";
 
 export function WorkspacePanel() {
+  const navigate = useNavigate();
   const {
     folders,
     currentFolderId,
     loadFolderTree,
-    selectFolder,
     createFolder,
     renameFolder,
     deleteFolder,
@@ -65,7 +67,9 @@ export function WorkspacePanel() {
             node={node}
             depth={0}
             selectedId={currentFolderId}
-            onSelect={(id) => void selectFolder(id)}
+            onSelect={(id) => {
+              void navigate(buildWorkspaceFolderRoute(id));
+            }}
             onCreateChild={(parentId) => {
               setDialog({ mode: "create", parentId });
               setInputValue("");

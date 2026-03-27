@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 
+const mockNavigate = vi.fn();
+
+vi.mock("@tanstack/react-router", () => ({
+  useNavigate: () => mockNavigate,
+}));
+
 const { mockCommands } = vi.hoisted(() => ({
   mockCommands: {
     listFolderTree: vi.fn(),
@@ -37,7 +43,7 @@ describe("SearchBar", () => {
           title: "Launch Notes",
           snippet: "<mark>Launch</mark> notes",
           rank: -1,
-          folder_id: null,
+          folder_id: "folder-1",
           updated_at: 1,
         },
       ],
@@ -73,5 +79,25 @@ describe("SearchBar", () => {
     expect(mockCommands.searchWorkspace).toHaveBeenCalledWith("Launch");
     expect(screen.getByText("Launch Notes")).toBeInTheDocument();
     expect(screen.getByText((_, node) => node?.innerHTML === "<mark>Launch</mark> notes")).toBeInTheDocument();
+  });
+
+  it("navigates to the workspace document route when selecting a result", async () => {
+    render(<SearchBar />);
+
+    fireEvent.change(screen.getByPlaceholderText("搜索文档…"), {
+      target: { value: "Launch" },
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+      await Promise.resolve();
+    });
+
+    fireEvent.click(screen.getByText("Launch Notes"));
+
+    expect(mockNavigate).toHaveBeenCalledWith({
+      to: "/workspace/$folderId/$docId",
+      params: { folderId: "folder-1", docId: "doc-1" },
+    });
   });
 });
