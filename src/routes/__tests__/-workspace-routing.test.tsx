@@ -98,12 +98,15 @@ describe("workspace routing", () => {
   it("highlights the current route folder and expands its ancestor chain", async () => {
     renderApp("/workspace/folder-child");
 
-    expect(await screen.findByRole("button", { name: "Project A" })).toHaveAttribute(
-      "aria-current",
-      "page",
+    expect(await screen.findByRole("tree", { name: "Workspace folders" })).toBeInTheDocument();
+    expect(await screen.findByRole("treeitem", { name: "Project A" })).toHaveAttribute(
+      "aria-selected",
+      "true",
     );
-    expect(screen.queryByRole("tree")).not.toBeInTheDocument();
-    expect(screen.queryByRole("treeitem")).not.toBeInTheDocument();
+    expect(screen.getByRole("treeitem", { name: "Project A" })).toHaveAttribute(
+      "aria-level",
+      "2",
+    );
     expect(screen.getByRole("button", { name: "折叠 Workspace" })).toHaveAttribute(
       "aria-expanded",
       "true",

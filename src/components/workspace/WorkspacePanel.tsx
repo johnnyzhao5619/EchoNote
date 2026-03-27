@@ -96,7 +96,7 @@ export function WorkspacePanel() {
         <SearchBar />
       </div>
 
-      <ul className="flex-1 overflow-y-auto py-1">
+      <ul className="flex-1 overflow-y-auto py-1" role="tree" aria-label="Workspace folders">
         {folders.map((node) => (
           <FolderTreeNode
             key={node.id}

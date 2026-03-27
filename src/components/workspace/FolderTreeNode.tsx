@@ -1,3 +1,4 @@
+import { type KeyboardEvent } from "react";
 import {
   ChevronRight,
   Folder,
@@ -42,9 +43,31 @@ export function FolderTreeNode({
   const isSelected = node.id === selectedId;
   const hasChildren = node.children.length > 0;
   const isExpanded = expandedFolderIds.has(node.id);
+  const selectNode = () => {
+    onSelect(node.id);
+  };
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      selectNode();
+      return;
+    }
+
+    if (event.key === "ArrowRight" && hasChildren && !isExpanded) {
+      event.preventDefault();
+      onToggleExpand(node.id);
+      return;
+    }
+
+    if (event.key === "ArrowLeft" && hasChildren && isExpanded) {
+      event.preventDefault();
+      onToggleExpand(node.id);
+    }
+  };
 
   return (
-    <li>
+    <li role="none">
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <div className="space-y-0.5">
@@ -79,18 +102,23 @@ export function FolderTreeNode({
               ) : (
                 <Folder size={14} className="shrink-0 text-text-secondary" />
               )}
-              <button
-                type="button"
-                className="flex min-w-0 flex-1 items-center rounded text-left"
-                aria-current={isSelected ? "page" : undefined}
-                onClick={() => {
-                  onSelect(node.id);
-                }}
+              <div
+                role="treeitem"
+                tabIndex={0}
+                aria-label={node.name}
+                aria-level={depth + 1}
+                aria-selected={isSelected}
+                aria-expanded={hasChildren ? isExpanded : undefined}
+                className="flex min-w-0 flex-1 items-center rounded outline-none focus-visible:ring-1 focus-visible:ring-accent/60"
+                onClick={selectNode}
+                onKeyDown={handleKeyDown}
               >
                 <span className="truncate">{node.name}</span>
-              </button>
+              </div>
               {node.document_count > 0 && (
-                <span className="ml-auto text-xs text-text-muted">{node.document_count}</span>
+                <span aria-hidden="true" className="ml-auto text-xs text-text-muted">
+                  {node.document_count}
+                </span>
               )}
             </div>
           </div>
@@ -118,7 +146,7 @@ export function FolderTreeNode({
       </ContextMenu>
 
       {isExpanded && node.children.length > 0 && (
-        <ul>
+        <ul role="group">
           {node.children.map((child) => (
             <FolderTreeNode
               key={child.id}

@@ -114,16 +114,15 @@ describe("WorkspacePanel", () => {
   it("renders folder tree and create action", async () => {
     render(<WorkspacePanel />);
 
-    expect(await screen.findByRole("button", { name: "Workspace" })).toBeInTheDocument();
-    expect(screen.queryByRole("tree")).not.toBeInTheDocument();
-    expect(screen.queryByRole("treeitem")).not.toBeInTheDocument();
+    expect(await screen.findByRole("tree", { name: "Workspace folders" })).toBeInTheDocument();
+    expect(await screen.findByRole("treeitem", { name: "Workspace" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /新建文件夹/i })).toBeInTheDocument();
   });
 
   it("navigates to folder route when selecting a folder", async () => {
     render(<WorkspacePanel />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Project A" }));
+    fireEvent.click(await screen.findByRole("treeitem", { name: "Project A" }));
 
     expect(mockNavigate).toHaveBeenCalledWith({
       to: "/workspace/$folderId",
@@ -131,19 +130,23 @@ describe("WorkspacePanel", () => {
     });
   });
 
-  it("keeps expansion and selection as separate actions without tree widget roles", async () => {
+  it("keeps expansion and selection as separate actions", async () => {
     render(<WorkspacePanel />);
 
-    const rootToggle = await screen.findByRole("button", { name: "折叠 Workspace" });
+    const rootTreeItem = await screen.findByRole("treeitem", { name: "Workspace" });
+    expect(rootTreeItem).toHaveAttribute("tabindex", "0");
+
+    const rootToggle = screen.getByRole("button", { name: "折叠 Workspace" });
     expect(rootToggle).toHaveAttribute("aria-expanded", "true");
 
     fireEvent.click(screen.getByRole("button", { name: /展开 Project A/i }));
     expect(mockNavigate).not.toHaveBeenCalled();
 
-    const grandchildSelect = await screen.findByRole("button", { name: "Research" });
-    expect(grandchildSelect).not.toHaveAttribute("aria-current");
+    const grandchildTreeItem = await screen.findByRole("treeitem", { name: "Research" });
+    expect(grandchildTreeItem).toHaveAttribute("aria-level", "3");
+    expect(grandchildTreeItem).toHaveAttribute("aria-selected", "false");
 
-    fireEvent.click(screen.getByRole("button", { name: "Project A" }));
+    fireEvent.click(screen.getByRole("treeitem", { name: "Project A" }));
     expect(mockNavigate).toHaveBeenCalledWith({
       to: "/workspace/$folderId",
       params: { folderId: "folder-child" },
@@ -160,9 +163,9 @@ describe("WorkspacePanel", () => {
 
     render(<WorkspacePanel />);
 
-    expect(await screen.findByRole("button", { name: "Research" })).toHaveAttribute(
-      "aria-current",
-      "page",
+    expect(await screen.findByRole("treeitem", { name: "Research" })).toHaveAttribute(
+      "aria-selected",
+      "true",
     );
 
     fireEvent.click(screen.getByRole("button", { name: /折叠 Project A/i }));
@@ -180,5 +183,30 @@ describe("WorkspacePanel", () => {
       "folder-root",
       "folder-child",
     ]);
+  });
+
+  it("supports keyboard selection and expansion on treeitems", async () => {
+    render(<WorkspacePanel />);
+
+    const projectNode = await screen.findByRole("treeitem", { name: "Project A" });
+    projectNode.focus();
+
+    fireEvent.keyDown(projectNode, { key: "ArrowRight" });
+    expect(screen.getByRole("button", { name: "折叠 Project A" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+
+    fireEvent.keyDown(projectNode, { key: "ArrowLeft" });
+    expect(screen.getByRole("button", { name: "展开 Project A" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+
+    fireEvent.keyDown(projectNode, { key: "Enter" });
+    expect(mockNavigate).toHaveBeenCalledWith({
+      to: "/workspace/$folderId",
+      params: { folderId: "folder-child" },
+    });
   });
 });
