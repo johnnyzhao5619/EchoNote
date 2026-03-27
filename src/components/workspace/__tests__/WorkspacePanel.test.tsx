@@ -15,11 +15,18 @@ vi.mock("@/store/workspace", () => ({
       },
     ],
     currentFolderId: null,
+    searchQuery: "",
+    searchResults: [],
+    isSearching: false,
     loadFolderTree: vi.fn(),
     selectFolder: vi.fn(),
     createFolder: vi.fn(),
     renameFolder: vi.fn(),
     deleteFolder: vi.fn(),
+    setSearchQuery: vi.fn(),
+    search: vi.fn(),
+    clearSearch: vi.fn(),
+    openDocument: vi.fn(),
   }),
 }));
 
