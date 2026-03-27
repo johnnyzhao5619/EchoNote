@@ -111,11 +111,12 @@ describe("WorkspacePanel", () => {
     workspaceState = createWorkspaceState();
   });
 
-  it("renders folder tree and create action", async () => {
+  it("loads the folder tree and auto-expands the root branch", async () => {
     render(<WorkspacePanel />);
 
     expect(await screen.findByRole("tree", { name: "Workspace folders" })).toBeInTheDocument();
     expect(await screen.findByRole("treeitem", { name: "Workspace" })).toBeInTheDocument();
+    expect(screen.getByRole("treeitem", { name: "Project A" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /新建文件夹/i })).toBeInTheDocument();
   });
 

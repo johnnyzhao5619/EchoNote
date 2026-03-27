@@ -104,7 +104,9 @@ describe("DocumentView", () => {
     });
   });
 
-  it("renders imported documents with document_text as the editable body asset", () => {
+  it("keeps imported document text editable after opening the document", async () => {
+    const user = userEvent.setup();
+
     render(
       <DocumentView
         doc={{
@@ -143,6 +145,18 @@ describe("DocumentView", () => {
     expect(screen.getByText("Imported body")).toBeInTheDocument();
     expect(screen.getByText("Imported translation")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /生成摘要/i })).toBeInTheDocument();
+
+    await user.click(screen.getByText("Imported body"));
+    await user.type(screen.getByPlaceholderText("在此输入正文"), " v2");
+    await user.click(screen.getByRole("button", { name: /完成/i }));
+
+    await waitFor(() => {
+      expect(mockCommands.updateDocumentAsset).toHaveBeenCalledWith(
+        "doc-2",
+        "document_text",
+        "Imported body v2",
+      );
+    });
   });
 
   it("renders recording documents with transcript as the primary body and keeps document_text editable on the same page", () => {

@@ -57,6 +57,39 @@ describe("useWorkspaceStore", () => {
     expect(useWorkspaceStore.getState().documents).toHaveLength(1);
   });
 
+  it("openDocument hydrates the editor state from the backend detail payload", async () => {
+    const detail = {
+      id: "doc-1",
+      title: "Launch Notes",
+      folder_id: "folder-1",
+      source_type: "import",
+      recording_id: null,
+      assets: [
+        {
+          id: "asset-1",
+          role: "document_text",
+          language: null,
+          content: "Imported body",
+          updated_at: 2,
+        },
+      ],
+      created_at: 1,
+      updated_at: 2,
+    };
+
+    mockCommands.getDocument.mockResolvedValue({
+      status: "ok",
+      data: detail,
+    });
+
+    await act(async () => {
+      await useWorkspaceStore.getState().openDocument("doc-1");
+    });
+
+    expect(mockCommands.getDocument).toHaveBeenCalledWith("doc-1");
+    expect(useWorkspaceStore.getState().currentDoc).toMatchObject(detail);
+  });
+
   it("createDocument updates the list and returns the new document id without opening it", async () => {
     const openDocumentSpy = vi.spyOn(useWorkspaceStore.getState(), "openDocument");
     const resultDoc = {

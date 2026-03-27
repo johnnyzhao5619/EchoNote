@@ -3,10 +3,15 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { open } from "@tauri-apps/plugin-dialog";
 
 const mockNavigate = vi.fn();
+let mockParams: {
+  folderId?: string;
+  docId?: string;
+  documentId?: string;
+} = {};
 
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => mockNavigate,
-  useParams: () => ({}),
+  useParams: () => mockParams,
 }));
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({
@@ -42,6 +47,7 @@ describe("WorkspaceMain", () => {
   beforeEach(() => {
     mockNavigate.mockReset();
     vi.mocked(open).mockReset();
+    mockParams = { folderId: "folder-1" };
     workspaceState.selectFolder.mockReset();
     workspaceState.openDocument.mockReset();
     workspaceState.createDocument.mockReset().mockResolvedValue("doc-new");
@@ -60,12 +66,41 @@ describe("WorkspaceMain", () => {
     workspaceState.currentFolderId = "folder-1";
   });
 
-  it("renders document list actions and cards", () => {
+  it("shows a loaded document editor when the route already points at a document", () => {
+    mockParams = { folderId: "folder-1", docId: "doc-1" };
+    workspaceState.currentDoc = {
+      id: "doc-1",
+      title: "Launch Notes",
+      folder_id: "folder-1",
+      source_type: "import",
+      recording_id: null,
+      created_at: 1,
+      updated_at: 1,
+      assets: [
+        {
+          id: "asset-1",
+          role: "document_text",
+          language: null,
+          content: "Imported body",
+          updated_at: 1,
+        },
+      ],
+    } as any;
+
+    render(<WorkspaceMain />);
+
+    expect(screen.getByRole("textbox", { name: /标题/i })).toHaveValue("Launch Notes");
+    expect(screen.getByText("Imported body")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /新建文档/i })).not.toBeInTheDocument();
+  });
+
+  it("renders the document list actions and metadata badges for the active folder", () => {
     render(<WorkspaceMain />);
 
     expect(screen.getByRole("button", { name: /新建文档/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /导入文件/i })).toBeInTheDocument();
     expect(screen.getByText("Launch Notes")).toBeInTheDocument();
+    expect(screen.getByText("转写")).toBeInTheDocument();
   });
 
   it("navigates to document route when clicking a document card", () => {
@@ -85,6 +120,7 @@ describe("WorkspaceMain", () => {
     fireEvent.click(screen.getByRole("button", { name: /新建文档/i }));
 
     await waitFor(() => {
+      expect(workspaceState.createDocument).toHaveBeenCalledWith("新建文档", "folder-1");
       expect(mockNavigate).toHaveBeenCalledWith({
         to: "/workspace/$folderId/$docId",
         params: { folderId: "folder-1", docId: "doc-new" },
