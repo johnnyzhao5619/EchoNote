@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 
 use crate::error::AppError;
 use crate::llm::tasks::LlmTaskType;
@@ -19,18 +19,18 @@ pub struct StructuredPromptSpec {
 #[derive(Debug, Deserialize)]
 struct SummaryJson {
     summary: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_vec_or_string")]
     key_points: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
 struct MeetingBriefJson {
     summary: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_vec_or_string")]
     decisions: Vec<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_vec_or_string")]
     action_items: Vec<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_vec_or_string")]
     next_steps: Vec<String>,
 }
 
@@ -162,7 +162,8 @@ fn sanitize_list(field_name: &str, values: Vec<String>) -> Result<Vec<String>, A
     for value in values {
         let trimmed = value.trim();
         if trimmed.is_empty() {
-            return Err(AppError::Llm(format!("{field_name} contains an empty item")));
+            // Keep it permissive: if LLM returns empty item in list, just ignore it
+            continue;
         }
         cleaned.push(trimmed.to_string());
     }
@@ -206,6 +207,29 @@ fn render_bullet_list(items: &[String]) -> String {
             .map(|item| format!("- {item}"))
             .collect::<Vec<_>>()
             .join("\n")
+    }
+}
+
+fn deserialize_vec_or_string<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum VecOrString {
+        Vec(Vec<String>),
+        String(String),
+    }
+
+    match VecOrString::deserialize(deserializer)? {
+        VecOrString::Vec(v) => Ok(v),
+        VecOrString::String(s) => {
+            if s.trim().is_empty() {
+                Ok(vec![])
+            } else {
+                Ok(vec![s])
+            }
+        }
     }
 }
 
@@ -289,5 +313,12 @@ Hope it helps!
         ).unwrap();
         assert!(output.result_text.contains("## Summary"));
         assert!(output.result_text.contains("讨论了课程内容规划。"));
+    }
+
+    #[test]
+    fn test_deserialize_vec_or_string_coercion() {
+        let raw = r#"{"summary":"Test","decisions":"Single item instead of list"}"#;
+        let parsed: MeetingBriefJson = serde_json::from_str(raw).unwrap();
+        assert_eq!(parsed.decisions, vec!["Single item instead of list"]);
     }
 }
