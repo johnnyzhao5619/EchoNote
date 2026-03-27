@@ -162,7 +162,7 @@ export const useTranscriptionStore = create<TranscriptionStore>((set, get) => ({
 
   refreshQueue: async () => {
     const result = await batchCommands.getBatchQueue();
-    if (result.status === "ok") {
+    if (result.status === "ok" && Array.isArray(result.data)) {
       set({ queue: result.data });
     }
   },

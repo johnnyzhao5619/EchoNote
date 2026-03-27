@@ -21,6 +21,7 @@ describe("routing", () => {
 
   it("renders transcription page at /transcription", async () => {
     renderWithRouter("/transcription");
-    await screen.findByText(/coming in m2/i);
+    await screen.findByText("转写队列");
+    await screen.findByText("暂无转写任务");
   });
 });

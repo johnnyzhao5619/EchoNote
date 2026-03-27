@@ -133,7 +133,7 @@ function JobRow({
 }
 
 export function TranscriptionMain() {
-  const queue = useTranscriptionStore((state) => state.queue);
+  const queue = useTranscriptionStore((state) => state.queue ?? []);
   const cancelJob = useTranscriptionStore((state) => state.cancelJob);
   const clearCompleted = useTranscriptionStore((state) => state.clearCompleted);
   const refreshQueue = useTranscriptionStore((state) => state.refreshQueue);
