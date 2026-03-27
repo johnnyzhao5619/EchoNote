@@ -578,3 +578,58 @@ fn decode_wav_to_pcm(path: &Path) -> Result<Vec<f32>, String> {
             .map_err(|error| error.to_string()),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    #[test]
+    fn test_batch_status_processing_progress_range() {
+        let status = BatchStatus::Processing { progress: 0.5 };
+        if let BatchStatus::Processing { progress } = status {
+            assert!((0.0..=1.0).contains(&progress));
+        } else {
+            panic!("Expected Processing variant");
+        }
+    }
+
+    #[test]
+    fn test_batch_status_variants_are_distinct() {
+        assert_eq!(BatchStatus::Queued, BatchStatus::Queued);
+        assert_ne!(BatchStatus::Queued, BatchStatus::Cancelled);
+        assert_ne!(
+            BatchStatus::Processing { progress: 0.0 },
+            BatchStatus::Processing { progress: 1.0 }
+        );
+    }
+
+    #[test]
+    fn test_job_id_uniqueness() {
+        let ids: HashSet<String> = (0..1000).map(|_| Uuid::new_v4().to_string()).collect();
+        assert_eq!(ids.len(), 1000);
+    }
+
+    #[test]
+    fn test_batch_job_view_serializable() {
+        let view = BatchJobView {
+            job_id: "test-id".to_string(),
+            file_name: "audio.mp3".to_string(),
+            language: Some("en".to_string()),
+            status: BatchStatus::Queued,
+            created_at: 1_700_000_000_000,
+        };
+
+        let json = serde_json::to_string(&view).expect("Should serialize");
+        assert!(json.contains("test-id"));
+        assert!(json.contains("audio.mp3"));
+        assert!(json.contains("Queued"));
+    }
+
+    #[tokio::test]
+    async fn test_batch_queue_get_all_jobs_empty() {
+        let queue = BatchQueue::new();
+        let jobs = queue.get_all_jobs().await;
+        assert!(jobs.is_empty());
+    }
+}

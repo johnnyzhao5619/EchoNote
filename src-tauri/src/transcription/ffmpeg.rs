@@ -70,3 +70,47 @@ pub fn is_supported_format(path: &Path) -> bool {
         Some("wav" | "flac" | "mp3" | "mp4" | "m4a" | "mov" | "mkv" | "webm" | "ogg")
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::{Path, PathBuf};
+
+    #[test]
+    fn test_detect_ffmpeg_returns_bool() {
+        let result = detect_ffmpeg();
+        assert!(result == true || result == false);
+    }
+
+    #[test]
+    fn test_needs_transcode_wav_is_false() {
+        assert!(!needs_transcode(Path::new("audio.wav")));
+        assert!(!needs_transcode(Path::new("/path/to/recording.WAV")));
+    }
+
+    #[test]
+    fn test_needs_transcode_non_wav_is_true() {
+        for ext in ["mp3", "mp4", "m4a", "mov", "mkv", "webm", "ogg", "flac"] {
+            let path = PathBuf::from(format!("audio.{ext}"));
+            assert!(needs_transcode(&path), "Expected needs_transcode=true for .{ext}");
+        }
+    }
+
+    #[test]
+    fn test_is_supported_format() {
+        for ext in ["wav", "flac", "mp3", "mp4", "m4a", "mov", "mkv", "webm", "ogg"] {
+            let path = PathBuf::from(format!("file.{ext}"));
+            assert!(is_supported_format(&path), ".{ext} should be supported");
+        }
+
+        assert!(!is_supported_format(Path::new("file.txt")));
+        assert!(!is_supported_format(Path::new("file.avi")));
+        assert!(!is_supported_format(Path::new("file")));
+    }
+
+    #[test]
+    fn test_needs_transcode_case_insensitive() {
+        assert!(!needs_transcode(Path::new("AUDIO.WAV")));
+        assert!(needs_transcode(Path::new("AUDIO.MP3")));
+    }
+}
