@@ -32,7 +32,7 @@ interface WorkspaceState {
   search: (query: string) => Promise<void>;
   clearSearch: () => void;
 
-  importFile: (filePath: string, folderId?: string) => Promise<void>;
+  importFile: (filePath: string, folderId?: string) => Promise<DocumentSummary>;
   exportDocument: (id: string, format: "md" | "txt" | "srt" | "vtt", targetPath: string) => Promise<void>;
 }
 
@@ -141,7 +141,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
   importFile: async (filePath, folderId) => {
     const summary = unwrapResult(await commands.importFileToWorkspace(filePath, folderId ?? null));
-    set((state) => ({ documents: [summary, ...state.documents] }));
+    await get().openDocument(summary.id);
+    set((state) => ({
+      documents: [summary, ...state.documents.filter((doc) => doc.id !== summary.id)],
+    }));
+    return summary;
   },
 
   exportDocument: async (id, format, targetPath) => {

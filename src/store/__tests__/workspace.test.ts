@@ -87,6 +87,58 @@ describe("useWorkspaceStore", () => {
     expect(openDocumentSpy).not.toHaveBeenCalled();
   });
 
+  it("importFile prepends the new document, opens it, and returns route data", async () => {
+    const importedSummary = {
+      id: "doc-imported",
+      title: "Imported Draft",
+      folder_id: "folder-1",
+      source_type: "import",
+      has_transcript: false,
+      has_summary: false,
+      has_meeting_brief: false,
+      recording_id: null,
+      created_at: 1,
+      updated_at: 2,
+    };
+    const importedDetail = {
+      id: "doc-imported",
+      title: "Imported Draft",
+      folder_id: "folder-1",
+      source_type: "import",
+      recording_id: null,
+      assets: [
+        {
+          id: "asset-1",
+          role: "document_text",
+          language: null,
+          content: "Imported body",
+          updated_at: 2,
+        },
+      ],
+      created_at: 1,
+      updated_at: 2,
+    };
+
+    mockCommands.importFileToWorkspace.mockResolvedValue({
+      status: "ok",
+      data: importedSummary,
+    });
+    mockCommands.getDocument.mockResolvedValue({
+      status: "ok",
+      data: importedDetail,
+    });
+
+    await act(async () => {
+      const importedDoc = await useWorkspaceStore.getState().importFile("/tmp/Imported Draft.md", "folder-1");
+      expect(importedDoc).toMatchObject(importedSummary);
+    });
+
+    expect(mockCommands.importFileToWorkspace).toHaveBeenCalledWith("/tmp/Imported Draft.md", "folder-1");
+    expect(mockCommands.getDocument).toHaveBeenCalledWith("doc-imported");
+    expect(useWorkspaceStore.getState().documents[0]).toMatchObject(importedSummary);
+    expect(useWorkspaceStore.getState().currentDoc).toMatchObject(importedDetail);
+  });
+
   it("search stores async search results", async () => {
     mockCommands.searchWorkspace.mockResolvedValue({
       status: "ok",

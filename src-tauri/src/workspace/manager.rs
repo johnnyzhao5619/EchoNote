@@ -594,4 +594,30 @@ mod tests {
 
         assert_eq!(asset.language.as_deref(), Some("fr-FR"));
     }
+
+    #[tokio::test]
+    async fn test_import_file_to_workspace_document_text_is_editable() {
+        let pool = setup_pool().await;
+        let manager = WorkspaceManager::new(pool);
+
+        let doc = manager
+            .create_document("Imported Draft", None, "import", None)
+            .await
+            .unwrap();
+
+        manager
+            .upsert_text_asset(&doc.id, "document_text", "Imported body", None)
+            .await
+            .unwrap();
+
+        let detail = manager.get_document(&doc.id).await.unwrap();
+        let document_text = detail
+            .assets
+            .iter()
+            .find(|asset| asset.role == "document_text")
+            .expect("imported document should expose document_text");
+
+        assert_eq!(detail.source_type, "import");
+        assert_eq!(document_text.content, "Imported body");
+    }
 }

@@ -72,7 +72,8 @@ export function WorkspaceMain() {
               ],
             });
             if (typeof selected === "string") {
-              await importFile(selected, currentFolderId ?? undefined);
+              const importedDocument = await importFile(selected, currentFolderId ?? undefined);
+              void navigate(buildWorkspaceDocumentRoute(importedDocument.id, importedDocument.folder_id));
             }
           }}
         >

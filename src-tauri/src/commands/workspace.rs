@@ -459,7 +459,8 @@ pub async fn import_file_to_workspace(
     let path = std::path::PathBuf::from(&file_path);
     let parsed = tokio::task::spawn_blocking(move || parser::parse_file(&path))
         .await
-        .map_err(AppError::io)??;
+        .map_err(AppError::io)?
+        .map_err(|error| AppError::Workspace(format!("workspace.import_failed: {error}")))?;
 
     let summary = state
         .workspace_manager
