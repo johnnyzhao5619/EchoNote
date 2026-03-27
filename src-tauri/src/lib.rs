@@ -9,6 +9,7 @@ pub mod audio;
 pub mod transcription;
 pub mod llm;
 pub mod workspace;
+pub mod timeline;
 
 use tauri::Manager;
 use crate::llm::{
