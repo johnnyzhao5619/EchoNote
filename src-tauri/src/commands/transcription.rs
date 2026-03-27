@@ -10,6 +10,8 @@ use uuid::Uuid;
 use crate::audio;
 use crate::error::AppError;
 use crate::state::{AppState, RecordingSessionMeta};
+use crate::transcription::batch::{BatchCommand, BatchJobView};
+use crate::transcription::ffmpeg::{detect_ffmpeg, is_supported_format};
 use crate::transcription::pipeline::TranscriptionCommand;
 
 const CAPTURE_STARTUP_TIMEOUT: Duration = Duration::from_secs(15);
@@ -620,6 +622,89 @@ pub async fn get_recording_status(
 ) -> Result<RecordingStatus, AppError> {
     let meta = get_recording_meta(&state)?;
     Ok(build_recording_status(meta.as_ref()))
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn check_ffmpeg_available() -> bool {
+    tokio::task::spawn_blocking(detect_ffmpeg)
+        .await
+        .unwrap_or(false)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn add_files_to_batch(
+    paths: Vec<String>,
+    state: State<'_, AppState>,
+) -> Result<Vec<String>, AppError> {
+    let mut job_ids = Vec::with_capacity(paths.len());
+
+    for path in paths {
+        let file_path = std::path::PathBuf::from(&path);
+        if !file_path.exists() {
+            return Err(AppError::Io(format!("File not found: {path}")));
+        }
+
+        if !is_supported_format(&file_path) {
+            return Err(AppError::Validation(format!(
+                "Unsupported format: {}",
+                file_path
+                    .extension()
+                    .and_then(|ext| ext.to_str())
+                    .unwrap_or("unknown")
+            )));
+        }
+
+        let job_id = Uuid::new_v4().to_string();
+        state
+            .batch_tx
+            .send(BatchCommand::Enqueue {
+                job_id: job_id.clone(),
+                file_path,
+                language: None,
+            })
+            .await
+            .map_err(AppError::channel)?;
+        job_ids.push(job_id);
+    }
+
+    Ok(job_ids)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn get_batch_queue(
+    _state: State<'_, AppState>,
+) -> Result<Vec<BatchJobView>, AppError> {
+    Err(AppError::Validation(
+        "batch queue not wired yet".to_string(),
+    ))
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn cancel_batch_job(
+    job_id: String,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    state
+        .batch_tx
+        .send(BatchCommand::Cancel { job_id })
+        .await
+        .map_err(AppError::channel)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn clear_completed_jobs(
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    state
+        .batch_tx
+        .send(BatchCommand::ClearCompleted)
+        .await
+        .map_err(AppError::channel)
 }
 
 #[cfg(test)]
