@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 
@@ -12,10 +12,26 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { buildWorkspaceFolderRoute } from "@/lib/workspace-routes";
-import { useWorkspaceStore } from "@/store/workspace";
+import {
+  getFolderAncestorIds,
+  getRootFolderIds,
+  useWorkspaceStore,
+} from "@/store/workspace";
 
 import { FolderTreeNode } from "./FolderTreeNode";
 import { SearchBar } from "./SearchBar";
+
+function mergeExpandedFolderIds(current: Set<string>, folderIds: string[]) {
+  let changed = false;
+  const next = new Set(current);
+  for (const folderId of folderIds) {
+    if (!next.has(folderId)) {
+      next.add(folderId);
+      changed = true;
+    }
+  }
+  return changed ? next : current;
+}
 
 export function WorkspacePanel() {
   const navigate = useNavigate();
@@ -34,10 +50,33 @@ export function WorkspacePanel() {
     | null
   >(null);
   const [inputValue, setInputValue] = useState("");
+  const [expandedFolderIds, setExpandedFolderIds] = useState<Set<string>>(() => new Set());
+  const initializedRootsRef = useRef(false);
 
   useEffect(() => {
     void loadFolderTree();
   }, [loadFolderTree]);
+
+  useEffect(() => {
+    if (initializedRootsRef.current || folders.length === 0) {
+      return;
+    }
+
+    initializedRootsRef.current = true;
+    setExpandedFolderIds((current) => {
+      return mergeExpandedFolderIds(current, getRootFolderIds(folders));
+    });
+  }, [folders]);
+
+  useEffect(() => {
+    if (!currentFolderId) {
+      return;
+    }
+
+    setExpandedFolderIds((current) => {
+      return mergeExpandedFolderIds(current, getFolderAncestorIds(folders, currentFolderId));
+    });
+  }, [folders, currentFolderId, expandedFolderIds]);
 
   const handleConfirm = async () => {
     if (!dialog || !inputValue.trim()) {
@@ -60,15 +99,27 @@ export function WorkspacePanel() {
         <SearchBar />
       </div>
 
-      <div className="flex-1 overflow-y-auto py-1">
+      <div className="flex-1 overflow-y-auto py-1" role="tree" aria-label="Workspace folders">
         {folders.map((node) => (
           <FolderTreeNode
             key={node.id}
             node={node}
             depth={0}
             selectedId={currentFolderId}
+            expandedFolderIds={expandedFolderIds}
             onSelect={(id) => {
               void navigate(buildWorkspaceFolderRoute(id));
+            }}
+            onToggleExpand={(id) => {
+              setExpandedFolderIds((current) => {
+                const next = new Set(current);
+                if (next.has(id)) {
+                  next.delete(id);
+                } else {
+                  next.add(id);
+                }
+                return next;
+              });
             }}
             onCreateChild={(parentId) => {
               setDialog({ mode: "create", parentId });

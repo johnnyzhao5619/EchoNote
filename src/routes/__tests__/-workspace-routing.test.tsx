@@ -10,7 +10,30 @@ import { routeTree } from "@/routeTree.gen";
 
 vi.mock("@/lib/bindings", () => ({
   commands: {
-    listFolderTree: vi.fn().mockResolvedValue({ status: "ok", data: [] }),
+    listFolderTree: vi.fn().mockResolvedValue({
+      status: "ok",
+      data: [
+        {
+          id: "folder-root",
+          name: "Workspace",
+          parent_id: null,
+          folder_kind: "workspace",
+          is_system: false,
+          document_count: 2,
+          children: [
+            {
+              id: "folder-child",
+              name: "Project A",
+              parent_id: "folder-root",
+              folder_kind: "workspace",
+              is_system: false,
+              document_count: 1,
+              children: [],
+            },
+          ],
+        },
+      ],
+    }),
     listDocumentsInFolder: vi.fn().mockResolvedValue({ status: "ok", data: [] }),
     createFolder: vi.fn(),
     renameFolder: vi.fn(),
@@ -70,5 +93,18 @@ describe("workspace routing", () => {
     expect(await screen.findByRole("textbox", { name: /标题/i })).toHaveValue("Launch Notes");
     expect(screen.getByRole("button", { name: /编辑正文/i })).toBeInTheDocument();
     expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+  });
+
+  it("highlights the current route folder and expands its ancestor chain", async () => {
+    renderApp("/workspace/folder-child");
+
+    expect(await screen.findByRole("treeitem", { name: /Project A/i })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: /Workspace/i })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
   });
 });

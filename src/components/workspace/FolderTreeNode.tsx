@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   ChevronRight,
   Folder,
@@ -21,7 +20,9 @@ interface Props {
   node: FolderNodeType;
   depth: number;
   selectedId: string | null;
+  expandedFolderIds: Set<string>;
   onSelect: (id: string) => void;
+  onToggleExpand: (id: string) => void;
   onCreateChild: (parentId: string) => void;
   onRename: (id: string, currentName: string) => void;
   onDelete: (id: string) => void;
@@ -31,41 +32,56 @@ export function FolderTreeNode({
   node,
   depth,
   selectedId,
+  expandedFolderIds,
   onSelect,
+  onToggleExpand,
   onCreateChild,
   onRename,
   onDelete,
 }: Props) {
-  const [expanded, setExpanded] = useState(depth === 0);
   const isSelected = node.id === selectedId;
   const hasChildren = node.children.length > 0;
+  const isExpanded = expandedFolderIds.has(node.id);
 
   return (
     <div>
       <ContextMenu>
-        <ContextMenuTrigger>
+        <ContextMenuTrigger asChild>
           <div
             className={cn(
               "flex cursor-pointer select-none items-center gap-1 rounded px-2 py-1 text-sm hover:bg-bg-hover",
               isSelected && "bg-accent-muted text-accent",
             )}
+            role="treeitem"
+            aria-label={node.name}
+            aria-level={depth + 1}
+            aria-selected={isSelected}
+            aria-expanded={hasChildren ? isExpanded : undefined}
             style={{ paddingLeft: `${depth * 12 + 8}px` }}
             onClick={() => {
               onSelect(node.id);
-              if (hasChildren) {
-                setExpanded((value) => !value);
-              }
             }}
           >
             {hasChildren ? (
-              <ChevronRight
-                size={14}
-                className={cn("shrink-0 transition-transform", expanded && "rotate-90")}
-              />
+              <button
+                type="button"
+                className="flex shrink-0 items-center justify-center"
+                aria-label={`${isExpanded ? "折叠" : "展开"} ${node.name}`}
+                aria-expanded={isExpanded}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onToggleExpand(node.id);
+                }}
+              >
+                <ChevronRight
+                  size={14}
+                  className={cn("shrink-0 transition-transform", isExpanded && "rotate-90")}
+                />
+              </button>
             ) : (
               <span className="w-3.5 shrink-0" />
             )}
-            {expanded && hasChildren ? (
+            {isExpanded && hasChildren ? (
               <FolderOpen size={14} className="shrink-0 text-accent" />
             ) : (
               <Folder size={14} className="shrink-0 text-text-secondary" />
@@ -98,14 +114,16 @@ export function FolderTreeNode({
         </ContextMenuContent>
       </ContextMenu>
 
-      {expanded &&
+      {isExpanded &&
         node.children.map((child) => (
           <FolderTreeNode
             key={child.id}
             node={child}
             depth={depth + 1}
             selectedId={selectedId}
+            expandedFolderIds={expandedFolderIds}
             onSelect={onSelect}
+            onToggleExpand={onToggleExpand}
             onCreateChild={onCreateChild}
             onRename={onRename}
             onDelete={onDelete}
