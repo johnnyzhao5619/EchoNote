@@ -15,7 +15,27 @@ vi.mock("@/lib/bindings", () => ({
     createFolder: vi.fn(),
     renameFolder: vi.fn(),
     deleteFolder: vi.fn(),
-    getDocument: vi.fn(),
+    getDocument: vi.fn().mockResolvedValue({
+      status: "ok",
+      data: {
+        id: "doc-1",
+        title: "Launch Notes",
+        folder_id: "folder-1",
+        source_type: "note",
+        recording_id: null,
+        created_at: 1,
+        updated_at: 2,
+        assets: [
+          {
+            id: "asset-1",
+            role: "transcript",
+            language: "zh-CN",
+            content: "document body",
+            updated_at: 2,
+          },
+        ],
+      },
+    }),
     createDocument: vi.fn(),
     updateDocument: vi.fn(),
     deleteDocument: vi.fn(),
@@ -36,5 +56,18 @@ describe("workspace routing", () => {
     renderApp("/workspace");
 
     expect(await screen.findByRole("button", { name: /新建文件夹/i })).toBeInTheDocument();
+  });
+
+  it("renders folder-scoped workspace route at /workspace/$folderId", async () => {
+    renderApp("/workspace/folder-1");
+
+    expect(await screen.findByRole("button", { name: /新建文档/i })).toBeInTheDocument();
+  });
+
+  it("renders document route at /workspace/$folderId/$docId", async () => {
+    renderApp("/workspace/folder-1/doc-1");
+
+    expect(await screen.findByText("Launch Notes")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /转写原文/i })).toBeInTheDocument();
   });
 });

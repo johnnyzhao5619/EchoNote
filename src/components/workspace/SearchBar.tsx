@@ -1,11 +1,14 @@
 import { useEffect } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { Search, X } from "lucide-react";
 import { useDebounce } from "use-debounce";
 
 import { Input } from "@/components/ui/input";
+import { buildWorkspaceDocumentRoute } from "@/lib/workspace-routes";
 import { useWorkspaceStore } from "@/store/workspace";
 
 export function SearchBar() {
+  const navigate = useNavigate();
   const {
     searchQuery,
     searchResults,
@@ -13,7 +16,6 @@ export function SearchBar() {
     setSearchQuery,
     search,
     clearSearch,
-    openDocument,
   } = useWorkspaceStore();
   const [debouncedQuery] = useDebounce(searchQuery, 300);
 
@@ -63,7 +65,9 @@ export function SearchBar() {
               key={result.document_id}
               className="cursor-pointer px-3 py-2 hover:bg-bg-hover"
               onClick={() => {
-                void openDocument(result.document_id);
+                void navigate(
+                  buildWorkspaceDocumentRoute(result.document_id, result.folder_id),
+                );
                 clearSearch();
               }}
             >

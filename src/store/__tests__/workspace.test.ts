@@ -73,6 +73,55 @@ describe("useWorkspaceStore", () => {
     expect(state.searchResults[0].document_id).toBe("doc-1");
   });
 
+  it("search keeps only the latest async result", async () => {
+    let resolveFirst: ((value: { status: "ok"; data: Array<{ document_id: string; title: string; snippet: string; rank: number; folder_id: string | null; updated_at: number }> }) => void) | undefined;
+    mockCommands.searchWorkspace
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveFirst = resolve;
+          }),
+      )
+      .mockResolvedValueOnce({
+        status: "ok",
+        data: [
+          {
+            document_id: "doc-new",
+            title: "New",
+            snippet: "<mark>new</mark>",
+            rank: -1,
+            folder_id: "folder-1",
+            updated_at: 2,
+          },
+        ],
+      });
+
+    useWorkspaceStore.getState().setSearchQuery("old");
+    const firstSearch = useWorkspaceStore.getState().search("old");
+    useWorkspaceStore.getState().setSearchQuery("new");
+    await useWorkspaceStore.getState().search("new");
+
+    resolveFirst?.({
+      status: "ok",
+      data: [
+        {
+          document_id: "doc-old",
+          title: "Old",
+          snippet: "<mark>old</mark>",
+          rank: -2,
+          folder_id: "folder-2",
+          updated_at: 1,
+        },
+      ],
+    });
+    await firstSearch;
+
+    const state = useWorkspaceStore.getState();
+    expect(state.searchResults).toHaveLength(1);
+    expect(state.searchResults[0].document_id).toBe("doc-new");
+    expect(state.isSearching).toBe(false);
+  });
+
   it("deleteFolder clears current selection when deleting active folder", async () => {
     useWorkspaceStore.setState({ currentFolderId: "folder-1", documents: [{ id: "doc-1" } as any] });
     mockCommands.deleteFolder.mockResolvedValue({ status: "ok", data: null });

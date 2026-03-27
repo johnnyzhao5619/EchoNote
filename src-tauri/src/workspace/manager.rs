@@ -183,7 +183,7 @@ impl WorkspaceManager {
         .ok_or_else(|| AppError::NotFound(format!("document {id}")))?;
 
         let asset_rows = sqlx::query_as::<_, WorkspaceTextAssetRow>(
-            "SELECT id, document_id, role, NULL as language, content, file_path, created_at, updated_at
+            "SELECT id, document_id, role, language, content, file_path, created_at, updated_at
              FROM workspace_text_assets
              WHERE document_id = ?
              ORDER BY created_at ASC",
@@ -197,7 +197,7 @@ impl WorkspaceManager {
             .map(|row| TextAsset {
                 id: row.id,
                 role: row.role,
-                language: None,
+                language: row.language,
                 content: row.content,
                 updated_at: row.updated_at,
             })
@@ -242,23 +242,25 @@ impl WorkspaceManager {
         document_id: &str,
         role: &str,
         content: &str,
-        _language: Option<&str>,
+        language: Option<&str>,
     ) -> Result<String, AppError> {
         let now = now_ms();
         let id = Uuid::new_v4().to_string();
 
         sqlx::query(
             "INSERT INTO workspace_text_assets
-             (id, document_id, role, content, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?)
+             (id, document_id, role, language, content, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)
              ON CONFLICT(document_id, role)
              DO UPDATE SET
+               language = excluded.language,
                content = excluded.content,
                updated_at = excluded.updated_at",
         )
         .bind(&id)
         .bind(document_id)
         .bind(role)
+        .bind(language)
         .bind(content)
         .bind(now)
         .bind(now)
@@ -566,5 +568,30 @@ mod tests {
         manager.create_folder("Alpha", None).await.unwrap();
         let err = manager.create_folder("Alpha", None).await;
         assert!(matches!(err, Err(AppError::Validation(ref s)) if s.contains("duplicate_name")));
+    }
+
+    #[tokio::test]
+    async fn test_text_asset_language_round_trips() {
+        let pool = setup_pool().await;
+        let manager = WorkspaceManager::new(pool);
+
+        let doc = manager
+            .create_document("Translated Notes", None, "note", None)
+            .await
+            .unwrap();
+
+        manager
+            .upsert_text_asset(&doc.id, "translation", "Bonjour EchoNote", Some("fr-FR"))
+            .await
+            .unwrap();
+
+        let detail = manager.get_document(&doc.id).await.unwrap();
+        let asset = detail
+            .assets
+            .into_iter()
+            .find(|asset| asset.role == "translation")
+            .expect("translation asset should exist");
+
+        assert_eq!(asset.language.as_deref(), Some("fr-FR"));
     }
 }

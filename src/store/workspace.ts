@@ -43,6 +43,8 @@ function unwrapResult<T>(result: { status: "ok"; data: T } | { status: "error"; 
   return result.data;
 }
 
+let latestSearchRequestId = 0;
+
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   folders: [],
   currentFolderId: null,
@@ -110,21 +112,32 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   setSearchQuery: (searchQuery) => set({ searchQuery }),
 
   search: async (query) => {
-    if (!query.trim()) {
+    const normalizedQuery = query.trim();
+    if (!normalizedQuery) {
+      latestSearchRequestId += 1;
       set({ searchResults: [], isSearching: false });
       return;
     }
 
+    const requestId = ++latestSearchRequestId;
     set({ isSearching: true });
     try {
-      const searchResults = unwrapResult(await commands.searchWorkspace(query));
+      const searchResults = unwrapResult(await commands.searchWorkspace(normalizedQuery));
+      if (requestId !== latestSearchRequestId) {
+        return;
+      }
       set({ searchResults });
     } finally {
-      set({ isSearching: false });
+      if (requestId === latestSearchRequestId) {
+        set({ isSearching: false });
+      }
     }
   },
 
-  clearSearch: () => set({ searchQuery: "", searchResults: [], isSearching: false }),
+  clearSearch: () => {
+    latestSearchRequestId += 1;
+    set({ searchQuery: "", searchResults: [], isSearching: false });
+  },
 
   importFile: async (filePath, folderId) => {
     const summary = unwrapResult(await commands.importFileToWorkspace(filePath, folderId ?? null));
